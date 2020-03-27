@@ -1,0 +1,256 @@
+#include "ether/ether.h"
+
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+eth_ir_pattern*
+eth_ir_ident_pattern(int varid)
+{
+  eth_ir_pattern *pat = malloc(sizeof(eth_ir_pattern));
+  pat->tag = ETH_PATTERN_IDENT;
+  pat->ident.varid = varid;
+  return pat;
+}
+
+eth_ir_pattern*
+eth_ir_unpack_pattern(eth_type *type, int offs[], eth_ir_pattern *pats[], int n)
+{
+  eth_ir_pattern *pat = malloc(sizeof(eth_ir_pattern));
+  pat->tag = ETH_PATTERN_UNPACK;
+  pat->unpack.type = type;
+  pat->unpack.offs = malloc(sizeof(int) * n);
+  pat->unpack.subpats = malloc(sizeof(eth_ir_pattern*) * n);
+  pat->unpack.n = n;
+  memcpy(pat->unpack.offs, offs, sizeof(int) * n);
+  memcpy(pat->unpack.subpats, pats, sizeof(eth_ir_pattern*) * n);
+  return pat;
+}
+
+void
+eth_destroy_ir_pattern(eth_ir_pattern *pat)
+{
+  switch (pat->tag)
+  {
+    case ETH_PATTERN_IDENT:
+      break;
+
+    case ETH_PATTERN_UNPACK:
+      free(pat->unpack.offs);
+      for (int i = 0; i < pat->unpack.n; ++i)
+        eth_destroy_ir_pattern(pat->unpack.subpats[i]);
+      free(pat->unpack.subpats);
+      break;
+  }
+  free(pat);
+}
+
+
+static inline eth_ir_node*
+create_ir_node(eth_ir_tag tag)
+{
+  eth_ir_node *node = malloc(sizeof(eth_ir_node));
+  node->rc = 0;
+  node->tag = tag;
+  return node;
+}
+
+void
+destroy_ir_node(eth_ir_node *node)
+{
+  switch (node->tag)
+  {
+    case ETH_IR_ERROR:
+      break;
+
+    case ETH_IR_CVAL:
+      eth_unref(node->cval.val);
+      break;
+
+    case ETH_IR_VAR:
+      break;
+
+    case ETH_IR_APPLY:
+      eth_unref_ir_node(node->apply.fn);
+      for (int i = 0; i < node->apply.nargs; ++i)
+        eth_unref_ir_node(node->apply.args[i]);
+      free(node->apply.args);
+      break;
+
+    case ETH_IR_IF:
+      eth_unref_ir_node(node->iff.cond);
+      eth_unref_ir_node(node->iff.thenbr);
+      eth_unref_ir_node(node->iff.elsebr);
+      break;
+
+    case ETH_IR_SEQ:
+      eth_unref_ir_node(node->seq.e1);
+      eth_unref_ir_node(node->seq.e2);
+      break;
+
+    case ETH_IR_LET:
+    case ETH_IR_LETREC:
+      free(node->let.vids);
+      for (int i = 0; i < node->let.n; ++i)
+        eth_unref_ir_node(node->let.vals[i]);
+      free(node->let.vals);
+      eth_unref_ir_node(node->let.body);
+      break;
+
+    case ETH_IR_BINOP:
+      eth_unref_ir_node(node->binop.lhs);
+      eth_unref_ir_node(node->binop.rhs);
+      break;
+
+    case ETH_IR_FN:
+      free(node->fn.caps);
+      free(node->fn.capvars);
+      eth_unref_ir(node->fn.body);
+      break;
+
+    case ETH_IR_MATCH:
+      eth_destroy_ir_pattern(node->match.pat);
+      eth_unref_ir_node(node->match.expr);
+      eth_unref_ir_node(node->match.thenbr);
+      eth_unref_ir_node(node->match.elsebr);
+      break;
+  }
+
+  free(node);
+}
+
+extern inline void
+eth_ref_ir_node(eth_ir_node *node)
+{
+  node->rc += 1;
+}
+
+extern inline void
+eth_unref_ir_node(eth_ir_node *node)
+{
+  if (--node->rc == 0)
+    destroy_ir_node(node);
+}
+
+extern inline void
+eth_drop_ir_node(eth_ir_node *node)
+{
+  if (node->rc == 0)
+    destroy_ir_node(node);
+}
+
+eth_ir_node*
+eth_ir_error(void)
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_ERROR);
+  return node;
+}
+
+eth_ir_node*
+eth_ir_cval(eth_t val)
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_CVAL);
+  eth_ref(node->cval.val = val);
+  return node;
+}
+
+eth_ir_node*
+eth_ir_var(int vid)
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_VAR);
+  node->var.vid = vid;
+  return node;
+}
+
+eth_ir_node*
+eth_ir_apply(eth_ir_node *fn, eth_ir_node *const *args, int nargs)
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_APPLY);
+  eth_ref_ir_node(node->apply.fn = fn);
+  node->apply.nargs = nargs;
+  node->apply.args = malloc(sizeof(eth_ir_node*) * nargs);
+  for (int i = 0; i < nargs; ++i)
+    eth_ref_ir_node(node->apply.args[i] = args[i]);
+  return node;
+}
+
+eth_ir_node*
+eth_ir_if(eth_ir_node *cond, eth_ir_node *thenbr, eth_ir_node *elsebr)
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_IF);
+  eth_ref_ir_node(node->iff.cond = cond);
+  eth_ref_ir_node(node->iff.thenbr = thenbr);
+  eth_ref_ir_node(node->iff.elsebr = elsebr);
+  return node;
+}
+
+eth_ir_node*
+eth_ir_seq(eth_ir_node *e1, eth_ir_node *e2)
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_SEQ);
+  eth_ref_ir_node(node->seq.e1 = e1);
+  eth_ref_ir_node(node->seq.e2 = e2);
+  return node;
+}
+
+eth_ir_node*
+eth_ir_let(const int *vids, eth_ir_node *const *vals, int n, eth_ir_node *body)
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_LET);
+  node->let.n = n;
+  node->let.vids = malloc(sizeof(int) * n);
+  node->let.vals = malloc(sizeof(eth_ir_node*) * n);
+  for (int i = 0; i < n; ++i)
+  {
+    node->let.vids[i] = vids[i];
+    eth_ref_ir_node(node->let.vals[i] = vals[i]);
+  }
+  eth_ref_ir_node(node->let.body = body);
+  return node;
+}
+
+eth_ir_node*
+eth_ir_letrec(const int *vids, eth_ir_node *const *vals, int n, eth_ir_node *body)
+{
+  eth_ir_node *node = eth_ir_let(vids, vals, n, body);
+  node->tag = ETH_IR_LETREC;
+  return node;
+}
+
+eth_ir_node*
+eth_ir_binop(eth_binop op, eth_ir_node *lhs, eth_ir_node *rhs)
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_BINOP);
+  node->binop.op = op;
+  eth_ref_ir_node(node->binop.lhs = lhs);
+  eth_ref_ir_node(node->binop.rhs = rhs);
+  return node;
+}
+
+eth_ir_node*
+eth_ir_fn(int arity, int *caps, int *capvars, int ncap, eth_ir *body)
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_FN);
+  node->fn.arity = arity;
+  node->fn.caps = malloc(sizeof(int) * ncap);
+  node->fn.capvars = malloc(sizeof(int) * ncap);
+  node->fn.ncap = ncap;
+  node->fn.body = body;
+  memcpy(node->fn.caps, caps, sizeof(int) * ncap);
+  memcpy(node->fn.capvars, capvars, sizeof(int) * ncap);
+  eth_ref_ir(body);
+  return node;
+}
+
+eth_ir_node*
+eth_ir_match(eth_ir_pattern *pat, eth_ir_node *expr, eth_ir_node *thenbr,
+    eth_ir_node *elsebr)
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_MATCH);
+  node->match.pat = pat;
+  eth_ref_ir_node(node->match.expr = expr);
+  eth_ref_ir_node(node->match.thenbr = thenbr);
+  eth_ref_ir_node(node->match.elsebr = elsebr);
+  return node;
+}
+
