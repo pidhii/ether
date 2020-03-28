@@ -105,6 +105,7 @@ destroy_ast_node(eth_ast *ast)
       }
       free(ast->let.nams);
       free(ast->let.vals);
+      free(ast->let.pub);
       eth_unref_ast(ast->let.body);
       break;
 
@@ -125,6 +126,19 @@ destroy_ast_node(eth_ast *ast)
       eth_unref_ast(ast->match.expr);
       eth_unref_ast(ast->match.thenbr);
       eth_unref_ast(ast->match.elsebr);
+      break;
+
+    case ETH_AST_IMPORT:
+      free(ast->import.module);
+      if (ast->import.alias)
+        free(ast->import.alias);
+      if (ast->import.nams)
+      {
+        for (int i = 0; i < ast->import.nnam; ++i)
+          free(ast->import.nams[i]);
+        free(ast->import.nams);
+      }
+      eth_unref_ast(ast->import.body);
       break;
   }
 
@@ -200,25 +214,29 @@ eth_ast_seq(eth_ast *e1, eth_ast *e2)
 }
 
 eth_ast*
-eth_ast_let(char *const *nams, eth_ast *const *vals, int n, eth_ast *body)
+eth_ast_let(char *const *nams, eth_ast *const *vals, bool const pub[], int n,
+    eth_ast *body)
 {
   eth_ast *ast = create_ast_node(ETH_AST_LET);
   eth_ref_ast(ast->let.body = body);
   ast->let.n = n;
   ast->let.nams = malloc(sizeof(char*) * n);
   ast->let.vals = malloc(sizeof(eth_ast*) * n);
+  ast->let.pub = malloc(sizeof(bool) * n);
   for (int i = 0; i < n; ++i)
   {
     eth_ref_ast(ast->let.vals[i] = vals[i]);
     ast->let.nams[i] = strdup(nams[i]);
+    ast->let.pub[i] = pub[i];
   }
   return ast;
 }
 
 eth_ast*
-eth_ast_letrec(char *const *nams, eth_ast *const *vals, int n, eth_ast *body)
+eth_ast_letrec(char *const *nams, eth_ast *const *vals, bool const pub[], int n,
+    eth_ast *body)
 {
-  eth_ast *ast = eth_ast_let(nams, vals, n, body);
+  eth_ast *ast = eth_ast_let(nams, vals, pub, n, body);
   ast->tag = ETH_AST_LETREC;
   return ast;
 }
@@ -257,3 +275,24 @@ eth_ast_match(eth_ast_pattern *pat, eth_ast *expr, eth_ast *thenbr,
   eth_ref_ast(ast->match.elsebr = elsebr);
   return ast;
 }
+
+eth_ast*
+eth_ast_import(const char *module, const char *alias, char *const nams[],
+    int nnam, eth_ast *body)
+{
+  eth_ast *ast = create_ast_node(ETH_AST_IMPORT);
+  ast->import.module = strdup(module);
+  eth_ref_ast(ast->import.body = body);
+  ast->import.alias = alias ? strdup(alias) : NULL;
+  if (nams)
+  {
+    ast->import.nams = malloc(sizeof(char*) * nnam);
+    ast->import.nnam = nnam;
+    for (int i = 0; i < nnam; ++i)
+      ast->import.nams[i] = strdup(nams[i]);
+  }
+  else
+    ast->import.nams = NULL;
+  return ast;
+}
+

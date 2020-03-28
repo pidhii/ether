@@ -11,9 +11,14 @@ ETH_MODULE("ether:ir-builder")
 
 typedef struct ir_builder {
   struct ir_builder *parent;
+  eth_env *env;
+  bool ismodule;
   eth_var_list *vars;
   int nvars;
   cod_vec(eth_type*) types;
+  cod_vec(eth_module*) mods;
+  cod_vec(char*) defidents;
+  cod_vec(int  ) defvarids;
 } ir_builder;
 
 static ir_builder*
@@ -21,11 +26,24 @@ create_ir_builder(ir_builder *parent)
 {
   ir_builder *bldr = malloc(sizeof(ir_builder));
   bldr->parent = parent;
+  bldr->env = parent ? parent->env : NULL;
+  bldr->ismodule = false;
   bldr->vars = eth_create_var_list();
   bldr->nvars = 0;
   cod_vec_init(bldr->types);
+  cod_vec_init(bldr->mods);
+  cod_vec_init(bldr->defidents);
+  cod_vec_init(bldr->defvarids);
 
-  cod_vec_push(bldr->types, eth_pair_type);
+  if (parent)
+  {
+    cod_vec_iter(parent->types, i, x, cod_vec_push(bldr->types, x));
+    cod_vec_iter(parent->mods, i, x, cod_vec_push(bldr->mods, x));
+  }
+  else
+  {
+    cod_vec_push(bldr->types, eth_pair_type);
+  }
 
   return bldr;
 }
@@ -35,6 +53,10 @@ destroy_ir_builder(ir_builder *bldr)
 {
   eth_destroy_var_list(bldr->vars);
   cod_vec_destroy(bldr->types);
+  cod_vec_destroy(bldr->mods);
+  cod_vec_iter(bldr->defidents, i, x, free(x));
+  cod_vec_destroy(bldr->defidents);
+  cod_vec_destroy(bldr->defvarids);
   free(bldr);
 }
 
@@ -42,6 +64,21 @@ static inline int
 new_vid(ir_builder *bldr)
 {
   return bldr->nvars++;
+}
+
+static inline void
+trace_pub_var(ir_builder *bldr, const char *ident, int varid, int *e)
+{
+  if (bldr->ismodule)
+  {
+    cod_vec_push(bldr->defidents, strdup(ident));
+    cod_vec_push(bldr->defvarids, varid);
+  }
+  else
+  {
+    eth_warning("can't have public variables outside top-level scope");
+    *e = 1;
+  }
 }
 
 /*
@@ -75,15 +112,48 @@ require_var(ir_builder *bldr, const char *ident, int *cnt)
   return NULL;
 }
 
-static int
-load_c_module(ir_builder *bldr, eth_module *mod)
+static bool
+load_module(ir_builder *bldr, const eth_module *mod, const char *alias,
+    char *const nams[], int nnam)
 {
-  for (int i = 0; i < mod->ndefs; ++i)
+  const char *modname = alias ? alias : mod->name;
+  char prefix[strlen(modname) + 2];
+  if (modname[0])
+    sprintf(prefix, "%s.", modname);
+  else
+    prefix[0] = 0;
+
+  char buf[124];
+  if (nams)
   {
-    eth_var_cfg var = eth_const_var(mod->defs[i].ident, mod->defs[i].val);
-    eth_prepend_var(bldr->vars, var);
+    for (int i = 0; i < nnam; ++i)
+    {
+      eth_def *def = eth_find_def(mod, nams[i]);
+      if (not def)
+      {
+        eth_warning("no '%s' in module %s", nams[i], mod->name);
+        return false;
+      }
+      assert(strlen(def->ident) + sizeof prefix < sizeof buf);
+      sprintf(buf, "%s%s", prefix, def->ident);
+      eth_var_cfg var = eth_const_var(buf, def->val);
+      eth_prepend_var(bldr->vars, var);
+    }
+    return true;
   }
-  return mod->ndefs;
+  else
+  {
+    // import all identifiers
+    for (int i = 0; i < mod->ndefs; ++i)
+    {
+      char *ident = mod->defs[i].ident;
+      assert(strlen(ident) + sizeof prefix < sizeof buf);
+      sprintf(buf, "%s%s", prefix, ident);
+      eth_var_cfg var = eth_const_var(buf, mod->defs[i].val);
+      eth_prepend_var(bldr->vars, var);
+    }
+    return true;
+  }
 }
 
 static eth_ir_pattern*
@@ -137,7 +207,8 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, int *e)
     }
   }
 
-  assert(!"WTF");
+  eth_error("wtf");
+  abort();
 }
 
 static eth_ir_node*
@@ -201,6 +272,9 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       {
         vids[i] = new_vid(bldr);
         eth_prepend_var(bldr->vars, eth_dyn_var(ast->let.nams[i], vids[i]));
+
+        if (ast->let.pub[i])
+          trace_pub_var(bldr, ast->let.nams[i], vids[i], e);
       }
       // build body
       eth_ir_node *body = build(bldr, ast->let.body, e);
@@ -217,6 +291,9 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       {
         vids[i] = new_vid(bldr);
         eth_prepend_var(bldr->vars, eth_dyn_var(ast->letrec.nams[i], vids[i]));
+
+        if (ast->letrec.pub[i])
+          trace_pub_var(bldr, ast->letrec.nams[i], vids[i], e);
       }
       // build values
       eth_ir_node *vals[ast->letrec.n];
@@ -285,6 +362,26 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       eth_ir_node *elsebr = build(bldr, ast->match.elsebr, e);
       return eth_ir_match(pat, expr, thenbr, elsebr);
     }
+
+    case ETH_AST_IMPORT:
+    {
+      assert(bldr->env);
+      eth_module *mod = eth_require_module(bldr->env, ast->import.module);
+      if (not mod)
+      {
+        eth_warning("failed to import module %s", ast->import.module);
+        *e = 1;
+        return eth_ir_error();
+      }
+      int n1 = bldr->vars->len;
+      int ok = load_module(bldr, mod, ast->import.alias, ast->import.nams,
+          ast->import.nnam);
+      if (not ok) *e = 1;
+      int n2 = bldr->vars->len;
+      eth_ir_node *body = build(bldr, ast->import.body, e);
+      eth_pop_var(bldr->vars, n2 - n1);
+      return body;
+    }
   }
 
   eth_error("undefined AST-node");
@@ -293,16 +390,22 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
 }
 
 eth_ir*
-eth_build_ir(eth_ast *ast, eth_environment *env)
+eth_build_ir(eth_ast *ast, eth_env *env, eth_ir_defs *defs)
 {
   eth_ir *ret;
   int e = 0;
 
   ir_builder *bldr = create_ir_builder(NULL);
+  bldr->env = env;
+  bldr->ismodule = true;
+
   if (env)
   {
-    for (int imod = 0; imod < env->nmods; ++imod)
-      load_c_module(bldr, env->mods[imod]);
+    int n = eth_get_nmodules(env);
+    const eth_module *mods[n];
+    eth_get_modules(env, mods, n);
+    for (int i = 0; i < n; ++i)
+      load_module(bldr, mods[i], NULL, NULL, 0);
   }
 
   eth_ir_node *body = build(bldr, ast, &e);
@@ -310,12 +413,32 @@ eth_build_ir(eth_ast *ast, eth_environment *env)
   {
     eth_drop_ir_node(body);
     ret = NULL;
+    destroy_ir_builder(bldr);
+    return NULL;
   }
-  else
+
+  if (defs)
   {
-    ret = eth_create_ir(body, bldr->nvars);
+    defs->idents = bldr->defidents.data;
+    defs->varids = bldr->defvarids.data;
+    defs->n = bldr->defidents.len;
+    bldr->defidents.data = NULL;
+    bldr->defvarids.data = NULL;
+    cod_vec_destroy(bldr->defidents);
+    cod_vec_destroy(bldr->defvarids);
   }
+
+  ret = eth_create_ir(body, bldr->nvars);
   destroy_ir_builder(bldr);
   return ret;
+}
+
+void
+eth_destroy_ir_defs(eth_ir_defs *defs)
+{
+  for (int i = 0; i < defs->n; ++i)
+    free(defs->idents[i]);
+  free(defs->idents);
+  free(defs->varids);
 }
 

@@ -80,17 +80,19 @@ else   { return ELSE; }
 when   { return WHEN; }
 unless { return UNLESS; }
 fn     { return FN; }
-"->"   { return RARROW; }
 if[ \t\n]+let   { return IFLET; }
 when[ \t\n]+let { return WHENLET; }
-module { return MODULE; }
-end    { return END; }
-export { return EXPORT; }
+pub    { return PUB; }
+import { return IMPORT; }
+as     { return AS; }
+unqualified { return UNQUALIFIED; }
 
 nil   { yylval->constant = eth_nil;   return CONST; }
 true  { yylval->constant = eth_true;  return CONST; }
 false { yylval->constant = eth_false; return CONST; }
 
+"."     |
+"$"     |
 ":"     |
 "!"     |
 ">"|"<" |
@@ -105,10 +107,16 @@ false { yylval->constant = eth_false; return CONST; }
 "=="    { return EQ; }
 "/="    { return NE; }
 is      { return IS; }
+"->"    { return RARROW; }
 
 [_a-z][_a-zA-Z0-9]* {
   yylval->string = strdup(yytext);
   return SYMBOL;
+}
+
+[A-Z][_a-zA-Z0-9]* {
+  yylval->string = strdup(yytext);
+  return CAPSYMBOL;
 }
 
 %%

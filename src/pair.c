@@ -29,13 +29,13 @@ write_pair(eth_type *type, eth_t x, FILE *stream)
   while (x->type == eth_pair_type) {
     if (eth_car(x)->type == eth_pair_type)
       putc('(', stream);
-    eth_display(eth_car(x), stream);
+    eth_write(eth_car(x), stream);
     if (eth_car(x)->type == eth_pair_type)
       putc(')', stream);
     putc(':', stream);
     x = eth_cdr(x);
   }
-  eth_display(x, stream);
+  eth_write(x, stream);
 }
 
 static void

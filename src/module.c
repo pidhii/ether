@@ -38,3 +38,15 @@ eth_define(eth_module *mod, const char *ident, eth_t val)
   mod->defs[mod->ndefs++] = (eth_def) { strdup(ident), val };
   eth_ref(val);
 }
+
+eth_def*
+eth_find_def(const eth_module *mod, const char *ident)
+{
+  for (int i = 0; i < mod->ndefs; ++i)
+  {
+    if (strcmp(mod->defs[i].ident, ident) == 0)
+      return mod->defs + i;
+  }
+  return NULL;
+}
+

@@ -307,7 +307,8 @@ build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int f, bool *e)
   eth_write_insn(fntape, pop);
   for (int i = 0; i < arity; ++i)
   {
-    assert(new_val(fnbldr, RC_RULES_DEFAULT) == i);
+    int vid = new_val(fnbldr, RC_RULES_DEFAULT);
+    assert(vid == i);
     fnbldr->vinfo[i]->creatloc = pop;
     fnbldr->vars[i] = i;
   }
@@ -409,7 +410,9 @@ build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
     }
   }
 
-  assert(!"WTF");
+
+  eth_error("wtf");
+  abort();
 }
 
 /*
@@ -771,7 +774,8 @@ is_using(eth_insn *insn, int vid)
       return false;
   }
 
-  assert(!"WTF");
+  eth_error("wtf");
+  abort();
 }
 
 /*
@@ -846,7 +850,8 @@ get_moved_vids(eth_insn *insn, int *n)
       return insn->finfn.movs;
 
     default:
-      assert(!"WTF");
+      eth_error("wtf");
+      abort();
   }
 }
 
@@ -1093,8 +1098,37 @@ build_body(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *body, bool *e)
   return create_ssa(tape->head, bldr->vilen);
 }
 
+typedef struct {
+  int ndefs;
+  char **idents;
+} module_info;
+
+static void
+destroy_module_info(void *ptr)
+{
+  module_info *data = ptr;
+  for (int i = 0; i < data->ndefs; ++i)
+    free(data->idents[i]);
+  free(data->idents);
+  free(data);
+}
+
+static eth_t
+make_module(void)
+{
+  module_info *data = eth_this->proc.data;
+  eth_t acc = eth_nil;
+  for (int i = data->ndefs - 1; i >= 0; --i)
+  {
+    eth_t keyval = eth_cons(eth_str(data->idents[i]), eth_sp[i]);
+    acc = eth_cons(keyval, acc);
+  }
+  eth_pop_stack(data->ndefs);
+  return acc;
+}
+
 eth_ssa*
-eth_build_ssa(eth_ir *ir)
+eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
 {
   eth_ssa *ssa = NULL;
   bool e = false;
@@ -1109,6 +1143,29 @@ eth_build_ssa(eth_ir *ir)
   }
   else
   {
+    if (defs)
+    {
+      int n = defs->n;
+      module_info *data = malloc(sizeof(module_info));
+      data->ndefs = n;
+      data->idents = malloc(sizeof(char*) * n);
+      for (int i = 0; i < n; ++i)
+        data->idents[i] = strdup(defs->idents[i]);
+
+      eth_t mkmod = eth_create_proc(make_module, n, data, destroy_module_info);
+
+      ret = new_val(bldr, RC_RULES_DEFAULT);
+      int fnvid = new_val(bldr, RC_RULES_DISABLE);
+      eth_write_insn(tape, eth_insn_cval(fnvid, mkmod));
+      int argvids[n];
+      for (int i = 0; i < n; ++i)
+        argvids[i] = bldr->vars[defs->varids[i]];
+
+      eth_insn *insn = eth_insn_apply(ret, fnvid, argvids, n);
+      eth_write_insn(tape, insn);
+      bldr->vinfo[ret]->creatloc = insn;
+    }
+
     eth_write_insn(tape, eth_insn_ret(ret));
     insert_rc(bldr, tape->head);
     ssa = create_ssa(tape->head, bldr->vilen);

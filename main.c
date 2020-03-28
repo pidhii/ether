@@ -138,7 +138,7 @@ _printf(void)
     eth_drop(fmt);
     return eth_exn(eth_str("type-error"));
   }
-  
+
   int n = 0;
   char *p = ETH_STRING(fmt)->cstr;
   while (true)
@@ -175,7 +175,6 @@ _printf(void)
     format_data *data = malloc(sizeof(format_data));
     eth_ref(data->fmt = fmt);
     data->n = n;
-    eth_debug("n = %d", n);
     return eth_create_proc(_printf_aux, n, data, (void*)destroy_format_data);
   }
 }
@@ -239,7 +238,7 @@ main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
   }
-  
+
   FILE *input = stdin;
   if (optind != argc)
   {
@@ -273,17 +272,20 @@ main(int argc, char **argv)
     eth_define(mod, "newline", eth_create_proc(_newline, 0, NULL, NULL));
     eth_define(mod,  "printf", eth_create_proc( _printf, 1, NULL, NULL));
 
-    eth_environment *env = eth_create_environment();
+    eth_env *env = eth_create_env();
+    eth_add_module_path(env, ".");
+
     eth_add_module(env, mod);
+    /*eth_load_module_from_script(env, "../module.eth", NULL);*/
+
 
     eth_debug("build IR");
-    eth_ir *ir = eth_build_ir(ast, env);
-    eth_destroy_environment(env);
+    eth_ir *ir = eth_build_ir(ast, env, NULL);
     eth_drop_ast(ast);
     if (ir)
     {
       eth_debug("build SSA");
-      eth_ssa *ssa = eth_build_ssa(ir);
+      eth_ssa *ssa = eth_build_ssa(ir, NULL);
       eth_drop_ir(ir);
       if (ssa)
       {
@@ -301,7 +303,9 @@ main(int argc, char **argv)
         {
           eth_debug("run VM");
           eth_t ret = eth_vm(bc);
-          eth_printf("> ~w\n", ret);
+          if (ret->type == eth_exception_type)
+            eth_error("unhandled exception: ~w", ETH_EXCEPTION(ret)->what);
+          /*eth_printf("> ~w\n", ret);*/
           eth_drop(ret);
           eth_drop_bytecode(bc);
         }
@@ -314,9 +318,12 @@ main(int argc, char **argv)
     }
     else
       eth_error("failed to build IR");
+
+    eth_destroy_env(env);
   }
   else
     eth_error("failed to build AST");
+
 
   eth_debug("cleanup");
   eth_cleanup();
