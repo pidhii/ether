@@ -90,11 +90,11 @@ syn keyword StorageClass pub
 "hi link ethModuleName Identifier
 
 " import [as]:
-syn region ethImport matchgroup=Keyword start=/\<import\>/ end=/\<in\>/ contains=ethImportAs,ethDelimiter,ethIdentifier,ethUnqualified
+syn region ethImport matchgroup=ethKeyword start=/\<import\>/ end=/\<in\>/ contains=ethImportAs,ethDelimiter,ethIdentifier,ethUnqualified
 syn keyword ethImportAs as
 hi link ethImportAs Keyword
 syn keyword ethUnqualified unqualified
-hi link ethUnqualified Keyword
+hi link ethUnqualified ethKeyword
 
 syn keyword ethKeyword let rec mut and or in return
 syn region ethBegin matchgroup=ethKeyword start=/\<begin\>/ end=/\<end\>/ contains=TOP
@@ -105,7 +105,7 @@ syn keyword ethLazy lazy
 
 syn match ethOperator /[-+=*/%><&|.!ο]\+/
 syn match ethOperator /:\|\$/
-syn keyword ethOperator is eq equal not
+syn keyword ethOperator is eq equal not mod land lor lxor lshl lshr ashl ashr lnot
 
 syn match ethDelimiter /[,;()]/
 
@@ -126,10 +126,9 @@ syn keyword ethLoad load
 syn match Comment /#.*$/ contains=ethCommentLabel
 syn match ethCommentLabel /[A-Z]\w*:/ contained
 
-" Integer with - + or nothing in front
+" Integer
 syn match Number '\<\d\+'
-syn keyword Number nan
-syn match Number /\<[\-+]\?inf\>/
+syn match Number '0[xX][0-9a-fA-F]\+'
 
 " Floating point number with decimal no E or e
 syn match Number '\<\d\+\.\d*'
@@ -139,6 +138,8 @@ syn match Number '\<\d[[:digit:]]*[eE][\-+]\=\d\+'
 
 " Floating point like number with E and decimal point (+,-)
 syn match Number '\<\d[[:digit:]]*\.\d*[eE][\-+]\=\d\+'
+
+syn keyword Number nan inf
 
 " String
 " "..."

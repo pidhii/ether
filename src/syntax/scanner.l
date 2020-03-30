@@ -31,6 +31,8 @@ extern int _eth_start_token;
 
 %x STRING
 
+OPERATOR [-+%^.$:!<>*/=&|]+
+
 %%
 
 %{
@@ -63,8 +65,9 @@ extern int _eth_start_token;
 <STRING>.      { yylval->character = yytext[0]; return CHAR; }
 <STRING>\n     { yylval->character = yytext[0]; return CHAR; }
 
-nan |
-[-+]?inf |
+nan                                 |
+inf                                 |
+0[xX][0-9a-fA-F]+                   |
 [0-9]+(\.[0-9]+)?([eE][-+]?[0-9]+)? {
   yylval->number = strtold(yytext, NULL);
   return NUMBER;
@@ -91,6 +94,8 @@ nil   { yylval->constant = eth_nil;   return CONST; }
 true  { yylval->constant = eth_true;  return CONST; }
 false { yylval->constant = eth_false; return CONST; }
 
+'%'     |
+'^'     |
 "."     |
 "$"     |
 ":"     |
@@ -108,6 +113,29 @@ false { yylval->constant = eth_false; return CONST; }
 "/="    { return NE; }
 is      { return IS; }
 "->"    { return RARROW; }
+"&&"    { return OPAND; }
+"||"    { return OPOR; }
+mod     { return MOD; }
+land    { return LAND; }
+lor     { return LOR; }
+lxor    { return LXOR; }
+lshl    { return LSHL; }
+lshr    { return LSHR; }
+ashl    { return ASHL; }
+ashr    { return ASHR; }
+not     { return NOT; }
+lnot    { return LNOT; }
+"++"    { return PPLUS; }
+
+
+"("(mod|land|lor|lxor|lshl|lshr|ashl|ashr|is)")" |
+"("{OPERATOR}")"     {
+  char *buf = malloc(yyleng - 2 + 1);
+  strncpy(buf, yytext + 1, yyleng - 2);
+  buf[yyleng - 2] = 0;
+  yylval->string = buf;
+  return SYMBOL;
+}
 
 [_a-z][_a-zA-Z0-9]* {
   yylval->string = strdup(yytext);

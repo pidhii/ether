@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <math.h>
 
 ETH_MODULE("ether:vm")
 
@@ -148,6 +149,16 @@ fetch_insn:
       ARITHM_BINOP(SUB, lhs - rhs)
       ARITHM_BINOP(MUL, lhs * rhs)
       ARITHM_BINOP(DIV, lhs / rhs)
+      ARITHM_BINOP(MOD, fmodl(lhs, rhs))
+      ARITHM_BINOP(POW, powl(lhs, rhs))
+      // ---
+      ARITHM_BINOP(LAND, (intmax_t)lhs & (intmax_t)rhs)
+      ARITHM_BINOP(LOR,  (intmax_t)lhs | (intmax_t)rhs)
+      ARITHM_BINOP(LXOR, (intmax_t)lhs ^ (intmax_t)rhs)
+      ARITHM_BINOP(LSHL, (uintmax_t)lhs << (uintmax_t)rhs)
+      ARITHM_BINOP(LSHR, (uintmax_t)lhs >> (uintmax_t)rhs)
+      ARITHM_BINOP(ASHL, (intmax_t)lhs << (intmax_t)rhs)
+      ARITHM_BINOP(ASHR, (intmax_t)lhs >> (intmax_t)rhs)
 
 #define ARITHM_CMP_BINOP(opc, op)                             \
       case ETH_OPC_##opc:                                     \
@@ -170,6 +181,14 @@ fetch_insn:
 
       case ETH_OPC_CONS:
         r[ip->binop.out] = eth_cons(r[ip->binop.lhs], r[ip->binop.rhs]);
+        break;
+
+      case ETH_OPC_NOT:
+        r[ip->unop.out] = eth_boolean(r[ip->unop.vid] == eth_false);
+        break;
+
+      case ETH_OPC_LNOT:
+        r[ip->unop.out] = eth_num(~(intmax_t)ETH_NUMBER(r[ip->unop.vid])->val);
         break;
 
       case ETH_OPC_FN:

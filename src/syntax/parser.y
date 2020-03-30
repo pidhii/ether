@@ -42,14 +42,12 @@ int _eth_start_token = -1;
   char character;
   bool boolean;
   struct {
-    cod_vec(char*) idents;
+    cod_vec(eth_ast_pattern*) pats;
     cod_vec(eth_ast*) vals;
-    cod_vec(bool) pub;
   } binds;
   struct {
-    char *ident;
+    eth_ast_pattern *pat;
     eth_ast *val;
-    bool pub;
   } bind;
   cod_vec(eth_ast*) astvec;
   cod_vec(char*) strvec;
@@ -70,16 +68,15 @@ int _eth_start_token = -1;
 } <string>
 
 %destructor {
-  free($$.ident);
+  eth_destroy_ast_pattern($$.pat);
   eth_drop_ast($$.val);
 } <bind>
 
 %destructor {
-  cod_vec_iter($$.idents, i, x, free(x));
+  cod_vec_iter($$.pats, i, x, eth_destroy_ast_pattern(x));
   cod_vec_iter($$.vals, i, x, eth_drop_ast(x));
-  cod_vec_destroy($$.idents);
+  cod_vec_destroy($$.pats);
   cod_vec_destroy($$.vals);
-  cod_vec_destroy($$.pub);
 } <binds>
 
 %destructor {
@@ -88,8 +85,11 @@ int _eth_start_token = -1;
 } <astvec>
 
 %destructor {
-  cod_vec_iter($$, i, x, free(x));
-  cod_vec_destroy($$);
+  if ($$.data)
+  {
+    cod_vec_iter($$, i, x, free(x));
+    cod_vec_destroy($$);
+  }
 } <strvec>
 
 %destructor {
@@ -111,14 +111,30 @@ int _eth_start_token = -1;
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %nonassoc LET REC AND IN FN IFLET WHENLET
 %nonassoc PUB IMPORT AS UNQUALIFIED
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %right RARROW
 %right ';'
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %nonassoc IF THEN ELSE WHEN UNLESS
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+// level 0:
 %right '$'
+// level 1:
+%right OPOR
+// level 2:
+%right OPAND
+// level 3:
 %nonassoc '<' LE '>' GE EQ NE IS
-%right ':'
+// level 4:
+%right ':' PPLUS
+// level 5:
 %left '+' '-'
-%left '*' '/'
+// level 6:
+%left '*' '/' '%' MOD LAND LOR LXOR
+// level 7:
+%right '^' LSHL LSHR ASHL ASHR
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+%left UMINUS UPLUS NOT LNOT
 %nonassoc '!'
 
 
@@ -128,7 +144,7 @@ int _eth_start_token = -1;
 %type<ast> expr
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %type<string> ident
-%type<string> capident
+/*%type<string> capident*/
 %type<binds> binds
 %type<bind> bind
 %type<boolean> maybe_pub
@@ -136,7 +152,7 @@ int _eth_start_token = -1;
 %type<strvec> fnargs
 %type<string> string
 %type<charvec> string_aux
-%type<pattern> pattern
+%type<pattern> atomic_pattern pattern
 %type<strvec> maybe_imports import_list
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %start entry
@@ -205,18 +221,14 @@ expr
     free($3);
   }
   | LET binds IN expr {
-    $$ = eth_ast_let($2.idents.data, $2.vals.data, $2.pub.data, $2.pub.len, $4);
-    cod_vec_iter($2.idents, i, x, free(x));
-    cod_vec_destroy($2.idents);
+    $$ = eth_ast_let($2.pats.data, $2.vals.data, $2.pats.len, $4);
+    cod_vec_destroy($2.pats);
     cod_vec_destroy($2.vals);
-    cod_vec_destroy($2.pub);
   }
   | LET REC binds IN expr {
-    $$ = eth_ast_letrec($3.idents.data, $3.vals.data, $3.pub.data, $3.pub.len, $5);
-    cod_vec_iter($3.idents, i, x, free(x));
-    cod_vec_destroy($3.idents);
+    $$ = eth_ast_letrec($3.pats.data, $3.vals.data, $3.pats.len, $5);
+    cod_vec_destroy($3.pats);
     cod_vec_destroy($3.vals);
-    cod_vec_destroy($3.pub);
   }
   | IFLET pattern '=' expr THEN expr ELSE expr {
     $$ = eth_ast_match($2, $4, $6, $8);
@@ -232,20 +244,45 @@ expr
     cod_vec_iter($2, i, x, free(x));
     cod_vec_destroy($2);
   }
-  | expr ';' expr { $$ = eth_ast_seq($1, $3); }
-  | expr ';'      { $$ = $1; }
-  | expr '+' expr { $$ = eth_ast_binop(ETH_ADD , $1, $3); }
-  | expr '-' expr { $$ = eth_ast_binop(ETH_SUB , $1, $3); }
-  | expr '*' expr { $$ = eth_ast_binop(ETH_MUL , $1, $3); }
-  | expr '/' expr { $$ = eth_ast_binop(ETH_DIV , $1, $3); }
-  | expr '<' expr { $$ = eth_ast_binop(ETH_LT  , $1, $3); }
-  | expr  LE expr { $$ = eth_ast_binop(ETH_LE  , $1, $3); }
-  | expr '>' expr { $$ = eth_ast_binop(ETH_GT  , $1, $3); }
-  | expr  GE expr { $$ = eth_ast_binop(ETH_GE  , $1, $3); }
-  | expr  EQ expr { $$ = eth_ast_binop(ETH_EQ  , $1, $3); }
-  | expr  NE expr { $$ = eth_ast_binop(ETH_NE  , $1, $3); }
-  | expr  IS expr { $$ = eth_ast_binop(ETH_IS  , $1, $3); }
-  | expr ':' expr { $$ = eth_ast_binop(ETH_CONS, $1, $3); }
+  | expr ';'        { $$ = $1; }
+  | expr OPAND expr { $$ = eth_ast_and($1, $3); }
+  | expr OPOR  expr { $$ = eth_ast_or($1, $3); }
+  | expr ';'   expr { $$ = eth_ast_seq($1, $3); }
+  | expr '+'   expr { $$ = eth_ast_binop(ETH_ADD , $1, $3); }
+  | expr '-'   expr { $$ = eth_ast_binop(ETH_SUB , $1, $3); }
+  | expr '*'   expr { $$ = eth_ast_binop(ETH_MUL , $1, $3); }
+  | expr '/'   expr { $$ = eth_ast_binop(ETH_DIV , $1, $3); }
+  | expr '<'   expr { $$ = eth_ast_binop(ETH_LT  , $1, $3); }
+  | expr LE    expr { $$ = eth_ast_binop(ETH_LE  , $1, $3); }
+  | expr '>'   expr { $$ = eth_ast_binop(ETH_GT  , $1, $3); }
+  | expr GE    expr { $$ = eth_ast_binop(ETH_GE  , $1, $3); }
+  | expr EQ    expr { $$ = eth_ast_binop(ETH_EQ  , $1, $3); }
+  | expr NE    expr { $$ = eth_ast_binop(ETH_NE  , $1, $3); }
+  | expr IS    expr { $$ = eth_ast_binop(ETH_IS  , $1, $3); }
+  | expr ':'   expr { $$ = eth_ast_binop(ETH_CONS, $1, $3); }
+  | expr '%'   expr { $$ = eth_ast_binop(ETH_MOD , $1, $3); }
+  | expr '^'   expr { $$ = eth_ast_binop(ETH_POW , $1, $3); }
+  | expr MOD   expr { $$ = eth_ast_binop(ETH_MOD , $1, $3); }
+  | expr LAND  expr { $$ = eth_ast_binop(ETH_LAND, $1, $3); }
+  | expr LOR   expr { $$ = eth_ast_binop(ETH_LOR , $1, $3); }
+  | expr LXOR  expr { $$ = eth_ast_binop(ETH_LXOR, $1, $3); }
+  | expr LSHL  expr { $$ = eth_ast_binop(ETH_LSHL, $1, $3); }
+  | expr LSHR  expr { $$ = eth_ast_binop(ETH_LSHR, $1, $3); }
+  | expr ASHL  expr { $$ = eth_ast_binop(ETH_ASHL, $1, $3); }
+  | expr ASHR  expr { $$ = eth_ast_binop(ETH_ASHR, $1, $3); }
+  | expr PPLUS expr {
+    eth_ast *args[] = { $1, $3 };
+    eth_ast *fn = eth_ast_cval(eth_get_builtin("++"));
+    $$ = eth_ast_apply(fn, args, 2);
+  }
+  | '-' expr %prec UMINUS {
+    $$ = eth_ast_binop(ETH_SUB, eth_ast_cval(eth_num(0)), $2);
+  }
+  | '+' expr %prec UPLUS {
+    $$ = eth_ast_binop(ETH_ADD, eth_ast_cval(eth_num(0)), $2);
+  }
+  | NOT  expr { $$ = eth_ast_unop(ETH_NOT , $2); }
+  | LNOT expr { $$ = eth_ast_unop(ETH_LNOT, $2); }
 ;
 
 ident
@@ -263,20 +300,20 @@ ident
   }
 ;
 
-capident
-  : CAPSYMBOL
-  | CAPSYMBOL '.' capident {
-    int len1 = strlen($1);
-    int len2 = strlen($3);
-    $$ = malloc(len1 + 1 + len2 + 1);
-    memcpy($$, $1, len1);
-    $$[len1] = '.';
-    memcpy($$ + len1 + 1, $3, len2);
-    $$[len1 + 1 + len2] = 0;
-    free($1);
-    free($3);
-  }
-;
+/*capident*/
+  /*: CAPSYMBOL*/
+  /*| CAPSYMBOL '.' capident {*/
+    /*int len1 = strlen($1);*/
+    /*int len2 = strlen($3);*/
+    /*$$ = malloc(len1 + 1 + len2 + 1);*/
+    /*memcpy($$, $1, len1);*/
+    /*$$[len1] = '.';*/
+    /*memcpy($$ + len1 + 1, $3, len2);*/
+    /*$$[len1 + 1 + len2] = 0;*/
+    /*free($1);*/
+    /*free($3);*/
+  /*}*/
+/*;*/
 
 args
   : atom {
@@ -299,39 +336,37 @@ fnargs
 
 binds
   : bind {
-    cod_vec_init($$.idents);
+    cod_vec_init($$.pats);
     cod_vec_init($$.vals);
-    cod_vec_init($$.pub);
-    cod_vec_push($$.idents, $1.ident);
+    cod_vec_push($$.pats, $1.pat);
     cod_vec_push($$.vals, $1.val);
-    cod_vec_push($$.pub, $1.pub);
   }
   | binds AND bind {
     $$ = $1;
-    cod_vec_push($$.idents, $3.ident);
+    cod_vec_push($$.pats, $3.pat);
     cod_vec_push($$.vals, $3.val);
-    cod_vec_push($$.pub, $3.pub);
   }
 ;
 
 bind
-  : maybe_pub SYMBOL '=' expr {
-    $$.pub = $1;
-    $$.ident = $2;
-    $$.val = $4;
+  : pattern '=' expr {
+    $$.pat = $1;
+    $$.val = $3;
   }
   | maybe_pub SYMBOL fnargs SYMBOL '=' expr {
-    $$.pub = $1;
-    $$.ident = $2;
+    $$.pat = eth_ast_ident_pattern($2);
+    $$.pat->ident.pub = $1;
     cod_vec_push($3, $4);
     $$.val = eth_ast_fn($3.data, $3.len, $6);
+    free($2);
     cod_vec_iter($3, i, x, free(x));
     cod_vec_destroy($3);
   }
   | maybe_pub SYMBOL '!' '=' expr {
-    $$.pub = $1;
-    $$.ident = $2;
+    $$.pat = eth_ast_ident_pattern($2);
+    $$.pat->ident.pub = $1;
     $$.val = eth_ast_fn(NULL, 0, $5);
+    free($2);
   }
 ;
 
@@ -352,11 +387,17 @@ string_aux
   }
 ;
 
-pattern
-  : SYMBOL {
-    $$ = eth_ast_ident_pattern($1);
-    free($1);
+atomic_pattern
+  : maybe_pub SYMBOL {
+    $$ = eth_ast_ident_pattern($2);
+    $$->ident.pub = $1;
+    free($2);
   }
+  | '(' pattern ')' { $$ = $2; }
+;
+
+pattern
+  : atomic_pattern
   | pattern ':' pattern {
     char *fields[2] = { "car", "cdr" };
     eth_ast_pattern *pats[2] = { $1, $3 };

@@ -92,25 +92,50 @@ eth_log_aux(bool enable, const char *module, const char *file, const char *func,
       "\e[38;5;16;48;5;9;1m", stderr, fmt, ##__VA_ARGS__)
 
 
+const char*
+eth_get_prefix(void);
+
+const char*
+eth_get_version(void);
+
+const char*
+eth_get_build(void);
+
+const char*
+eth_get_build_flags(void);
+
+
 void
 eth_init(void);
 
 void
 eth_cleanup(void);
 
-
 typedef enum {
   ETH_ADD,
   ETH_SUB,
   ETH_MUL,
   ETH_DIV,
+  ETH_MOD,
+  ETH_POW,
+  // ---
+  ETH_LAND,
+  ETH_LOR,
+  ETH_LXOR,
+  ETH_LSHL,
+  ETH_LSHR,
+  ETH_ASHL,
+  ETH_ASHR,
+  // ---
   ETH_LT,
   ETH_LE,
   ETH_GT,
   ETH_GE,
   ETH_EQ,
   ETH_NE,
+  // ---
   ETH_IS,
+  // ---
   ETH_CONS,
 } eth_binop;
 
@@ -120,6 +145,16 @@ eth_binop_sym(eth_binop op);
 const char*
 eth_binop_name(eth_binop op);
 
+typedef enum {
+  ETH_NOT,
+  ETH_LNOT,
+} eth_unop;
+
+const char*
+eth_unop_sym(eth_unop op);
+
+const char*
+eth_unop_name(eth_unop op);
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                            CALL PROPAGATION
@@ -479,6 +514,15 @@ eth_t __attribute__((malloc))
 eth_create_string(const char *cstr);
 #define eth_str eth_create_string
 
+eth_t __attribute__((malloc))
+eth_create_string2(const char *str, int len);
+
+eth_t __attribute__((malloc))
+eth_create_string_from_ptr(char *cstr);
+
+eth_t __attribute__((malloc))
+eth_create_string_from_ptr2(char *cstr, int len);
+
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                               boolean
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -548,6 +592,8 @@ eth_cdr(eth_t x)
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                       MODULES AND ENVIRONMENT
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                              module
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 typedef struct {
   char *ident;
   eth_t val;
@@ -571,10 +617,25 @@ eth_define(eth_module *mod, const char *ident, eth_t val);
 eth_def*
 eth_find_def(const eth_module *mod, const char *ident);
 
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                            builtins
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+const eth_module*
+eth_builtins(void);
+
+eth_t
+eth_get_builtin(const char *name);
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                           environment
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 #define ETH_MFLAG_READY (1 << 0)
 
 eth_env* __attribute__((malloc))
 eth_create_env(void);
+
+eth_env* __attribute__((malloc))
+eth_create_empty_env(void);
 
 void
 eth_destroy_env(eth_env *env);
@@ -591,14 +652,15 @@ eth_add_module(eth_env *env, eth_module *mod);
 eth_module*
 eth_require_module(eth_env *env, const char *name);
 
-eth_module*
-eth_load_module_from_script(eth_env *env, const char *path, const char *name);
+bool
+eth_load_module_from_script(eth_env *env, eth_module *mod, const char *path);
 
 int
 eth_get_nmodules(const eth_env *env);
 
 void
 eth_get_modules(const eth_env *env, const eth_module *out[], int n);
+
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                         ABSTRACT SYNTAX TREE
@@ -612,7 +674,7 @@ typedef struct eth_ast_pattern eth_ast_pattern;
 struct eth_ast_pattern {
   eth_pattern_tag tag;
   union {
-    struct { char *str; } ident;
+    struct { char *str; bool pub; } ident;
     struct { char *type, **fields; eth_ast_pattern **subpats; int n; } unpack;
   };
 };
@@ -636,10 +698,19 @@ typedef enum {
   ETH_AST_LET,
   ETH_AST_LETREC,
   ETH_AST_BINOP,
+  ETH_AST_UNOP,
   ETH_AST_FN,
   ETH_AST_MATCH,
   ETH_AST_IMPORT,
+  ETH_AST_AND,
+  ETH_AST_OR,
 } eth_ast_tag;
+
+typedef enum {
+  ETH_TOPLVL_NONE,
+  ETH_TOPLVL_THEN,
+  ETH_TOPLVL_ELSE,
+} eth_toplvl_flag;
 
 struct eth_ast {
   eth_ast_tag tag;
@@ -648,15 +719,19 @@ struct eth_ast {
     struct { eth_t val; } cval;
     struct { char *str; } ident;
     struct { eth_ast *fn, **args; int nargs; } apply;
-    struct { eth_ast *cond, *then, *els; } iff;
+    struct { eth_ast *cond, *then, *els; eth_toplvl_flag toplvl; } iff;
     struct { eth_ast *e1, *e2; } seq;
-    struct { char **nams; eth_ast **vals; bool *pub; eth_ast *body; int n; }
+    struct { eth_ast_pattern **pats; eth_ast **vals; eth_ast *body; int n; }
       let, letrec;
     struct { eth_binop op; eth_ast *lhs, *rhs; } binop;
+    struct { eth_unop op; eth_ast *expr; } unop;
     struct { char **args; int arity; eth_ast *body; } fn;
-    struct { eth_ast_pattern *pat; eth_ast *expr, *thenbr, *elsebr; } match;
+    struct { eth_ast_pattern *pat; eth_ast *expr, *thenbr, *elsebr;
+             eth_toplvl_flag toplvl; }
+      match;
     struct { char *module; eth_ast *body; char *alias; char **nams; int nnam; }
       import;
+    struct { eth_ast *lhs, *rhs; } scand, scor;
   };
 };
 
@@ -685,15 +760,18 @@ eth_ast* __attribute__((malloc))
 eth_ast_seq(eth_ast *e1, eth_ast *e2);
 
 eth_ast* __attribute__((malloc))
-eth_ast_let(char *const *nams, eth_ast *const *vals, bool const pub[], int n,
+eth_ast_let(eth_ast_pattern *const pats[], eth_ast *const *vals, int n,
     eth_ast *body);
 
 eth_ast* __attribute__((malloc))
-eth_ast_letrec(char *const *nams, eth_ast *const *vals, bool const pub[], int n,
+eth_ast_letrec(eth_ast_pattern *const pats[], eth_ast *const *vals, int n,
     eth_ast *body);
 
 eth_ast* __attribute__((malloc))
 eth_ast_binop(eth_binop op, eth_ast *lhs, eth_ast *rhs);
+
+eth_ast* __attribute__((malloc))
+eth_ast_unop(eth_unop op, eth_ast *expr);
 
 eth_ast* __attribute__((malloc))
 eth_ast_fn(char **args, int arity, eth_ast *body);
@@ -702,9 +780,15 @@ eth_ast* __attribute__((malloc))
 eth_ast_match(eth_ast_pattern *pat, eth_ast *expr, eth_ast *thenbr,
     eth_ast *elsebr);
 
-eth_ast*
+eth_ast* __attribute__((malloc))
 eth_ast_import(const char *module, const char *alias, char *const nams[],
     int nnam, eth_ast *body);
+
+eth_ast* __attribute__((malloc))
+eth_ast_and(eth_ast *lhs, eth_ast *rhs);
+
+eth_ast* __attribute__((malloc))
+eth_ast_or(eth_ast *lhs, eth_ast *rhs);
 
 typedef struct eth_scanner eth_scanner;
 
@@ -739,6 +823,9 @@ eth_ir_ident_pattern(int varid);
 eth_ir_pattern*
 eth_ir_unpack_pattern(eth_type *type, int offs[], eth_ir_pattern *pats[], int n);
 
+void
+eth_destroy_ir_pattern(eth_ir_pattern *pat);
+
 enum eth_ir_tag {
   ETH_IR_ERROR,
   ETH_IR_CVAL,
@@ -746,11 +833,12 @@ enum eth_ir_tag {
   ETH_IR_APPLY,
   ETH_IR_IF,
   ETH_IR_SEQ,
-  ETH_IR_LET,
-  ETH_IR_LETREC,
   ETH_IR_BINOP,
+  ETH_IR_UNOP,
   ETH_IR_FN,
   ETH_IR_MATCH,
+  ETH_IR_STARTFIX,
+  ETH_IR_ENDFIX,
 };
 
 struct eth_ir_node {
@@ -760,13 +848,16 @@ struct eth_ir_node {
     struct { eth_t val; } cval;
     struct { int vid; } var;
     struct { eth_ir_node *fn, **args; int nargs; } apply;
-    struct { eth_ir_node *cond, *thenbr, *elsebr; } iff;
+    struct { eth_ir_node *cond, *thenbr, *elsebr; eth_toplvl_flag toplvl; } iff;
     struct { eth_ir_node *e1, *e2; } seq;
-    struct { int *vids; eth_ir_node **vals; int n; eth_ir_node *body; } let,
-                                                                        letrec;
     struct { eth_binop op; eth_ir_node *lhs, *rhs; } binop;
+    struct { eth_unop op; eth_ir_node *expr; } unop;
     struct { int arity, *caps, *capvars, ncap; eth_ir *body; } fn;
-    struct { eth_ir_pattern *pat; eth_ir_node *expr, *thenbr, *elsebr; } match;
+    struct { eth_ir_pattern *pat; eth_ir_node *expr, *thenbr, *elsebr;
+             eth_toplvl_flag toplvl; }
+      match;
+    struct { int *vars, n; eth_ir_node *body; } startfix;
+    struct { int *vars, n; eth_ir_node *body; } endfix;
   };
 };
 
@@ -798,13 +889,10 @@ eth_ir_node* __attribute__((malloc))
 eth_ir_seq(eth_ir_node *e1, eth_ir_node *e2);
 
 eth_ir_node* __attribute__((malloc))
-eth_ir_let(const int *vids, eth_ir_node *const *vals, int n, eth_ir_node *body);
-
-eth_ir_node*
-eth_ir_letrec(const int *vids, eth_ir_node *const *vals, int n, eth_ir_node *body);
+eth_ir_binop(eth_binop op, eth_ir_node *lhs, eth_ir_node *rhs);
 
 eth_ir_node* __attribute__((malloc))
-eth_ir_binop(eth_binop op, eth_ir_node *lhs, eth_ir_node *rhs);
+eth_ir_unop(eth_unop op, eth_ir_node *expr);
 
 eth_ir_node* __attribute__((malloc))
 eth_ir_fn(int arity, int *caps, int *capvars, int ncap, eth_ir *body);
@@ -812,6 +900,16 @@ eth_ir_fn(int arity, int *caps, int *capvars, int ncap, eth_ir *body);
 eth_ir_node* __attribute__((malloc))
 eth_ir_match(eth_ir_pattern *pat, eth_ir_node *expr, eth_ir_node *thenbr,
     eth_ir_node *elsebr);
+
+eth_ir_node* __attribute__((malloc))
+eth_ir_startfix(int const vars[], int n, eth_ir_node *body);
+
+eth_ir_node* __attribute__((malloc))
+eth_ir_endfix(int const vars[], int n, eth_ir_node *body);
+
+eth_ir_node*
+eth_ir_bind(int const varids[], eth_ir_node *const vals[], int n,
+    eth_ir_node *body);
 
 struct eth_ir {
   size_t rc;
@@ -961,6 +1059,7 @@ enum eth_insn_tag {
   ETH_INSN_DROP,
   ETH_INSN_RET,
   ETH_INSN_BINOP,
+  ETH_INSN_UNOP,
   ETH_INSN_FN,
   ETH_INSN_ALCFN,
   ETH_INSN_FINFN,
@@ -989,9 +1088,11 @@ struct eth_insn {
     struct { int vid; } var;
     struct { int fn, *args; int nargs; } apply;
     struct { int cond, likely; eth_insn *thenbr, *elsebr; eth_test_tag test;
-             union { eth_type *type; eth_ssa_pattern *pat; }; }
+             union { eth_type *type; eth_ssa_pattern *pat; };
+             eth_toplvl_flag toplvl; }
       iff;
     struct { eth_binop op; int lhs, rhs; } binop;
+    struct { eth_unop op; int vid; } unop;
     struct { int arity, *caps, ncap; eth_ir *ir; eth_ssa *ssa; } fn;
     struct { int arity, *caps, ncap, *movs, nmov; eth_ir *ir; eth_ssa *ssa; }
       finfn;
@@ -1055,6 +1156,9 @@ eth_insn* __attribute__((malloc))
 eth_insn_binop(eth_binop op, int out, int lhs, int rhs);
 
 eth_insn* __attribute__((malloc))
+eth_insn_unop(eth_unop op, int out, int vid);
+
+eth_insn* __attribute__((malloc))
 eth_insn_fn(int out, int arity, int *caps, int ncap, eth_ir *ir, eth_ssa *ssa);
 
 eth_insn* __attribute__((malloc))
@@ -1080,6 +1184,9 @@ struct eth_ssa_tape {
 
 eth_ssa_tape* __attribute__((malloc))
 eth_create_ssa_tape(void);
+
+eth_ssa_tape* __attribute__((malloc))
+eth_create_ssa_tape_at(eth_insn *at);
 
 void
 eth_destroy_ssa_tape(eth_ssa_tape *tape);
@@ -1141,14 +1248,30 @@ typedef enum {
   ETH_OPC_SUB,
   ETH_OPC_MUL,
   ETH_OPC_DIV,
+  ETH_OPC_MOD,
+  ETH_OPC_POW,
+  // ---
+  ETH_OPC_LAND,
+  ETH_OPC_LOR,
+  ETH_OPC_LXOR,
+  ETH_OPC_LSHL,
+  ETH_OPC_LSHR,
+  ETH_OPC_ASHL,
+  ETH_OPC_ASHR,
+  // ---
   ETH_OPC_LT,
   ETH_OPC_LE,
   ETH_OPC_GT,
   ETH_OPC_GE,
   ETH_OPC_EQ,
   ETH_OPC_NE,
+  // ---
   ETH_OPC_IS,
+  // ---
   ETH_OPC_CONS,
+
+  ETH_OPC_NOT,
+  ETH_OPC_LNOT,
 
   ETH_OPC_FN,
   ETH_OPC_ALCFN,
@@ -1187,6 +1310,7 @@ struct eth_bc_insn {
     struct { size_t vid; } ret;
 
     struct { size_t out; uint32_t lhs, rhs; } binop;
+    struct { size_t out, vid; } unop;
 
     struct {
       size_t out;
@@ -1231,5 +1355,66 @@ eth_drop_bytecode(eth_bytecode *bc);
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 eth_t
 eth_vm(eth_bytecode *bc);
+
+
+// ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
+//                              API HELPER
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+typedef struct {
+  const size_t n;
+  size_t cnt;
+} eth_args;
+
+static inline eth_t
+_eth_type_error(size_t n, size_t ntot)
+{
+  for (size_t i = 0; i < n; ++i)
+    eth_unref(eth_sp[i]);
+  eth_pop_stack(ntot);
+  return eth_exn(eth_str("type-error"));
+}
+
+#define eth_start(arity) \
+  { .n = arity, .cnt = 0 }
+
+#define eth_arg(args)                          \
+  ({                                           \
+    const eth_t _eth_arg = eth_sp[args.cnt++]; \
+    eth_ref(_eth_arg);                         \
+    _eth_arg;                                  \
+  })
+
+#define eth_arg2(args, ty)                          \
+  ({                                                \
+    const eth_t _eth_arg = eth_sp[args.cnt++];      \
+    if (_eth_arg->type != ty)                       \
+      return _eth_type_error(args.cnt - 1, args.n); \
+    eth_ref(_eth_arg);                              \
+    _eth_arg;                                       \
+  })
+
+#define eth_end(args) \
+  eth_pop_stack(args.n);
+
+#define eth_end_dec(args)               \
+  do {                                  \
+    for (size_t i = 0; i < args.n; ++i) \
+      eth_dec(*eth_sp++);               \
+  } while (0)
+
+#define eth_end_unref(args)             \
+  do {                                  \
+    for (size_t i = 0; i < args.n; ++i) \
+      eth_unref(*eth_sp++);             \
+  } while (0)
+
+#define eth_return(args, ret)           \
+  do {                                  \
+    eth_ref(ret);                       \
+    for (size_t i = 0; i < args.n; ++i) \
+      eth_unref(*eth_sp++);             \
+    eth_dec(ret);                       \
+    return ret;                         \
+  } while (0)
 
 #endif

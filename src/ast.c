@@ -10,6 +10,7 @@ eth_ast_ident_pattern(const char *ident)
   eth_ast_pattern *pat = malloc(sizeof(eth_ast_pattern));
   pat->tag = ETH_PATTERN_IDENT;
   pat->ident.str = strdup(ident);
+  pat->ident.pub = false;
   return pat;
 }
 
@@ -100,18 +101,21 @@ destroy_ast_node(eth_ast *ast)
     case ETH_AST_LETREC:
       for (int i = 0; i < ast->let.n; ++i)
       {
-        free(ast->let.nams[i]);
         eth_unref_ast(ast->let.vals[i]);
+        eth_destroy_ast_pattern(ast->let.pats[i]);
       }
-      free(ast->let.nams);
+      free(ast->let.pats);
       free(ast->let.vals);
-      free(ast->let.pub);
       eth_unref_ast(ast->let.body);
       break;
 
     case ETH_AST_BINOP:
       eth_unref_ast(ast->binop.lhs);
       eth_unref_ast(ast->binop.rhs);
+      break;
+
+    case ETH_AST_UNOP:
+      eth_unref_ast(ast->unop.expr);
       break;
 
     case ETH_AST_FN:
@@ -139,6 +143,12 @@ destroy_ast_node(eth_ast *ast)
         free(ast->import.nams);
       }
       eth_unref_ast(ast->import.body);
+      break;
+
+    case ETH_AST_AND:
+    case ETH_AST_OR:
+      eth_unref_ast(ast->scor.lhs);
+      eth_unref_ast(ast->scor.rhs);
       break;
   }
 
@@ -201,6 +211,7 @@ eth_ast_if(eth_ast *cond, eth_ast *then, eth_ast *els)
   eth_ref_ast(ast->iff.cond = cond);
   eth_ref_ast(ast->iff.then = then);
   eth_ref_ast(ast->iff.els  = els );
+  ast->iff.toplvl = ETH_TOPLVL_NONE;
   return ast;
 }
 
@@ -214,29 +225,27 @@ eth_ast_seq(eth_ast *e1, eth_ast *e2)
 }
 
 eth_ast*
-eth_ast_let(char *const *nams, eth_ast *const *vals, bool const pub[], int n,
+eth_ast_let(eth_ast_pattern *const pats[], eth_ast *const *vals, int n,
     eth_ast *body)
 {
   eth_ast *ast = create_ast_node(ETH_AST_LET);
   eth_ref_ast(ast->let.body = body);
   ast->let.n = n;
-  ast->let.nams = malloc(sizeof(char*) * n);
+  ast->let.pats = malloc(sizeof(eth_ast_pattern*) * n);
   ast->let.vals = malloc(sizeof(eth_ast*) * n);
-  ast->let.pub = malloc(sizeof(bool) * n);
   for (int i = 0; i < n; ++i)
   {
     eth_ref_ast(ast->let.vals[i] = vals[i]);
-    ast->let.nams[i] = strdup(nams[i]);
-    ast->let.pub[i] = pub[i];
+    ast->let.pats[i] = pats[i];
   }
   return ast;
 }
 
 eth_ast*
-eth_ast_letrec(char *const *nams, eth_ast *const *vals, bool const pub[], int n,
+eth_ast_letrec(eth_ast_pattern *const pats[], eth_ast *const *vals, int n,
     eth_ast *body)
 {
-  eth_ast *ast = eth_ast_let(nams, vals, pub, n, body);
+  eth_ast *ast = eth_ast_let(pats, vals, n, body);
   ast->tag = ETH_AST_LETREC;
   return ast;
 }
@@ -248,6 +257,15 @@ eth_ast_binop(eth_binop op, eth_ast *lhs, eth_ast *rhs)
   ast->binop.op = op;
   eth_ref_ast(ast->binop.lhs = lhs);
   eth_ref_ast(ast->binop.rhs = rhs);
+  return ast;
+}
+
+eth_ast*
+eth_ast_unop(eth_unop op, eth_ast *expr)
+{
+  eth_ast *ast = create_ast_node(ETH_AST_UNOP);
+  ast->unop.op = op;
+  eth_ref_ast(ast->unop.expr = expr);
   return ast;
 }
 
@@ -273,6 +291,7 @@ eth_ast_match(eth_ast_pattern *pat, eth_ast *expr, eth_ast *thenbr,
   eth_ref_ast(ast->match.expr = expr);
   eth_ref_ast(ast->match.thenbr = thenbr);
   eth_ref_ast(ast->match.elsebr = elsebr);
+  ast->match.toplvl = ETH_TOPLVL_NONE;
   return ast;
 }
 
@@ -293,6 +312,24 @@ eth_ast_import(const char *module, const char *alias, char *const nams[],
   }
   else
     ast->import.nams = NULL;
+  return ast;
+}
+
+eth_ast*
+eth_ast_and(eth_ast *lhs, eth_ast *rhs)
+{
+  eth_ast *ast = create_ast_node(ETH_AST_AND);
+  eth_ref_ast(ast->scand.lhs = lhs);
+  eth_ref_ast(ast->scand.rhs = rhs);
+  return ast;
+}
+
+eth_ast*
+eth_ast_or(eth_ast *lhs, eth_ast *rhs)
+{
+  eth_ast *ast = create_ast_node(ETH_AST_OR);
+  eth_ref_ast(ast->scor.lhs = lhs);
+  eth_ref_ast(ast->scor.rhs = rhs);
   return ast;
 }
 

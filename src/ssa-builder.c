@@ -73,6 +73,7 @@ typedef struct value_info {
   eth_type *type;
   eth_insn *creatloc;
   bool isrec;
+  bool isdummy;
 } value_info;
 
 typedef struct  {
@@ -303,14 +304,17 @@ build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int f, bool *e)
   eth_ssa_tape *fntape = eth_create_ssa_tape();
 
   // declare arguments [0, arity):
-  eth_insn *pop = eth_insn_pop(0, arity);
-  eth_write_insn(fntape, pop);
-  for (int i = 0; i < arity; ++i)
+  if (arity)
   {
-    int vid = new_val(fnbldr, RC_RULES_DEFAULT);
-    assert(vid == i);
-    fnbldr->vinfo[i]->creatloc = pop;
-    fnbldr->vars[i] = i;
+    eth_insn *pop = eth_insn_pop(0, arity);
+    eth_write_insn(fntape, pop);
+    for (int i = 0; i < arity; ++i)
+    {
+      int vid = new_val(fnbldr, RC_RULES_DEFAULT);
+      assert(vid == i);
+      fnbldr->vinfo[i]->creatloc = pop;
+      fnbldr->vars[i] = i;
+    }
   }
 
   // declare captures [arity, arity + ncap):
@@ -390,9 +394,14 @@ build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
   {
     case ETH_PATTERN_IDENT:
     {
+      bldr->vars[pat->ident.varid] = expr;
+
       if (myrules)
         bldr->vinfo[expr]->rules = RC_RULES_DEFAULT;
-      bldr->vars[pat->ident.varid] = expr;
+
+      if (bldr->recscp)
+        bldr->vinfo[expr]->isrec = true;
+
       return eth_ssa_ident_pattern(expr);
     }
 
@@ -409,7 +418,6 @@ build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
           pats, pat->unpack.n);
     }
   }
-
 
   eth_error("wtf");
   abort();
@@ -441,7 +449,14 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
 
     case ETH_IR_VAR:
     {
-      return bldr->vars[ir->var.vid];
+      int vid = bldr->vars[ir->var.vid];
+      if (bldr->vinfo[vid]->isdummy)
+      {
+        eth_error("evaluating variable before initialization");
+        *e = 1;
+        return 0;
+      }
+      return vid;
     }
 
     case ETH_IR_APPLY:
@@ -506,6 +521,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
         ret = resolve_phi(bldr, thentape, thenret, elsetape, elseret);
 
       eth_insn *insn = eth_insn_if(ret, cond, thentape->head, elsetape->head);
+      insn->iff.toplvl = ir->iff.toplvl;
       eth_destroy_ssa_tape(thentape);
       eth_destroy_ssa_tape(elsetape);
 
@@ -523,33 +539,26 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
       return v2;
     }
 
-    case ETH_IR_LET:
-    {
-      for (int i = 0; i < ir->let.n; ++i)
-      {
-        int val = build(bldr, tape, ir->let.vals[i], false, e);
-        bldr->vars[ir->let.vids[i]] = val;
-      }
-      return build(bldr, tape, ir->let.body, istc, e);
-    }
-
-    case ETH_IR_LETREC:
+    case ETH_IR_STARTFIX:
     {
       start_rec_scope(bldr);
-      for (int i = 0; i < ir->letrec.n; ++i)
-      {
-        int myval = new_val(bldr, RC_RULES_DISABLE);
-        bldr->vinfo[myval]->isrec = true;
-        bldr->vars[ir->letrec.vids[i]] = myval;
-        int val = build(bldr, tape, ir->letrec.vals[i], false, e);
-        eth_write_insn(tape, eth_insn_mov(myval, val));
-        bldr->vars[ir->letrec.vids[i]] = val; // replace with real value
-        bldr->vinfo[val]->isrec = true;
 
-        add_rec_variable(bldr, val);
-      }
+      int dummy = new_val(bldr, RC_RULES_DISABLE);
+      bldr->vinfo[dummy]->isrec = true;
+      bldr->vinfo[dummy]->isdummy = true;
+      for (int i = 0; i < ir->startfix.n; ++i)
+        bldr->vars[ir->startfix.vars[i]] = dummy;
+
+      return build(bldr, tape, ir->startfix.body, istc, e);
+    }
+
+    case ETH_IR_ENDFIX:
+    {
+      for (int i = 0; i < ir->endfix.n; ++i)
+        add_rec_variable(bldr, bldr->vars[ir->endfix.vars[i]]);
       finalize_rec_scope(bldr, tape, e);
-      return build(bldr, tape, ir->letrec.body, istc, e);
+
+      return build(bldr, tape, ir->endfix.body, istc, e);
     }
 
     case ETH_IR_BINOP:
@@ -562,7 +571,8 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
       eth_insn *insn = NULL;
       switch (ir->binop.op)
       {
-        case ETH_ADD ... ETH_DIV:
+        case ETH_ADD ... ETH_POW:
+        case ETH_LAND ... ETH_ASHR:
           ret = new_val(bldr, RC_RULES_DEFAULT);
           insn = eth_insn_binop(ir->binop.op, ret, lhs, rhs);
 
@@ -600,6 +610,38 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
       return ret;
     }
 
+    case ETH_IR_UNOP:
+    {
+      int expr = build(bldr, tape, ir->unop.expr, false, e);
+
+      bool testnum = false;
+      int ret = -1;
+      eth_insn *insn = NULL;
+      switch (ir->unop.op)
+      {
+        case ETH_NOT:
+          ret = new_val(bldr, RC_RULES_DISABLE);
+          insn = eth_insn_unop(ir->unop.op, ret, expr);
+          testnum = false;
+          bldr->vinfo[ret]->type = eth_boolean_type;
+          break;
+
+        case ETH_LNOT:
+          ret = new_val(bldr, RC_RULES_DEFAULT);
+          insn = eth_insn_unop(ir->unop.op, ret, expr);
+          testnum = true;
+          bldr->vinfo[ret]->type = eth_number_type;
+          bldr->vinfo[ret]->creatloc = insn;
+          break;
+      }
+
+      if (testnum)
+        assert_number(bldr, tape, expr, e);
+
+      eth_write_insn(tape, insn);
+      return ret;
+    }
+
     case ETH_IR_FN:
     {
       int arity = ir->fn.arity;
@@ -623,45 +665,58 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
     case ETH_IR_MATCH:
     {
       int cond = build(bldr, tape, ir->match.expr, false, e);
-
       int n1 = bldr->vilen;
       eth_ssa_pattern *pat = build_pattern(bldr, ir->match.pat, cond, false, e);
       int n2 = bldr->vilen;
 
-      eth_insn *ctor = eth_insn_nop();
-      ctor->flag = ETH_IFLAG_NOBEFORE;
-
-      eth_ssa_tape *thentape = eth_create_ssa_tape();
-      eth_write_insn(thentape, ctor);
-      int thenret = build(bldr, thentape, ir->match.thenbr, istc, e);
-
-      eth_ssa_tape *elsetape = eth_create_ssa_tape();
-      int elseret = build(bldr, elsetape, ir->match.elsebr, istc, e);
-
-      int ret;
-      eth_insn *loc = NULL;
-      if (istc)
+      if (ir->match.pat->tag == ETH_PATTERN_IDENT)
+        // optimize trivial identifier-match
       {
-        eth_write_insn(thentape, eth_insn_ret(thenret));
-        eth_write_insn(elsetape, eth_insn_ret(elseret));
-        ret = -1;
+        eth_destroy_ssa_pattern(pat);
+        return build(bldr, tape, ir->match.thenbr, istc, e);
       }
       else
-        ret = resolve_phi(bldr, thentape, thenret, elsetape, elseret);
+      {
 
-      eth_insn *insn = eth_insn_if_match(ret, cond, pat, thentape->head,
-          elsetape->head);
-      eth_destroy_ssa_tape(thentape);
-      eth_destroy_ssa_tape(elsetape);
+        eth_insn *ctor = eth_insn_nop();
+        ctor->flag = ETH_IFLAG_NOBEFORE;
 
-      for (int i = n1; i < n2; ++i)
-        bldr->vinfo[i]->creatloc = ctor;
+        eth_ssa_tape *thentape = eth_create_ssa_tape();
+        eth_write_insn(thentape, ctor);
+        int thenret = build(bldr, thentape, ir->match.thenbr, istc, e);
 
-      eth_write_insn(tape, insn);
-      if (ret >= 0)
-        bldr->vinfo[ret]->creatloc = insn;
+        eth_ssa_tape *elsetape = eth_create_ssa_tape();
+        int elseret = build(bldr, elsetape, ir->match.elsebr, istc, e);
 
-      return ret;
+        int ret;
+        eth_insn *loc = NULL;
+        if (istc)
+        {
+          eth_write_insn(thentape, eth_insn_ret(thenret));
+          eth_write_insn(elsetape, eth_insn_ret(elseret));
+          ret = -1;
+        }
+        else
+          ret = resolve_phi(bldr, thentape, thenret, elsetape, elseret);
+
+        eth_insn *insn = eth_insn_if_match(ret, cond, pat, thentape->head,
+            elsetape->head);
+        insn->iff.toplvl = ir->match.toplvl;
+        eth_destroy_ssa_tape(thentape);
+        eth_destroy_ssa_tape(elsetape);
+
+        for (int i = n1; i < n2; ++i)
+        {
+          if (not bldr->vinfo[i]->creatloc)
+            bldr->vinfo[i]->creatloc = ctor;
+        }
+
+        eth_write_insn(tape, insn);
+        if (ret >= 0)
+          bldr->vinfo[ret]->creatloc = insn;
+
+        return ret;
+      }
     }
   }
 
@@ -734,6 +789,9 @@ is_using(eth_insn *insn, int vid)
 
     case ETH_INSN_BINOP:
       return insn->binop.lhs == vid || insn->binop.rhs == vid;
+
+    case ETH_INSN_UNOP:
+      return insn->unop.vid == vid;
 
     case ETH_INSN_FN:
       for (int i = 0; i < insn->fn.ncap; ++i)
@@ -946,6 +1004,9 @@ kill_value(kill_info *kinfo, eth_insn *begin, int vid)
           break;
       }
     }
+
+    if (insn->tag == ETH_INSN_RET)
+      break;
   }
 
   if (lastusr == 0)
@@ -986,32 +1047,35 @@ static void
 insert_rc_default(kill_info *kinfo, eth_insn *begin, int vid)
 {
   if (kill_value(kinfo, begin, vid))
-  {
-    if (begin->tag == ETH_INSN_IF)
-    {
-      eth_insert_insn_before(begin->iff.thenbr, eth_insn_ref(vid));
-      eth_insert_insn_before(begin->iff.elsebr, eth_insn_ref(vid));
-    }
-    else
-      eth_insert_insn_after(begin, eth_insn_ref(vid));
-  }
+    eth_insert_insn_after(begin, eth_insn_ref(vid));
   else
-  {
-    if (begin->tag == ETH_INSN_IF)
-    {
-      eth_insert_insn_before(begin->iff.thenbr, eth_insn_drop(vid));
-      eth_insert_insn_before(begin->iff.elsebr, eth_insn_drop(vid));
-    }
-    else
-      eth_insert_insn_after(begin, eth_insn_drop(vid));
-  }
+    eth_insert_insn_after(begin, eth_insn_drop(vid));
+}
+
+static eth_insn*
+find_mov(eth_insn *begin, int vid)
+{
+  if (begin == NULL) return NULL;
+  if (begin->tag == ETH_INSN_MOV && begin->out == vid) return begin;
+  return find_mov(begin->next, vid);
 }
 
 static void
 insert_rc_phi(kill_info *kinfo, eth_insn *begin, int vid)
 {
-  bool ok = kill_value(kinfo, begin, vid);
-  assert(ok);
+  assert(begin->tag == ETH_INSN_IF);
+  if (not kill_value(kinfo, begin->next, vid))
+  {
+    // TODO: should remove that MOV at all
+    eth_insn *mov;
+    mov = find_mov(begin->iff.thenbr, vid);
+    if (not kill_value(kinfo, mov->next, vid))
+      eth_insert_insn_after(mov, eth_insn_unref(vid));
+
+    mov = find_mov(begin->iff.elsebr, vid);
+    if (not kill_value(kinfo, mov->next, vid))
+      eth_insert_insn_after(mov, eth_insn_unref(vid));
+  }
 }
 
 static void
@@ -1127,6 +1191,30 @@ make_module(void)
   return acc;
 }
 
+static eth_insn*
+find_last_toplevel_insn(eth_insn *insn)
+{
+  if (insn->tag == ETH_INSN_IF)
+  {
+    switch (insn->iff.toplvl)
+    {
+      case ETH_TOPLVL_THEN:
+        return find_last_toplevel_insn(insn->iff.thenbr);
+
+      case ETH_TOPLVL_ELSE:
+        return find_last_toplevel_insn(insn->iff.elsebr);
+
+      case ETH_TOPLVL_NONE:
+        break;
+    }
+  }
+
+  if (insn->next == NULL)
+    return insn;
+  else
+    return find_last_toplevel_insn(insn->next);
+}
+
 eth_ssa*
 eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
 {
@@ -1135,7 +1223,7 @@ eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
 
   ssa_builder *bldr = create_ssa_builder(ir->nvars);
   eth_ssa_tape *tape = eth_create_ssa_tape();
-  int ret = build(bldr, tape, ir->body, true, &e);
+  int ret = build(bldr, tape, ir->body, false, &e);
   if (e)
   {
     eth_destroy_insn_list(tape->head);
@@ -1145,6 +1233,13 @@ eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
   {
     if (defs)
     {
+      eth_insn *lastinsn = find_last_toplevel_insn(tape->head);
+      eth_ssa_tape *tlvltape;
+      if (lastinsn == tape->point)
+        tlvltape = tape;
+      else
+        tlvltape = eth_create_ssa_tape_at(lastinsn);
+
       int n = defs->n;
       module_info *data = malloc(sizeof(module_info));
       data->ndefs = n;
@@ -1154,19 +1249,33 @@ eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
 
       eth_t mkmod = eth_create_proc(make_module, n, data, destroy_module_info);
 
-      ret = new_val(bldr, RC_RULES_DEFAULT);
+      int modret = new_val(bldr, RC_RULES_DEFAULT);
       int fnvid = new_val(bldr, RC_RULES_DISABLE);
-      eth_write_insn(tape, eth_insn_cval(fnvid, mkmod));
+      eth_write_insn(tlvltape, eth_insn_cval(fnvid, mkmod));
       int argvids[n];
       for (int i = 0; i < n; ++i)
         argvids[i] = bldr->vars[defs->varids[i]];
 
-      eth_insn *insn = eth_insn_apply(ret, fnvid, argvids, n);
-      eth_write_insn(tape, insn);
-      bldr->vinfo[ret]->creatloc = insn;
+      eth_insn *insn = eth_insn_apply(modret, fnvid, argvids, n);
+      eth_write_insn(tlvltape, insn);
+      bldr->vinfo[modret]->creatloc = insn;
+
+      eth_write_insn(tlvltape, eth_insn_ret(modret));
+      eth_write_insn(tlvltape, eth_insn_ret(ret));
+
+      if (tlvltape != tape)
+        eth_destroy_ssa_tape(tlvltape);
+
+      int exnvid = new_val(bldr, RC_RULES_DISABLE);
+      eth_t exn = eth_exn(eth_str("import-error"));
+      eth_write_insn(tape, eth_insn_cval(exnvid, exn));
+      eth_write_insn(tape, eth_insn_ret(exnvid));
+    }
+    else
+    {
+      eth_write_insn(tape, eth_insn_ret(ret));
     }
 
-    eth_write_insn(tape, eth_insn_ret(ret));
     insert_rc(bldr, tape->head);
     ssa = create_ssa(tape->head, bldr->vilen);
   }

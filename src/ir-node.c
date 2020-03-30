@@ -88,18 +88,13 @@ destroy_ir_node(eth_ir_node *node)
       eth_unref_ir_node(node->seq.e2);
       break;
 
-    case ETH_IR_LET:
-    case ETH_IR_LETREC:
-      free(node->let.vids);
-      for (int i = 0; i < node->let.n; ++i)
-        eth_unref_ir_node(node->let.vals[i]);
-      free(node->let.vals);
-      eth_unref_ir_node(node->let.body);
-      break;
-
     case ETH_IR_BINOP:
       eth_unref_ir_node(node->binop.lhs);
       eth_unref_ir_node(node->binop.rhs);
+      break;
+
+    case ETH_IR_UNOP:
+      eth_unref_ir_node(node->unop.expr);
       break;
 
     case ETH_IR_FN:
@@ -113,6 +108,16 @@ destroy_ir_node(eth_ir_node *node)
       eth_unref_ir_node(node->match.expr);
       eth_unref_ir_node(node->match.thenbr);
       eth_unref_ir_node(node->match.elsebr);
+      break;
+
+    case ETH_IR_STARTFIX:
+      free(node->startfix.vars);
+      eth_unref_ir_node(node->startfix.body);
+      break;
+
+    case ETH_IR_ENDFIX:
+      free(node->endfix.vars);
+      eth_unref_ir_node(node->endfix.body);
       break;
   }
 
@@ -181,6 +186,7 @@ eth_ir_if(eth_ir_node *cond, eth_ir_node *thenbr, eth_ir_node *elsebr)
   eth_ref_ir_node(node->iff.cond = cond);
   eth_ref_ir_node(node->iff.thenbr = thenbr);
   eth_ref_ir_node(node->iff.elsebr = elsebr);
+  node->iff.toplvl = ETH_TOPLVL_NONE;
   return node;
 }
 
@@ -194,36 +200,21 @@ eth_ir_seq(eth_ir_node *e1, eth_ir_node *e2)
 }
 
 eth_ir_node*
-eth_ir_let(const int *vids, eth_ir_node *const *vals, int n, eth_ir_node *body)
-{
-  eth_ir_node *node = create_ir_node(ETH_IR_LET);
-  node->let.n = n;
-  node->let.vids = malloc(sizeof(int) * n);
-  node->let.vals = malloc(sizeof(eth_ir_node*) * n);
-  for (int i = 0; i < n; ++i)
-  {
-    node->let.vids[i] = vids[i];
-    eth_ref_ir_node(node->let.vals[i] = vals[i]);
-  }
-  eth_ref_ir_node(node->let.body = body);
-  return node;
-}
-
-eth_ir_node*
-eth_ir_letrec(const int *vids, eth_ir_node *const *vals, int n, eth_ir_node *body)
-{
-  eth_ir_node *node = eth_ir_let(vids, vals, n, body);
-  node->tag = ETH_IR_LETREC;
-  return node;
-}
-
-eth_ir_node*
 eth_ir_binop(eth_binop op, eth_ir_node *lhs, eth_ir_node *rhs)
 {
   eth_ir_node *node = create_ir_node(ETH_IR_BINOP);
   node->binop.op = op;
   eth_ref_ir_node(node->binop.lhs = lhs);
   eth_ref_ir_node(node->binop.rhs = rhs);
+  return node;
+}
+
+eth_ir_node*
+eth_ir_unop(eth_unop op, eth_ir_node *expr)
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_UNOP);
+  node->unop.op = op;
+  eth_ref_ir_node(node->unop.expr = expr);
   return node;
 }
 
@@ -251,6 +242,50 @@ eth_ir_match(eth_ir_pattern *pat, eth_ir_node *expr, eth_ir_node *thenbr,
   eth_ref_ir_node(node->match.expr = expr);
   eth_ref_ir_node(node->match.thenbr = thenbr);
   eth_ref_ir_node(node->match.elsebr = elsebr);
+  node->match.toplvl = ETH_TOPLVL_NONE;
   return node;
 }
 
+static eth_ir_node*
+create_bind(int i, int const varids[], eth_ir_node *const vals[], int n,
+    eth_ir_node *body)
+{
+  if (i < n)
+  {
+    eth_ir_pattern *ident = eth_ir_ident_pattern(varids[i]);
+    eth_ir_node *expr = vals[i];
+    eth_ir_node *next = create_bind(i + 1, varids, vals, n, body);
+    return eth_ir_match(ident, expr, next, eth_ir_error());
+  }
+  else
+    return body;
+}
+
+eth_ir_node*
+eth_ir_bind(int const varids[], eth_ir_node *const vals[], int n,
+    eth_ir_node *body)
+{
+  return create_bind(0, varids, vals, n, body);
+}
+
+eth_ir_node*
+eth_ir_startfix(int const vars[], int n, eth_ir_node *body)
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_STARTFIX);
+  node->startfix.vars = malloc(sizeof(int) * n);
+  node->startfix.n = n;
+  eth_ref_ir_node(node->startfix.body = body);
+  memcpy(node->startfix.vars, vars, sizeof(int) * n);
+  return node;
+}
+
+eth_ir_node*
+eth_ir_endfix(int const vars[], int n, eth_ir_node *body)
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_ENDFIX);
+  node->endfix.vars = malloc(sizeof(int) * n);
+  node->endfix.n = n;
+  eth_ref_ir_node(node->endfix.body = body);
+  memcpy(node->endfix.vars, vars, sizeof(int) * n);
+  return node;
+}

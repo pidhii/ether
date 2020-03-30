@@ -51,8 +51,8 @@ eth_create_scp(eth_function **clos, int nclos, eth_t *wrefs, int nwref)
   }
 
   // fix RC for closures
-  for (int i = 0; i < nclos; ++i)
-    clos[i]->header.rc = 1;
+  //for (int i = 0; i < nclos; ++i)
+    //clos[i]->header.rc = 1;
 
   return scp;
 }

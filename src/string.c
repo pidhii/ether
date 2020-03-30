@@ -44,12 +44,36 @@ _eth_init_string_type(void)
 }
 
 eth_t
-eth_create_string(const char *cstr)
+eth_create_string_from_ptr2(char *cstr, int len)
 {
   eth_string *str = malloc(sizeof(eth_string));
   eth_init_header(str, eth_string_type);
-  str->len = strlen(cstr);
-  str->cstr = malloc(str->len + 1);
-  memcpy(str->cstr, cstr, str->len + 1);
+  str->len = len;
+  str->cstr = cstr;
   return ETH(str);
 }
+
+eth_t
+eth_create_string_from_ptr(char *cstr)
+{
+  return eth_create_string_from_ptr2(cstr, strlen(cstr));
+}
+
+eth_t
+eth_create_string(const char *cstr)
+{
+  int len = strlen(cstr);
+  char *mystr = malloc(len + 1);
+  memcpy(mystr, cstr, len + 1);
+  return eth_create_string_from_ptr2(mystr, len);
+}
+
+eth_t
+eth_create_string2(const char *str, int len)
+{
+  char *mystr = malloc(len + 1);
+  memcpy(mystr, str, len);
+  mystr[len] = 0;
+  return eth_create_string_from_ptr2(mystr, len);
+}
+

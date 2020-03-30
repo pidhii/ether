@@ -11,8 +11,8 @@ eth_log_aux(bool enable, const char *module, const char *file, const char *func,
 {
   if (not enable) return;
 
-  fprintf(os, "[%s %s \e[0m] ", style, module);
-  /*fprintf(os, "[%s ether \e[0m] ", style);*/
+  /*fprintf(os, "[%s %s \e[0m] ", style, module);*/
+  fprintf(os, "[%s ether \e[0m] ", style);
 
   va_list arg;
   va_start(arg, fmt);

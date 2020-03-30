@@ -165,12 +165,13 @@ eth_insn*
 eth_insn_if(int out, int cond, eth_insn *thenbr, eth_insn *elsebr)
 {
   eth_insn *insn = create_insn(ETH_INSN_IF);
+  insn->out = out;
   insn->iff.test = ETH_TEST_NOTFALSE;
   insn->iff.cond = cond;
   insn->iff.likely = 0;
   insn->iff.thenbr = thenbr;
   insn->iff.elsebr = elsebr;
-  insn->out = out;
+  insn->iff.toplvl = ETH_TOPLVL_NONE;
   thenbr->prev = elsebr->prev = insn;
   return insn;
 }
@@ -252,6 +253,16 @@ eth_insn_binop(eth_binop op, int out, int lhs, int rhs)
   insn->out = out;
   insn->binop.lhs = lhs;
   insn->binop.rhs = rhs;
+  return insn;
+}
+
+eth_insn*
+eth_insn_unop(eth_unop op, int out, int vid)
+{
+  eth_insn *insn = create_insn(ETH_INSN_UNOP);
+  insn->unop.op = op;
+  insn->out = out;
+  insn->unop.vid = vid;
   return insn;
 }
 
@@ -424,6 +435,11 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
     case ETH_INSN_BINOP:
       fprintf(stream, "%%%d = %s %%%d %%%d;\n", insn->out,
           eth_binop_name(insn->binop.op), insn->binop.lhs, insn->binop.rhs);
+      break;
+
+    case ETH_INSN_UNOP:
+      fprintf(stream, "%%%d = %s %%%d;\n", insn->out,
+          eth_unop_name(insn->unop.op), insn->unop.vid);
       break;
 
     case ETH_INSN_FN:

@@ -332,19 +332,40 @@ write_load(builder *bldr, int out, int vid, int offs)
     insn->binop.rhs = rhs;                               \
     return bldr->len - 1;                                \
   }
-
-MAKE_BINOP(add, ADD)
-MAKE_BINOP(sub, SUB)
-MAKE_BINOP(mul, MUL)
-MAKE_BINOP(div, DIV)
-MAKE_BINOP(lt, LT)
-MAKE_BINOP(le, LE)
-MAKE_BINOP(gt, GT)
-MAKE_BINOP(ge, GE)
-MAKE_BINOP(eq, EQ)
-MAKE_BINOP(ne, NE)
-MAKE_BINOP(is, IS)
+MAKE_BINOP(add , ADD)
+MAKE_BINOP(sub , SUB)
+MAKE_BINOP(mul , MUL)
+MAKE_BINOP(div , DIV)
+MAKE_BINOP(mod , MOD)
+MAKE_BINOP(pow , POW)
+MAKE_BINOP(land, LAND)
+MAKE_BINOP(lor , LOR)
+MAKE_BINOP(lxor, LXOR)
+MAKE_BINOP(lshl, LSHL)
+MAKE_BINOP(lshr, LSHR)
+MAKE_BINOP(ashl, ASHL)
+MAKE_BINOP(ashr, ASHR)
+MAKE_BINOP(lt  , LT)
+MAKE_BINOP(le  , LE)
+MAKE_BINOP(gt  , GT)
+MAKE_BINOP(ge  , GE)
+MAKE_BINOP(eq  , EQ)
+MAKE_BINOP(ne  , NE)
+MAKE_BINOP(is  , IS)
 MAKE_BINOP(cons, CONS)
+
+#define MAKE_UNOP(name, op)                     \
+  static int                                    \
+  write_##name(builder *bldr, int out, int vid) \
+  {                                             \
+    eth_bc_insn *insn = append_insn(bldr);      \
+    insn->opc = ETH_OPC_##op;                   \
+    insn->unop.out = out;                       \
+    insn->unop.vid = vid;                       \
+    return bldr->len - 1;                       \
+  }
+MAKE_UNOP(not , NOT)
+MAKE_UNOP(lnot, LNOT)
 
 typedef cod_vec(int) int_vec;
 
@@ -496,52 +517,47 @@ end_if:
       case ETH_INSN_BINOP:
         switch (ip->binop.op)
         {
-          case ETH_ADD:
-            write_add(bldr, ip->out, ip->binop.lhs, ip->binop.rhs);
+#define WRITE_BINOP(name, opc)                                         \
+          case ETH_##opc:                                              \
+            write_##name(bldr, ip->out, ip->binop.lhs, ip->binop.rhs); \
+            break;
+          WRITE_BINOP(add, ADD)
+          WRITE_BINOP(sub, SUB)
+          WRITE_BINOP(mul, MUL)
+          WRITE_BINOP(div, DIV)
+          WRITE_BINOP(mod, MOD)
+          WRITE_BINOP(pow, POW)
+          // ---
+          WRITE_BINOP(land, LAND)
+          WRITE_BINOP(lor,  LOR)
+          WRITE_BINOP(lxor, LXOR)
+          WRITE_BINOP(lshl, LSHL)
+          WRITE_BINOP(lshr, LSHR)
+          WRITE_BINOP(ashl, ASHL)
+          WRITE_BINOP(ashr, ASHR)
+          // ---
+          WRITE_BINOP(lt, LT)
+          WRITE_BINOP(le, LE)
+          WRITE_BINOP(gt, GT)
+          WRITE_BINOP(ge, GE)
+          WRITE_BINOP(eq, EQ)
+          WRITE_BINOP(ne, NE)
+          // ---
+          WRITE_BINOP(is, IS)
+          // ---
+          WRITE_BINOP(cons, CONS)
+        }
+        break;
+
+      case ETH_INSN_UNOP:
+        switch (ip->unop.op)
+        {
+          case ETH_NOT:
+            write_not(bldr, ip->out, ip->unop.vid);
             break;
 
-          case ETH_SUB:
-            write_sub(bldr, ip->out, ip->binop.lhs, ip->binop.rhs);
-            break;
-
-          case ETH_MUL:
-            write_mul(bldr, ip->out, ip->binop.lhs, ip->binop.rhs);
-            break;
-
-          case ETH_DIV:
-            write_div(bldr, ip->out, ip->binop.lhs, ip->binop.rhs);
-            break;
-
-          case ETH_LT:
-            write_lt(bldr, ip->out, ip->binop.lhs, ip->binop.rhs);
-            break;
-
-          case ETH_LE:
-            write_le(bldr, ip->out, ip->binop.lhs, ip->binop.rhs);
-            break;
-
-          case ETH_GT:
-            write_gt(bldr, ip->out, ip->binop.lhs, ip->binop.rhs);
-            break;
-
-          case ETH_GE:
-            write_ge(bldr, ip->out, ip->binop.lhs, ip->binop.rhs);
-            break;
-
-          case ETH_EQ:
-            write_eq(bldr, ip->out, ip->binop.lhs, ip->binop.rhs);
-            break;
-
-          case ETH_NE:
-            write_ne(bldr, ip->out, ip->binop.lhs, ip->binop.rhs);
-            break;
-
-          case ETH_IS:
-            write_is(bldr, ip->out, ip->binop.lhs, ip->binop.rhs);
-            break;
-
-          case ETH_CONS:
-            write_cons(bldr, ip->out, ip->binop.lhs, ip->binop.rhs);
+          case ETH_LNOT:
+            write_lnot(bldr, ip->out, ip->unop.vid);
             break;
         }
         break;

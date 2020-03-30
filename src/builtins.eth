@@ -1,0 +1,32 @@
+
+let pub car p = let x:_ = p in x in
+let pub cdr p = let _:x = p in x in
+
+let pub (+) x y = x + y in
+let pub (-) x y = x - y in
+let pub (*) x y = x * y in
+let pub (/) x y = x / y in
+let pub (mod) x y = x mod y in
+let pub (^) x y = x ^ y in
+
+let pub (land) x y = x land y in
+let pub (lor) x y = x lor y in
+let pub (lxor) x y = x lxor y in
+let pub (lshl) x y = x lshl y in
+let pub (lshr) x y = x lshr y in
+let pub (ashl) x y = x ashl y in
+let pub (ashr) x y = x ashr y in
+
+let pub (<) x y = x < y in
+let pub (>) x y = x > y in
+let pub (<=) x y = x <= y in
+let pub (>=) x y = x >= y in
+let pub (==) x y = x == y in
+let pub (/=) x y = x /= y in
+
+let pub (is) x y = x is y in
+
+let pub (:) x y = x : y in
+let pub (++) x y = x ++ y in
+
+()
