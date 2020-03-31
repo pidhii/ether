@@ -13,6 +13,12 @@ default_destroy(eth_type *type, eth_t x)
   eth_warning("destructor for type '%s' not specified", type->name);
 }
 
+static void
+default_display(eth_type *type, eth_t x, FILE *stream)
+{
+  type->write(type, x, stream);
+}
+
 eth_type*
 eth_create_type(const char *name)
 {
@@ -20,7 +26,7 @@ eth_create_type(const char *name)
   type->name = strdup(name);
   type->destroy = default_destroy;
   type->write = eth_default_write;
-  type->display = eth_default_write;
+  type->display = default_display;
   type->nfields = 0;
   type->fields = NULL;
   type->clos = NULL;

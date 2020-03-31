@@ -21,6 +21,7 @@ help_and_exit(char *argv0)
   puts("                           'warning' - show warnings and errors;");
   puts("                           'error'   - show only error messages.");
   puts("  --version    -v          Show version and configuration and exit.");
+  puts("  --prefix                 Show installation prefix and exit.");
   exit(EXIT_SUCCESS);
 }
 
@@ -32,11 +33,12 @@ main(int argc, char **argv)
     { "bytecode", false, NULL, 0x1FF },
     { "log-level", true, NULL, 0x2FF },
     { "version", false, NULL, 'v' },
+    { "prefix", false, NULL, 0x3FF },
     { 0, 0, 0, 0 }
   };
   bool showbc = false;
   int opt;
-  opterr = 0;
+  /*opterr = 0;*/
   while ((opt = getopt_long(argc, argv, "+hv", longopts, NULL)) > 0)
   {
     switch (opt)
@@ -71,8 +73,18 @@ main(int argc, char **argv)
         }
         break;
 
+      case 0x3FF:
+        if (eth_get_prefix())
+        {
+          puts(eth_get_prefix());
+          exit(EXIT_SUCCESS);
+        }
+        else
+          exit(EXIT_FAILURE);
+        break;
+
       case '?':
-        eth_error("unrecognized option '%s'", argv[optind - 1]);
+        /*eth_error("unrecognized option '%s'", optopt);*/
         eth_error("see `%s --help` for available options", argv[0]);
         exit(EXIT_FAILURE);
     }

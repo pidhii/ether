@@ -13,7 +13,9 @@
 #include <limits.h>
 #include <unistd.h>
 
+
 ETH_MODULE("ether:parser")
+
 
 extern
 int yylex();
@@ -102,7 +104,7 @@ int _eth_start_token = -1;
 
 
 // =============================================================================
-/*%token START_SCRIPT START_MODULE*/
+%token UNDEFINED
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %token<number> NUMBER
 %token<string> SYMBOL CAPSYMBOL
@@ -115,7 +117,8 @@ int _eth_start_token = -1;
 %right RARROW
 %right ';'
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-%nonassoc IF THEN ELSE WHEN UNLESS
+%nonassoc IF THEN ELSE WHEN UNLESS TRY WITH
+%right OR
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 // level 0:
 %right '$'
@@ -154,6 +157,7 @@ int _eth_start_token = -1;
 %type<charvec> string_aux
 %type<pattern> atomic_pattern pattern
 %type<strvec> maybe_imports import_list
+%type<astvec> list
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %start entry
 
@@ -172,6 +176,12 @@ atom
   | '('')' { $$ = eth_ast_cval(eth_nil); }
   | '(' expr ')' { $$ = $2; }
   | atom '!' { $$ = eth_ast_apply($1, NULL, 0); }
+  | '[' list ']' {
+    $$ = eth_ast_cval(eth_nil);
+    cod_vec_riter($2, i, x, $$ = eth_ast_binop(ETH_CONS, x, $$));
+    cod_vec_destroy($2);
+  }
+  | '['']' { $$ = eth_ast_cval(eth_nil); }
 ;
 
 form
@@ -220,6 +230,10 @@ expr
     }
     free($3);
   }
+  | TRY expr WITH pattern RARROW expr %prec WITH {
+    $$ = eth_ast_try($4, $2, $6, 1);
+  }
+  | expr OR expr { $$ = eth_ast_try(NULL, $1, $3, 0); }
   | LET binds IN expr {
     $$ = eth_ast_let($2.pats.data, $2.vals.data, $2.pats.len, $4);
     cod_vec_destroy($2.pats);
@@ -416,6 +430,17 @@ import_list
     cod_vec_push($$, $1);
   }
   | import_list ',' ident {
+    $$ = $1;
+    cod_vec_push($$, $3);
+  }
+;
+
+list
+  : expr {
+    cod_vec_init($$);
+    cod_vec_push($$, $1);
+  }
+  | list ',' expr {
     $$ = $1;
     cod_vec_push($$, $3);
   }

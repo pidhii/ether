@@ -9,38 +9,6 @@ ETH_MODULE("ether:builtins")
 
 
 static eth_t
-_car(void)
-{
-  eth_t x = *eth_sp++;
-  if (x->type != eth_pair_type)
-  {
-    eth_drop(x);
-    return eth_exn(eth_str("type-error"));
-  }
-  eth_t ret = eth_car(x);
-  eth_ref(ret);
-  eth_drop(x);
-  eth_dec(ret);
-  return ret;
-}
-
-static eth_t
-_cdr(void)
-{
-  eth_t x = *eth_sp++;
-  if (x->type != eth_pair_type)
-  {
-    eth_drop(x);
-    return eth_exn(eth_str("type-error"));
-  }
-  eth_t ret = eth_cdr(x);
-  eth_ref(ret);
-  eth_drop(x);
-  eth_dec(ret);
-  return ret;
-}
-
-static eth_t
 _strcat(void)
 {
   eth_args args = eth_start(2);
@@ -58,6 +26,45 @@ _strcat(void)
 
   eth_end_unref(args);
   return eth_create_string_from_ptr2(str, xlen + ylen);
+}
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                                  lists
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+static eth_t
+_length(void)
+{
+  eth_t l = *eth_sp++;
+  bool isproper;
+  size_t len = eth_length(l, &isproper);
+  eth_drop(l);
+  if (isproper)
+    return eth_num(len);
+  else
+    return eth_exn(eth_str("improper-list"));
+}
+
+static eth_t
+_revappend(void)
+{
+  eth_t l = *eth_sp++;
+  eth_ref(l);
+
+  eth_t acc = *eth_sp++;
+
+  eth_t it = l;
+  for (; it->type == eth_pair_type; it = eth_cdr(it))
+    acc = eth_cons(eth_car(it), acc);
+
+  if (it != eth_nil)
+  {
+    eth_drop(acc);
+    eth_unref(l);
+    return eth_exn(eth_str("improper-list"));
+  }
+  eth_ref(acc);
+  eth_unref(l);
+  eth_dec(acc);
+  return acc;
 }
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -234,17 +241,18 @@ _eth_init_builtins(void)
 
   eth_debug("loading builtins");
 
-  eth_define(g_mod,     "car", eth_create_proc(    _car, 1, NULL, NULL));
-  eth_define(g_mod,     "cdr", eth_create_proc(    _cdr, 1, NULL, NULL));
-  eth_define(g_mod,      "++", eth_create_proc( _strcat, 2, NULL, NULL));
+  eth_define(g_mod,        "++", eth_create_proc(   _strcat, 2, NULL, NULL));
   // ---
-  eth_define(g_mod,   "write", eth_create_proc(  _write, 1, NULL, NULL));
-  eth_define(g_mod, "display", eth_create_proc(_display, 1, NULL, NULL));
-  eth_define(g_mod, "newline", eth_create_proc(_newline, 0, NULL, NULL));
+  eth_define(g_mod,    "length", eth_create_proc(   _length, 1, NULL, NULL));
+  eth_define(g_mod, "revappend", eth_create_proc(_revappend, 2, NULL, NULL));
   // ---
-  eth_define(g_mod,  "printf", eth_create_proc( _printf, 1, NULL, NULL));
+  eth_define(g_mod,     "write", eth_create_proc(    _write, 1, NULL, NULL));
+  eth_define(g_mod,   "display", eth_create_proc(  _display, 1, NULL, NULL));
+  eth_define(g_mod,   "newline", eth_create_proc(  _newline, 0, NULL, NULL));
   // ---
-  eth_define(g_mod,   "raise", eth_create_proc(  _raise, 1, NULL, NULL));
+  eth_define(g_mod,    "printf", eth_create_proc(   _printf, 1, NULL, NULL));
+  // ---
+  eth_define(g_mod,     "raise", eth_create_proc(    _raise, 1, NULL, NULL));
 
   eth_debug("loading \"src/builtins.eth\"");
   if (not eth_load_module_from_script(g_env, g_mod, "src/builtins.eth"))

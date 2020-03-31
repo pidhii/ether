@@ -150,6 +150,12 @@ destroy_ast_node(eth_ast *ast)
       eth_unref_ast(ast->scor.lhs);
       eth_unref_ast(ast->scor.rhs);
       break;
+
+    case ETH_AST_TRY:
+      eth_destroy_ast_pattern(ast->try.pat);
+      eth_unref_ast(ast->try.trybr);
+      eth_unref_ast(ast->try.catchbr);
+      break;
   }
 
   free(ast);
@@ -330,6 +336,17 @@ eth_ast_or(eth_ast *lhs, eth_ast *rhs)
   eth_ast *ast = create_ast_node(ETH_AST_OR);
   eth_ref_ast(ast->scor.lhs = lhs);
   eth_ref_ast(ast->scor.rhs = rhs);
+  return ast;
+}
+
+eth_ast*
+eth_ast_try(eth_ast_pattern *pat, eth_ast *try, eth_ast *catch, int likely)
+{
+  eth_ast *ast = create_ast_node(ETH_AST_TRY);
+  ast->try.pat = pat ? pat : eth_ast_ident_pattern("");
+  eth_ref_ast(ast->try.trybr = try);
+  eth_ref_ast(ast->try.catchbr = catch);
+  ast->try.likely = likely;
   return ast;
 }
 

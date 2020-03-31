@@ -42,19 +42,27 @@ typedef struct {
 } deff_block;
 
 typedef struct {
+  int pos, tryid;
+} catch_jmp;
+
+typedef struct {
   int len, cap; /* Length and capacity of code-tape. */
   eth_bc_insn *arr; /* Code(output)-tape. */
   cod_vec(deff_block) deff; /* Deffered blocks. */
+  cod_vec(catch_jmp) cchjmps;
+  int *catches;
 } builder;
 
 static builder*
-create_builder(void)
+create_builder(int ntries)
 {
   builder *bldr = malloc(sizeof(builder));
   bldr->len = 0;
   bldr->cap = 0x40;
   bldr->arr = malloc(sizeof(eth_bc_insn) * bldr->cap);
   cod_vec_init(bldr->deff);
+  cod_vec_init(bldr->cchjmps);
+  bldr->catches = malloc(sizeof(int) * ntries);
   return bldr;
 }
 
@@ -62,6 +70,8 @@ static void
 destroy_builder(builder *bldr)
 {
   cod_vec_destroy(bldr->deff);
+  cod_vec_destroy(bldr->cchjmps);
+  free(bldr->catches);
   free(bldr);
 }
 
@@ -318,6 +328,24 @@ write_load(builder *bldr, int out, int vid, int offs)
   insn->load.out = out;
   insn->load.vid = vid;
   insn->load.offs = offs;
+  return bldr->len - 1;
+}
+
+static int
+write_setexn(builder *bldr, int vid)
+{
+  eth_bc_insn *insn = append_insn(bldr);
+  insn->opc = ETH_OPC_SETEXN;
+  insn->setexn.vid = vid;
+  return bldr->len - 1;
+}
+
+static int
+write_getexn(builder *bldr, int out)
+{
+  eth_bc_insn *insn = append_insn(bldr);
+  insn->opc = ETH_OPC_GETEXN;
+  insn->getexn.out = out;
   return bldr->len - 1;
 }
 
@@ -595,6 +623,29 @@ end_if:
         write_mkscp(bldr, ip->mkscp.clos, ip->mkscp.nclos, ip->mkscp.wrefs,
             ip->mkscp.nwref);
         break;
+
+      // TODO: handle likely/unlikely
+      case ETH_INSN_TRY:
+        build(bldr, ip->try.trybr);
+        int jmpidx = write_jmp(bldr, -1);
+        int cchidx = jmpidx + 1;
+        build(bldr, ip->try.catchbr);
+        bldr->arr[jmpidx].jmp.offs = bldr->len - jmpidx;
+        bldr->catches[ip->try.id] = cchidx;
+        break;
+
+      case ETH_INSN_CATCH:
+      {
+        write_setexn(bldr, ip->catch.vid);
+        int jmpidx = write_jmp(bldr, -1);
+        catch_jmp jmp = { .pos = jmpidx, .tryid = ip->catch.tryid };
+        cod_vec_push(bldr->cchjmps, jmp);
+        break;
+      }
+
+      case ETH_INSN_GETEXN:
+        write_getexn(bldr, ip->out);
+        break;
     }
   }
 }
@@ -602,7 +653,7 @@ end_if:
 eth_bytecode*
 eth_build_bytecode(eth_ssa *ssa)
 {
-  builder *bldr = create_builder();
+  builder *bldr = create_builder(ssa->ntries);
 
   build(bldr, ssa->body);
 
@@ -614,6 +665,13 @@ eth_build_bytecode(eth_ssa *ssa)
     bldr->arr[dblock->jmppos].jmp.offs = startpos - dblock->jmppos;
     build(bldr, dblock->code);
     write_jmp(bldr, dblock->retpos);
+  }
+
+  // set up catch-jumps
+  for (size_t i = 0; i < bldr->cchjmps.len; ++i)
+  {
+    catch_jmp *jmp = bldr->cchjmps.data + i;
+    bldr->arr[jmp->pos].jmp.offs = bldr->catches[jmp->tryid] - jmp->pos;;
   }
 
   eth_bytecode *bc = malloc(sizeof(eth_bytecode));

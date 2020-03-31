@@ -47,17 +47,29 @@ eth_insert_insn_before(eth_insn *where, eth_insn *insn)
   insn->prev = where->prev;
   if (where->prev)
   {
-    if (where->prev->tag == ETH_INSN_IF)
+    switch (where->prev->tag)
     {
-      if (where->prev->iff.thenbr == where)
-        where->prev->iff.thenbr = insn;
-      else if (where->prev->iff.elsebr == where)
-        where->prev->iff.elsebr = insn;
-      else
+      case ETH_INSN_IF:
+        if (where->prev->iff.thenbr == where)
+          where->prev->iff.thenbr = insn;
+        else if (where->prev->iff.elsebr == where)
+          where->prev->iff.elsebr = insn;
+        else
+          where->prev->next = insn;
+        break;
+
+      case ETH_INSN_TRY:
+        if (where->prev->try.trybr == where)
+          where->prev->try.trybr = insn;
+        else if (where->prev->try.catchbr == where)
+          where->prev->try.catchbr = insn;
+        else
+          where->prev->next = insn;
+        break;
+
+      default:
         where->prev->next = insn;
     }
-    else
-      where->prev->next = insn;
   }
   where->prev = insn;
 }

@@ -83,6 +83,11 @@ destroy_ir_node(eth_ir_node *node)
       eth_unref_ir_node(node->iff.elsebr);
       break;
 
+    case ETH_IR_TRY:
+      eth_unref_ir_node(node->try.trybr);
+      eth_unref_ir_node(node->try.catchbr);
+      break;
+
     case ETH_IR_SEQ:
       eth_unref_ir_node(node->seq.e1);
       eth_unref_ir_node(node->seq.e2);
@@ -187,6 +192,17 @@ eth_ir_if(eth_ir_node *cond, eth_ir_node *thenbr, eth_ir_node *elsebr)
   eth_ref_ir_node(node->iff.thenbr = thenbr);
   eth_ref_ir_node(node->iff.elsebr = elsebr);
   node->iff.toplvl = ETH_TOPLVL_NONE;
+  return node;
+}
+
+eth_ir_node*
+eth_ir_try(int exnvar, eth_ir_node *trybr, eth_ir_node *catchbr, int likely)
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_TRY);
+  node->try.exnvar = exnvar;
+  eth_ref_ir_node(node->try.trybr = trybr);
+  eth_ref_ir_node(node->try.catchbr = catchbr);
+  node->try.likely = likely;
   return node;
 }
 

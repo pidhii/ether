@@ -13,6 +13,7 @@ eth_vm(eth_bytecode *bc)
   eth_t r[bc->nreg];
   bool test = 0;
   int nstack = 0;
+  eth_t exn = NULL;
 
   for (eth_bc_insn *restrict ip = bc->code; true; ++ip)
   {
@@ -237,6 +238,19 @@ fetch_insn:
 
       case ETH_OPC_LOAD:
         r[ip->load.out] = *(eth_t*) ((char*)r[ip->load.vid] + ip->load.offs);
+        break;
+
+      case ETH_OPC_SETEXN:
+        exn = r[ip->setexn.vid];
+        break;
+
+      case ETH_OPC_GETEXN:
+      {
+        eth_t what = ETH_EXCEPTION(exn)->what;
+        eth_ref(what);
+        eth_unref(exn);
+        r[ip->getexn.out] = what;
+      }
         break;
     }
   }

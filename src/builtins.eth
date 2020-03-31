@@ -16,6 +16,7 @@ let pub (lshl) x y = x lshl y in
 let pub (lshr) x y = x lshr y in
 let pub (ashl) x y = x ashl y in
 let pub (ashr) x y = x ashr y in
+let pub (lnot) x = lnot x in
 
 let pub (<) x y = x < y in
 let pub (>) x y = x > y in
@@ -29,4 +30,50 @@ let pub (is) x y = x is y in
 let pub (:) x y = x : y in
 let pub (++) x y = x ++ y in
 
+let pub (not) x = not x in
+
+
+let pub id x = x in
+let pub flip f x y = f y x in
+
+
+let pub reverse xs = revappend xs nil in
+
+let pub revmap f xs =
+  let rec loop xs acc =
+    if let x:xs = xs then
+      loop xs (f x : acc)
+    else acc
+  in loop xs nil
+in
+
+let pub map f xs = reverse $ revmap f xs in
+
+let rec pub foreach f xs =
+  when let x:xs = xs then (
+    f x;
+    foreach f xs
+  )
+in
+
+let pub revfilter f xs =
+  let rec loop xs acc =
+    if let x:xs = xs then
+      loop xs (if f x then x : acc else acc)
+    else acc
+  in loop xs nil
+in
+
+let pub filter f xs = reverse $ revfilter f xs in
+
+let pub foldl f acc xs =
+  let rec loop xs acc =
+    if let x:xs = xs then
+      loop xs (f acc x)
+    else acc
+  in loop xs acc
+in
+
+
 ()
+

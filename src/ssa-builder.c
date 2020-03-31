@@ -64,6 +64,7 @@ typedef enum {
   RC_RULES_DEFAULT,
   RC_RULES_DISABLE,
   RC_RULES_PHI,
+  RC_RULES_UNREF,
 } rc_rules;
 
 typedef struct value_info {
@@ -74,11 +75,13 @@ typedef struct value_info {
   eth_insn *creatloc;
   bool isrec;
   bool isdummy;
+  int tryid;
 } value_info;
 
 typedef struct  {
   int nvars;
   int *vars;
+  // TODO: use cod_vec
   int vilen;
   int vicap;
   value_info **vinfo;
@@ -86,6 +89,8 @@ typedef struct  {
   rec_scope *recscp;
   int recscpcnt;
   bool testexn;
+  int ntries;
+  int istry, tryid;
 } ssa_builder;
 
 static value_info*
@@ -119,6 +124,8 @@ create_ssa_builder(int nvars)
   bldr->recscp = NULL;
   bldr->recscpcnt = 0;
   bldr->testexn = true;
+  bldr->ntries = 0;
+  bldr->istry = 0;
   return bldr;
 }
 
@@ -135,6 +142,12 @@ destroy_ssa_builder(ssa_builder *bldr)
   cod_vec_destroy(bldr->movs);
   assert(bldr->recscp == NULL);
   free(bldr);
+}
+
+static int
+new_try(ssa_builder *bldr)
+{
+  return bldr->ntries++;
 }
 
 /*
@@ -162,10 +175,11 @@ trace_mov(ssa_builder *bldr, eth_insn *insn)
 
 
 static eth_ssa*
-create_ssa(eth_insn *body, int nvals)
+create_ssa(eth_insn *body, int nvals, int ntries)
 {
   eth_ssa *ssa = malloc(sizeof(eth_ssa));
   ssa->nvals = nvals;
+  ssa->ntries = ntries;
   ssa->body = body;
   return ssa;
 }
@@ -241,6 +255,7 @@ move_to_phi_default(ssa_builder *bldr, eth_ssa_tape *tape, int phi, int vid)
   {
     case RC_RULES_DEFAULT:
     case RC_RULES_PHI:
+    case RC_RULES_UNREF:
     {
       eth_insn *mov = eth_insn_mov(phi, vid);
       eth_write_insn(tape, mov);
@@ -251,9 +266,8 @@ move_to_phi_default(ssa_builder *bldr, eth_ssa_tape *tape, int phi, int vid)
     case RC_RULES_DISABLE:
     {
       eth_insn *mov = eth_insn_mov(phi, vid);
-      eth_write_insn(tape, eth_insn_ref(vid));
       eth_write_insn(tape, mov);
-      trace_mov(bldr, mov); // don't realy need to trace THIS mov
+      trace_mov(bldr, mov);
       break;
     }
   }
@@ -353,6 +367,19 @@ build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int f, bool *e)
 }
 
 static void
+write_throw(ssa_builder *bldr, eth_ssa_tape *tape, int exnvid)
+{
+  if (bldr->istry)
+  {
+    eth_insn *catch = eth_insn_catch(bldr->tryid, exnvid);
+    eth_write_insn(tape, catch);
+    trace_mov(bldr, catch);
+  }
+  else
+    eth_write_insn(tape, eth_insn_ret(exnvid));
+}
+
+static void
 assert_number(ssa_builder *bldr, eth_ssa_tape *tape, int vid, bool *e)
 {
   if (bldr->vinfo[vid]->type)
@@ -363,9 +390,8 @@ assert_number(ssa_builder *bldr, eth_ssa_tape *tape, int vid, bool *e)
           bldr->vinfo[vid]->type->name);
       *e = 1;
       int exn = new_val(bldr, RC_RULES_DISABLE);
-      eth_write_insn(tape,
-          eth_insn_cval(exn, eth_exn(eth_str("type-error"))));
-      eth_write_insn(tape, eth_insn_ret(exn));
+      eth_write_insn(tape, eth_insn_cval(exn, eth_exn(eth_str("type-error"))));
+      write_throw(bldr, tape, exn);
     }
   }
   else
@@ -373,9 +399,8 @@ assert_number(ssa_builder *bldr, eth_ssa_tape *tape, int vid, bool *e)
     // test type:
     eth_ssa_tape *errtape = eth_create_ssa_tape();
     int exn = new_val(bldr, RC_RULES_DISABLE);
-    eth_write_insn(errtape,
-        eth_insn_cval(exn, eth_exn(eth_str("type-error"))));
-    eth_write_insn(errtape, eth_insn_ret(exn));
+    eth_write_insn(errtape, eth_insn_cval(exn, eth_exn(eth_str("type-error"))));
+    write_throw(bldr, errtape, exn);
     // --
     eth_insn *test = eth_insn_if_test_type(-1, vid, eth_number_type,
         eth_insn_nop(), errtape->head);
@@ -481,7 +506,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
       if (bldr->testexn)
       {
         eth_ssa_tape *thentape = eth_create_ssa_tape();
-        eth_write_insn(thentape, eth_insn_ret(ret));
+        write_throw(bldr, thentape, ret);
 
         eth_ssa_tape *elsetape = eth_create_ssa_tape();
         eth_write_insn(elsetape, eth_insn_nop());
@@ -528,7 +553,49 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
       eth_write_insn(tape, insn);
       if (ret >= 0)
         bldr->vinfo[ret]->creatloc = insn;
+      return ret;
+    }
 
+    case ETH_IR_TRY:
+    {
+      eth_ssa_tape *trytape = eth_create_ssa_tape();
+
+      bldr->istry++;
+      int oldid = bldr->tryid;
+      int tryid = bldr->tryid = new_try(bldr);
+      int tryret = build(bldr, trytape, ir->try.trybr, false, e);
+      bldr->istry--;
+      bldr->tryid = oldid;
+
+      eth_ssa_tape *cchtape = eth_create_ssa_tape();
+      // ---
+      int exnvid = new_val(bldr, RC_RULES_UNREF);
+      eth_insn *getexn = eth_insn_getexn(exnvid);
+      bldr->vinfo[exnvid]->creatloc = getexn;
+      bldr->vars[ir->try.exnvar] = exnvid;
+      eth_write_insn(cchtape, getexn);
+      // ---
+      int cchret = build(bldr, cchtape, ir->try.catchbr, istc, e);
+
+      int ret;
+      eth_insn *loc = NULL;
+      if (istc)
+      {
+        eth_write_insn(trytape, eth_insn_ret(tryret));
+        eth_write_insn(cchtape, eth_insn_ret(cchret));
+        ret = -1;
+      }
+      else
+        ret = resolve_phi(bldr, trytape, tryret, cchtape, cchret);
+
+      eth_insn *insn = eth_insn_try(ret, tryid, trytape->head, cchtape->head);
+      insn->try.likely = ir->try.likely;
+      eth_destroy_ssa_tape(trytape);
+      eth_destroy_ssa_tape(cchtape);
+
+      eth_write_insn(tape, insn);
+      if (ret >= 0)
+        bldr->vinfo[ret]->creatloc = insn;
       return ret;
     }
 
@@ -743,7 +810,8 @@ is_dead_end(eth_insn *begin)
       return (a && b) || is_dead_end(insn->next);
     }
 
-    if (insn->tag == ETH_INSN_RET)
+    // TODO: create marker-function
+    if (insn->tag == ETH_INSN_RET or insn->tag == ETH_INSN_CATCH)
       return true;
   }
 
@@ -777,6 +845,9 @@ is_using(eth_insn *insn, int vid)
 
     case ETH_INSN_IF:
       return insn->iff.cond == vid;
+
+    case ETH_INSN_TRY:
+      return false;
 
     case ETH_INSN_MOV:
       return insn->out == vid || insn->var.vid == vid;
@@ -829,6 +900,12 @@ is_using(eth_insn *insn, int vid)
         if (insn->mkscp.wrefs[i] == vid)
           return true;
       }
+      return false;
+
+    case ETH_INSN_CATCH:
+      return insn->catch.vid == vid;
+
+    case ETH_INSN_GETEXN:
       return false;
   }
 
@@ -885,6 +962,9 @@ is_moving(eth_insn *insn, int vid)
       }
       return false;
 
+    case ETH_INSN_CATCH:
+      return insn->catch.vid == vid;
+
     default:
       return false;
   }
@@ -906,6 +986,10 @@ get_moved_vids(eth_insn *insn, int *n)
     case ETH_INSN_FINFN:
       *n = insn->finfn.nmov;
       return insn->finfn.movs;
+
+    case ETH_INSN_CATCH:
+      *n = 1;
+      return &insn->catch.vid;
 
     default:
       eth_error("wtf");
@@ -946,6 +1030,14 @@ add_killer(kill_info *kinfo, int vid, eth_insn *insn)
   cod_vec_push(kinfo->vals[vid].killers, insn);
 }
 
+static eth_insn*
+last_insn(eth_insn *begin)
+{
+  while (begin->next)
+    begin = begin->next;
+  return begin;
+}
+
 static bool
 kill_value(kill_info *kinfo, eth_insn *begin, int vid)
 {
@@ -975,14 +1067,12 @@ kill_value(kill_info *kinfo, eth_insn *begin, int vid)
           eth_insert_insn_before(elseb, unref);
           add_killer(kinfo, vid, unref);
         }
-
         return true;
       }
       else
       {
         int thenkill = kill_value(kinfo, thenb, vid);
         int elsekill = kill_value(kinfo, elseb, vid);
-
         if (thenkill || elsekill)
         {
           if (not elsekill)
@@ -997,7 +1087,6 @@ kill_value(kill_info *kinfo, eth_insn *begin, int vid)
             eth_insert_insn_before(thenb, unref);
             add_killer(kinfo, vid, unref);
           }
-
           return true;
         }
         else
@@ -1005,7 +1094,41 @@ kill_value(kill_info *kinfo, eth_insn *begin, int vid)
       }
     }
 
-    if (insn->tag == ETH_INSN_RET)
+    if (insn->tag == ETH_INSN_TRY)
+    {
+      eth_insn *trybr = insn->try.trybr;
+      eth_insn *cchbr = insn->try.catchbr;
+
+      if (kill_value(kinfo, insn->next, vid))
+      {
+        if (is_dead_end(cchbr) and not kill_value(kinfo, cchbr, vid))
+        {
+          eth_insn *unref = eth_insn_unref(vid);
+          eth_insert_insn_before(cchbr, unref);
+          add_killer(kinfo, vid, unref);
+        }
+        return true;
+      }
+      else
+      {
+        if (kill_value(kinfo, cchbr, vid))
+        {
+          eth_insn *unref = eth_insn_unref(vid);
+          // TODO: can kill earlier: after last IF with CATCH
+          eth_insert_insn_after(last_insn(trybr), unref);
+          add_killer(kinfo, vid, unref);
+          return true;
+        }
+
+        if (kill_value(kinfo, trybr, vid))
+          return true;
+
+        break;
+      }
+    }
+
+    // TODO: create marker-function
+    if (insn->tag == ETH_INSN_RET or insn->tag == ETH_INSN_CATCH)
       break;
   }
 
@@ -1063,18 +1186,49 @@ find_mov(eth_insn *begin, int vid)
 static void
 insert_rc_phi(kill_info *kinfo, eth_insn *begin, int vid)
 {
-  assert(begin->tag == ETH_INSN_IF);
+  eth_insn *br1, *br2;
+  if (begin->tag == ETH_INSN_IF)
+  {
+    br1 = begin->iff.thenbr;
+    br2 = begin->iff.elsebr;
+  }
+  else if (begin->tag == ETH_INSN_TRY)
+  {
+    br1 = begin->try.trybr;
+    br2 = begin->try.catchbr;
+  }
+  else
+    abort();
+
   if (not kill_value(kinfo, begin->next, vid))
   {
     // TODO: should remove that MOV at all
     eth_insn *mov;
-    mov = find_mov(begin->iff.thenbr, vid);
+    mov = find_mov(br1, vid);
     if (not kill_value(kinfo, mov->next, vid))
-      eth_insert_insn_after(mov, eth_insn_unref(vid));
+    {
+      eth_insn *unref = eth_insn_unref(vid);
+      eth_insert_insn_after(mov, unref);
+      add_killer(kinfo, vid, unref);
+    }
+    mov = find_mov(br2, vid);
+    if (not kill_value(kinfo, mov->next, vid))
+    {
+      eth_insn *unref = eth_insn_unref(vid);
+      eth_insert_insn_after(mov, unref);
+      add_killer(kinfo, vid, unref);
+    }
+  }
+}
 
-    mov = find_mov(begin->iff.elsebr, vid);
-    if (not kill_value(kinfo, mov->next, vid))
-      eth_insert_insn_after(mov, eth_insn_unref(vid));
+static void
+insert_rc_unref(kill_info *kinfo, eth_insn *begin, int vid)
+{
+  if (not kill_value(kinfo, begin->next, vid))
+  {
+      eth_insn *unref = eth_insn_unref(vid);
+      eth_insert_insn_after(begin, unref);
+      add_killer(kinfo, vid, unref);
   }
 }
 
@@ -1125,20 +1279,22 @@ insert_rc(ssa_builder *bldr, eth_insn *body)
     switch (vinfo->rules)
     {
       case RC_RULES_DEFAULT:
-      {
         assert(vinfo->creatloc);
         insert_rc_default(kinfo, vinfo->creatloc, vid);
         break;
-      }
 
       case RC_RULES_PHI:
-      {
         assert(vinfo->creatloc);
         insert_rc_phi(kinfo, vinfo->creatloc, vid);
         break;
-      }
 
-      case RC_RULES_DISABLE: break;
+      case RC_RULES_UNREF:
+        assert(vinfo->creatloc);
+        insert_rc_unref(kinfo, vinfo->creatloc, vid);
+        break;
+
+      case RC_RULES_DISABLE:
+        break;
     }
   }
   handle_movs(bldr, kinfo);
@@ -1159,7 +1315,7 @@ build_body(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *body, bool *e)
   int fnret = build(bldr, tape, body, true, e);
   eth_write_insn(tape, eth_insn_ret(fnret));
   insert_rc(bldr, tape->head);
-  return create_ssa(tape->head, bldr->vilen);
+  return create_ssa(tape->head, bldr->vilen, bldr->ntries);
 }
 
 typedef struct {
@@ -1233,6 +1389,7 @@ eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
   {
     if (defs)
     {
+      // TODO: into separate function
       eth_insn *lastinsn = find_last_toplevel_insn(tape->head);
       eth_ssa_tape *tlvltape;
       if (lastinsn == tape->point)
@@ -1277,7 +1434,7 @@ eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
     }
 
     insert_rc(bldr, tape->head);
-    ssa = create_ssa(tape->head, bldr->vilen);
+    ssa = create_ssa(tape->head, bldr->vilen, bldr->ntries);
   }
   eth_destroy_ssa_tape(tape);
   destroy_ssa_builder(bldr);

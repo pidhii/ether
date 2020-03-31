@@ -588,6 +588,28 @@ eth_cdr(eth_t x)
   return ETH_PAIR(x)->cdr;
 }
 
+static inline size_t __attribute__((pure))
+eth_length(eth_t l, bool *isproper)
+{
+  size_t len = 0;
+  while (l->type == eth_pair_type)
+  {
+    l = eth_cdr(l);
+    len += 1;
+  }
+  if (isproper)
+    *isproper = l == eth_nil;
+  return len;
+}
+
+static inline bool __attribute__((pure))
+eth_is_proper_list(eth_t l)
+{
+  while (l->type == eth_pair_type)
+    l = eth_cdr(l);
+  return l == eth_nil;
+}
+
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                       MODULES AND ENVIRONMENT
@@ -655,6 +677,9 @@ eth_require_module(eth_env *env, const char *name);
 bool
 eth_load_module_from_script(eth_env *env, eth_module *mod, const char *path);
 
+bool
+eth_load_module_from_elf(eth_env *env, eth_module *mod, const char *path);
+
 int
 eth_get_nmodules(const eth_env *env);
 
@@ -704,6 +729,7 @@ typedef enum {
   ETH_AST_IMPORT,
   ETH_AST_AND,
   ETH_AST_OR,
+  ETH_AST_TRY,
 } eth_ast_tag;
 
 typedef enum {
@@ -732,6 +758,7 @@ struct eth_ast {
     struct { char *module; eth_ast *body; char *alias; char **nams; int nnam; }
       import;
     struct { eth_ast *lhs, *rhs; } scand, scor;
+    struct { eth_ast_pattern *pat; eth_ast *trybr, *catchbr; int likely; } try;
   };
 };
 
@@ -790,6 +817,9 @@ eth_ast_and(eth_ast *lhs, eth_ast *rhs);
 eth_ast* __attribute__((malloc))
 eth_ast_or(eth_ast *lhs, eth_ast *rhs);
 
+eth_ast* __attribute__((malloc))
+eth_ast_try(eth_ast_pattern *pat, eth_ast *try, eth_ast *catch, int likely);
+
 typedef struct eth_scanner eth_scanner;
 
 eth_scanner* __attribute__((malloc))
@@ -832,6 +862,7 @@ enum eth_ir_tag {
   ETH_IR_VAR,
   ETH_IR_APPLY,
   ETH_IR_IF,
+  ETH_IR_TRY,
   ETH_IR_SEQ,
   ETH_IR_BINOP,
   ETH_IR_UNOP,
@@ -849,6 +880,7 @@ struct eth_ir_node {
     struct { int vid; } var;
     struct { eth_ir_node *fn, **args; int nargs; } apply;
     struct { eth_ir_node *cond, *thenbr, *elsebr; eth_toplvl_flag toplvl; } iff;
+    struct { int exnvar; eth_ir_node *trybr, *catchbr; int likely; } try;
     struct { eth_ir_node *e1, *e2; } seq;
     struct { eth_binop op; eth_ir_node *lhs, *rhs; } binop;
     struct { eth_unop op; eth_ir_node *expr; } unop;
@@ -884,6 +916,9 @@ eth_ir_apply(eth_ir_node *fn, eth_ir_node *const *args, int nargs);
 
 eth_ir_node* __attribute__((malloc))
 eth_ir_if(eth_ir_node *cond, eth_ir_node *thenbr, eth_ir_node *elsebr);
+
+eth_ir_node* __attribute__((malloc))
+eth_ir_try(int exnvar, eth_ir_node *trybr, eth_ir_node *catchbr, int likely);
 
 eth_ir_node* __attribute__((malloc))
 eth_ir_seq(eth_ir_node *e1, eth_ir_node *e2);
@@ -1066,6 +1101,9 @@ enum eth_insn_tag {
   ETH_INSN_POP,
   ETH_INSN_CAP,
   ETH_INSN_MKSCP,
+  ETH_INSN_CATCH,
+  ETH_INSN_TRY,
+  ETH_INSN_GETEXN,
 };
 
 enum {
@@ -1100,6 +1138,9 @@ struct eth_insn {
     struct { int n; } pop;
     struct { int n; } cap;
     struct { int *clos, nclos, *wrefs, nwref; } mkscp;
+    struct { int tryid, vid; } catch;
+    struct { int id, likely; eth_insn *trybr, *catchbr; } try;
+    struct { } getexn;
   };
   eth_insn *prev;
   eth_insn *next;
@@ -1177,6 +1218,18 @@ eth_insn_cap(int vid0, int n);
 eth_insn* __attribute__((malloc))
 eth_insn_mkscp(int *clos, int nclos, int *wrefs, int nwref);
 
+eth_insn* __attribute__((malloc))
+eth_insn_catch(int tryid, int vid);
+
+eth_insn* __attribute__((malloc))
+eth_insn_try(int out, int id, eth_insn *trybr, eth_insn *catchbr);
+
+eth_insn* __attribute__((malloc))
+eth_insn_getexn(int out);
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                             SSA tape
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 struct eth_ssa_tape {
   eth_insn *head;
   eth_insn *point;
@@ -1200,9 +1253,13 @@ eth_insert_insn_before(eth_insn *where, eth_insn *insn);
 void
 eth_insert_insn_after(eth_insn *where, eth_insn *insn);
 
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                             SSA chunk
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 struct eth_ssa {
   int rc;
   int nvals;
+  int ntries;
   eth_insn *body;
 };
 
@@ -1280,6 +1337,9 @@ typedef enum {
   ETH_OPC_MKSCP,
 
   ETH_OPC_LOAD,
+
+  ETH_OPC_SETEXN,
+  ETH_OPC_GETEXN,
 } eth_opc;
 
 struct eth_bc_insn {
@@ -1298,9 +1358,7 @@ struct eth_bc_insn {
 
     struct { size_t out, vid; } dup;
 
-    struct { ptrdiff_t offs; } jnz;
-    struct { ptrdiff_t offs; } jze;
-    struct { ptrdiff_t offs; } jmp;
+    struct { ptrdiff_t offs; } jnz, jze, jmp;
 
     struct { size_t vid; } ref;
     struct { size_t vid; } dec;
@@ -1328,6 +1386,9 @@ struct eth_bc_insn {
 
     struct { size_t out; uint32_t vid; int32_t offs; } load;
   };
+
+  struct { size_t vid; } setexn;
+  struct { size_t out; } getexn;
 };
 
 struct eth_bytecode {

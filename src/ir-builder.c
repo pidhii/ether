@@ -485,6 +485,28 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
           eth_ir_if(eth_ir_var(tmpvar), eth_ir_var(tmpvar), rhs));
       return ret;
     }
+
+    case ETH_AST_TRY:
+    {
+      eth_ir_node *trybr = build(bldr, ast->try.trybr, e);
+
+      int exnvar = new_vid(bldr);
+
+      int n1 = bldr->vars->len;
+      eth_ir_pattern *pat = build_pattern(bldr, ast->try.pat, e);
+      int n2 = bldr->vars->len;
+      int nvars = n2 - n1;
+      eth_ir_node *ok = build(bldr, ast->try.catchbr, e);
+      eth_pop_var(bldr->vars, n2 - n1);
+
+      eth_ir_node *exn = eth_ir_var(exnvar);
+      eth_ir_node *ris = eth_ir_cval(eth_get_builtin("raise"));
+      eth_ir_node *rethrow = eth_ir_apply(ris, &exn, 1);
+
+      eth_ir_node *catchbr = eth_ir_match(pat, eth_ir_var(exnvar), ok, rethrow);
+
+      return eth_ir_try(exnvar, trybr, catchbr, ast->try.likely);
+    }
   }
 
   eth_error("undefined AST-node");

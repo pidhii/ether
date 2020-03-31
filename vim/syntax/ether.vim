@@ -40,7 +40,7 @@ syn keyword Function car cdr
 syn keyword Function pairs
 syn keyword Function apply vaarg
 syn keyword Function id
-syn keyword Function die error
+syn keyword Function die raise
 syn keyword Function force
 syn keyword Function system shell
 syn keyword Function loadfile
@@ -100,7 +100,7 @@ syn keyword ethKeyword let rec mut and or in return
 syn region ethBegin matchgroup=ethKeyword start=/\<begin\>/ end=/\<end\>/ contains=TOP
 syn keyword ethAssert assert
 
-syn keyword ethKeyword if unless when then else
+syn keyword ethKeyword if unless when then else try with
 syn keyword ethLazy lazy
 
 syn match ethOperator /[-+=*/%><&|.!ο]\+/

@@ -169,9 +169,15 @@ function! GetOCamlIndent()
    endif
  endif
 
+ " Indent if current line begins with 'with':
+ elseif line =~ '^\s*with\>'
+   if lline !~ '^\s*\(match\|try\)\>'
+     return s:FindPair('\<\%(match\|try\)\>', '','\<with\>')
+   endif
+
  " Add a 'shiftwidth' after lines ending with:
  "if lline =~ '\(:\|=\|->\|<-\|(\|\[\|{\|{<\|\[|\|\[<\|\<\(begin\|do\|else\|fun\|function\|functor\|if\|initializer\|object\|parser\|private\|sig\|struct\|then\|try\)\|\<object\s*(.*)\)\s*$'
- if lline =~ '\(=\|->\|<-\|(\|\[\|{\|{<\|\[|\|\[<\|\<\(begin\|do\|else\|fun\|function\|functor\|if\|initializer\|object\|parser\|private\|sig\|struct\|then\|try\)\|\<object\s*(.*)\)\s*$'
+ if lline =~ '\(=\|->\|<-\|(\|\[\|{\|{<\|\[|\|\[<\|\<\(begin\|do\|else\|fn\|if\|parser\|private\|sig\|struct\|then\|try\)\|\<object\s*(.*)\)\s*$'
    let ind = ind + shiftwidth()
 
  " Back to normal indent after lines ending with ';;':

@@ -26,31 +26,30 @@ destroy_pair(eth_type *type, eth_t x)
 static void
 write_pair(eth_type *type, eth_t x, FILE *stream)
 {
-  while (x->type == eth_pair_type) {
-    if (eth_car(x)->type == eth_pair_type)
-      putc('(', stream);
-    eth_write(eth_car(x), stream);
-    if (eth_car(x)->type == eth_pair_type)
-      putc(')', stream);
-    putc(':', stream);
-    x = eth_cdr(x);
+  if (eth_is_proper_list(x))
+  {
+    putc('[', stream);
+    while (x->type == eth_pair_type) {
+      eth_write(eth_car(x), stream);
+      x = eth_cdr(x);
+      if (x != eth_nil)
+        putc(',', stream);
+    }
+    putc(']', stream);
   }
-  eth_write(x, stream);
-}
-
-static void
-display_pair(eth_type *type, eth_t x, FILE *stream)
-{
-  while (x->type == eth_pair_type) {
-    if (eth_car(x)->type == eth_pair_type)
-      putc('(', stream);
-    eth_display(eth_car(x), stream);
-    if (eth_car(x)->type == eth_pair_type)
-      putc(')', stream);
-    putc(':', stream);
-    x = eth_cdr(x);
+  else
+  {
+    while (x->type == eth_pair_type) {
+      if (eth_car(x)->type == eth_pair_type)
+        putc('(', stream);
+      eth_write(eth_car(x), stream);
+      if (eth_car(x)->type == eth_pair_type)
+        putc(')', stream);
+      putc(':', stream);
+      x = eth_cdr(x);
+    }
+    eth_write(x, stream);
   }
-  eth_display(x, stream);
 }
 
 void
@@ -61,6 +60,5 @@ _eth_init_pair_type(void)
   eth_pair_type = eth_create_struct_type("pair", fields, offs, 2);
   eth_pair_type->destroy = destroy_pair;
   eth_pair_type->write = write_pair;
-  eth_pair_type->display = display_pair;
 }
 

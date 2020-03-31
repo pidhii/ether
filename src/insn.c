@@ -103,6 +103,11 @@ eth_destroy_insn(eth_insn *insn)
       free(insn->mkscp.wrefs);
       break;
 
+    case ETH_INSN_TRY:
+      eth_destroy_insn_list(insn->try.trybr);
+      eth_destroy_insn_list(insn->try.catchbr);
+      break;
+
     default:
       break;
   }
@@ -340,6 +345,36 @@ eth_insn_mkscp(int *clos, int nclos, int *wrefs, int nwref)
   return insn;
 }
 
+eth_insn*
+eth_insn_catch(int tryid, int vid)
+{
+  eth_insn *insn = create_insn(ETH_INSN_CATCH);
+  insn->catch.tryid = tryid;
+  insn->catch.vid = vid;
+  return insn;
+}
+
+eth_insn*
+eth_insn_try(int out, int id, eth_insn *trybr, eth_insn *catchbr)
+{
+  eth_insn *insn = create_insn(ETH_INSN_TRY);
+  insn->out = out;
+  insn->try.id = id;
+  insn->try.likely = 0;
+  insn->try.trybr = trybr;
+  insn->try.catchbr = catchbr;
+  trybr->prev = catchbr->prev = insn;
+  return insn;
+}
+
+eth_insn*
+eth_insn_getexn(int out)
+{
+  eth_insn *insn = create_insn(ETH_INSN_GETEXN);
+  insn->out = out;
+  return insn;
+}
+
 void
 dump_ssa(int ident, const eth_insn *insn, FILE *stream)
 {
@@ -514,6 +549,32 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
       for (int i = 0; i < insn->mkscp.nclos; ++i)
         fprintf(stream, i > 0 ? " %%%d" : "%%%d", insn->mkscp.clos[i]);
       fputs(">;\n", stream);
+      break;
+
+    case ETH_INSN_CATCH:
+      fprintf(stream, "catch %%%d;\n", insn->catch.vid);
+      break;
+
+    case ETH_INSN_TRY:
+      fprintf(stream, "try ");
+      if (insn->out >= 0) fprintf(stream, "<phi %%%d> ", insn->out);
+      if (insn->try.likely > 0) fprintf(stream, "<likely> ");
+      else if (insn->try.likely < 0) fprintf(stream, "<unlikely> ");
+      fprintf(stream, "\n");
+
+      dump_ssa(ident + 2, insn->try.trybr, stream);
+
+      for (int i = 0; i < ident; ++i) putc(' ', stream);
+      fputs("except\n", stream);
+
+      dump_ssa(ident + 2, insn->try.catchbr, stream);
+
+      for (int i = 0; i < ident; ++i) putc(' ', stream);
+      fputs("end\n", stream);
+      break;
+
+    case ETH_INSN_GETEXN:
+      fprintf(stream, "%%%d = getexn;\n", insn->out);
       break;
   }
 

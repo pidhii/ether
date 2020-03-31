@@ -1,6 +1,10 @@
 %{
 #include "ether/ether.h"
 
+
+ETH_MODULE("ether:scanner");
+
+
 #define YY_DECL \
   int yylex(YYSTYPE *yylval, YYLTYPE *yylloc, eth_scanner *yyscanner)
 
@@ -22,6 +26,7 @@
 #include <string.h>
 
 extern int _eth_start_token;
+
 
 %}
 
@@ -89,13 +94,16 @@ pub    { return PUB; }
 import { return IMPORT; }
 as     { return AS; }
 unqualified { return UNQUALIFIED; }
+try    { return TRY; }
+with   { return WITH; }
+or     { return OR; }
 
 nil   { yylval->constant = eth_nil;   return CONST; }
 true  { yylval->constant = eth_true;  return CONST; }
 false { yylval->constant = eth_false; return CONST; }
 
-'%'     |
-'^'     |
+"%"     |
+"^"     |
 "."     |
 "$"     |
 ":"     |
@@ -104,6 +112,7 @@ false { yylval->constant = eth_false; return CONST; }
 "+"|"-" |
 "*"|"/" |
 "("|")" |
+"["|"]" |
 "="     |
 ","     |
 ";"     { return yytext[0]; }
@@ -128,7 +137,7 @@ lnot    { return LNOT; }
 "++"    { return PPLUS; }
 
 
-"("(mod|land|lor|lxor|lshl|lshr|ashl|ashr|is)")" |
+"("(mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|not|lnot)")" |
 "("{OPERATOR}")"     {
   char *buf = malloc(yyleng - 2 + 1);
   strncpy(buf, yytext + 1, yyleng - 2);
@@ -145,6 +154,11 @@ lnot    { return LNOT; }
 [A-Z][_a-zA-Z0-9]* {
   yylval->string = strdup(yytext);
   return CAPSYMBOL;
+}
+
+. {
+  eth_warning("undefined symbol '%c'", yytext[0]);
+  return UNDEFINED;
 }
 
 %%
