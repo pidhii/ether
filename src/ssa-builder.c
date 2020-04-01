@@ -68,7 +68,6 @@ typedef enum {
 } rc_rules;
 
 typedef struct value_info {
-  struct value_info *prev;
   rc_rules rules;
   eth_t cval;
   eth_type *type;
@@ -101,14 +100,9 @@ create_empty_vinfo()
 }
 
 static void
-destroy_vinfo_list(value_info *vinfo)
+destroy_vinfo(value_info *vinfo)
 {
-  while (vinfo)
-  {
-    value_info *tmp = vinfo->prev;
-    free(vinfo);
-    vinfo = tmp;
-  }
+  free(vinfo);
 }
 
 static ssa_builder*
@@ -134,10 +128,7 @@ destroy_ssa_builder(ssa_builder *bldr)
 {
   free(bldr->vars);
   for (int i = 0; i < bldr->vilen; ++i)
-  {
-    assert(bldr->vinfo[i]->prev == NULL);
-    destroy_vinfo_list(bldr->vinfo[i]);
-  }
+    destroy_vinfo(bldr->vinfo[i]);
   free(bldr->vinfo);
   cod_vec_destroy(bldr->movs);
   assert(bldr->recscp == NULL);
@@ -390,7 +381,7 @@ assert_number(ssa_builder *bldr, eth_ssa_tape *tape, int vid, bool *e)
           bldr->vinfo[vid]->type->name);
       *e = 1;
       int exn = new_val(bldr, RC_RULES_DISABLE);
-      eth_write_insn(tape, eth_insn_cval(exn, eth_exn(eth_str("type-error"))));
+      eth_write_insn(tape, eth_insn_cval(exn, eth_exn(eth_sym("Type_error"))));
       write_throw(bldr, tape, exn);
     }
   }
@@ -399,7 +390,7 @@ assert_number(ssa_builder *bldr, eth_ssa_tape *tape, int vid, bool *e)
     // test type:
     eth_ssa_tape *errtape = eth_create_ssa_tape();
     int exn = new_val(bldr, RC_RULES_DISABLE);
-    eth_write_insn(errtape, eth_insn_cval(exn, eth_exn(eth_str("type-error"))));
+    eth_write_insn(errtape, eth_insn_cval(exn, eth_exn(eth_sym("Type_error"))));
     write_throw(bldr, errtape, exn);
     // --
     eth_insn *test = eth_insn_if_test_type(-1, vid, eth_number_type,
@@ -411,9 +402,12 @@ assert_number(ssa_builder *bldr, eth_ssa_tape *tape, int vid, bool *e)
   }
 }
 
+typedef struct { int vid; eth_type *oldtype; eth_t oldcval; } pat_save;
+typedef cod_vec(pat_save) pat_save_vec;
+
 static eth_ssa_pattern*
 build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
-    bool *e)
+    pat_save_vec *savs, bool *e)
 {
   switch (pat->tag)
   {
@@ -432,15 +426,67 @@ build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
 
     case ETH_PATTERN_UNPACK:
     {
+      bool dotest;
+      if (bldr->vinfo[expr]->type)
+      {
+        if (bldr->vinfo[expr]->type != pat->unpack.type)
+        {
+          eth_warning("pattern won't match: expect %s, but value is of type %s",
+              pat->unpack.type->name, bldr->vinfo[expr]->type->name);
+          *e = true;
+          dotest = true;
+        }
+        else
+          dotest = false;
+      }
+      else
+        dotest = true;
+
+      pat_save save = {
+        .vid = expr,
+        .oldtype = bldr->vinfo[expr]->type,
+        .oldcval = bldr->vinfo[expr]->cval,
+      };
+      cod_vec_push(*savs, save);
+      bldr->vinfo[expr]->type = pat->unpack.type;
+
       eth_ssa_pattern *pats[pat->unpack.n];
       int vids[pat->unpack.n];
       for (int i = 0; i < pat->unpack.n; ++i)
       {
         vids[i] = new_val(bldr, RC_RULES_DISABLE);
-        pats[i] = build_pattern(bldr, pat->unpack.subpats[i], vids[i], true, e);
+        pats[i] = build_pattern(bldr, pat->unpack.subpats[i], vids[i], true,
+            savs, e);
       }
+
       return eth_ssa_unpack_pattern(pat->unpack.type, pat->unpack.offs, vids,
-          pats, pat->unpack.n);
+          pats, pat->unpack.n, dotest);
+    }
+
+    case ETH_PATTERN_SYMBOL:
+    {
+      value_info *vinfo = bldr->vinfo[expr];
+
+      if (vinfo->cval and vinfo->cval == pat->symbol.sym)
+        return eth_ssa_symbol_pattern(pat->symbol.sym, false);
+
+      if (vinfo->type and vinfo->type != eth_symbol_type)
+      {
+        eth_warning("pattern won't match: expect %s, but value is of type %s",
+            eth_symbol_type->name, vinfo->type->name);
+        *e = 1;
+      }
+
+      pat_save save = {
+        .vid = expr,
+        .oldtype = bldr->vinfo[expr]->type,
+        .oldcval = bldr->vinfo[expr]->cval,
+      };
+      cod_vec_push(*savs, save);
+      bldr->vinfo[expr]->type = eth_symbol_type;
+      bldr->vinfo[expr]->cval = pat->symbol.sym;
+
+      return eth_ssa_symbol_pattern(pat->symbol.sym, true);
     }
   }
 
@@ -741,25 +787,38 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
     case ETH_IR_MATCH:
     {
       int cond = build(bldr, tape, ir->match.expr, false, e);
-      int n1 = bldr->vilen;
-      eth_ssa_pattern *pat = build_pattern(bldr, ir->match.pat, cond, false, e);
-      int n2 = bldr->vilen;
 
       if (ir->match.pat->tag == ETH_PATTERN_IDENT)
         // optimize trivial identifier-match
       {
+        eth_ssa_pattern *pat = build_pattern(bldr, ir->match.pat, cond, false,
+            NULL, e);
         eth_destroy_ssa_pattern(pat);
         return build(bldr, tape, ir->match.thenbr, istc, e);
       }
       else
       {
-
+        pat_save_vec savs;
+        cod_vec_init(savs);
+        // --
+        int n1 = bldr->vilen;
+        eth_ssa_pattern *pat = build_pattern(bldr, ir->match.pat, cond, false,
+            &savs, e);
+        int n2 = bldr->vilen;
+        // --
         eth_insn *ctor = eth_insn_nop();
         ctor->flag = ETH_IFLAG_NOBEFORE;
-
+        // --
         eth_ssa_tape *thentape = eth_create_ssa_tape();
         eth_write_insn(thentape, ctor);
         int thenret = build(bldr, thentape, ir->match.thenbr, istc, e);
+        // --
+        // TODO: this recovery must be a separate function
+        cod_vec_iter(savs, i, x,
+            bldr->vinfo[x.vid]->type = x.oldtype;
+            bldr->vinfo[x.vid]->cval = x.oldcval;
+        );
+        cod_vec_destroy(savs);
 
         eth_ssa_tape *elsetape = eth_create_ssa_tape();
         int elseret = build(bldr, elsetape, ir->match.elsebr, istc, e);
@@ -1433,7 +1492,7 @@ eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
         eth_destroy_ssa_tape(tlvltape);
 
       int exnvid = new_val(bldr, RC_RULES_DISABLE);
-      eth_t exn = eth_exn(eth_str("import-error"));
+      eth_t exn = eth_exn(eth_sym("Import_error"));
       eth_write_insn(tape, eth_insn_cval(exnvid, exn));
       eth_write_insn(tape, eth_insn_ret(exnvid));
     }

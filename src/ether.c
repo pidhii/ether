@@ -97,6 +97,20 @@ eth_get_build_flags(void)
 }
 
 
+static
+uint8_t g_siphash_key[16] = {
+  1, 2, 3, 4, 5, 6, 7, 8, 9,
+  10, 11, 12, 13, 14, 15, 16
+};
+
+const uint8_t*
+eth_get_siphash_key(void)
+{
+  return g_siphash_key;
+}
+
+
+
 void
 eth_init(void)
 {
@@ -137,6 +151,9 @@ eth_init(void)
   extern void _eth_init_nil_type(void);
   _eth_init_nil_type();
 
+  extern void _eth_init_symbol_type(void);
+  _eth_init_symbol_type();
+
   extern void _eth_init_builtins(void);
   _eth_init_builtins();
 }
@@ -154,6 +171,9 @@ eth_cleanup(void)
   eth_destroy_type(eth_boolean_type);
   eth_destroy_type(eth_nil_type);
   eth_destroy_type(eth_pair_type);
+
+  extern void _eth_cleanup_symbol_type(void);
+  _eth_cleanup_symbol_type();
 
   extern void _eth_cleanup_magic(void);
   _eth_cleanup_magic();

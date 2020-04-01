@@ -27,6 +27,15 @@ eth_ir_unpack_pattern(eth_type *type, int offs[], eth_ir_pattern *pats[], int n)
   return pat;
 }
 
+eth_ir_pattern*
+eth_ir_symbol_pattern(eth_t sym)
+{
+  eth_ir_pattern *pat = malloc(sizeof(eth_ir_pattern));
+  pat->tag = ETH_PATTERN_SYMBOL;
+  eth_ref(pat->symbol.sym = sym);
+  return pat;
+}
+
 void
 eth_destroy_ir_pattern(eth_ir_pattern *pat)
 {
@@ -40,6 +49,10 @@ eth_destroy_ir_pattern(eth_ir_pattern *pat)
       for (int i = 0; i < pat->unpack.n; ++i)
         eth_destroy_ir_pattern(pat->unpack.subpats[i]);
       free(pat->unpack.subpats);
+      break;
+
+    case ETH_PATTERN_SYMBOL:
+      eth_unref(pat->symbol.sym);
       break;
   }
   free(pat);

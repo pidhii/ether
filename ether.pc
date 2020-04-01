@@ -4,6 +4,6 @@ libdir=${prefix}/lib
 
 Name: opium
 Description: Interpreter
-Version: 0.1.0
+Version: @PROJECT_VERSION@
 Cflags: -I${includedir}
 Libs: -L${libdir} -lether

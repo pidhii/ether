@@ -21,6 +21,7 @@ typedef uint32_t eth_word_t;
 typedef int32_t eth_sword_t;
 typedef uint64_t eth_dword_t;
 typedef int64_t eth_sdword_t;
+typedef uint32_t eth_hash_t;
 
 typedef enum eth_ir_tag eth_ir_tag;
 typedef enum eth_insn_tag eth_insn_tag;
@@ -104,6 +105,9 @@ eth_get_build(void);
 const char*
 eth_get_build_flags(void);
 
+const uint8_t*
+eth_get_siphash_key(void);
+
 
 void
 eth_init(void);
@@ -155,6 +159,7 @@ eth_unop_sym(eth_unop op);
 
 const char*
 eth_unop_name(eth_unop op);
+
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                            CALL PROPAGATION
@@ -610,6 +615,16 @@ eth_is_proper_list(eth_t l)
   return l == eth_nil;
 }
 
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                              symbol
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+ETH_EXTERN
+eth_type *eth_symbol_type;
+
+eth_t
+eth_create_symbol(const char *str);
+#define eth_sym eth_create_symbol
+
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                       MODULES AND ENVIRONMENT
@@ -693,6 +708,7 @@ eth_get_modules(const eth_env *env, const eth_module *out[], int n);
 typedef enum {
   ETH_PATTERN_IDENT,
   ETH_PATTERN_UNPACK,
+  ETH_PATTERN_SYMBOL,
 } eth_pattern_tag;
 
 typedef struct eth_ast_pattern eth_ast_pattern;
@@ -701,6 +717,7 @@ struct eth_ast_pattern {
   union {
     struct { char *str; bool pub; } ident;
     struct { char *type, **fields; eth_ast_pattern **subpats; int n; } unpack;
+    struct { eth_t sym; } symbol;
   };
 };
 
@@ -710,6 +727,9 @@ eth_ast_ident_pattern(const char *ident);
 eth_ast_pattern*
 eth_ast_unpack_pattern(const char *type, char *const fields[],
     eth_ast_pattern *pats[], int n);
+
+eth_ast_pattern*
+eth_ast_symbol_pattern(eth_t sym);
 
 void
 eth_destroy_ast_pattern(eth_ast_pattern *pat);
@@ -844,6 +864,7 @@ struct eth_ir_pattern {
   union {
     struct { int varid; } ident;
     struct { eth_type *type; int n, *offs; eth_ir_pattern **subpats; } unpack;
+    struct { eth_t sym; } symbol;
   };
 };
 
@@ -852,6 +873,9 @@ eth_ir_ident_pattern(int varid);
 
 eth_ir_pattern*
 eth_ir_unpack_pattern(eth_type *type, int offs[], eth_ir_pattern *pats[], int n);
+
+eth_ir_pattern*
+eth_ir_symbol_pattern(eth_t sym);
 
 void
 eth_destroy_ir_pattern(eth_ir_pattern *pat);
@@ -1066,8 +1090,10 @@ struct eth_ssa_pattern {
   eth_pattern_tag tag;
   union {
     struct { int vid; } ident;
-    struct { eth_type *type; int *offs, *vids, n; eth_ssa_pattern **subpat; }
+    struct { eth_type *type; int *offs, *vids, n; eth_ssa_pattern **subpat;
+             bool dotest; }
       unpack;
+    struct { eth_t sym; bool dotest; } symbol;
   };
 };
 
@@ -1076,7 +1102,10 @@ eth_ssa_ident_pattern(int vid);
 
 eth_ssa_pattern* __attribute__((malloc))
 eth_ssa_unpack_pattern(eth_type *type, int const offs[], int const vids[],
-    eth_ssa_pattern *const pats[], int n);
+    eth_ssa_pattern *const pats[], int n, bool dotest);
+
+eth_ssa_pattern*
+eth_ssa_symbol_pattern(eth_t sym, bool dotest);
 
 void
 eth_destroy_ssa_pattern(eth_ssa_pattern *pat);
@@ -1286,6 +1315,7 @@ typedef enum {
 
   ETH_OPC_TEST,
   ETH_OPC_TESTTY,
+  ETH_OPC_TESTIS,
   ETH_OPC_GETTEST,
 
   ETH_OPC_DUP,
@@ -1343,7 +1373,11 @@ typedef enum {
 } eth_opc;
 
 struct eth_bc_insn {
+#ifdef ETH_DEBUG_MODE
+  eth_opc opc;
+#else
   uint64_t opc;
+#endif
   union {
     struct { uint64_t out; eth_t val; } cval;
 
@@ -1354,6 +1388,7 @@ struct eth_bc_insn {
 
     struct { uint64_t vid; } test;
     struct { uint64_t vid; eth_type *type; } testty;
+    struct { uint64_t vid; eth_t cval; } testis;
     struct { uint64_t out; } gettest;
 
     struct { uint64_t out, vid; } dup;
@@ -1433,7 +1468,7 @@ _eth_type_error(size_t n, size_t ntot)
   for (size_t i = 0; i < n; ++i)
     eth_unref(eth_sp[i]);
   eth_pop_stack(ntot);
-  return eth_exn(eth_str("type-error"));
+  return eth_exn(eth_sym("Type_error"));
 }
 
 #define eth_start(arity) \

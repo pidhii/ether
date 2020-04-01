@@ -210,6 +210,9 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, int *e)
       }
       return eth_ir_unpack_pattern(type, offs, pats, n);
     }
+
+    case ETH_PATTERN_SYMBOL:
+      return eth_ir_symbol_pattern(pat->symbol.sym);
   }
 
   eth_error("wtf");
@@ -239,7 +242,7 @@ build_let(ir_builder *bldr, int idx, eth_ast *ast, eth_ir_node *const vals[],
     eth_ir_node *thenbr = build_let(bldr, idx + 1, ast, vals, nvars0, e);
 
     eth_ir_node *raise = eth_ir_cval(eth_get_builtin("raise"));
-    eth_ir_node *what = eth_ir_cval(eth_str("type-error"));
+    eth_ir_node *what = eth_ir_cval(eth_sym("Type_error"));
     eth_ir_node *elsebr = eth_ir_apply(raise, &what, 1);
 
     eth_ir_node *ret = eth_ir_match(pat, vals[idx], thenbr, elsebr);
@@ -267,7 +270,7 @@ build_letrec(ir_builder *bldr, int idx, eth_ast *ast, int nvars0, int nvars,
     eth_ir_node *thenbr = build_letrec(bldr, idx + 1, ast, nvars0, nvars, pats, e);
 
     eth_ir_node *raise = eth_ir_cval(eth_get_builtin("raise"));
-    eth_ir_node *what = eth_ir_cval(eth_str("type-error"));
+    eth_ir_node *what = eth_ir_cval(eth_sym("Type_error"));
     eth_ir_node *elsebr = eth_ir_apply(raise, &what, 1);
 
     eth_ir_node *ret = eth_ir_match(pats[idx], expr, thenbr, elsebr);

@@ -173,6 +173,7 @@ atom
   | ident { $$ = eth_ast_ident($1); free($1); }
   | CONST  { $$ = eth_ast_cval($1); }
   | string { $$ = eth_ast_cval(eth_create_string($1)); free($1); }
+  | CAPSYMBOL { $$ = eth_ast_cval(eth_sym($1)); free($1); }
   | '('')' { $$ = eth_ast_cval(eth_nil); }
   | '(' expr ')' { $$ = $2; }
   | atom '!' { $$ = eth_ast_apply($1, NULL, 0); }
@@ -407,6 +408,7 @@ atomic_pattern
     $$->ident.pub = $1;
     free($2);
   }
+  | CAPSYMBOL { $$ = eth_ast_symbol_pattern(eth_sym($1)); free($1); }
   | '(' pattern ')' { $$ = $2; }
 ;
 

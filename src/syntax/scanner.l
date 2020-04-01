@@ -146,7 +146,7 @@ lnot    { return LNOT; }
   return SYMBOL;
 }
 
-[_a-z][_a-zA-Z0-9]* {
+[_a-z][_a-zA-Z0-9]*['?]? {
   yylval->string = strdup(yytext);
   return SYMBOL;
 }

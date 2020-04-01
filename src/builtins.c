@@ -169,7 +169,7 @@ _printf(void)
   if (fmt->type != eth_string_type)
   {
     eth_drop(fmt);
-    return eth_exn(eth_str("type-error"));
+    return eth_exn(eth_sym("Type_error"));
   }
 
   int n = 0;
@@ -190,7 +190,7 @@ _printf(void)
       else
       {
         eth_drop(fmt);
-        return eth_exn(eth_str("format-error"));
+        return eth_exn(eth_sym("Format_error"));
       }
       continue;
     }

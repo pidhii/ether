@@ -44,7 +44,7 @@ fetch_insn:
         if (eth_unlikely(fn->type != eth_function_type))
         {
           while (nstack--) eth_drop(*eth_sp++);
-          r[ip->apply.out] = eth_exn(eth_str("apply-error"));
+          r[ip->apply.out] = eth_exn(eth_sym("Apply_error"));
           nstack = 0;
           break;
         }
@@ -59,7 +59,7 @@ fetch_insn:
         if (eth_unlikely(fn->type != eth_function_type))
         {
           while (nstack--) eth_drop(*eth_sp++);
-          r[ip->apply.out] = eth_exn(eth_str("apply-error"));
+          r[ip->apply.out] = eth_exn(eth_sym("Apply_error"));
           nstack = 0;
           break;
         }
@@ -88,6 +88,10 @@ fetch_insn:
 
       case ETH_OPC_TESTTY:
         test = r[ip->testty.vid]->type == ip->testty.type;
+        break;
+
+      case ETH_OPC_TESTIS:
+        test = r[ip->testty.vid] == ip->testis.cval;
         break;
 
       case ETH_OPC_GETTEST:
@@ -131,22 +135,13 @@ fetch_insn:
       case ETH_OPC_RET:
         return r[ip->ret.vid];
 
-#define ARITHM_BINOP(opc, op)                                   \
-      case ETH_OPC_##opc:                                       \
-      {                                                         \
-        if (r[ip->binop.lhs]->type != eth_number_type ||        \
-            r[ip->binop.rhs]->type != eth_number_type)          \
-        {                                                       \
-          r[ip->binop.out] =                                    \
-            eth_exn(eth_str("type-error"));                     \
-        }                                                       \
-        else                                                    \
-        {                                                       \
-          eth_number_t lhs = ETH_NUMBER(r[ip->binop.lhs])->val; \
-          eth_number_t rhs = ETH_NUMBER(r[ip->binop.rhs])->val; \
-          r[ip->binop.out] = eth_num(op);                       \
-        }                                                       \
-        break;                                                  \
+#define ARITHM_BINOP(opc, op)                                 \
+      case ETH_OPC_##opc:                                     \
+      {                                                       \
+        eth_number_t lhs = ETH_NUMBER(r[ip->binop.lhs])->val; \
+        eth_number_t rhs = ETH_NUMBER(r[ip->binop.rhs])->val; \
+        r[ip->binop.out] = eth_num(op);                       \
+        break;                                                \
       }
       ARITHM_BINOP(ADD, lhs + rhs)
       ARITHM_BINOP(SUB, lhs - rhs)

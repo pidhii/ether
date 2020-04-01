@@ -10,8 +10,7 @@ set comments=b:#
 
 set iskeyword+=?,'
 syn match ethIdentifier /\<[a-z_][a-zA-Z0-9_]*['?]?\>/
-syn match ethModule     /\<[A-Z][a-zA-Z0-9_]*\>/
-syn match ethSymbol     /'[^ \t\n(){}\[\]'";,:]\+/
+syn match ethSymbol     /\<[A-Z][a-zA-Z0-9_]*\>/
 
 "syn region ethModuleDef matchgroup=ethModule start=/\<module\>/ end=/\<end\>/ contains=TOP
 
@@ -80,6 +79,7 @@ syn keyword Function drop take
 syn keyword Function zero? positive? negative? even? odd?
 syn keyword Function match split join
 
+syn match ethModule /\<[A-Z][a-zA-Z0-9_]*\s*\./he=e-1
 
 syn keyword ethType fn
 syn region ethTable matchgroup=Type start=/{/ end=/}/ contains=TOP skipwhite skipnl

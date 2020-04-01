@@ -158,7 +158,6 @@ main(int argc, char **argv)
           double t2sec = t2.tv_sec + t2.tv_nsec * 1e-9;
           double dtsec = t2sec - t1sec;
           eth_debug("evaluation time: %f [cpu sec.]", dtsec);
-          eth_debug("size: %ju, align: %ju", sizeof(eth_bc_insn), __alignof__(eth_bc_insn));
         }
         else
           eth_error("failed to build bytecode");

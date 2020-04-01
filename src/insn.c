@@ -15,7 +15,7 @@ eth_ssa_ident_pattern(int vid)
 
 eth_ssa_pattern*
 eth_ssa_unpack_pattern(eth_type *type, int const offs[], int const vids[],
-    eth_ssa_pattern *const pats[], int n)
+    eth_ssa_pattern *const pats[], int n, bool dotest)
 {
   eth_ssa_pattern *pat = malloc(sizeof(eth_ssa_pattern));
   pat->tag = ETH_PATTERN_UNPACK;
@@ -24,9 +24,20 @@ eth_ssa_unpack_pattern(eth_type *type, int const offs[], int const vids[],
   pat->unpack.vids = malloc(sizeof(int) * n);
   pat->unpack.subpat = malloc(sizeof(eth_ssa_pattern*) * n);
   pat->unpack.n = n;
+  pat->unpack.dotest = dotest;
   memcpy(pat->unpack.offs, offs, sizeof(int) * n);
   memcpy(pat->unpack.vids, vids, sizeof(int) * n);
   memcpy(pat->unpack.subpat, pats, sizeof(eth_ssa_pattern*) * n);
+  return pat;
+}
+
+eth_ssa_pattern*
+eth_ssa_symbol_pattern(eth_t sym, bool dotest)
+{
+  eth_ssa_pattern *pat = malloc(sizeof(eth_ssa_pattern));
+  pat->tag = ETH_PATTERN_SYMBOL;
+  eth_ref(pat->symbol.sym = sym);
+  pat->symbol.dotest = dotest;
   return pat;
 }
 
@@ -44,6 +55,10 @@ eth_destroy_ssa_pattern(eth_ssa_pattern *pat)
       for (int i = 0; i < pat->unpack.n; ++i)
         eth_destroy_ssa_pattern(pat->unpack.subpat[i]);
       free(pat->unpack.subpat);
+      break;
+
+    case ETH_PATTERN_SYMBOL:
+      eth_unref(pat->symbol.sym);
       break;
   }
   free(pat);

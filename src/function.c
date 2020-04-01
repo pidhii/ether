@@ -185,7 +185,7 @@ _eth_partial_apply(eth_function *fn, int narg)
       else
       {
         eth_drop(tmp_f);
-        return eth_exn(eth_str("apply-error"));
+        return eth_exn(eth_sym("Apply_error"));
       }
     }
 

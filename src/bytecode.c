@@ -5,6 +5,10 @@
 #include <assert.h>
 #include <string.h>
 
+
+ETH_MODULE("ether:bytecode")
+
+
 static void
 destroy_insn(eth_bc_insn *insn)
 {
@@ -29,6 +33,10 @@ destroy_insn(eth_bc_insn *insn)
       free(insn->mkscp.data->clos);
       free(insn->mkscp.data->wrefs);
       free(insn->mkscp.data);
+      break;
+
+    case ETH_OPC_TESTIS:
+      eth_unref(insn->testis.cval);
       break;
 
     default:
@@ -155,6 +163,17 @@ write_testty(builder *bldr, int vid, eth_type *type)
   insn->opc = ETH_OPC_TESTTY;
   insn->testty.vid = vid;
   insn->testty.type = type;
+  return bldr->len - 1;
+}
+
+static int
+write_testis(builder *bldr, int vid, eth_t cval)
+{
+  eth_bc_insn *insn = append_insn(bldr);
+  insn->opc = ETH_OPC_TESTIS;
+  insn->testis.vid = vid;
+  insn->testis.cval = cval;
+  eth_ref(cval);
   return bldr->len - 1;
 }
 
@@ -397,6 +416,8 @@ MAKE_BINOP(cons, CONS)
 MAKE_UNOP(not , NOT)
 MAKE_UNOP(lnot, LNOT)
 
+
+
 typedef cod_vec(int) int_vec;
 
 // TODO: optimize (first unpacks, then idents)
@@ -410,12 +431,14 @@ build_pattern(builder *bldr, eth_ssa_pattern *pat, int expr, int_vec *jmps)
 
     case ETH_PATTERN_UNPACK:
     {
-      if (pat->unpack.type)
+      if (pat->unpack.dotest)
       {
         write_testty(bldr, expr, pat->unpack.type);
         int jmp = write_jze(bldr, -1);
         cod_vec_push(*jmps, jmp);
       }
+      else
+        eth_debug("ommiting type-check for %s", pat->unpack.type->name);
 
       for (int i = 0; i < pat->unpack.n; ++i)
       {
@@ -425,6 +448,17 @@ build_pattern(builder *bldr, eth_ssa_pattern *pat, int expr, int_vec *jmps)
 
       break;
     }
+
+    case ETH_PATTERN_SYMBOL:
+      if (pat->symbol.dotest)
+      {
+        write_testis(bldr, expr, pat->symbol.sym);
+        int jmp = write_jze(bldr, -1);
+        cod_vec_push(*jmps, jmp);
+      }
+      else
+        eth_debug("ommiting EQ test for ~w", pat->symbol.sym);
+      break;
   }
 }
 
@@ -507,12 +541,20 @@ if_type:
         goto end_if;
 
 if_match:
-        // TODO: handle likely/unlikely
-        build(bldr, ip->iff.thenbr);
-        int sepidx = write_jmp(bldr, -1);
-        build(bldr, ip->iff.elsebr);
-        cod_vec_iter(jmps, i, x, bldr->arr[x].jze.offs = sepidx - x + 1);
-        bldr->arr[sepidx].jmp.offs = bldr->len - sepidx;
+        if (jmps.len == 0)
+        {
+          eth_debug("ommiting else-branch in MATCH");
+          build(bldr, ip->iff.thenbr);
+        }
+        else
+        {
+          // TODO: handle likely/unlikely
+          build(bldr, ip->iff.thenbr);
+          int sepidx = write_jmp(bldr, -1);
+          build(bldr, ip->iff.elsebr);
+          cod_vec_iter(jmps, i, x, bldr->arr[x].jze.offs = sepidx - x + 1);
+          bldr->arr[sepidx].jmp.offs = bldr->len - sepidx;
+        }
         goto end_if;
 
 end_if:
