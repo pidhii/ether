@@ -483,6 +483,8 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       eth_ir_node *ret =
         eth_ir_bind(&tmpvar, &lhs, 1,
           eth_ir_if(eth_ir_var(tmpvar), eth_ir_var(tmpvar), rhs));
+          /*eth_ir_if(eth_ir_var(tmpvar), eth_ir_cval(eth_true), rhs));*/
+          /*eth_ir_if(eth_ir_var(tmpvar), eth_ir_seq(eth_ir_cval(eth_true), eth_ir_var(tmpvar)), rhs));*/
       return ret;
     }
 

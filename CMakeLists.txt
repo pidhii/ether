@@ -8,7 +8,7 @@ find_package (FLEX REQUIRED)
 
 
 option (BUILD_SHARED_LIBRARY "Build shared library \"ether.so\"" OFF)
-option (BUILD_STATIC_LIBRARY "Build static library \"ether.a\"" ON)
+option (BUILD_STATIC_LIBRARY "Build static library \"ether.a\"" OFF)
 
 
 set (WARNING_FLAGS "-Wall -Werror -Wextra -Wno-unused -Wno-error=cpp")

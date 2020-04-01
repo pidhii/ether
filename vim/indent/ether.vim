@@ -51,10 +51,10 @@ let s:type = '^\s*\%(class\|let\|type\)\>.*='
 " Skipping pattern, for comments
 function! s:GetLineWithoutFullComment(lnum)
  let lnum = prevnonblank(a:lnum - 1)
- let lline = substitute(getline(lnum), '{-.*$', '', '')
+ let lline = substitute(getline(lnum), '(\*.*\*)\s*$', '', '')
  while lline =~ '^\s*$' && lnum > 0
    let lnum = prevnonblank(lnum - 1)
-   let lline = substitute(getline(lnum), '{-.*$', '', '')
+   let lline = substitute(getline(lnum), '(\*.*\*)\s*$', '', '')
  endwhile
  return lnum
 endfunction
@@ -96,7 +96,7 @@ function! GetOCamlIndent()
  endif
 
  let ind = indent(lnum)
- let lline = substitute(getline(lnum), '{-.*-}\s*$', '', '')
+ let lline = substitute(getline(lnum), '(\*.*\*)\s*$', '', '')
 
  " Return double 'shiftwidth' after lines matching:
  if lline =~ '^\s*|.*->\s*$'
@@ -167,7 +167,6 @@ function! GetOCamlIndent()
    if lline !~ '^\s*\(and\|let\|type\)\>\|\<end\s*$'
      return ind - shiftwidth()
    endif
- endif
 
  " Indent if current line begins with 'with':
  elseif line =~ '^\s*with\>'
@@ -175,9 +174,31 @@ function! GetOCamlIndent()
      return s:FindPair('\<\%(match\|try\)\>', '','\<with\>')
    endif
 
+ " Indent if current line begins with 'exception', 'external', 'include' or
+ " 'open':
+ elseif line =~ '^\s*\(exception\|external\|include\|open\)\>'
+   if lline !~ s:lim . '\|' . s:letlim
+     call search(line)
+     return indent(search('^\s*\(\(exception\|external\|include\|open\|type\)\>\|val\>.*:\)', 'bW'))
+   endif
+
+ " Indent if current line begins with 'val':
+ elseif line =~ '^\s*val\>'
+   if lline !~ '^\s*\(exception\|external\|include\|open\)\>\|' . s:obj . '\|' . s:letlim
+     return indent(search('^\s*\(\(exception\|include\|initializer\|method\|open\|type\|val\)\>\|external\>.*:\)', 'bW'))
+   endif
+
+ " Indent if current line begins with 'constraint', 'inherit', 'initializer'
+ " or 'method':
+ elseif line =~ '^\s*\(constraint\|inherit\|initializer\|method\)\>'
+   if lline !~ s:obj
+     return indent(search('\<\(object\|object\s*(.*)\)\s*$', 'bW')) + shiftwidth()
+   endif
+
+ endif
+
  " Add a 'shiftwidth' after lines ending with:
- "if lline =~ '\(:\|=\|->\|<-\|(\|\[\|{\|{<\|\[|\|\[<\|\<\(begin\|do\|else\|fun\|function\|functor\|if\|initializer\|object\|parser\|private\|sig\|struct\|then\|try\)\|\<object\s*(.*)\)\s*$'
- if lline =~ '\(=\|->\|<-\|(\|\[\|{\|{<\|\[|\|\[<\|\<\(begin\|do\|else\|fn\|if\|parser\|private\|sig\|struct\|then\|try\)\|\<object\s*(.*)\)\s*$'
+ if lline =~ '\(:\|=\|->\|<-\|(\|\[\|{\|{<\|\[|\|\[<\|\<\(begin\|do\|else\|fun\|function\|functor\|if\|initializer\|object\|parser\|private\|sig\|struct\|then\|try\)\|\<object\s*(.*)\)\s*$'
    let ind = ind + shiftwidth()
 
  " Back to normal indent after lines ending with ';;':
@@ -205,16 +226,16 @@ function! GetOCamlIndent()
    let ind = s:FindPair('\[', '','\]')
 
  " Back to normal indent after comments:
- elseif lline =~ '-}\s*$'
-   call search('*-}', 'bW')
-   let ind = indent(searchpair('{-', '', '-}', 'bWn', 'synIDattr(synID(line("."), col("."), 0), "name") =~? "string"'))
+ elseif lline =~ '\*)\s*$'
+   call search('\*)', 'bW')
+   let ind = indent(searchpair('(\*', '', '\*)', 'bWn', 'synIDattr(synID(line("."), col("."), 0), "name") =~? "string"'))
 
  " Back to normal indent after lines ending with ')':
  elseif lline =~ ')\s*$'
    let ind = s:FindPair('(', '',')')
 
  " If this is a multiline comment then align '*':
- elseif lline =~ '^\s*{-' && line =~ '^\s*-'
+ elseif lline =~ '^\s*(\*' && line =~ '^\s*\*'
    let ind = ind + 1
 
  else

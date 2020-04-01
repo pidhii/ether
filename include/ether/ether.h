@@ -1343,35 +1343,35 @@ typedef enum {
 } eth_opc;
 
 struct eth_bc_insn {
-  eth_opc opc;
+  uint64_t opc;
   union {
-    struct { size_t out; eth_t val; } cval;
+    struct { uint64_t out; eth_t val; } cval;
 
-    struct { size_t *vids, n; } push;
-    struct { size_t vid0, n; } pop;
+    struct { uint64_t *vids, n; } push;
+    struct { uint64_t vid0, n; } pop;
 
-    struct { size_t out; size_t fn; } apply;
+    struct { uint64_t out, fn; } apply;
 
-    struct { size_t vid; } test;
-    struct { size_t vid; eth_type *type; } testty;
-    struct { size_t out; } gettest;
+    struct { uint64_t vid; } test;
+    struct { uint64_t vid; eth_type *type; } testty;
+    struct { uint64_t out; } gettest;
 
-    struct { size_t out, vid; } dup;
+    struct { uint64_t out, vid; } dup;
 
     struct { ptrdiff_t offs; } jnz, jze, jmp;
 
-    struct { size_t vid; } ref;
-    struct { size_t vid; } dec;
-    struct { size_t vid; } unref;
-    struct { size_t vid; } drop;
+    struct { uint64_t vid; } ref;
+    struct { uint64_t vid; } dec;
+    struct { uint64_t vid; } unref;
+    struct { uint64_t vid; } drop;
 
-    struct { size_t vid; } ret;
+    struct { uint64_t vid; } ret;
 
-    struct { size_t out; uint32_t lhs, rhs; } binop;
-    struct { size_t out, vid; } unop;
+    struct { uint64_t out; uint32_t lhs, rhs; } binop;
+    struct { uint64_t out, vid; } unop;
 
     struct {
-      size_t out;
+      uint64_t out;
       struct {
         int arity;
         eth_ir *ir;
@@ -1380,16 +1380,17 @@ struct eth_bc_insn {
         int caps[];
       } *restrict data;
     } fn, finfn;
-    struct { size_t out; int arity; } alcfn;
-    struct { size_t vid0, n; } cap;
-    struct { size_t *clos, nclos, *wrefs, nwref; } mkscp;
+    struct { uint64_t out; int arity; } alcfn;
+    struct { uint64_t vid0, n; } cap;
+    struct { struct { uint64_t *clos, nclos, *wrefs, nwref; } *restrict data; }
+      mkscp;
 
-    struct { size_t out; uint32_t vid; int32_t offs; } load;
+    struct { uint64_t out; uint32_t vid, offs; } load;
+
+    struct { uint64_t vid; } setexn;
+    struct { uint64_t out; } getexn;
   };
-
-  struct { size_t vid; } setexn;
-  struct { size_t out; } getexn;
-};
+} __attribute__((aligned(32)));
 
 struct eth_bytecode {
   int rc;

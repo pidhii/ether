@@ -5,6 +5,7 @@
 #include <getopt.h>
 #include <errno.h>
 #include <string.h>
+#include <time.h>
 
 ETH_MODULE("ether:main")
 
@@ -141,12 +142,23 @@ main(int argc, char **argv)
         if (bc)
         {
           eth_debug("run VM");
+
+          struct timespec t1, t2;
+          clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t1);
           eth_t ret = eth_vm(bc);
+          clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t2);
+
           if (ret->type == eth_exception_type)
             eth_error("unhandled exception: ~w", ETH_EXCEPTION(ret)->what);
-          /*eth_printf("> ~w\n", ret);*/
+
           eth_drop(ret);
           eth_drop_bytecode(bc);
+
+          double t1sec = t1.tv_sec + t1.tv_nsec * 1e-9;
+          double t2sec = t2.tv_sec + t2.tv_nsec * 1e-9;
+          double dtsec = t2sec - t1sec;
+          eth_debug("evaluation time: %f [cpu sec.]", dtsec);
+          eth_debug("size: %ju, align: %ju", sizeof(eth_bc_insn), __alignof__(eth_bc_insn));
         }
         else
           eth_error("failed to build bytecode");

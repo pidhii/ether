@@ -26,8 +26,9 @@ destroy_insn(eth_bc_insn *insn)
       break;
 
     case ETH_OPC_MKSCP:
-      free(insn->mkscp.clos);
-      free(insn->mkscp.wrefs);
+      free(insn->mkscp.data->clos);
+      free(insn->mkscp.data->wrefs);
+      free(insn->mkscp.data);
       break;
 
     default:
@@ -309,14 +310,15 @@ write_mkscp(builder *bldr, int *clos, int nclos, int *wrefs, int nwref)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_MKSCP;
-  insn->mkscp.clos = malloc(sizeof(size_t) * nclos);
-  insn->mkscp.nclos = nclos;
-  insn->mkscp.wrefs = malloc(sizeof(size_t) * nwref);
-  insn->mkscp.nwref = nwref;
+  insn->mkscp.data = malloc(sizeof *insn->mkscp.data);
+  insn->mkscp.data->clos = malloc(sizeof(size_t) * nclos);
+  insn->mkscp.data->nclos = nclos;
+  insn->mkscp.data->wrefs = malloc(sizeof(size_t) * nwref);
+  insn->mkscp.data->nwref = nwref;
   for (int i = 0; i < nclos; ++i)
-    insn->mkscp.clos[i] = clos[i];
+    insn->mkscp.data->clos[i] = clos[i];
   for (int i = 0; i < nwref; ++i)
-    insn->mkscp.wrefs[i] = wrefs[i];
+    insn->mkscp.data->wrefs[i] = wrefs[i];
   return bldr->len - 1;
 }
 

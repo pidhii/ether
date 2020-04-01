@@ -7,18 +7,20 @@
 
 ETH_MODULE("ether:vm")
 
+
 eth_t
 eth_vm(eth_bytecode *bc)
 {
-  eth_t r[bc->nreg];
+  const int nreg = bc->nreg;
+  eth_t r[nreg];
   bool test = 0;
   int nstack = 0;
   eth_t exn = NULL;
 
-  for (eth_bc_insn *restrict ip = bc->code; true; ++ip)
+  for (register eth_bc_insn *restrict ip = bc->code; true; ++ip)
   {
 fetch_insn:
-    switch (ip->opc)
+    switch (ip->opc & 0x3F)
     {
       case ETH_OPC_CVAL:
         r[ip->cval.out] = ip->cval.val;
@@ -63,7 +65,7 @@ fetch_insn:
         }
 
         eth_function *restrict func = ETH_FUNCTION(fn);
-        if (func->islam && func->clos.bc->nreg <= bc->nreg)
+        if (func->islam && func->clos.bc->nreg <= nreg)
         {
           bc = func->clos.bc;
           ip = func->clos.bc->code;
@@ -226,13 +228,13 @@ fetch_insn:
 
       case ETH_OPC_MKSCP:
       {
-        eth_t wrefs[ip->mkscp.nwref];
-        eth_function *clos[ip->mkscp.nclos];
-        for (size_t i = 0; i < ip->mkscp.nwref; ++i)
-          wrefs[i] = r[ip->mkscp.wrefs[i]];
-        for (size_t i = 0; i < ip->mkscp.nclos; ++i)
-          clos[i] = ETH_FUNCTION(r[ip->mkscp.clos[i]]);
-        eth_create_scp(clos, ip->mkscp.nclos, wrefs, ip->mkscp.nwref);
+        eth_t wrefs[ip->mkscp.data->nwref];
+        eth_function *clos[ip->mkscp.data->nclos];
+        for (size_t i = 0; i < ip->mkscp.data->nwref; ++i)
+          wrefs[i] = r[ip->mkscp.data->wrefs[i]];
+        for (size_t i = 0; i < ip->mkscp.data->nclos; ++i)
+          clos[i] = ETH_FUNCTION(r[ip->mkscp.data->clos[i]]);
+        eth_create_scp(clos, ip->mkscp.data->nclos, wrefs, ip->mkscp.data->nwref);
         break;
       }
 
@@ -250,8 +252,9 @@ fetch_insn:
         eth_ref(what);
         eth_unref(exn);
         r[ip->getexn.out] = what;
-      }
         break;
+      }
     }
   }
 }
+
