@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <math.h>
 
 
 ETH_MODULE("ether:ir-builder")
@@ -11,7 +12,8 @@ ETH_MODULE("ether:ir-builder")
 
 typedef struct ir_builder {
   struct ir_builder *parent;
-  eth_env *env;
+  eth_env *env; // top-level environment
+  eth_module *mod; // this module
   bool istoplvl;
   eth_var_list *vars;
   int nvars;
@@ -26,6 +28,7 @@ create_ir_builder(ir_builder *parent)
 {
   ir_builder *bldr = malloc(sizeof(ir_builder));
   bldr->parent = parent;
+  bldr->mod = NULL;
   bldr->env = parent ? parent->env : NULL;
   bldr->istoplvl = false;
   bldr->vars = eth_create_var_list();
@@ -84,6 +87,18 @@ trace_pub_var(ir_builder *bldr, const char *ident, int varid, int *e)
   }
 }
 
+static eth_type*
+find_type(ir_builder *bldr, const char *name)
+{
+  for (size_t i = 0; i < bldr->types.len; ++i)
+  {
+    eth_type *ty = bldr->types.data[i];
+    if (strcmp(ty->name, name) == 0)
+      return ty;
+  }
+  return NULL;
+}
+
 /*
  * Require variable in the scope. Variable will be captured if not found in
  * current scope.
@@ -115,11 +130,12 @@ require_var(ir_builder *bldr, const char *ident, int *cnt)
   return NULL;
 }
 
+// TODO: simplify (e.g. split on several specified functions)
 static bool
 load_module(ir_builder *bldr, const eth_module *mod, const char *alias,
     char *const nams[], int nnam)
 {
-  const char *modname = alias ? alias : mod->name;
+  const char *modname = alias ? alias : eth_get_module_name(mod);
   char prefix[strlen(modname) + 2];
   if (modname[0])
     sprintf(prefix, "%s.", modname);
@@ -134,7 +150,7 @@ load_module(ir_builder *bldr, const eth_module *mod, const char *alias,
       eth_def *def = eth_find_def(mod, nams[i]);
       if (not def)
       {
-        eth_warning("no '%s' in module %s", nams[i], mod->name);
+        eth_warning("no '%s' in module %s", nams[i], eth_get_module_name(mod));
         return false;
       }
       assert(strlen(def->ident) + sizeof prefix < sizeof buf);
@@ -147,12 +163,15 @@ load_module(ir_builder *bldr, const eth_module *mod, const char *alias,
   else
   {
     // import all identifiers
-    for (int i = 0; i < mod->ndefs; ++i)
+    int ndefs = eth_get_ndefs(mod);
+    eth_def defs[ndefs];
+    eth_get_defs(mod, defs);
+    for (int i = 0; i < ndefs; ++i)
     {
-      char *ident = mod->defs[i].ident;
+      char *ident = defs[i].ident;
       assert(strlen(ident) + sizeof prefix < sizeof buf);
       sprintf(buf, "%s%s", prefix, ident);
-      eth_var_cfg var = eth_const_var(buf, mod->defs[i].val);
+      eth_var_cfg var = eth_const_var(buf, defs[i].val);
       eth_prepend_var(bldr->vars, var);
     }
     return true;
@@ -176,20 +195,17 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, int *e)
     case ETH_PATTERN_UNPACK:
     {
       eth_type *type = NULL;
-      for (size_t i = 0; i < bldr->types.len; ++i)
+      if (pat->unpack.isctype)
+        type = pat->unpack.type.ctype;
+      else
       {
-        eth_type *ty = bldr->types.data[i];
-        if (strcmp(ty->name, pat->unpack.type) == 0)
+        type = find_type(bldr, pat->unpack.type.str);
+        if (type == NULL)
         {
-          type = ty;
-          break;
+          eth_error("no such type '%s'", pat->unpack.type.str);
+          *e = 1;
+          return eth_ir_ident_pattern(-1); // just some dummy
         }
-      }
-      if (type == NULL)
-      {
-        eth_error("no such type '%s'", pat->unpack.type);
-        *e = 1;
-        return eth_ir_ident_pattern(-1); // just some dummy
       }
 
       int n = pat->unpack.n;
@@ -293,6 +309,73 @@ build_letrec(ir_builder *bldr, int idx, eth_ast *ast, int nvars0, int nvars,
   }
 }
 
+eth_ir_node*
+constexpr_binop(eth_binop op, eth_t lhs, eth_t rhs, int *e)
+{
+  eth_t ret = NULL;
+  switch (op)
+  {
+    case ETH_ADD ... ETH_POW:
+    case ETH_LAND ... ETH_ASHR:
+    case ETH_LT ... ETH_NE:
+    {
+      if (lhs->type != eth_number_type || rhs->type != eth_number_type)
+      {
+        eth_warning("invalid operands for binary %s (%s and %s)",
+            eth_binop_sym(op), lhs->type->name, rhs->type->name);
+        *e = 1;
+        return eth_ir_error();
+      }
+      eth_number_t x = ETH_NUMBER(lhs)->val;
+      eth_number_t y = ETH_NUMBER(rhs)->val;
+      switch (op)
+      {
+        case ETH_ADD: ret = eth_num(x + y); break;
+        case ETH_SUB: ret = eth_num(x - y); break;
+        case ETH_MUL: ret = eth_num(x * y); break;
+        case ETH_DIV: ret = eth_num(x / y); break;
+        case ETH_MOD: ret = eth_num(eth_mod(x, y)); break;
+        case ETH_POW: ret = eth_num(eth_pow(x, y)); break;
+        // ---
+        case ETH_LAND: ret = eth_num((intmax_t)x & (intmax_t)y); break;
+        case ETH_LOR:  ret = eth_num((intmax_t)x | (intmax_t)y); break;
+        case ETH_LXOR: ret = eth_num((intmax_t)x ^ (intmax_t)y); break;
+        case ETH_LSHL: ret = eth_num((uintmax_t)x << (uintmax_t)y); break;
+        case ETH_LSHR: ret = eth_num((uintmax_t)x >> (uintmax_t)y); break;
+        case ETH_ASHL: ret = eth_num((intmax_t)x << (intmax_t)y); break;
+        case ETH_ASHR: ret = eth_num((intmax_t)x >> (intmax_t)y); break;
+        // ---
+        case ETH_LT: ret = eth_boolean(lhs < rhs); break;
+        case ETH_LE: ret = eth_boolean(lhs <= rhs); break;
+        case ETH_GT: ret = eth_boolean(lhs > rhs); break;
+        case ETH_GE: ret = eth_boolean(lhs >= rhs); break;
+        case ETH_EQ: ret = eth_boolean(lhs == rhs); break;
+        case ETH_NE: ret = eth_boolean(lhs != rhs); break;
+        // ---
+        default: abort();
+      }
+      break;
+    }
+
+    case ETH_IS: ret = eth_boolean(lhs == rhs); break;
+    case ETH_CONS: ret = eth_cons(lhs, rhs); break;
+  }
+
+  return eth_ir_cval(ret);
+}
+
+static eth_ir_node*
+constexpr_unop(eth_unop op, eth_t x, int *e)
+{
+  eth_t ret = NULL;
+  switch (op)
+  {
+    case ETH_NOT: ret = eth_boolean(x == eth_false); break;
+    case ETH_LNOT: ret = eth_num(~(intmax_t)ETH_NUMBER(x)->val);
+  }
+  return eth_ir_cval(ret);
+}
+
 static eth_ir_node*
 build(ir_builder *bldr, eth_ast *ast, int *e)
 {
@@ -380,13 +463,30 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
     {
       eth_ir_node *lhs = build(bldr, ast->binop.lhs, e);
       eth_ir_node *rhs = build(bldr, ast->binop.rhs, e);
-      return eth_ir_binop(ast->binop.op, lhs, rhs);
+      eth_ir_node *ret;
+      if (lhs->tag == ETH_IR_CVAL and rhs->tag == ETH_IR_CVAL)
+      {
+        ret = constexpr_binop(ast->binop.op, lhs->cval.val, rhs->cval.val, e);
+        eth_drop_ir_node(lhs);
+        eth_drop_ir_node(rhs);
+      }
+      else
+        ret = eth_ir_binop(ast->binop.op, lhs, rhs);
+      return ret;
     }
 
     case ETH_AST_UNOP:
     {
       eth_ir_node *expr = build(bldr, ast->unop.expr, e);
-      return eth_ir_unop(ast->unop.op, expr);
+      eth_ir_node *ret;
+      if (expr->tag == ETH_IR_CVAL)
+      {
+        ret = constexpr_unop(ast->unop.op, expr->cval.val, e);
+        eth_drop_ir_node(expr);
+      }
+      else
+        ret = eth_ir_unop(ast->unop.op, expr);
+      return ret;
     }
 
     case ETH_AST_FN:
@@ -450,13 +550,22 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
     case ETH_AST_IMPORT:
     {
       assert(bldr->env);
-      eth_module *mod = eth_require_module(bldr->env, ast->import.module);
+
+      // 1. try to load as a submodule
+      // 2. otherwize, load with global environment
+      eth_module *mod = NULL;
+      if (bldr->mod)
+        mod = eth_require_module(eth_get_env(bldr->mod), ast->import.module);
+      if (not mod)
+        mod = eth_require_module(bldr->env, ast->import.module);
+
       if (not mod)
       {
         eth_warning("failed to import module %s", ast->import.module);
         *e = 1;
         return eth_ir_error();
       }
+
       int n1 = bldr->vars->len;
       int ok = load_module(bldr, mod, ast->import.alias, ast->import.nams,
           ast->import.nnam);
@@ -486,8 +595,6 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       eth_ir_node *ret =
         eth_ir_bind(&tmpvar, &lhs, 1,
           eth_ir_if(eth_ir_var(tmpvar), eth_ir_var(tmpvar), rhs));
-          /*eth_ir_if(eth_ir_var(tmpvar), eth_ir_cval(eth_true), rhs));*/
-          /*eth_ir_if(eth_ir_var(tmpvar), eth_ir_seq(eth_ir_cval(eth_true), eth_ir_var(tmpvar)), rhs));*/
       return ret;
     }
 
@@ -512,6 +619,75 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
 
       return eth_ir_try(exnvar, trybr, catchbr, ast->try.likely);
     }
+
+    case ETH_AST_MKRCRD:
+    {
+      eth_type *type;
+      if (not ast->mkrcrd.isctype)
+      {
+        type = find_type(bldr, ast->mkrcrd.type.str);
+        if (type == NULL)
+        {
+          eth_error("no such type '%s'", ast->mkrcrd.type.str);
+          *e = 1;
+          return eth_ir_error();
+        }
+      }
+      else
+        type = ast->mkrcrd.type.ctype;
+
+      if (not eth_is_record(type))
+      {
+        eth_error("%s is not a record-type", type->name);
+        *e = 1;
+        return eth_ir_error();
+      }
+
+      int nsup = ast->mkrcrd.n;
+      int ntot = type->nfields;
+      char *fields[ntot];
+      memcpy(fields, ast->mkrcrd.fields, sizeof(char*) * nsup);
+      typedef struct { eth_ast *val; char *field; ptrdiff_t offs; } value;
+      value vals[ntot];
+
+      // validate supplied fields
+      for (int i = 0; i < nsup; ++i)
+      {
+        eth_field *fldinfo = eth_get_field(type, fields[i]);
+        if (not fldinfo)
+        {
+          eth_error("no field '%s' in record %s", fields[i],
+              ast->mkrcrd.type.str);
+          *e = 1;
+          return eth_ir_error();
+        }
+        vals[i].val = ast->mkrcrd.vals[i];
+        vals[i].field = ast->mkrcrd.fields[i];
+        vals[i].offs = fldinfo->offs;
+      }
+      // add missing fields
+      if (nsup != ntot)
+      {
+        eth_error("default values for fields are not implemented");
+        *e = 1;
+        return eth_ir_error();
+      }
+
+      // sort fields
+      bool err = false;
+      int cmp(const void *p1, const void *p2)
+      {
+        const value *v1 = p1;
+        const value *v2 = p2;
+        return v1->offs - v2->offs;
+      }
+      qsort(vals, ntot, sizeof(value), cmp);
+
+      eth_ir_node *irvals[ntot];
+      for (int i = 0; i < ntot; ++i)
+        irvals[i] = build(bldr, vals[i].val, e);
+      return eth_ir_mkrcrd(type, irvals);
+    }
   }
 
   eth_error("undefined AST-node");
@@ -519,8 +695,8 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
   return eth_ir_error();
 }
 
-eth_ir*
-eth_build_ir(eth_ast *ast, eth_env *env, eth_ir_defs *defs)
+static eth_ir*
+build_ir(eth_ast *ast, eth_env *env, eth_module *mod, eth_ir_defs *defs)
 {
   eth_ir *ret;
   int e = 0;
@@ -528,18 +704,10 @@ eth_build_ir(eth_ast *ast, eth_env *env, eth_ir_defs *defs)
   ir_builder *bldr = create_ir_builder(NULL);
   bldr->env = env;
   bldr->istoplvl = true;
+  bldr->mod = mod;
 
   // import builtins:
   load_module(bldr, eth_builtins(), "", NULL, 0);
-  // and extra modules:
-  if (env)
-  {
-    int n = eth_get_nmodules(env);
-    const eth_module *mods[n];
-    eth_get_modules(env, mods, n);
-    for (int i = 0; i < n; ++i)
-      load_module(bldr, mods[i], NULL, NULL, 0);
-  }
 
   eth_ir_node *body = build(bldr, ast, &e);
   if (e)
@@ -564,6 +732,19 @@ eth_build_ir(eth_ast *ast, eth_env *env, eth_ir_defs *defs)
   ret = eth_create_ir(body, bldr->nvars);
   destroy_ir_builder(bldr);
   return ret;
+}
+
+eth_ir*
+eth_build_ir(eth_ast *ast, eth_env *env)
+{
+  return build_ir(ast, env, NULL, NULL);
+}
+
+eth_ir*
+eth_build_module_ir(eth_ast *ast, eth_env *env, eth_module *mod,
+    eth_ir_defs *defs)
+{
+  return build_ir(ast, env, mod, defs);
 }
 
 void

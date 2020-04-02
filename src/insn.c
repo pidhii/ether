@@ -123,6 +123,10 @@ eth_destroy_insn(eth_insn *insn)
       eth_destroy_insn_list(insn->try.catchbr);
       break;
 
+    case ETH_INSN_MKRCRD:
+      free(insn->mkrcrd.vids);
+      break;
+
     default:
       break;
   }
@@ -390,6 +394,18 @@ eth_insn_getexn(int out)
   return insn;
 }
 
+eth_insn*
+eth_insn_mkrcrd(int out, int const vids[], eth_type *type)
+{
+  eth_insn *insn = create_insn(ETH_INSN_MKRCRD);
+  insn->out = out;
+  int n = type->nfields;
+  insn->mkrcrd.vids = malloc(sizeof(int) * n);
+  memcpy(insn->mkrcrd.vids, vids, sizeof(int) * n);
+  insn->mkrcrd.type = type;
+  return insn;
+}
+
 void
 dump_ssa(int ident, const eth_insn *insn, FILE *stream)
 {
@@ -590,6 +606,13 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
 
     case ETH_INSN_GETEXN:
       fprintf(stream, "%%%d = getexn;\n", insn->out);
+      break;
+
+    case ETH_INSN_MKRCRD:
+      fprintf(stream, "%%%d = mkrcrd", insn->out);
+      for (int i = 0; i < insn->mkrcrd.type->nfields; ++i)
+        fprintf(stream, " %%%d", insn->mkrcrd.vids[i]);
+      fputs(";\n", stream);
       break;
   }
 

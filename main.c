@@ -120,7 +120,7 @@ main(int argc, char **argv)
     eth_env *env = eth_create_env();
 
     eth_debug("build IR");
-    eth_ir *ir = eth_build_ir(ast, env, NULL);
+    eth_ir *ir = eth_build_ir(ast, env);
     eth_drop_ast(ast);
     if (ir)
     {

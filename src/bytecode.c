@@ -39,6 +39,10 @@ destroy_insn(eth_bc_insn *insn)
       eth_unref(insn->testis.cval);
       break;
 
+    case ETH_OPC_MKRCRD:
+      free(insn->mkrcrd.data);
+      break;
+
     default:
       break;
   }
@@ -370,6 +374,20 @@ write_getexn(builder *bldr, int out)
   return bldr->len - 1;
 }
 
+static int
+write_mkrcrd(builder *bldr, int out, int const vids[], eth_type *type)
+{
+  int n = type->nfields;
+  eth_bc_insn *insn = append_insn(bldr);
+  insn->opc = ETH_OPC_MKRCRD;
+  insn->mkrcrd.out = out;
+  insn->mkrcrd.data = malloc(sizeof(*insn->mkrcrd.data) + sizeof(uint64_t) * n);
+  insn->mkrcrd.data->type = type;
+  for (int i = 0; i < n; ++i)
+    insn->mkrcrd.data->vids[i] = vids[i];
+  return bldr->len - 1;
+}
+
 #define MAKE_BINOP(name, op)                             \
   static int                                             \
   write_##name(builder *bldr, int out, int lhs, int rhs) \
@@ -689,6 +707,10 @@ end_if:
 
       case ETH_INSN_GETEXN:
         write_getexn(bldr, ip->out);
+        break;
+
+      case ETH_INSN_MKRCRD:
+        write_mkrcrd(bldr, ip->out, ip->mkrcrd.vids, ip->mkrcrd.type);
         break;
     }
   }

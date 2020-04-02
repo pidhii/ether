@@ -20,7 +20,25 @@ eth_ast_unpack_pattern(const char *type, char *const fields[],
 {
   eth_ast_pattern *pat = malloc(sizeof(eth_ast_pattern));
   pat->tag = ETH_PATTERN_UNPACK;
-  pat->unpack.type = strdup(type);
+  pat->unpack.isctype = false;
+  pat->unpack.type.str = strdup(type);
+  pat->unpack.fields = malloc(sizeof(char*) * n);
+  pat->unpack.subpats = malloc(sizeof(eth_ast_pattern*) * n);
+  pat->unpack.n = n;
+  for (int i = 0; i < n; ++i)
+    pat->unpack.fields[i] = strdup(fields[i]);
+  memcpy(pat->unpack.subpats, pats, sizeof(eth_ast_pattern*) * n);
+  return pat;
+}
+
+eth_ast_pattern*
+eth_ast_unpack_pattern_with_type(eth_type *type, char *const fields[],
+    eth_ast_pattern *pats[], int n)
+{
+  eth_ast_pattern *pat = malloc(sizeof(eth_ast_pattern));
+  pat->tag = ETH_PATTERN_UNPACK;
+  pat->unpack.isctype = true;
+  pat->unpack.type.ctype = type;
   pat->unpack.fields = malloc(sizeof(char*) * n);
   pat->unpack.subpats = malloc(sizeof(eth_ast_pattern*) * n);
   pat->unpack.n = n;
@@ -54,7 +72,8 @@ eth_destroy_ast_pattern(eth_ast_pattern *pat)
         free(pat->unpack.fields[i]);
         eth_destroy_ast_pattern(pat->unpack.subpats[i]);
       }
-      free(pat->unpack.type);
+      if (not pat->unpack.isctype)
+        free(pat->unpack.type.str);
       free(pat->unpack.fields);
       free(pat->unpack.subpats);
       break;
@@ -168,6 +187,18 @@ destroy_ast_node(eth_ast *ast)
       eth_destroy_ast_pattern(ast->try.pat);
       eth_unref_ast(ast->try.trybr);
       eth_unref_ast(ast->try.catchbr);
+      break;
+
+    case ETH_AST_MKRCRD:
+      if (not ast->mkrcrd.isctype)
+        free(ast->mkrcrd.type.str);
+      for (int i = 0; i < ast->mkrcrd.n; ++i)
+      {
+        free(ast->mkrcrd.fields[i]);
+        eth_unref_ast(ast->mkrcrd.vals[i]);
+      }
+      free(ast->mkrcrd.fields);
+      free(ast->mkrcrd.vals);
       break;
   }
 
@@ -363,3 +394,38 @@ eth_ast_try(eth_ast_pattern *pat, eth_ast *try, eth_ast *catch, int likely)
   return ast;
 }
 
+eth_ast*
+eth_ast_make_record(const char *type, char *const fields[],
+    eth_ast *const vals[], int n)
+{
+  eth_ast *ast = create_ast_node(ETH_AST_MKRCRD);
+  ast->mkrcrd.isctype = false;
+  ast->mkrcrd.type.str = strdup(type);
+  ast->mkrcrd.fields = malloc(sizeof(char*) * n);
+  ast->mkrcrd.vals = malloc(sizeof(eth_ast*) * n);
+  ast->mkrcrd.n = n;
+  for (int i = 0; i < n; ++i)
+  {
+    eth_ref_ast(ast->mkrcrd.vals[i] = vals[i]);
+    ast->mkrcrd.fields[i] = strdup(fields[i]);
+  }
+  return ast;
+}
+
+eth_ast*
+eth_ast_make_record_with_type(eth_type *type, char *const fields[],
+   eth_ast *const vals[], int n)
+{
+  eth_ast *ast = create_ast_node(ETH_AST_MKRCRD);
+  ast->mkrcrd.isctype = true;
+  ast->mkrcrd.type.ctype = type;
+  ast->mkrcrd.fields = malloc(sizeof(char*) * n);
+  ast->mkrcrd.vals = malloc(sizeof(eth_ast*) * n);
+  ast->mkrcrd.n = n;
+  for (int i = 0; i < n; ++i)
+  {
+    eth_ref_ast(ast->mkrcrd.vals[i] = vals[i]);
+    ast->mkrcrd.fields[i] = strdup(fields[i]);
+  }
+  return ast;
+}

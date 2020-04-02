@@ -154,6 +154,9 @@ eth_init(void)
   extern void _eth_init_symbol_type(void);
   _eth_init_symbol_type();
 
+  extern void _eth_init_tuple_types(void);
+  _eth_init_tuple_types();
+
   extern void _eth_init_builtins(void);
   _eth_init_builtins();
 }
@@ -174,6 +177,9 @@ eth_cleanup(void)
 
   extern void _eth_cleanup_symbol_type(void);
   _eth_cleanup_symbol_type();
+
+  extern void _eth_cleanup_tuple_types(void);
+  _eth_cleanup_tuple_types();
 
   extern void _eth_cleanup_magic(void);
   _eth_cleanup_magic();

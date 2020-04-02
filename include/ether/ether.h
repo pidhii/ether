@@ -189,21 +189,61 @@ eth_pop_stack(int n)
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                             ALLOCATORS
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                          header + 1 dword
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+#define ETH_H1_SIZE (sizeof(eth_header) + sizeof(eth_dword_t) * 1)
+void* __attribute__((malloc))
+eth_alloc_h1(void);
+
+void
+eth_free_h1(void *ptr);
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                          header + 2 dwords
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 #define ETH_H2_SIZE (sizeof(eth_header) + sizeof(eth_dword_t) * 2)
-void*
+void* __attribute__((malloc))
 eth_alloc_h2(void);
 
 void
 eth_free_h2(void *ptr);
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                          header + 3 dwords
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+#define ETH_H3_SIZE (sizeof(eth_header) + sizeof(eth_dword_t) * 3)
+void* __attribute__((malloc))
+eth_alloc_h3(void);
+
+void
+eth_free_h3(void *ptr);
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                          header + 4 dwords
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+#define ETH_H4_SIZE (sizeof(eth_header) + sizeof(eth_dword_t) * 4)
+void* __attribute__((malloc))
+eth_alloc_h4(void);
+
+void
+eth_free_h4(void *ptr);
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                          header + 5 dwords
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+#define ETH_H5_SIZE (sizeof(eth_header) + sizeof(eth_dword_t) * 5)
+void* __attribute__((malloc))
+eth_alloc_h5(void);
+
+void
+eth_free_h5(void *ptr);
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                          header + 6 dwords
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 #define ETH_H6_SIZE (sizeof(eth_header) + sizeof(eth_dword_t) * 6)
 
-void*
+void* __attribute__((malloc))
 eth_alloc_h6(void);
 
 void
@@ -218,6 +258,9 @@ typedef struct {
   ptrdiff_t offs;
 } eth_field;
 
+#define ETH_TFLAG_RECORD 0x1
+#define ETH_TFLAG_TUPLE  0x3
+
 struct eth_type {
   char *name;
   void (*destroy)(eth_type *type, eth_t x);
@@ -226,6 +269,8 @@ struct eth_type {
 
   int nfields;
   eth_field *fields;
+
+  uint8_t flag;
 
   void *clos;
   void (*dtor)(void *clos);
@@ -243,6 +288,18 @@ eth_create_struct_type(const char *name, char *const fields[],
 
 eth_field* __attribute__((pure))
 eth_get_field(eth_type *type, const char *field);
+
+static inline bool
+eth_is_record(eth_type *type)
+{
+  return type->flag & ETH_TFLAG_RECORD;
+}
+
+static inline bool
+eth_is_tuple(eth_type *type)
+{
+  return type->flag == ETH_TFLAG_TUPLE;
+}
 
 void
 eth_destroy_type(eth_type *type);
@@ -389,10 +446,16 @@ eth_drop_out(eth_scp *scp);
 
 #if ETH_NUMBER_TYPE == ETH_NUMBER_LONGDOUBLE
 typedef long double eth_number_t;
+# define eth_mod fmodl
+# define eth_pow powl
 #elif ETH_NUMBER_TYPE == ETH_NUMBER_DOUBLE
 typedef double eth_number_t;
+# define eth_mod fmod
+# define eth_pow pow
 #elif ETH_NUMBER_TYPE == ETH_NUMBER_FLOAT
 typedef float eth_number_t;
+# define eth_mod fmodf
+# define eth_pow powf
 #else
 # error Undefined value of ETH_NUMBER_TYPE.
 #endif
@@ -625,6 +688,126 @@ eth_t
 eth_create_symbol(const char *str);
 #define eth_sym eth_create_symbol
 
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                         records & tuples
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+typedef struct {
+  eth_header header;
+  eth_t data[];
+} eth_tuple;
+#define ETH_TUPLE(x) ((eth_tuple*)(x))
+
+eth_type*
+eth_tuple_type(size_t n);
+
+static inline eth_t __attribute__((malloc))
+eth_create_tuple_2(eth_t _1, eth_t _2)
+{
+  static eth_type *type = NULL;
+  if (eth_unlikely(type == NULL))
+    type = eth_tuple_type(2);
+  eth_tuple *tup = eth_alloc_h2();
+  eth_init_header(tup, type);
+  eth_ref(tup->data[0] = _1);
+  eth_ref(tup->data[1] = _2);
+  return ETH(tup);
+}
+#define eth_tup2 eth_create_tuple_2
+
+static inline eth_t __attribute__((malloc))
+eth_create_tuple_3(eth_t _1, eth_t _2, eth_t _3)
+{
+  static eth_type *type = NULL;
+  if (eth_unlikely(type == NULL))
+    type = eth_tuple_type(3);
+  eth_tuple *tup = eth_alloc_h3();
+  eth_init_header(tup, type);
+  eth_ref(tup->data[0] = _1);
+  eth_ref(tup->data[1] = _2);
+  eth_ref(tup->data[2] = _3);
+  return ETH(tup);
+}
+#define eth_tup3 eth_create_tuple_3
+
+static inline eth_t __attribute__((malloc))
+eth_create_tuple_4(eth_t _1, eth_t _2, eth_t _3, eth_t _4)
+{
+  static eth_type *type = NULL;
+  if (eth_unlikely(type == NULL))
+    type = eth_tuple_type(4);
+  eth_tuple *tup = eth_alloc_h4();
+  eth_init_header(tup, type);
+  eth_ref(tup->data[0] = _1);
+  eth_ref(tup->data[1] = _2);
+  eth_ref(tup->data[2] = _3);
+  eth_ref(tup->data[3] = _4);
+  return ETH(tup);
+}
+#define eth_tup4 eth_create_tuple_4
+
+static inline eth_t __attribute__((malloc))
+eth_create_tuple_5(eth_t _1, eth_t _2, eth_t _3, eth_t _4, eth_t _5)
+{
+  static eth_type *type = NULL;
+  if (eth_unlikely(type == NULL))
+    type = eth_tuple_type(5);
+  eth_tuple *tup = eth_alloc_h5();
+  eth_init_header(tup, type);
+  eth_ref(tup->data[0] = _1);
+  eth_ref(tup->data[1] = _2);
+  eth_ref(tup->data[2] = _3);
+  eth_ref(tup->data[3] = _4);
+  eth_ref(tup->data[4] = _5);
+  return ETH(tup);
+}
+#define eth_tup5 eth_create_tuple_5
+
+static inline eth_t __attribute__((malloc))
+eth_create_tuple_6(eth_t _1, eth_t _2, eth_t _3, eth_t _4, eth_t _5, eth_t _6)
+{
+  static eth_type *type = NULL;
+  if (eth_unlikely(type == NULL))
+    type = eth_tuple_type(6);
+  eth_tuple *tup = eth_alloc_h6();
+  eth_init_header(tup, type);
+  eth_ref(tup->data[0] = _1);
+  eth_ref(tup->data[1] = _2);
+  eth_ref(tup->data[2] = _3);
+  eth_ref(tup->data[3] = _4);
+  eth_ref(tup->data[4] = _5);
+  eth_ref(tup->data[5] = _6);
+  return ETH(tup);
+}
+#define eth_tup6 eth_create_tuple_6
+
+eth_t __attribute__((malloc))
+eth_create_tuple_n(eth_type *type, eth_t const data[]);
+#define eth_tupn eth_create_tuple_n
+
+eth_t __attribute__((malloc))
+eth_create_record(eth_type *type, eth_t const data[]);
+
+void
+eth_destroy_record_h1(eth_type *type, eth_t x);
+
+void
+eth_destroy_record_h2(eth_type *type, eth_t x);
+
+void
+eth_destroy_record_h3(eth_type *type, eth_t x);
+
+void
+eth_destroy_record_h4(eth_type *type, eth_t x);
+
+void
+eth_destroy_record_h5(eth_type *type, eth_t x);
+
+void
+eth_destroy_record_h6(eth_type *type, eth_t x);
+
+void
+eth_destroy_record_hn(eth_type *type, eth_t x);
+
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                       MODULES AND ENVIRONMENT
@@ -636,17 +819,23 @@ typedef struct {
   eth_t val;
 } eth_def;
 
-struct eth_module {
-  char *name;
-  int ndefs, defscap;
-  eth_def *defs;
-};
-
 eth_module* __attribute__((malloc))
 eth_create_module(const char *name);
 
 void
 eth_destroy_module(eth_module *mod);
+
+const char*
+eth_get_module_name(const eth_module *mod);
+
+int
+eth_get_ndefs(const eth_module *mod);
+
+eth_def*
+eth_get_defs(const eth_module *mod, eth_def out[]);
+
+eth_env*
+eth_get_env(const eth_module *mod);
 
 void
 eth_define(eth_module *mod, const char *ident, eth_t val);
@@ -716,7 +905,9 @@ struct eth_ast_pattern {
   eth_pattern_tag tag;
   union {
     struct { char *str; bool pub; } ident;
-    struct { char *type, **fields; eth_ast_pattern **subpats; int n; } unpack;
+    struct { bool isctype; union { char *str; eth_type *ctype; } type; char **fields;
+             eth_ast_pattern **subpats; int n; }
+      unpack;
     struct { eth_t sym; } symbol;
   };
 };
@@ -726,6 +917,10 @@ eth_ast_ident_pattern(const char *ident);
 
 eth_ast_pattern*
 eth_ast_unpack_pattern(const char *type, char *const fields[],
+    eth_ast_pattern *pats[], int n);
+
+eth_ast_pattern*
+eth_ast_unpack_pattern_with_type(eth_type *type, char *const fields[],
     eth_ast_pattern *pats[], int n);
 
 eth_ast_pattern*
@@ -750,6 +945,7 @@ typedef enum {
   ETH_AST_AND,
   ETH_AST_OR,
   ETH_AST_TRY,
+  ETH_AST_MKRCRD,
 } eth_ast_tag;
 
 typedef enum {
@@ -779,6 +975,9 @@ struct eth_ast {
       import;
     struct { eth_ast *lhs, *rhs; } scand, scor;
     struct { eth_ast_pattern *pat; eth_ast *trybr, *catchbr; int likely; } try;
+    struct { bool isctype; union { eth_type *ctype; char *str; } type;
+             char **fields; eth_ast **vals; int n; }
+      mkrcrd;
   };
 };
 
@@ -840,6 +1039,14 @@ eth_ast_or(eth_ast *lhs, eth_ast *rhs);
 eth_ast* __attribute__((malloc))
 eth_ast_try(eth_ast_pattern *pat, eth_ast *try, eth_ast *catch, int likely);
 
+eth_ast*
+eth_ast_make_record(const char *type, char *const fields[],
+    eth_ast *const vals[], int n);
+
+eth_ast*
+eth_ast_make_record_with_type(eth_type *type, char *const fields[],
+   eth_ast *const vals[], int n);
+
 typedef struct eth_scanner eth_scanner;
 
 eth_scanner* __attribute__((malloc))
@@ -894,6 +1101,7 @@ enum eth_ir_tag {
   ETH_IR_MATCH,
   ETH_IR_STARTFIX,
   ETH_IR_ENDFIX,
+  ETH_IR_MKRCRD,
 };
 
 struct eth_ir_node {
@@ -914,6 +1122,7 @@ struct eth_ir_node {
       match;
     struct { int *vars, n; eth_ir_node *body; } startfix;
     struct { int *vars, n; eth_ir_node *body; } endfix;
+    struct { eth_type *type; eth_ir_node **fields; } mkrcrd;
   };
 };
 
@@ -969,6 +1178,9 @@ eth_ir_endfix(int const vars[], int n, eth_ir_node *body);
 eth_ir_node*
 eth_ir_bind(int const varids[], eth_ir_node *const vals[], int n,
     eth_ir_node *body);
+
+eth_ir_node*
+eth_ir_mkrcrd(eth_type *type, eth_ir_node *const fields[]);
 
 struct eth_ir {
   size_t rc;
@@ -1075,8 +1287,12 @@ typedef struct {
 void
 eth_destroy_ir_defs(eth_ir_defs *defs);
 
-eth_ir* __attribute__((malloc))
-eth_build_ir(eth_ast *ast, eth_env *env, eth_ir_defs *defs);
+eth_ir*
+eth_build_ir(eth_ast *ast, eth_env *env);
+
+eth_ir*
+eth_build_module_ir(eth_ast *ast, eth_env *env, eth_module *mod,
+    eth_ir_defs *defs);
 
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
@@ -1133,6 +1349,7 @@ enum eth_insn_tag {
   ETH_INSN_CATCH,
   ETH_INSN_TRY,
   ETH_INSN_GETEXN,
+  ETH_INSN_MKRCRD,
 };
 
 enum {
@@ -1170,6 +1387,7 @@ struct eth_insn {
     struct { int tryid, vid; } catch;
     struct { int id, likely; eth_insn *trybr, *catchbr; } try;
     struct { } getexn;
+    struct { int *vids; eth_type *type; } mkrcrd;
   };
   eth_insn *prev;
   eth_insn *next;
@@ -1255,6 +1473,9 @@ eth_insn_try(int out, int id, eth_insn *trybr, eth_insn *catchbr);
 
 eth_insn* __attribute__((malloc))
 eth_insn_getexn(int out);
+
+eth_insn* __attribute__((malloc))
+eth_insn_mkrcrd(int out, int const vids[], eth_type *type);
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                             SSA tape
@@ -1370,6 +1591,8 @@ typedef enum {
 
   ETH_OPC_SETEXN,
   ETH_OPC_GETEXN,
+
+  ETH_OPC_MKRCRD,
 } eth_opc;
 
 struct eth_bc_insn {
@@ -1424,6 +1647,10 @@ struct eth_bc_insn {
 
     struct { uint64_t vid; } setexn;
     struct { uint64_t out; } getexn;
+
+    struct { uint64_t out;
+             struct { eth_type *type; uint64_t vids[]; } *restrict data; }
+      mkrcrd;
   };
 } __attribute__((aligned(32)));
 

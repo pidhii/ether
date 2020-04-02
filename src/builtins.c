@@ -237,7 +237,7 @@ void
 _eth_init_builtins(void)
 {
   g_env = eth_create_empty_env();
-  g_mod = eth_create_module("Ether.Builtins");
+  g_mod = eth_create_module("Builtins");
 
   eth_debug("loading builtins");
 

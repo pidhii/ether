@@ -137,6 +137,12 @@ destroy_ir_node(eth_ir_node *node)
       free(node->endfix.vars);
       eth_unref_ir_node(node->endfix.body);
       break;
+
+    case ETH_IR_MKRCRD:
+      for (int i = 0; i < node->mkrcrd.type->nfields; ++i)
+        eth_unref_ir_node(node->mkrcrd.fields[i]);
+      free(node->mkrcrd.fields);
+      break;
   }
 
   free(node);
@@ -318,3 +324,15 @@ eth_ir_endfix(int const vars[], int n, eth_ir_node *body)
   memcpy(node->endfix.vars, vars, sizeof(int) * n);
   return node;
 }
+
+eth_ir_node*
+eth_ir_mkrcrd(eth_type *type, eth_ir_node *const fields[])
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_MKRCRD);
+  node->mkrcrd.type = type;
+  node->mkrcrd.fields = malloc(sizeof(eth_ir_node*) * type->nfields);
+  for (int i = 0; i < type->nfields; ++i)
+    eth_ref_ir_node(node->mkrcrd.fields[i] = fields[i]);
+  return node;
+}
+

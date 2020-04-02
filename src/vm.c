@@ -20,7 +20,11 @@ eth_vm(eth_bytecode *bc)
   for (register eth_bc_insn *restrict ip = bc->code; true; ++ip)
   {
 fetch_insn:
+#ifdef ETH_DEBUG_MODE
+    switch (ip->opc)
+#else
     switch (ip->opc & 0x3F)
+#endif
     {
       case ETH_OPC_CVAL:
         r[ip->cval.out] = ip->cval.val;
@@ -147,8 +151,8 @@ fetch_insn:
       ARITHM_BINOP(SUB, lhs - rhs)
       ARITHM_BINOP(MUL, lhs * rhs)
       ARITHM_BINOP(DIV, lhs / rhs)
-      ARITHM_BINOP(MOD, fmodl(lhs, rhs))
-      ARITHM_BINOP(POW, powl(lhs, rhs))
+      ARITHM_BINOP(MOD, eth_mod(lhs, rhs))
+      ARITHM_BINOP(POW, eth_pow(lhs, rhs))
       // ---
       ARITHM_BINOP(LAND, (intmax_t)lhs & (intmax_t)rhs)
       ARITHM_BINOP(LOR,  (intmax_t)lhs | (intmax_t)rhs)
@@ -247,6 +251,30 @@ fetch_insn:
         eth_ref(what);
         eth_unref(exn);
         r[ip->getexn.out] = what;
+        break;
+      }
+
+      case ETH_OPC_MKRCRD:
+      {
+        eth_type *type = ip->mkrcrd.data->type;
+        uint64_t *vids = ip->mkrcrd.data->vids;
+        int n = type->nfields;
+        assert(n > 0);
+        eth_tuple *rec;
+        switch (n)
+        {
+          case 1:  rec = eth_alloc_h1(); break;
+          case 2:  rec = eth_alloc_h2(); break;
+          case 3:  rec = eth_alloc_h3(); break;
+          case 4:  rec = eth_alloc_h4(); break;
+          case 5:  rec = eth_alloc_h5(); break;
+          case 6:  rec = eth_alloc_h6(); break;
+          default: rec = malloc(sizeof(eth_tuple) + sizeof(eth_t) * n);
+        }
+        eth_init_header(rec, type);
+        for (int i = 0; i < n; ++i)
+          rec->data[i] = r[vids[i]];
+        r[ip->mkrcrd.out] = ETH(rec);
         break;
       }
     }

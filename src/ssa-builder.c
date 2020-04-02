@@ -330,6 +330,8 @@ build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int f, bool *e)
     {
       int vid = new_val(fnbldr, RC_RULES_DISABLE);
       fnbldr->vars[ir->fn.capvars[i]] = vid;
+      fnbldr->vinfo[vid]->cval = bldr->vinfo[caps[i]]->cval;
+      fnbldr->vinfo[vid]->type = bldr->vinfo[caps[i]]->type;
     }
   }
 
@@ -772,6 +774,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
       {
         // create temporary dummy place-holder
         int ret = new_val(bldr, RC_RULES_DEFAULT);
+        bldr->vinfo[ret]->type = eth_function_type;
         eth_insn *insn = eth_insn_alcfn(ret, arity);
         eth_write_insn(tape, insn);
         bldr->vinfo[ret]->creatloc = insn;
@@ -851,6 +854,21 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
           bldr->vinfo[ret]->creatloc = insn;
 
         return ret;
+      }
+
+      case ETH_IR_MKRCRD:
+      {
+        int n = ir->mkrcrd.type->nfields;
+        int vids[n];
+        for (int i = 0; i < n; ++i)
+          vids[i] = build(bldr, tape, ir->mkrcrd.fields[i], false, e);
+        int out = new_val(bldr, RC_RULES_DEFAULT);
+        eth_insn *insn = eth_insn_mkrcrd(out, vids, ir->mkrcrd.type);
+        bldr->vinfo[out]->creatloc = insn;
+        bldr->vinfo[out]->type = ir->mkrcrd.type;
+        eth_write_insn(tape, insn);
+        trace_mov(bldr, insn);
+        return out;
       }
     }
   }
@@ -975,6 +993,14 @@ is_using(eth_insn *insn, int vid)
 
     case ETH_INSN_GETEXN:
       return false;
+
+    case ETH_INSN_MKRCRD:
+      for (int i = 0; i < insn->mkrcrd.type->nfields; ++i)
+      {
+        if (insn->mkrcrd.vids[i] == vid)
+          return true;
+      }
+      return false;
   }
 
   eth_error("wtf");
@@ -1033,6 +1059,14 @@ is_moving(eth_insn *insn, int vid)
     case ETH_INSN_CATCH:
       return insn->catch.vid == vid;
 
+    case ETH_INSN_MKRCRD:
+      for (int i = 0; i < insn->mkrcrd.type->nfields; ++i)
+      {
+        if (insn->mkrcrd.vids[i] == vid)
+          return true;
+      }
+      return false;
+
     default:
       return false;
   }
@@ -1058,6 +1092,10 @@ get_moved_vids(eth_insn *insn, int *n)
     case ETH_INSN_CATCH:
       *n = 1;
       return &insn->catch.vid;
+
+    case ETH_INSN_MKRCRD:
+      *n = insn->mkrcrd.type->nfields;
+      return insn->mkrcrd.vids;
 
     default:
       eth_error("wtf");

@@ -55,6 +55,7 @@ int _eth_start_token = -1;
   cod_vec(char*) strvec;
   cod_vec(char) charvec;
   eth_ast_pattern *pattern;
+  cod_vec(eth_ast_pattern*) patvec;
 }
 
 %destructor {
@@ -102,6 +103,11 @@ int _eth_start_token = -1;
   eth_destroy_ast_pattern($$);
 } <pattern>
 
+%destructor {
+  cod_vec_iter($$, i, x, eth_destroy_ast_pattern(x));
+  cod_vec_destroy($$);
+} <patvec>
+
 
 // =============================================================================
 %token UNDEFINED
@@ -147,7 +153,7 @@ int _eth_start_token = -1;
 %type<ast> expr
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %type<string> ident
-/*%type<string> capident*/
+%type<string> capident
 %type<binds> binds
 %type<bind> bind
 %type<boolean> maybe_pub
@@ -158,6 +164,7 @@ int _eth_start_token = -1;
 %type<pattern> atomic_pattern pattern
 %type<strvec> maybe_imports import_list
 %type<astvec> list
+%type<patvec> pattern_list
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %start entry
 
@@ -183,6 +190,19 @@ atom
     cod_vec_destroy($2);
   }
   | '['']' { $$ = eth_ast_cval(eth_nil); }
+  | '(' list ',' expr ')' {
+    cod_vec_push($2, $4);
+    int n = $2.len;
+    char fieldsbuf[n][22];
+    char *fields[n];
+    for (int i = 0; i < n; ++i)
+    {
+      fields[i] = fieldsbuf[i];
+      sprintf(fields[i], "%d", i+1);
+    }
+    $$ = eth_ast_make_record_with_type(eth_tuple_type(n), fields, $2.data, n);
+    cod_vec_destroy($2);
+  }
 ;
 
 form
@@ -203,7 +223,7 @@ form
 
 expr
   : form
-  | IMPORT CAPSYMBOL maybe_imports IN expr {
+  | IMPORT capident maybe_imports IN expr {
     $$ = eth_ast_import($2, NULL, $3.data, $3.len, $5);
     free($2);
     if ($3.data)
@@ -212,7 +232,7 @@ expr
       cod_vec_destroy($3);
     }
   }
-  | IMPORT CAPSYMBOL AS CAPSYMBOL maybe_imports IN expr {
+  | IMPORT capident AS CAPSYMBOL maybe_imports IN expr {
     $$ = eth_ast_import($2, $4, $5.data, $5.len, $7);
     if ($5.data)
     {
@@ -222,7 +242,7 @@ expr
     free($2);
     free($4);
   }
-  | IMPORT UNQUALIFIED CAPSYMBOL maybe_imports IN expr {
+  | IMPORT UNQUALIFIED capident maybe_imports IN expr {
     $$ = eth_ast_import($3, "", $4.data, $4.len, $6);
     if ($4.data)
     {
@@ -315,20 +335,20 @@ ident
   }
 ;
 
-/*capident*/
-  /*: CAPSYMBOL*/
-  /*| CAPSYMBOL '.' capident {*/
-    /*int len1 = strlen($1);*/
-    /*int len2 = strlen($3);*/
-    /*$$ = malloc(len1 + 1 + len2 + 1);*/
-    /*memcpy($$, $1, len1);*/
-    /*$$[len1] = '.';*/
-    /*memcpy($$ + len1 + 1, $3, len2);*/
-    /*$$[len1 + 1 + len2] = 0;*/
-    /*free($1);*/
-    /*free($3);*/
-  /*}*/
-/*;*/
+capident
+  : CAPSYMBOL
+  | CAPSYMBOL '.' capident {
+    int len1 = strlen($1);
+    int len2 = strlen($3);
+    $$ = malloc(len1 + 1 + len2 + 1);
+    memcpy($$, $1, len1);
+    $$[len1] = '.';
+    memcpy($$ + len1 + 1, $3, len2);
+    $$[len1 + 1 + len2] = 0;
+    free($1);
+    free($3);
+  }
+;
 
 args
   : atom {
@@ -410,6 +430,23 @@ atomic_pattern
   }
   | CAPSYMBOL { $$ = eth_ast_symbol_pattern(eth_sym($1)); free($1); }
   | '(' pattern ')' { $$ = $2; }
+  | '(' pattern_list ',' pattern ')' {
+    cod_vec_push($2, $4);
+    int n = $2.len;
+    // ---
+    char fldbufs[n][21];
+    char *fields[n];
+    for (int i = 0; i < n; ++i)
+    {
+      fields[i] = fldbufs[i];
+      sprintf(fields[i], "%d", i+1);
+    }
+    // ---
+    eth_type *type = eth_tuple_type(n);
+    $$ = eth_ast_unpack_pattern_with_type(type, fields, $2.data, n);
+    // ---
+    cod_vec_destroy($2);
+  }
 ;
 
 pattern
@@ -418,6 +455,17 @@ pattern
     char *fields[2] = { "car", "cdr" };
     eth_ast_pattern *pats[2] = { $1, $3 };
     $$ = eth_ast_unpack_pattern("pair", fields, pats, 2);
+  }
+;
+
+pattern_list
+  : pattern {
+    cod_vec_init($$);
+    cod_vec_push($$, $1);
+  }
+  | pattern_list ',' pattern {
+    $$ = $1;
+    cod_vec_push($$, $3);
   }
 ;
 

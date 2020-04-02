@@ -1,0 +1,214 @@
+#include "ether/ether.h"
+#include "codeine/hash-map.h"
+
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+static
+cod_hash_map *g_tuptab;
+
+
+void
+_eth_init_tuple_types(void)
+{
+  g_tuptab = cod_hash_map_new();
+}
+
+void
+_eth_cleanup_tuple_types(void)
+{
+  cod_hash_map_delete(g_tuptab, (void*)eth_destroy_type);
+}
+
+void
+eth_destroy_record_h1(eth_type *type, eth_t x)
+{
+  assert(type->flag & ETH_TFLAG_RECORD);
+  eth_tuple *tup = ETH_TUPLE(x);
+  eth_unref(tup->data[0]);
+  eth_free_h1(tup);
+}
+
+void
+eth_destroy_record_h2(eth_type *type, eth_t x)
+{
+  assert(type->flag & ETH_TFLAG_RECORD);
+  eth_tuple *tup = ETH_TUPLE(x);
+  eth_unref(tup->data[0]);
+  eth_unref(tup->data[1]);
+  eth_free_h2(tup);
+}
+
+void
+eth_destroy_record_h3(eth_type *type, eth_t x)
+{
+  assert(type->flag & ETH_TFLAG_RECORD);
+  eth_tuple *tup = ETH_TUPLE(x);
+  eth_unref(tup->data[0]);
+  eth_unref(tup->data[1]);
+  eth_unref(tup->data[2]);
+  eth_free_h3(tup);
+}
+
+void
+eth_destroy_record_h4(eth_type *type, eth_t x)
+{
+  assert(type->flag & ETH_TFLAG_RECORD);
+  eth_tuple *tup = ETH_TUPLE(x);
+  eth_unref(tup->data[0]);
+  eth_unref(tup->data[1]);
+  eth_unref(tup->data[2]);
+  eth_unref(tup->data[3]);
+  eth_free_h4(tup);
+}
+
+void
+eth_destroy_record_h5(eth_type *type, eth_t x)
+{
+  assert(type->flag & ETH_TFLAG_RECORD);
+  eth_tuple *tup = ETH_TUPLE(x);
+  eth_unref(tup->data[0]);
+  eth_unref(tup->data[1]);
+  eth_unref(tup->data[2]);
+  eth_unref(tup->data[3]);
+  eth_unref(tup->data[4]);
+  eth_free_h5(tup);
+}
+
+void
+eth_destroy_record_h6(eth_type *type, eth_t x)
+{
+  assert(type->flag & ETH_TFLAG_RECORD);
+  eth_tuple *tup = ETH_TUPLE(x);
+  eth_unref(tup->data[0]);
+  eth_unref(tup->data[1]);
+  eth_unref(tup->data[2]);
+  eth_unref(tup->data[3]);
+  eth_unref(tup->data[4]);
+  eth_unref(tup->data[5]);
+  eth_free_h6(tup);
+}
+
+void
+eth_destroy_record_hn(eth_type *type, eth_t x)
+{
+  assert(type->flag & ETH_TFLAG_RECORD);
+  eth_tuple *tup = ETH_TUPLE(x);
+  for (int i = 0; i < type->nfields; ++i)
+    eth_unref(tup->data[i]);
+  free(tup);
+}
+
+static void
+write_tuple(eth_type *type, eth_t x, FILE *stream)
+{
+  int n = type->nfields;
+  eth_tuple *tup = ETH_TUPLE(x);
+  putc('(', stream);
+  for (int i = 0; i < n; ++i)
+  {
+    if (i > 0) putc(',', stream);
+    eth_write(tup->data[i], stream);
+  }
+  putc(')', stream);
+}
+
+eth_type*
+eth_tuple_type(size_t n)
+{
+  assert(n > 1);
+
+  char key[sizeof(size_t) + 1];
+  memcpy(key, &n, sizeof(size_t));
+  key[sizeof key - 1] = 0;
+
+  cod_hash_map_elt *elt;
+  if ((elt = cod_hash_map_find(g_tuptab, key, n)))
+  {
+    return elt->val;
+  }
+  else
+  {
+    char name[n+3];
+    name[0] = '(';
+    for (size_t i = 0; i < n; ++i)
+      name[i+1] = ',';
+    name[n+1] = ')';
+    name[n+2] = 0;
+
+    char *fields[n];
+    ptrdiff_t offs[n];
+    for (size_t i = 0; i < n; ++i)
+    {
+      fields[i] = malloc(21);
+      sprintf(fields[i], "%ju", i+1);
+      offs[i] = offsetof(eth_tuple, data[i]);
+    }
+    eth_type *type = eth_create_struct_type(name, fields, offs, n);
+    for (size_t i = 0; i < n; free(fields[i++]));
+
+    switch (n)
+    {
+      case 2:  type->destroy = eth_destroy_record_h2; break;
+      case 3:  type->destroy = eth_destroy_record_h3; break;
+      case 4:  type->destroy = eth_destroy_record_h4; break;
+      case 5:  type->destroy = eth_destroy_record_h5; break;
+      case 6:  type->destroy = eth_destroy_record_h6; break;
+      default: type->destroy = eth_destroy_record_hn; break;
+    }
+    type->write = write_tuple;
+    type->flag = ETH_TFLAG_TUPLE;
+
+    int ok = cod_hash_map_insert(g_tuptab, key, n, type, NULL);
+    assert(ok);
+    return type;
+  }
+}
+
+eth_t
+eth_create_tuple_n(eth_type *type, eth_t const data[])
+{
+  assert(eth_is_tuple(type));
+  int n = type->nfields;
+  switch (n)
+  {
+    case 2: return eth_tup2(data[0], data[1]); break;
+    case 3: return eth_tup3(data[0], data[1], data[2]); break;
+    case 4: return eth_tup4(data[0], data[1], data[2], data[3]); break;
+    case 5: return eth_tup5(data[0], data[1], data[2], data[3], data[4]); break;
+    case 6: return eth_tup6(data[0], data[1], data[2], data[3], data[4], data[5]); break;
+    default:
+    {
+      eth_tuple *tup = malloc(sizeof(eth_tuple) + sizeof(eth_t) * n);
+      eth_init_header(tup, type);
+      for (int i = 0; i < n; ++i)
+        eth_ref(tup->data[i] = data[i]);
+      return ETH(tup);
+    }
+  }
+}
+
+eth_t
+eth_create_record(eth_type *type, eth_t const data[])
+{
+  assert(eth_is_record(type));
+  int n = type->nfields;
+  assert(n > 0);
+  eth_tuple *rec;
+  switch (n)
+  {
+    case 1:  rec = eth_alloc_h1(); break;
+    case 2:  rec = eth_alloc_h2(); break;
+    case 3:  rec = eth_alloc_h3(); break;
+    case 4:  rec = eth_alloc_h4(); break;
+    case 5:  rec = eth_alloc_h5(); break;
+    case 6:  rec = eth_alloc_h6(); break;
+    default: rec = malloc(sizeof(eth_tuple) + sizeof(eth_t) * n);
+  }
+  eth_init_header(rec, type);
+  for (int i = 0; i < n; ++i)
+    eth_ref(rec->data[i] = data[i]);
+  return ETH(rec);
+}
+

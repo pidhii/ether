@@ -87,7 +87,6 @@ syn region ethList matchgroup=ethType start=/\[/ end=/\]/ skipwhite skipnl conta
 syn region ethArray matchgroup=ethType start=/\[\s*|/ end=/|\s*\]/ skipwhite skipnl contains=TOP
 
 syn keyword StorageClass pub
-"hi link ethModuleName Identifier
 
 " import [as]:
 syn region ethImport matchgroup=ethKeyword start=/\<import\>/ end=/\<in\>/ contains=ethImportAs,ethDelimiter,ethIdentifier,ethUnqualified
@@ -103,12 +102,13 @@ syn keyword ethAssert assert
 syn keyword ethKeyword if unless when then else try with
 syn keyword ethLazy lazy
 
-syn match ethOperator /[-+=*/%><&|.!ο]\+/
+syn match ethOperator /[-+=*/%><&|.!]\+/
 syn match ethOperator /:\|\$/
 syn keyword ethOperator is eq equal not mod land lor lxor lshl lshr ashl ashr lnot
 
 syn match ethDelimiter /[,;()]/
 
+syn match Keyword /!/
 syn match ethUnit /(\s*)/
 
 syn keyword ethNil nil
