@@ -85,7 +85,19 @@ create_ir_node(eth_ir_tag tag)
   eth_ir_node *node = malloc(sizeof(eth_ir_node));
   node->rc = 0;
   node->tag = tag;
+  node->loc = NULL;
   return node;
+}
+
+void
+eth_set_ir_location(eth_ir_node *node, eth_location *loc)
+{
+  if (loc)
+  {
+    if (node->loc)
+      eth_unref_location(node->loc);
+    eth_ref_location(node->loc = loc);
+  }
 }
 
 void
@@ -169,6 +181,8 @@ destroy_ir_node(eth_ir_node *node)
       break;
   }
 
+  if (node->loc)
+    eth_unref_location(node->loc);
   free(node);
 }
 

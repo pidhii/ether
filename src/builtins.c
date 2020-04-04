@@ -32,10 +32,73 @@ _strcat(void)
 }
 
 static eth_t
+_pair_p(void)
+{
+  eth_t x = *eth_sp++;
+  eth_t ret = eth_boolean(x->type == eth_pair_type);
+  eth_drop(x);
+  return ret;
+}
+
+static eth_t
+_symbol_p(void)
+{
+  eth_t x = *eth_sp++;
+  eth_t ret = eth_boolean(x->type == eth_symbol_type);
+  eth_drop(x);
+  return ret;
+}
+
+static eth_t
+_number_p(void)
+{
+  eth_t x = *eth_sp++;
+  eth_t ret = eth_boolean(x->type == eth_number_type);
+  eth_drop(x);
+  return ret;
+}
+
+static eth_t
+_string_p(void)
+{
+  eth_t x = *eth_sp++;
+  eth_t ret = eth_boolean(x->type == eth_string_type);
+  eth_drop(x);
+  return ret;
+}
+
+static eth_t
+_boolean_p(void)
+{
+  eth_t x = *eth_sp++;
+  eth_t ret = eth_boolean(x->type == eth_boolean_type);
+  eth_drop(x);
+  return ret;
+}
+
+static eth_t
+_function_p(void)
+{
+  eth_t x = *eth_sp++;
+  eth_t ret = eth_boolean(x->type == eth_function_type);
+  eth_drop(x);
+  return ret;
+}
+
+static eth_t
 _tuple_p(void)
 {
   eth_t x = *eth_sp++;
   eth_t ret = eth_boolean(eth_is_tuple(x->type));
+  eth_drop(x);
+  return ret;
+}
+
+static eth_t
+_record_p(void)
+{
+  eth_t x = *eth_sp++;
+  eth_t ret = eth_boolean(eth_is_record(x->type));
   eth_drop(x);
   return ret;
 }
@@ -409,24 +472,32 @@ _eth_init_builtins(void)
 
   eth_debug("loading builtins");
 
-  eth_define(g_mod,        "++", eth_create_proc(   _strcat, 2, NULL, NULL));
-  eth_define(g_mod,    "tuple?", eth_create_proc(  _tuple_p, 1, NULL, NULL));
-  eth_define(g_mod,  "tonumber", eth_create_proc( _tonumber, 1, NULL, NULL));
-  eth_define(g_mod,  "tosymbol", eth_create_proc( _tosymbol, 1, NULL, NULL));
-  eth_define(g_mod,      "list", eth_create_proc(     _list, 1, NULL, NULL));
+  eth_define(g_mod,        "++", eth_create_proc(    _strcat, 2, NULL, NULL));
   // ---
-  eth_define(g_mod,    "length", eth_create_proc(   _length, 1, NULL, NULL));
-  eth_define(g_mod, "revappend", eth_create_proc(_revappend, 2, NULL, NULL));
+  eth_define(g_mod,     "pair?", eth_create_proc(    _pair_p, 1, NULL, NULL));
+  eth_define(g_mod,   "symbol?", eth_create_proc(  _symbol_p, 1, NULL, NULL));
+  eth_define(g_mod,   "number?", eth_create_proc(  _number_p, 1, NULL, NULL));
+  eth_define(g_mod,   "string?", eth_create_proc(  _string_p, 1, NULL, NULL));
+  eth_define(g_mod,  "boolean?", eth_create_proc( _boolean_p, 1, NULL, NULL));
+  eth_define(g_mod, "function?", eth_create_proc(_function_p, 1, NULL, NULL));
+  eth_define(g_mod,    "tuple?", eth_create_proc(   _tuple_p, 1, NULL, NULL));
+  eth_define(g_mod,   "record?", eth_create_proc(  _record_p, 1, NULL, NULL));
+  eth_define(g_mod,  "tonumber", eth_create_proc(  _tonumber, 1, NULL, NULL));
+  eth_define(g_mod,  "tosymbol", eth_create_proc(  _tosymbol, 1, NULL, NULL));
+  eth_define(g_mod,      "list", eth_create_proc(      _list, 1, NULL, NULL));
   // ---
-  eth_define(g_mod,     "write", eth_create_proc(    _write, 1, NULL, NULL));
-  eth_define(g_mod,   "display", eth_create_proc(  _display, 1, NULL, NULL));
-  eth_define(g_mod,   "newline", eth_create_proc(  _newline, 0, NULL, NULL));
-  eth_define(g_mod,     "print", eth_create_proc(    _print, 1, NULL, NULL));
-  eth_define(g_mod,     "input", eth_create_proc(    _input, 1, NULL, NULL));
+  eth_define(g_mod,    "length", eth_create_proc(    _length, 1, NULL, NULL));
+  eth_define(g_mod, "revappend", eth_create_proc( _revappend, 2, NULL, NULL));
   // ---
-  eth_define(g_mod,    "printf", eth_create_proc(   _printf, 1, NULL, NULL));
+  eth_define(g_mod,     "write", eth_create_proc(     _write, 1, NULL, NULL));
+  eth_define(g_mod,   "display", eth_create_proc(   _display, 1, NULL, NULL));
+  eth_define(g_mod,   "newline", eth_create_proc(   _newline, 0, NULL, NULL));
+  eth_define(g_mod,     "print", eth_create_proc(     _print, 1, NULL, NULL));
+  eth_define(g_mod,     "input", eth_create_proc(     _input, 1, NULL, NULL));
   // ---
-  eth_define(g_mod,     "raise", eth_create_proc(    _raise, 1, NULL, NULL));
+  eth_define(g_mod,    "printf", eth_create_proc(    _printf, 1, NULL, NULL));
+  // ---
+  eth_define(g_mod,     "raise", eth_create_proc(     _raise, 1, NULL, NULL));
 
   eth_debug("loading \"src/builtins.eth\"");
   if (not eth_load_module_from_script(g_env, g_mod, "src/builtins.eth"))

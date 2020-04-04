@@ -34,12 +34,11 @@ syn match ethSymbol     /\<[A-Z][a-zA-Z0-9_]*\>/
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""'
 " Builtins:
 syn keyword Function tonumber tosymbol 
-syn keyword Function tuple?
+syn keyword Function pair? symbol? number? string? boolean? function? tuple? record?
 syn keyword Function list
 syn keyword Function write display newline print input
 syn keyword Function printf fprintf format
 syn keyword Function car cdr
-syn keyword Function pairs
 syn keyword Function apply
 syn keyword Function id flip const
 syn keyword Function die raise
@@ -83,11 +82,16 @@ syn match ethModule /\<[A-Z][a-zA-Z0-9_]*\s*\./he=e-1 nextgroup=ethModule,ethMem
 syn match ethMember /\<[a-z_][a-zA-Z0-9_]*['?]?\>/
 
 syn keyword ethType fn
+
+syn region ethBraces matchgroup=Delimiter start=/(/ end=/)/ contains=TOP skipwhite skipnl
+
 syn region ethTable matchgroup=Type start=/{/ end=/}/ contains=TOP skipwhite skipnl
-syn region ethList matchgroup=ethType start=/\[/ end=/\]/ skipwhite skipnl contains=TOP
-syn region ethArray matchgroup=ethType start=/\[\s*|/ end=/|\s*\]/ skipwhite skipnl contains=TOP
+syn region ethList matchgroup=Type start=/\[/ end=/\]/ skipwhite skipnl contains=TOP
+syn region ethArray matchgroup=Type start=/\[\s*|/ end=/|\s*\]/ skipwhite skipnl contains=TOP
 
 syn keyword StorageClass pub
+
+syn match ethDelimiter /[,;()]/
 
 " import [as]:
 syn region ethImport matchgroup=ethKeyword start=/\<import\>/ end=/\<in\>/ contains=ethImportAs,ethDelimiter,ethIdentifier,ethUnqualified
@@ -105,8 +109,6 @@ syn keyword ethLazy lazy
 syn match ethOperator /[-+=*/%><&|.!]\+/
 syn match ethOperator /:\|\$/
 syn keyword ethOperator is eq equal not mod land lor lxor lshl lshr ashl ashr lnot
-
-syn match ethDelimiter /[,;()]/
 
 syn match Keyword /!/
 syn match ethUnit /(\s*)/

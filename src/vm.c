@@ -69,7 +69,7 @@ fetch_insn:
         }
 
         eth_function *restrict func = ETH_FUNCTION(fn);
-        if (func->islam && func->clos.bc->nreg <= nreg)
+        if (func->islam && func->clos.bc->nreg <= nreg && func->arity == nstack)
         {
           bc = func->clos.bc;
           ip = func->clos.bc->code;

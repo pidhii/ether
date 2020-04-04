@@ -116,6 +116,7 @@ create_ast_node(eth_ast_tag tag)
   eth_ast *node = malloc(sizeof(eth_ast));
   node->rc = 0;
   node->tag = tag;
+  node->loc = NULL;
   return node;
 }
 
@@ -226,6 +227,8 @@ destroy_ast_node(eth_ast *ast)
       break;
   }
 
+  if (ast->loc)
+    eth_unref_location(ast->loc);
   free(ast);
 }
 
@@ -249,6 +252,13 @@ eth_drop_ast(eth_ast *ast)
     destroy_ast_node(ast);
 }
 
+void
+eth_set_ast_location(eth_ast *ast, eth_location *loc)
+{
+  if (ast->loc)
+    eth_unref_location(ast->loc);
+  eth_ref_location(ast->loc = loc);
+}
 
 eth_ast*
 eth_ast_cval(eth_t val)

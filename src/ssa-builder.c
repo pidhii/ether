@@ -1230,7 +1230,7 @@ kill_value(kill_info *kinfo, eth_insn *begin, int vid)
 
       if (kill_value(kinfo, insn->next, vid))
       {
-        if (not kill_value(kinfo, cchbr, vid))
+        if (not kill_value(kinfo, cchbr, vid) and is_dead_end(cchbr))
         {
           eth_insn *unref = eth_insn_unref(vid);
           eth_insert_insn_before(cchbr, unref);

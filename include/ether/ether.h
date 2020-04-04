@@ -944,6 +944,31 @@ eth_get_modules(const eth_env *env, const eth_module *out[], int n);
 
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
+//                              LOCATIONS
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+typedef struct {
+  int rc;
+  int fl, fc, ll, lc;
+  char *filepath;
+} eth_location;
+
+eth_location*
+eth_create_location(int fl, int fc, int ll, int lc, const char *path);
+
+void
+eth_ref_location(eth_location *loc);
+
+void
+eth_unref_location(eth_location *loc);
+
+void
+eth_drop_location(eth_location *loc);
+
+int
+eth_print_location(eth_location *loc, FILE *stream);
+
+
+// ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                         ABSTRACT SYNTAX TREE
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 typedef enum {
@@ -1036,6 +1061,7 @@ struct eth_ast {
              char **fields; eth_ast **vals; int n; }
       mkrcrd;
   };
+  eth_location *loc;
 };
 
 void
@@ -1046,6 +1072,9 @@ eth_unref_ast(eth_ast *ast);
 
 void
 eth_drop_ast(eth_ast *ast);
+
+void
+eth_set_ast_location(eth_ast *ast, eth_location *loc);
 
 eth_ast* __attribute__((malloc))
 eth_ast_cval(eth_t val);
@@ -1193,6 +1222,7 @@ struct eth_ir_node {
     struct { eth_type *type; eth_ir_node **fields; } mkrcrd;
     struct { eth_ir_node *exn; } throw;
   };
+  eth_location *loc;
 };
 
 void
@@ -1203,6 +1233,9 @@ eth_unref_ir_node(eth_ir_node *node);
 
 void
 eth_drop_ir_node(eth_ir_node *node);
+
+void
+eth_set_ir_location(eth_ir_node *node, eth_location *loc);
 
 eth_ir_node* __attribute__((malloc))
 eth_ir_error(void);

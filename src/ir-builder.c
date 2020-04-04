@@ -98,7 +98,8 @@ new_vid(ir_builder *bldr)
 }
 
 static inline void
-trace_pub_var(ir_builder *bldr, const char *ident, int varid, int *e)
+trace_pub_var(ir_builder *bldr, const char *ident, int varid, eth_location *loc,
+    int *e)
 {
   if (bldr->istoplvl)
   {
@@ -109,6 +110,7 @@ trace_pub_var(ir_builder *bldr, const char *ident, int varid, int *e)
   {
     eth_warning("can't have public variables outside top level-scope");
     *e = 1;
+    eth_print_location(loc, stderr);
   }
 }
 
@@ -249,7 +251,7 @@ import_unqualified(ir_builder *bldr, const eth_module *mod)
 }
 
 static eth_ir_pattern*
-build_pattern(ir_builder *bldr, eth_ast_pattern *pat, int *e)
+build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
 {
   switch (pat->tag)
   {
@@ -258,7 +260,7 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, int *e)
       int varid = new_vid(bldr);
       eth_prepend_var(bldr->vars, eth_dyn_var(pat->ident.str, varid));
       if (pat->ident.pub)
-        trace_pub_var(bldr, pat->ident.str, varid, e);
+        trace_pub_var(bldr, pat->ident.str, varid, loc, e);
       return eth_ir_ident_pattern(varid);
     }
 
@@ -274,6 +276,7 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, int *e)
         {
           eth_error("no such type '%s'", pat->unpack.type.str);
           *e = 1;
+          eth_print_location(loc, stderr);
           return eth_ir_ident_pattern(-1); // just some dummy
         }
       }
@@ -289,10 +292,11 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, int *e)
           eth_error("no field '%s' of type '%s'", pat->unpack.fields[i],
               type->name);
           *e = 1;
+          eth_print_location(loc, stderr);
           return eth_ir_ident_pattern(-1); // just some dummy
         }
         offs[i] = fld->offs;
-        pats[i] = build_pattern(bldr, pat->unpack.subpats[i], e);
+        pats[i] = build_pattern(bldr, pat->unpack.subpats[i], loc, e);
       }
       return eth_ir_unpack_pattern(type, offs, pats, n);
     }
@@ -308,7 +312,7 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, int *e)
       for (int i = 0; i < n; ++i)
       {
         ids[i] = eth_get_symbol_id(eth_sym(pat->record.fields[i]));
-        pats[i] = build_pattern(bldr, pat->record.subpats[i], e);
+        pats[i] = build_pattern(bldr, pat->record.subpats[i], loc, e);
       }
       return eth_ir_record_pattern(ids, pats, n);
     }
@@ -336,14 +340,16 @@ build_let(ir_builder *bldr, int idx, eth_ast *ast, eth_ir_node *const vals[],
 {
   if (idx < ast->let.n)
   {
-    eth_ir_pattern *pat = build_pattern(bldr, ast->let.pats[idx], e);
+    eth_ir_pattern *pat = build_pattern(bldr, ast->let.pats[idx], ast->loc, e);
 
     eth_ir_node *thenbr = build_let(bldr, idx + 1, ast, vals, nvars0, e);
 
     eth_t exn = eth_exn(eth_sym("Match_failure"));
     eth_ir_node *elsebr = eth_ir_throw(eth_ir_cval(exn));
+    eth_set_ir_location(elsebr, ast->loc);
 
     eth_ir_node *ret = eth_ir_match(pat, vals[idx], thenbr, elsebr);
+    eth_set_ir_location(ret, ast->loc);
     ret->match.toplvl = ETH_TOPLVL_THEN;
     return ret;
   }
@@ -364,14 +370,17 @@ build_letrec(ir_builder *bldr, int idx, eth_ast *ast, int nvars0, int nvars,
   if (idx < ast->letrec.n)
   {
     eth_ir_node *expr = build(bldr, ast->letrec.vals[idx], e);
+    eth_set_ir_location(expr, ast->letrec.vals[idx]->loc);
 
     eth_ir_node *thenbr = build_letrec(bldr, idx + 1, ast, nvars0, nvars, pats, e);
 
     eth_ir_node *raise = eth_ir_cval(eth_get_builtin("raise"));
     eth_ir_node *what = eth_ir_cval(eth_sym("Match_failure"));
     eth_ir_node *elsebr = eth_ir_apply(raise, &what, 1);
+    eth_set_ir_location(elsebr, ast->loc);
 
     eth_ir_node *ret = eth_ir_match(pats[idx], expr, thenbr, elsebr);
+    eth_set_ir_location(ret, ast->loc);
     ret->match.toplvl = ETH_TOPLVL_THEN;
     return ret;
   }
@@ -392,7 +401,7 @@ build_letrec(ir_builder *bldr, int idx, eth_ast *ast, int nvars0, int nvars,
 }
 
 eth_ir_node*
-constexpr_binop(eth_binop op, eth_t lhs, eth_t rhs, int *e)
+constexpr_binop(eth_binop op, eth_t lhs, eth_t rhs, eth_location *loc, int *e)
 {
   eth_t ret = NULL;
   switch (op)
@@ -406,6 +415,7 @@ constexpr_binop(eth_binop op, eth_t lhs, eth_t rhs, int *e)
         eth_warning("invalid operands for binary %s (%s and %s)",
             eth_binop_sym(op), lhs->type->name, rhs->type->name);
         *e = 1;
+        eth_print_location(loc, stderr);
         return eth_ir_error();
       }
       eth_number_t x = ETH_NUMBER(lhs)->val;
@@ -475,6 +485,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       {
         eth_warning("undefined variable, '%s'", ast->ident.str);
         *e = 1;
+        eth_print_location(ast->loc, stderr);
         return eth_ir_error();
       }
       else if (var->cval)
@@ -529,7 +540,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
 
       int n1 = bldr->nvars;
       for (int i = 0; i < ast->letrec.n; ++i)
-        pats[i] = build_pattern(bldr, ast->letrec.pats[i], e);
+        pats[i] = build_pattern(bldr, ast->letrec.pats[i], ast->loc, e);
       int n2 = bldr->nvars;
       int nvars = n2 - n1;
 
@@ -548,7 +559,8 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       eth_ir_node *ret;
       if (lhs->tag == ETH_IR_CVAL and rhs->tag == ETH_IR_CVAL)
       {
-        ret = constexpr_binop(ast->binop.op, lhs->cval.val, rhs->cval.val, e);
+        ret = constexpr_binop(ast->binop.op, lhs->cval.val, rhs->cval.val,
+            ast->loc, e);
         eth_drop_ir_node(lhs);
         eth_drop_ir_node(rhs);
       }
@@ -583,7 +595,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       for (int i = 0; i < nargs; ++i)
         args[i] = new_vid(fnbldr);
       for (int i = 0; i < nargs; ++i)
-        pats[i] = build_pattern(fnbldr, ast->fn.args[i], e);
+        pats[i] = build_pattern(fnbldr, ast->fn.args[i], ast->loc, e);
       int nargvars = fnbldr->vars->len;
 
       // body:
@@ -625,7 +637,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
     {
       eth_ir_node *expr = build(bldr, ast->match.expr, e);
       int n1 = bldr->vars->len;
-      eth_ir_pattern *pat = build_pattern(bldr, ast->match.pat, e);
+      eth_ir_pattern *pat = build_pattern(bldr, ast->match.pat, ast->loc, e);
       int n2 = bldr->vars->len;
       int nvars = n2 - n1;
 
@@ -675,6 +687,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       {
         eth_warning("failed to import module %s", ast->import.module);
         *e = 1;
+        eth_print_location(ast->loc, stderr);
         return eth_ir_error();
       }
 
@@ -730,7 +743,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       int exnvar = new_vid(bldr);
 
       int n1 = bldr->vars->len;
-      eth_ir_pattern *pat = build_pattern(bldr, ast->try.pat, e);
+      eth_ir_pattern *pat = build_pattern(bldr, ast->try.pat, ast->loc, e);
       int n2 = bldr->vars->len;
       int nvars = n2 - n1;
       eth_ir_node *ok = build(bldr, ast->try.catchbr, e);
@@ -755,6 +768,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         {
           eth_error("no such type '%s'", ast->mkrcrd.type.str);
           *e = 1;
+          eth_print_location(ast->loc, stderr);
           return eth_ir_error();
         }
       }
@@ -765,6 +779,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       {
         eth_error("%s is not a plain type", type->name);
         *e = 1;
+        eth_print_location(ast->loc, stderr);
         return eth_ir_error();
       }
 
@@ -784,6 +799,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
           eth_error("no field '%s' in record %s", fields[i],
               ast->mkrcrd.type.str);
           *e = 1;
+          eth_print_location(ast->loc, stderr);
           return eth_ir_error();
         }
         vals[i].val = ast->mkrcrd.vals[i];
@@ -795,6 +811,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       {
         eth_error("default values for fields are not implemented");
         *e = 1;
+        eth_print_location(ast->loc, stderr);
         return eth_ir_error();
       }
 

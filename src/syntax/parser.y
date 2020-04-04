@@ -29,6 +29,16 @@ yyget_in(eth_scanner *scanner);
 static
 void yyerror(void *locp, eth_scanner *yyscanner, const char *what);
 
+static eth_location*
+location(void *locp_ptr);
+
+#define LOC(ast, locp)                            \
+  do {                                            \
+    if (g_filename)                               \
+      eth_set_ast_location(ast, location(&locp)); \
+  } while (0)
+
+static const char *g_filename = NULL;
 static eth_ast* g_result;
 static bool g_iserror;
 int _eth_start_token = -1;
@@ -202,18 +212,19 @@ entry
 ;
 
 atom
-  : NUMBER { $$ = eth_ast_cval(eth_create_number($1)); }
-  | ident { $$ = eth_ast_ident($1); free($1); }
-  | CONST  { $$ = eth_ast_cval($1); }
-  | string { $$ = eth_ast_cval(eth_create_string($1)); free($1); }
-  | CAPSYMBOL { $$ = eth_ast_cval(eth_sym($1)); free($1); }
-  | '('')' { $$ = eth_ast_cval(eth_nil); }
+  : NUMBER { $$ = eth_ast_cval(eth_create_number($1)); LOC($$, @$); }
+  | ident { $$ = eth_ast_ident($1); free($1); LOC($$, @$); }
+  | CONST  { $$ = eth_ast_cval($1); LOC($$, @$); }
+  | string { $$ = eth_ast_cval(eth_create_string($1)); free($1); LOC($$, @$); }
+  | CAPSYMBOL { $$ = eth_ast_cval(eth_sym($1)); free($1); LOC($$, @$); }
+  | '('')' { $$ = eth_ast_cval(eth_nil); LOC($$, @$); }
   | '(' expr ')' { $$ = $2; }
-  | atom '!' { $$ = eth_ast_apply($1, NULL, 0); }
+  | atom '!' { $$ = eth_ast_apply($1, NULL, 0); LOC($$, @$); }
   | '[' list ']' {
     $$ = eth_ast_cval(eth_nil);
     cod_vec_riter($2, i, x, $$ = eth_ast_binop(ETH_CONS, x, $$));
     cod_vec_destroy($2);
+    LOC($$, @$);
   }
   | '['']' { $$ = eth_ast_cval(eth_nil); }
   | '(' list ',' expr ')' {
@@ -238,6 +249,7 @@ atom
   }
   | capident DOT_OPEN expr ')' {
     $$ = eth_ast_import($1, "", NULL, 0, $3);
+    LOC($$, @$);
     free($1);
   }
 ;
@@ -246,6 +258,7 @@ form
   : atom
   | atom args {
     $$ = eth_ast_apply($1, $2.data, $2.len);
+    LOC($$, @$);
     cod_vec_destroy($2);
   }
 ;
@@ -260,42 +273,60 @@ expr
       cod_vec_iter($3, i, x, free(x));
       cod_vec_destroy($3);
     }
+    LOC($$, @$);
   }
   | IMPORT capident AS CAPSYMBOL IN expr {
     $$ = eth_ast_import($2, $4, NULL, 0, $6);
     free($2);
     free($4);
+    LOC($$, @$);
   }
   | IMPORT UNQUALIFIED capident IN expr {
     $$ = eth_ast_import($3, "", NULL, 0, $5);
     free($3);
+    LOC($$, @$);
   }
   | TRY expr WITH pattern RARROW expr %prec WITH {
     $$ = eth_ast_try($4, $2, $6, 1);
+    LOC($$, @$);
   }
-  | expr OR expr { $$ = eth_ast_try(NULL, $1, $3, 0); }
+  | expr OR expr { $$ = eth_ast_try(NULL, $1, $3, 0); LOC($$, @$); }
   | LET binds IN expr {
     $$ = eth_ast_let($2.pats.data, $2.vals.data, $2.pats.len, $4);
     cod_vec_destroy($2.pats);
     cod_vec_destroy($2.vals);
+    LOC($$, @$);
   }
   | LET REC binds IN expr {
     $$ = eth_ast_letrec($3.pats.data, $3.vals.data, $3.pats.len, $5);
     cod_vec_destroy($3.pats);
     cod_vec_destroy($3.vals);
+    LOC($$, @$);
   }
   | IFLET pattern '=' expr THEN expr ELSE expr {
     $$ = eth_ast_match($2, $4, $6, $8);
+    LOC($$, @$);
   }
   | WHENLET pattern '=' expr THEN expr {
     $$ = eth_ast_match($2, $4, $6, eth_ast_cval(eth_nil));
+    LOC($$, @$);
   }
-  | IF expr THEN expr ELSE expr { $$ = eth_ast_if($2, $4, $6); }
-  | WHEN expr THEN expr { $$ = eth_ast_if($2, $4, eth_ast_cval(eth_nil)); }
-  | UNLESS expr THEN expr { $$ = eth_ast_if($2, eth_ast_cval(eth_nil), $4); }
+  | IF expr THEN expr ELSE expr {
+    $$ = eth_ast_if($2, $4, $6);
+    LOC($$, @$);
+  }
+  | WHEN expr THEN expr {
+    $$ = eth_ast_if($2, $4, eth_ast_cval(eth_nil));
+    LOC($$, @$);
+  }
+  | UNLESS expr THEN expr {
+    $$ = eth_ast_if($2, eth_ast_cval(eth_nil), $4);
+    LOC($$, @$);
+  }
   | FN fnargs RARROW expr {
     $$ = eth_ast_fn_with_patterns($2.data, $2.len, $4);
     cod_vec_destroy($2);
+    LOC($$, @$);
   }
   | expr '$' expr {
     if ($1->tag == ETH_AST_APPLY)
@@ -305,6 +336,7 @@ expr
     }
     else
       $$ = eth_ast_apply($1, &$3, 1);
+    LOC($$, @$);
   }
   | expr PIPE expr {
     if ($3->tag == ETH_AST_APPLY)
@@ -314,46 +346,50 @@ expr
     }
     else
       $$ = eth_ast_apply($3, &$1, 1);
+    LOC($$, @$);
   }
-  | expr OPAND expr { $$ = eth_ast_and($1, $3); }
-  | expr OPOR  expr { $$ = eth_ast_or($1, $3); }
-  | expr ';'   expr { $$ = eth_ast_seq($1, $3); }
-  | expr ';'        { $$ = $1; }
-  | expr '+'   expr { $$ = eth_ast_binop(ETH_ADD , $1, $3); }
-  | expr '-'   expr { $$ = eth_ast_binop(ETH_SUB , $1, $3); }
-  | expr '*'   expr { $$ = eth_ast_binop(ETH_MUL , $1, $3); }
-  | expr '/'   expr { $$ = eth_ast_binop(ETH_DIV , $1, $3); }
-  | expr '<'   expr { $$ = eth_ast_binop(ETH_LT  , $1, $3); }
-  | expr LE    expr { $$ = eth_ast_binop(ETH_LE  , $1, $3); }
-  | expr '>'   expr { $$ = eth_ast_binop(ETH_GT  , $1, $3); }
-  | expr GE    expr { $$ = eth_ast_binop(ETH_GE  , $1, $3); }
-  | expr EQ    expr { $$ = eth_ast_binop(ETH_EQ  , $1, $3); }
-  | expr NE    expr { $$ = eth_ast_binop(ETH_NE  , $1, $3); }
-  | expr IS    expr { $$ = eth_ast_binop(ETH_IS  , $1, $3); }
-  | expr ':'   expr { $$ = eth_ast_binop(ETH_CONS, $1, $3); }
-  | expr '%'   expr { $$ = eth_ast_binop(ETH_MOD , $1, $3); }
-  | expr MOD   expr { $$ = eth_ast_binop(ETH_MOD , $1, $3); }
-  | expr '^'   expr { $$ = eth_ast_binop(ETH_POW , $1, $3); }
-  | expr LAND  expr { $$ = eth_ast_binop(ETH_LAND, $1, $3); }
-  | expr LOR   expr { $$ = eth_ast_binop(ETH_LOR , $1, $3); }
-  | expr LXOR  expr { $$ = eth_ast_binop(ETH_LXOR, $1, $3); }
-  | expr LSHL  expr { $$ = eth_ast_binop(ETH_LSHL, $1, $3); }
-  | expr LSHR  expr { $$ = eth_ast_binop(ETH_LSHR, $1, $3); }
-  | expr ASHL  expr { $$ = eth_ast_binop(ETH_ASHL, $1, $3); }
-  | expr ASHR  expr { $$ = eth_ast_binop(ETH_ASHR, $1, $3); }
+  | expr OPAND expr { $$ = eth_ast_and($1, $3); LOC($$, @$); }
+  | expr OPOR  expr { $$ = eth_ast_or($1, $3); LOC($$, @$); }
+  | expr ';'   expr { $$ = eth_ast_seq($1, $3); LOC($$, @$); }
+  | expr ';'        { $$ = $1; LOC($$, @$); }
+  | expr '+'   expr { $$ = eth_ast_binop(ETH_ADD , $1, $3); LOC($$, @$); }
+  | expr '-'   expr { $$ = eth_ast_binop(ETH_SUB , $1, $3); LOC($$, @$); }
+  | expr '*'   expr { $$ = eth_ast_binop(ETH_MUL , $1, $3); LOC($$, @$); }
+  | expr '/'   expr { $$ = eth_ast_binop(ETH_DIV , $1, $3); LOC($$, @$); }
+  | expr '<'   expr { $$ = eth_ast_binop(ETH_LT  , $1, $3); LOC($$, @$); }
+  | expr LE    expr { $$ = eth_ast_binop(ETH_LE  , $1, $3); LOC($$, @$); }
+  | expr '>'   expr { $$ = eth_ast_binop(ETH_GT  , $1, $3); LOC($$, @$); }
+  | expr GE    expr { $$ = eth_ast_binop(ETH_GE  , $1, $3); LOC($$, @$); }
+  | expr EQ    expr { $$ = eth_ast_binop(ETH_EQ  , $1, $3); LOC($$, @$); }
+  | expr NE    expr { $$ = eth_ast_binop(ETH_NE  , $1, $3); LOC($$, @$); }
+  | expr IS    expr { $$ = eth_ast_binop(ETH_IS  , $1, $3); LOC($$, @$); }
+  | expr ':'   expr { $$ = eth_ast_binop(ETH_CONS, $1, $3); LOC($$, @$); }
+  | expr '%'   expr { $$ = eth_ast_binop(ETH_MOD , $1, $3); LOC($$, @$); }
+  | expr MOD   expr { $$ = eth_ast_binop(ETH_MOD , $1, $3); LOC($$, @$); }
+  | expr '^'   expr { $$ = eth_ast_binop(ETH_POW , $1, $3); LOC($$, @$); }
+  | expr LAND  expr { $$ = eth_ast_binop(ETH_LAND, $1, $3); LOC($$, @$); }
+  | expr LOR   expr { $$ = eth_ast_binop(ETH_LOR , $1, $3); LOC($$, @$); }
+  | expr LXOR  expr { $$ = eth_ast_binop(ETH_LXOR, $1, $3); LOC($$, @$); }
+  | expr LSHL  expr { $$ = eth_ast_binop(ETH_LSHL, $1, $3); LOC($$, @$); }
+  | expr LSHR  expr { $$ = eth_ast_binop(ETH_LSHR, $1, $3); LOC($$, @$); }
+  | expr ASHL  expr { $$ = eth_ast_binop(ETH_ASHL, $1, $3); LOC($$, @$); }
+  | expr ASHR  expr { $$ = eth_ast_binop(ETH_ASHR, $1, $3); LOC($$, @$); }
   | expr PPLUS expr {
     eth_ast *args[] = { $1, $3 };
     eth_ast *fn = eth_ast_cval(eth_get_builtin("++"));
     $$ = eth_ast_apply(fn, args, 2);
+    LOC($$, @$);
   }
   | '-' expr %prec UMINUS {
     $$ = eth_ast_binop(ETH_SUB, eth_ast_cval(eth_num(0)), $2);
+    LOC($$, @$);
   }
   | '+' expr %prec UPLUS {
     $$ = eth_ast_binop(ETH_ADD, eth_ast_cval(eth_num(0)), $2);
+    LOC($$, @$);
   }
-  | NOT  expr { $$ = eth_ast_unop(ETH_NOT , $2); }
-  | LNOT expr { $$ = eth_ast_unop(ETH_LNOT, $2); }
+  | NOT  expr { $$ = eth_ast_unop(ETH_NOT , $2); LOC($$, @$); }
+  | LNOT expr { $$ = eth_ast_unop(ETH_LNOT, $2); LOC($$, @$); }
 ;
 
 ident
@@ -615,6 +651,7 @@ eth_parse(FILE *stream)
 
   g_result = NULL;
   g_iserror = false;
+  g_filename = filename(stream);
   yyparse(scan);
 
   eth_destroy_scanner(scan);
@@ -637,9 +674,27 @@ yyerror(void *locp_ptr, eth_scanner *yyscanner, const char *what)
   const char *path = filename(eth_get_scanner_input(yyscanner));
   if (path)
   {
-    eth_warning("%s:%d:%d", path, locp->first_line, locp->first_column);
-    /*opi_assert(opi_show_location(eth_error, path, locp->first_column,*/
-        /*locp->first_line, locp->last_column, locp->last_line) == OPI_OK);*/
+    eth_location *loc = eth_create_location(locp->first_line, locp->first_column,
+        locp->last_line, locp->last_column, path);
+    eth_print_location(loc, stderr);
+    eth_drop_location(loc);
+  }
+}
+
+static eth_location*
+location(void *locp_ptr)
+{
+  YYLTYPE *locp = locp_ptr;
+  if (g_filename)
+  {
+    return eth_create_location(
+        locp->first_line, locp->first_column,
+        locp->last_line, locp->last_column,
+        g_filename);
+  }
+  else
+  {
+    return NULL;
   }
 }
 
