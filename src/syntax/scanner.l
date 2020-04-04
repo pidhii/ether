@@ -137,6 +137,7 @@ not     { return NOT; }
 lnot    { return LNOT; }
 "++"    { return PPLUS; }
 "|>"    { return PIPE; }
+"."\s*"(" { return DOT_OPEN; }
 
 
 "("(mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|not|lnot)")" |

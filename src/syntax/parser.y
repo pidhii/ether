@@ -141,6 +141,7 @@ int _eth_start_token = -1;
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %nonassoc LET REC AND IN FN IFLET WHENLET
 %nonassoc PUB IMPORT AS UNQUALIFIED
+%nonassoc DOT_OPEN
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %right RARROW
 %right ';'
@@ -235,6 +236,10 @@ atom
     cod_vec_destroy($2.keys);
     cod_vec_destroy($2.vals);
   }
+  | capident DOT_OPEN expr ')' {
+    $$ = eth_ast_import($1, "", NULL, 0, $3);
+    free($1);
+  }
 ;
 
 form
@@ -256,23 +261,13 @@ expr
       cod_vec_destroy($3);
     }
   }
-  | IMPORT capident AS CAPSYMBOL maybe_imports IN expr {
-    $$ = eth_ast_import($2, $4, $5.data, $5.len, $7);
-    if ($5.data)
-    {
-      cod_vec_iter($5, i, x, free(x));
-      cod_vec_destroy($5);
-    }
+  | IMPORT capident AS CAPSYMBOL IN expr {
+    $$ = eth_ast_import($2, $4, NULL, 0, $6);
     free($2);
     free($4);
   }
-  | IMPORT UNQUALIFIED capident maybe_imports IN expr {
-    $$ = eth_ast_import($3, "", $4.data, $4.len, $6);
-    if ($4.data)
-    {
-      cod_vec_iter($4, i, x, free(x));
-      cod_vec_destroy($4);
-    }
+  | IMPORT UNQUALIFIED capident IN expr {
+    $$ = eth_ast_import($3, "", NULL, 0, $5);
     free($3);
   }
   | TRY expr WITH pattern RARROW expr %prec WITH {
@@ -500,7 +495,7 @@ pattern
   | pattern ':' pattern {
     char *fields[2] = { "car", "cdr" };
     eth_ast_pattern *pats[2] = { $1, $3 };
-    $$ = eth_ast_unpack_pattern("pair", fields, pats, 2);
+    $$ = eth_ast_unpack_pattern_with_type(eth_pair_type, fields, pats, 2);
   }
 ;
 

@@ -10,6 +10,11 @@
 ETH_MODULE("ether:ir-builder")
 
 
+typedef struct {
+  char *name;
+  const eth_module *module;
+} module_entry;
+
 typedef struct ir_builder {
   struct ir_builder *parent;
   eth_env *env; // top-level environment
@@ -18,9 +23,9 @@ typedef struct ir_builder {
   eth_var_list *vars;
   int nvars;
   cod_vec(eth_type*) types;
-  cod_vec(eth_module*) mods;
   cod_vec(char*) defidents;
   cod_vec(int  ) defvarids;
+  cod_vec(module_entry) mods;
 } ir_builder;
 
 static ir_builder*
@@ -34,19 +39,9 @@ create_ir_builder(ir_builder *parent)
   bldr->vars = eth_create_var_list();
   bldr->nvars = 0;
   cod_vec_init(bldr->types);
-  cod_vec_init(bldr->mods);
   cod_vec_init(bldr->defidents);
   cod_vec_init(bldr->defvarids);
-
-  if (parent)
-  {
-    cod_vec_iter(parent->types, i, x, cod_vec_push(bldr->types, x));
-    cod_vec_iter(parent->mods, i, x, cod_vec_push(bldr->mods, x));
-  }
-  else
-  {
-    cod_vec_push(bldr->types, eth_pair_type);
-  }
+  cod_vec_init(bldr->mods);
 
   return bldr;
 }
@@ -56,15 +51,45 @@ destroy_ir_builder(ir_builder *bldr)
 {
   eth_destroy_var_list(bldr->vars);
   cod_vec_destroy(bldr->types);
-  cod_vec_destroy(bldr->mods);
   cod_vec_iter(bldr->defidents, i, x, free(x));
   cod_vec_destroy(bldr->defidents);
   cod_vec_destroy(bldr->defvarids);
+  assert(bldr->mods.len == 0);
+  cod_vec_destroy(bldr->mods);
   free(bldr);
 }
 
 static eth_ir_node*
 build(ir_builder *bldr, eth_ast *ast, int *e);
+
+static inline void
+add_module(ir_builder *bldr, const char *name, const eth_module *mod)
+{
+  module_entry ent = { .name = strdup(name), .module = mod };
+  cod_vec_push(bldr->mods, ent);
+}
+
+static inline void
+pop_module(ir_builder *bldr)
+{
+  module_entry ent = cod_vec_pop(bldr->mods);
+  free(ent.name);
+}
+
+static inline const eth_module*
+find_module(ir_builder *bldr, const char *name)
+{
+  for (size_t i = 0; i < bldr->mods.len; ++i)
+  {
+    if (strcmp(bldr->mods.data[i].name, name) == 0)
+      return bldr->mods.data[i].module;
+  }
+
+  if (bldr->parent)
+    return find_module(bldr->parent, name);
+  else
+    return NULL;
+}
 
 static inline int
 new_vid(ir_builder *bldr)
@@ -96,7 +121,41 @@ find_type(ir_builder *bldr, const char *name)
     if (strcmp(ty->name, name) == 0)
       return ty;
   }
-  return NULL;
+
+  if (bldr->parent)
+    return find_type(bldr->parent, name);
+  else
+    return NULL;
+}
+
+static eth_t
+resolve_var_path(const eth_module *mod, const char *path)
+{
+  char *p;
+  if ((p = strchr(path, '.')))
+  {
+    int modnamelen = p - path;
+    char modname[modnamelen + 1];
+    memcpy(modname, path, modnamelen);
+    modname[modnamelen-1] = '\0';
+
+    eth_module *submod = eth_require_module(eth_get_env(mod), modname);
+    if (submod == NULL)
+    {
+      eth_warning("no submodule %s in %s", modname, eth_get_module_name(mod));
+      return NULL;
+    }
+
+    return resolve_var_path(submod, p);
+  }
+
+  eth_def *def = eth_find_def(mod, path);
+  if (def == NULL)
+  {
+    eth_warning("no '%s' in module %s", path, eth_get_module_name(mod));
+    return NULL;
+  }
+  return def->val;
 }
 
 /*
@@ -109,73 +168,84 @@ find_type(ir_builder *bldr, const char *name)
 static eth_var*
 require_var(ir_builder *bldr, const char *ident, int *cnt)
 {
-  int offs;
-  eth_var *var = eth_find_var(bldr->vars->head, ident, &offs);
-  if (var)
+  char *p;
+  if ((p = strchr(ident, '.')))
   {
-    if (cnt) *cnt = offs;
-    return var;
-  }
-  else if (bldr->parent)
-  {
-    if ((var = require_var(bldr->parent, ident, &offs)))
+    int modnamelen = p - ident;
+    char modname[modnamelen + 1];
+    memcpy(modname, ident, modnamelen);
+    modname[modnamelen] = '\0';
+
+    const eth_module *mod = find_module(bldr, modname);
+    if (mod == NULL)
     {
-      // immediately return constants (don't perform capture)
-      if (var->cval) return var;
-      if (cnt) *cnt = bldr->vars->len;
-      int vid = new_vid(bldr);
-      return eth_append_var(bldr->vars, eth_copy_var_cfg(var, vid));
+      eth_warning("module %s was not imported", modname);
+      return NULL;
     }
+
+    eth_t val = resolve_var_path(mod, p);
+    static eth_var ret;
+    ret.ident = NULL;
+    ret.cval = val;
+    ret.vid = -1;
+    ret.next = NULL;
+    return &ret;
   }
-  return NULL;
+  else
+  {
+    int offs;
+    eth_var *var = eth_find_var(bldr->vars->head, ident, &offs);
+    if (var)
+    {
+      if (cnt) *cnt = offs;
+      return var;
+    }
+    else if (bldr->parent)
+    {
+      if ((var = require_var(bldr->parent, ident, &offs)))
+      {
+        // immediately return constants (don't perform capture)
+        if (var->cval) return var;
+        if (cnt) *cnt = bldr->vars->len;
+        int vid = new_vid(bldr);
+        return eth_append_var(bldr->vars, eth_copy_var_cfg(var, vid));
+      }
+    }
+    return NULL;
+  }
 }
 
-// TODO: simplify (e.g. split on several specified functions)
 static bool
-load_module(ir_builder *bldr, const eth_module *mod, const char *alias,
-    char *const nams[], int nnam)
+import_names(ir_builder *bldr, const eth_module *mod, char *const nams[], int n)
 {
-  const char *modname = alias ? alias : eth_get_module_name(mod);
-  char prefix[strlen(modname) + 2];
-  if (modname[0])
-    sprintf(prefix, "%s.", modname);
-  else
-    prefix[0] = 0;
+  for (int i = 0; i < n; ++i)
+  {
+    eth_def *def = eth_find_def(mod, nams[i]);
+    if (not def)
+    {
+      eth_warning("no '%s' in module %s", nams[i], eth_get_module_name(mod));
+      return false;
+    }
+    eth_var_cfg var = eth_const_var(def->ident, def->val);
+    eth_prepend_var(bldr->vars, var);
+  }
+  return true;
+}
 
-  char buf[124];
-  if (nams)
-  {
-    for (int i = 0; i < nnam; ++i)
-    {
-      eth_def *def = eth_find_def(mod, nams[i]);
-      if (not def)
-      {
-        eth_warning("no '%s' in module %s", nams[i], eth_get_module_name(mod));
-        return false;
-      }
-      assert(strlen(def->ident) + sizeof prefix < sizeof buf);
-      sprintf(buf, "%s%s", prefix, def->ident);
-      eth_var_cfg var = eth_const_var(buf, def->val);
-      eth_prepend_var(bldr->vars, var);
-    }
-    return true;
-  }
-  else
-  {
-    // import all identifiers
-    int ndefs = eth_get_ndefs(mod);
-    eth_def defs[ndefs];
-    eth_get_defs(mod, defs);
-    for (int i = 0; i < ndefs; ++i)
-    {
-      char *ident = defs[i].ident;
-      assert(strlen(ident) + sizeof prefix < sizeof buf);
-      sprintf(buf, "%s%s", prefix, ident);
-      eth_var_cfg var = eth_const_var(buf, defs[i].val);
-      eth_prepend_var(bldr->vars, var);
-    }
-    return true;
-  }
+static void
+import_default(ir_builder *bldr, const eth_module *mod, const char *alias)
+{
+  add_module(bldr, alias ? alias : eth_get_module_name(mod), mod);
+}
+
+static void
+import_unqualified(ir_builder *bldr, const eth_module *mod)
+{
+  int ndefs = eth_get_ndefs(mod);
+  eth_def defs[ndefs];
+  eth_get_defs(mod, defs);
+  for (int i = 0; i < ndefs; ++i)
+    eth_prepend_var(bldr->vars, eth_const_var(defs[i].ident, defs[i].val));
 }
 
 static eth_ir_pattern*
@@ -576,15 +646,32 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
     {
       assert(bldr->env);
 
+      char *p;
+      char topname[256];
+      if ((p = strchr(ast->import.module, '.')))
+      {
+        int len = p - ast->import.module;
+        memcpy(topname, ast->import.module, len);
+        topname[len] = '\0';
+      }
+      else
+        strcpy(topname, ast->import.module);
+
       // 1. try to load as a submodule
       // 2. otherwize, load with global environment
-      eth_module *mod = NULL;
+      const eth_module *topmod = NULL, *mod = NULL;
       if (bldr->mod)
+      {
+        topmod = eth_require_module(eth_get_env(bldr->mod), topname);
         mod = eth_require_module(eth_get_env(bldr->mod), ast->import.module);
+      }
       if (not mod)
+      {
+        topmod = eth_require_module(bldr->env, topname);
         mod = eth_require_module(bldr->env, ast->import.module);
+      }
 
-      if (not mod)
+      if (not topmod or not mod)
       {
         eth_warning("failed to import module %s", ast->import.module);
         *e = 1;
@@ -592,12 +679,25 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       }
 
       int n1 = bldr->vars->len;
-      int ok = load_module(bldr, mod, ast->import.alias, ast->import.nams,
-          ast->import.nnam);
+      int nm1 = bldr->mods.len;
+      bool ok = true;
+      if (ast->import.nams)
+        ok = import_names(bldr, mod, ast->import.nams, ast->import.nnam);
+      else if (ast->import.alias and ast->import.alias[0] == 0)
+        import_unqualified(bldr, mod);
+      else
+        import_default(bldr, mod, ast->import.alias);
+
+      add_module(bldr, topname, topmod);
+
+      int nmods = bldr->mods.len - nm1;
+      int nvars = bldr->vars->len - n1;
       if (not ok) *e = 1;
-      int n2 = bldr->vars->len;
+
       eth_ir_node *body = build(bldr, ast->import.body, e);
-      eth_pop_var(bldr->vars, n2 - n1);
+
+      eth_pop_var(bldr->vars, nvars);
+      while (nmods--) pop_module(bldr);
       return body;
     }
 
@@ -732,7 +832,7 @@ build_ir(eth_ast *ast, eth_env *env, eth_module *mod, eth_ir_defs *defs)
   bldr->mod = mod;
 
   // import builtins:
-  load_module(bldr, eth_builtins(), "", NULL, 0);
+  import_unqualified(bldr, eth_builtins());
 
   eth_ir_node *body = build(bldr, ast, &e);
   if (e)
