@@ -1,30 +1,40 @@
 #include "ether/ether.h"
 #include "codeine/hash-map.h"
+#include "codeine/hash.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 
+
+ETH_MODULE("ether:record")
+
+
 static
 cod_hash_map *g_tuptab;
 
+static
+cod_hash_map *g_rectab;
+
 
 void
-_eth_init_tuple_types(void)
+_eth_init_record_types(void)
 {
   g_tuptab = cod_hash_map_new();
+  g_rectab = cod_hash_map_new();
 }
 
 void
-_eth_cleanup_tuple_types(void)
+_eth_cleanup_record_types(void)
 {
   cod_hash_map_delete(g_tuptab, (void*)eth_destroy_type);
+  cod_hash_map_delete(g_rectab, (void*)eth_destroy_type);
 }
 
 void
 eth_destroy_record_h1(eth_type *type, eth_t x)
 {
-  assert(type->flag & ETH_TFLAG_RECORD);
+  assert(type->flag & ETH_TFLAG_PLAIN);
   eth_tuple *tup = ETH_TUPLE(x);
   eth_unref(tup->data[0]);
   eth_free_h1(tup);
@@ -33,7 +43,7 @@ eth_destroy_record_h1(eth_type *type, eth_t x)
 void
 eth_destroy_record_h2(eth_type *type, eth_t x)
 {
-  assert(type->flag & ETH_TFLAG_RECORD);
+  assert(type->flag & ETH_TFLAG_PLAIN);
   eth_tuple *tup = ETH_TUPLE(x);
   eth_unref(tup->data[0]);
   eth_unref(tup->data[1]);
@@ -43,7 +53,7 @@ eth_destroy_record_h2(eth_type *type, eth_t x)
 void
 eth_destroy_record_h3(eth_type *type, eth_t x)
 {
-  assert(type->flag & ETH_TFLAG_RECORD);
+  assert(type->flag & ETH_TFLAG_PLAIN);
   eth_tuple *tup = ETH_TUPLE(x);
   eth_unref(tup->data[0]);
   eth_unref(tup->data[1]);
@@ -54,7 +64,7 @@ eth_destroy_record_h3(eth_type *type, eth_t x)
 void
 eth_destroy_record_h4(eth_type *type, eth_t x)
 {
-  assert(type->flag & ETH_TFLAG_RECORD);
+  assert(type->flag & ETH_TFLAG_PLAIN);
   eth_tuple *tup = ETH_TUPLE(x);
   eth_unref(tup->data[0]);
   eth_unref(tup->data[1]);
@@ -66,7 +76,7 @@ eth_destroy_record_h4(eth_type *type, eth_t x)
 void
 eth_destroy_record_h5(eth_type *type, eth_t x)
 {
-  assert(type->flag & ETH_TFLAG_RECORD);
+  assert(type->flag & ETH_TFLAG_PLAIN);
   eth_tuple *tup = ETH_TUPLE(x);
   eth_unref(tup->data[0]);
   eth_unref(tup->data[1]);
@@ -79,7 +89,7 @@ eth_destroy_record_h5(eth_type *type, eth_t x)
 void
 eth_destroy_record_h6(eth_type *type, eth_t x)
 {
-  assert(type->flag & ETH_TFLAG_RECORD);
+  assert(type->flag & ETH_TFLAG_PLAIN);
   eth_tuple *tup = ETH_TUPLE(x);
   eth_unref(tup->data[0]);
   eth_unref(tup->data[1]);
@@ -93,7 +103,7 @@ eth_destroy_record_h6(eth_type *type, eth_t x)
 void
 eth_destroy_record_hn(eth_type *type, eth_t x)
 {
-  assert(type->flag & ETH_TFLAG_RECORD);
+  assert(type->flag & ETH_TFLAG_PLAIN);
   eth_tuple *tup = ETH_TUPLE(x);
   for (int i = 0; i < type->nfields; ++i)
     eth_unref(tup->data[i]);
@@ -166,6 +176,96 @@ eth_tuple_type(size_t n)
   }
 }
 
+
+static void
+write_record(eth_type *type, eth_t x, FILE *stream)
+{
+  int n = type->nfields;
+  eth_tuple *tup = ETH_TUPLE(x);
+  putc('{', stream);
+  for (int i = 0; i < n; ++i)
+  {
+    if (i > 0) putc(',', stream);
+    eth_fprintf(stream, "%s=~w", type->fields[i].name, tup->data[i]);
+  }
+  putc('}', stream);
+}
+
+// TODO: this looks ugly
+eth_type*
+eth_record_type(char *const fields[], size_t n)
+{
+  assert(n > 0);
+
+  typedef struct { const char *str; size_t id; } info;
+  info arr[n];
+  size_t totlen = 0;
+  for (size_t i = 0; i < n; ++i)
+  {
+    arr[i].str = fields[i];
+    arr[i].id = eth_get_symbol_id(eth_sym(fields[i]));
+    totlen += strlen(fields[i]);
+  }
+  totlen += n + 1;
+
+  int cmp(const void *p1, const void *p2)
+  {
+    const info *i1 = p1;
+    const info *i2 = p2;
+    return i1->id - i2->id;
+  }
+  qsort(arr, n, sizeof(info), cmp);
+
+  char *sortedfields[n];
+  ptrdiff_t offsets[n];
+  char totstr[totlen + 1];
+  totstr[0] = 0;
+  char *p = totstr;
+  // ---
+  *p++ = '{';
+  for (size_t i = 0; i < n; ++i)
+  {
+    sortedfields[i] = (char*)arr[i].str;
+    offsets[i] = offsetof(eth_tuple, data[i]);
+
+    if (i > 0) *p++ = ',';
+    int len = strlen(arr[i].str);
+    memcpy(p, arr[i].str, len);
+    p += len;
+  }
+  *p++ = '}';
+  *p++ = '\0';
+  // ---
+  eth_hash_t hash = cod_halfsiphash(eth_get_siphash_key(), (void*)totstr, totlen);
+
+  cod_hash_map_elt *elt;
+  if ((elt = cod_hash_map_find(g_rectab, totstr, hash)))
+  {
+    return elt->val;
+  }
+  else
+  {
+    eth_debug("new record-type: %s", totstr);
+    eth_type *type = eth_create_struct_type(totstr, sortedfields, offsets, n);
+    switch (n)
+    {
+      case 2:  type->destroy = eth_destroy_record_h2; break;
+      case 3:  type->destroy = eth_destroy_record_h3; break;
+      case 4:  type->destroy = eth_destroy_record_h4; break;
+      case 5:  type->destroy = eth_destroy_record_h5; break;
+      case 6:  type->destroy = eth_destroy_record_h6; break;
+      default: type->destroy = eth_destroy_record_hn; break;
+    }
+    type->flag = ETH_TFLAG_RECORD;
+    type->write = write_record;
+
+    int ok = cod_hash_map_insert(g_rectab, totstr, hash, type, NULL);
+    assert(ok);
+    return type;
+  }
+}
+
+
 eth_t
 eth_create_tuple_n(eth_type *type, eth_t const data[])
 {
@@ -192,7 +292,7 @@ eth_create_tuple_n(eth_type *type, eth_t const data[])
 eth_t
 eth_create_record(eth_type *type, eth_t const data[])
 {
-  assert(eth_is_record(type));
+  assert(eth_is_plain(type));
   int n = type->nfields;
   assert(n > 0);
   eth_tuple *rec;
@@ -211,4 +311,3 @@ eth_create_record(eth_type *type, eth_t const data[])
     eth_ref(rec->data[i] = data[i]);
   return ETH(rec);
 }
-

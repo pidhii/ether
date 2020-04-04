@@ -43,6 +43,11 @@ destroy_insn(eth_bc_insn *insn)
       free(insn->mkrcrd.data);
       break;
 
+    case ETH_OPC_LOADRCRD:
+      free(insn->loadrcrd.vids);
+      free(insn->loadrcrd.ids);
+      break;
+
     default:
       break;
   }
@@ -357,6 +362,34 @@ write_load(builder *bldr, int out, int vid, int offs)
 }
 
 static int
+write_loadrcrd(builder *bldr, size_t *ids, int *vids, int n, int src)
+{
+  eth_bc_insn *insn = append_insn(bldr);
+  insn->opc = ETH_OPC_LOADRCRD;
+  insn->loadrcrd.ids = malloc(sizeof(size_t) * n);
+  insn->loadrcrd.vids = malloc(sizeof(uint64_t) * n);
+  insn->loadrcrd.n = n;
+  insn->loadrcrd.src = src;
+  for (int i = 0; i < n; ++i)
+  {
+    insn->loadrcrd.ids[i] = ids[i];
+    insn->loadrcrd.vids[i] = vids[i];
+  }
+  return bldr->len - 1;
+}
+
+static int
+write_loadrcrd1(builder *bldr, int out, int vid, size_t id)
+{
+  eth_bc_insn *insn = append_insn(bldr);
+  insn->opc = ETH_OPC_LOADRCRD1;
+  insn->loadrcrd1.out = out;
+  insn->loadrcrd1.vid = vid;
+  insn->loadrcrd1.id  = id;
+  return bldr->len - 1;
+}
+
+static int
 write_setexn(builder *bldr, int vid)
 {
   eth_bc_insn *insn = append_insn(bldr);
@@ -477,6 +510,29 @@ build_pattern(builder *bldr, eth_ssa_pattern *pat, int expr, int_vec *jmps)
       else
         eth_debug("ommiting EQ test for ~w", pat->symbol.sym);
       break;
+
+    case ETH_PATTERN_RECORD:
+    {
+      assert(pat->record.n > 0);
+
+      if (pat->record.n == 1)
+        write_loadrcrd1(bldr, pat->record.vids[0], expr, pat->record.ids[0]);
+      else
+        write_loadrcrd(bldr, pat->record.ids, pat->record.vids, pat->record.n, expr);
+
+      if (pat->record.dotest)
+      {
+        int jmp = write_jze(bldr, -1);
+        cod_vec_push(*jmps, jmp);
+      }
+      else
+        eth_debug("ommiting test for record");
+
+      for (int i = 0; i < pat->record.n; ++i)
+        build_pattern(bldr, pat->record.subpat[i], pat->record.vids[i], jmps);
+
+      break;
+    }
   }
 }
 

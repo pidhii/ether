@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <errno.h>
+#include <ctype.h>
+#include <unistd.h>
 
 
 ETH_MODULE("ether:builtins")
@@ -15,10 +18,10 @@ _strcat(void)
   eth_t x = eth_arg2(args, eth_string_type);
   eth_t y = eth_arg2(args, eth_string_type);
 
-  int xlen = ETH_STRING(x)->len;
-  int ylen = ETH_STRING(y)->len;
-  const char *xstr = ETH_STRING(x)->cstr;
-  const char *ystr = ETH_STRING(y)->cstr;
+  int xlen = eth_str_len(x);
+  int ylen = eth_str_len(y);
+  const char *xstr = eth_str_cstr(x);
+  const char *ystr = eth_str_cstr(y);
 
   char *str = malloc(xlen + ylen + 1);
   memcpy(str, xstr, xlen);
@@ -27,6 +30,101 @@ _strcat(void)
   eth_end_unref(args);
   return eth_create_string_from_ptr2(str, xlen + ylen);
 }
+
+static eth_t
+_tuple_p(void)
+{
+  eth_t x = *eth_sp++;
+  eth_t ret = eth_boolean(eth_is_tuple(x->type));
+  eth_drop(x);
+  return ret;
+}
+
+static eth_t
+_tonumber(void)
+{
+  eth_t x = *eth_sp++;
+  if (eth_unlikely(x->type != eth_string_type))
+  {
+    eth_drop(x);
+    return eth_exn(eth_sym("Type_error"));
+  }
+
+  char *nptr = eth_str_cstr(x);
+  char *endptr;
+  eth_number_t ret = eth_strtonum(nptr, &endptr);
+
+  if (endptr == nptr)
+  {
+    eth_drop(x);
+    return eth_exn(eth_sym("Failure"));
+  }
+
+  while (*endptr++)
+  {
+    if (not isspace(*endptr))
+    {
+      eth_drop(x);
+      return eth_exn(eth_sym("Failure"));
+    }
+  }
+
+  eth_drop(x);
+  return eth_num(ret);
+}
+
+static eth_t
+_tosymbol(void)
+{
+  eth_t x = *eth_sp++;
+  if (eth_unlikely(x->type != eth_string_type))
+  {
+    eth_drop(x);
+    return eth_exn(eth_sym("Type_error"));
+  }
+
+  eth_t ret = eth_sym(eth_str_cstr(x));
+  eth_drop(x);
+  return ret;
+}
+
+static eth_t
+_list(void)
+{
+  eth_t x = *eth_sp++;
+  if (x == eth_nil || x->type == eth_pair_type)
+  {
+    return x;
+  }
+  else if (eth_is_tuple(x->type))
+  {
+    int n = eth_tuple_size(x->type);
+    eth_t acc = eth_nil;
+    for (int i = n - 1; i >= 0; --i)
+      acc = eth_cons(eth_tup_get(x, i), acc);
+    eth_drop(x);
+    return acc;
+  }
+  else if (eth_is_record(x->type))
+  {
+    int n = eth_record_size(x->type);
+    eth_t acc = eth_nil;
+    for (int i = n - 1; i >= 0; --i)
+    {
+      eth_t key = eth_str(x->type->fields[i].name);
+      eth_t val = eth_tup_get(x, i);
+      acc = eth_cons(eth_tup2(key, val), acc);
+    }
+    eth_drop(x);
+    return acc;
+  }
+  else
+  {
+    eth_drop(x);
+    return eth_exn(eth_sym("Failure"));
+  }
+}
+
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                  lists
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -40,7 +138,7 @@ _length(void)
   if (isproper)
     return eth_num(len);
   else
-    return eth_exn(eth_str("improper-list"));
+    return eth_exn(eth_sym("Improper_list"));
 }
 
 static eth_t
@@ -59,7 +157,7 @@ _revappend(void)
   {
     eth_drop(acc);
     eth_unref(l);
-    return eth_exn(eth_str("improper-list"));
+    return eth_exn(eth_sym("Improper_list"));
   }
   eth_ref(acc);
   eth_unref(l);
@@ -93,6 +191,76 @@ _newline(void)
 {
   putchar('\n');
   return eth_nil;
+}
+
+static eth_t
+_print(void)
+{
+  eth_t x = *eth_sp++;
+
+  if (eth_is_tuple(x->type))
+  {
+    for (int i = 0; i < eth_tuple_size(x->type); ++i)
+    {
+      if (i > 0) putc('\t', stdout);
+      eth_display(eth_tup_get(x, i), stdout);
+    }
+  }
+  else
+    eth_display(x, stdout);
+  putc('\n', stdout);
+  eth_drop(x);
+  return eth_nil;
+}
+
+// TODO: print entered string when reading from terminal
+static eth_t
+_input(void)
+{
+  eth_t prompt = *eth_sp++;
+
+  // Try detect EOF before printing promt:
+  char c = getc(stdin);
+  if (c == EOF)
+  {
+    eth_drop(prompt);
+    return eth_exn(eth_sym("End_of_file"));
+  } 
+  ungetc(c, stdin);
+
+  eth_display(prompt, stdout);
+  eth_drop(prompt);
+
+  char *line = NULL;
+  size_t n = 0;
+  ssize_t nrd = getline(&line, &n, stdin);
+  if (nrd < 0)
+  {
+    int err = errno;
+    free(line);
+    if (feof(stdin))
+      return eth_exn(eth_sym("End_of_file"));
+    else
+    {
+      switch (err)
+      {
+        case EINVAL: return eth_exn(eth_sym("IO_error"));
+        case ENOMEM: return eth_exn(eth_sym("Out_of_memory"));
+        default: abort();
+      }
+    }
+  }
+
+  if (not isatty(STDIN_FILENO))
+    fputs(line, stdout);
+
+  int len = nrd;
+  if (line[len - 1] == '\n')
+  {
+    len = nrd - 1;
+    line[len] = 0;
+  }
+  return eth_create_string_from_ptr2(line, len);
 }
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -242,6 +410,10 @@ _eth_init_builtins(void)
   eth_debug("loading builtins");
 
   eth_define(g_mod,        "++", eth_create_proc(   _strcat, 2, NULL, NULL));
+  eth_define(g_mod,    "tuple?", eth_create_proc(  _tuple_p, 1, NULL, NULL));
+  eth_define(g_mod,  "tonumber", eth_create_proc( _tonumber, 1, NULL, NULL));
+  eth_define(g_mod,  "tosymbol", eth_create_proc( _tosymbol, 1, NULL, NULL));
+  eth_define(g_mod,      "list", eth_create_proc(     _list, 1, NULL, NULL));
   // ---
   eth_define(g_mod,    "length", eth_create_proc(   _length, 1, NULL, NULL));
   eth_define(g_mod, "revappend", eth_create_proc(_revappend, 2, NULL, NULL));
@@ -249,6 +421,8 @@ _eth_init_builtins(void)
   eth_define(g_mod,     "write", eth_create_proc(    _write, 1, NULL, NULL));
   eth_define(g_mod,   "display", eth_create_proc(  _display, 1, NULL, NULL));
   eth_define(g_mod,   "newline", eth_create_proc(  _newline, 0, NULL, NULL));
+  eth_define(g_mod,     "print", eth_create_proc(    _print, 1, NULL, NULL));
+  eth_define(g_mod,     "input", eth_create_proc(    _input, 1, NULL, NULL));
   // ---
   eth_define(g_mod,    "printf", eth_create_proc(   _printf, 1, NULL, NULL));
   // ---

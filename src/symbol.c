@@ -79,3 +79,10 @@ eth_create_symbol(const char *str)
   }
 }
 
+const char*
+eth_get_symbol_cstr(eth_t x)
+{
+  symbol *sym = (void*)x;
+  return sym->str;
+}
+

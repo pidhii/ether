@@ -49,6 +49,20 @@ eth_ast_unpack_pattern_with_type(eth_type *type, char *const fields[],
 }
 
 eth_ast_pattern*
+eth_ast_record_pattern(char *const fields[], eth_ast_pattern *pats[], int n)
+{
+  eth_ast_pattern *pat = malloc(sizeof(eth_ast_pattern));
+  pat->tag = ETH_PATTERN_RECORD;
+  pat->record.fields = malloc(sizeof(char*) * n);
+  pat->record.subpats = malloc(sizeof(eth_ast_pattern*) * n);
+  pat->record.n = n;
+  for (int i = 0; i < n; ++i)
+    pat->record.fields[i] = strdup(fields[i]);
+  memcpy(pat->record.subpats, pats, sizeof(eth_ast_pattern*) * n);
+  return pat;
+}
+
+eth_ast_pattern*
 eth_ast_symbol_pattern(eth_t sym)
 {
   eth_ast_pattern *pat = malloc(sizeof(eth_ast_pattern));
@@ -80,6 +94,16 @@ eth_destroy_ast_pattern(eth_ast_pattern *pat)
 
     case ETH_PATTERN_SYMBOL:
       eth_unref(pat->symbol.sym);
+      break;
+
+    case ETH_PATTERN_RECORD:
+      for (int i = 0; i < pat->record.n; ++i)
+      {
+        free(pat->record.fields[i]);
+        eth_destroy_ast_pattern(pat->record.subpats[i]);
+      }
+      free(pat->record.fields);
+      free(pat->record.subpats);
       break;
   }
   free(pat);
@@ -152,7 +176,7 @@ destroy_ast_node(eth_ast *ast)
 
     case ETH_AST_FN:
       for (int i = 0; i < ast->fn.arity; ++i)
-        free(ast->fn.args[i]);
+        eth_destroy_ast_pattern(ast->fn.args[i]);
       free(ast->fn.args);
       eth_unref_ast(ast->fn.body);
       break;
@@ -254,6 +278,16 @@ eth_ast_apply(eth_ast *fn, eth_ast *const *args, int nargs)
   return ast;
 }
 
+void
+eth_ast_append_arg(eth_ast *ast, eth_ast *arg)
+{
+  assert(ast->tag == ETH_AST_APPLY);
+  int nargs = ast->apply.nargs + 1;
+  ast->apply.args = realloc(ast->apply.args, sizeof(eth_ast*) * (nargs + 1));
+  ast->apply.args[ast->apply.nargs++] = arg;
+  eth_ref_ast(arg);
+}
+
 eth_ast*
 eth_ast_if(eth_ast *cond, eth_ast *then, eth_ast *els)
 {
@@ -320,16 +354,24 @@ eth_ast_unop(eth_unop op, eth_ast *expr)
 }
 
 eth_ast*
-eth_ast_fn(char **args, int arity, eth_ast *body)
+eth_ast_fn_with_patterns(eth_ast_pattern *const args[], int arity, eth_ast *body)
 {
   eth_ast *ast = create_ast_node(ETH_AST_FN);
-  ast->fn.args = malloc(sizeof(char*) * arity);
+  ast->fn.args = malloc(sizeof(eth_ast_pattern*) * arity);
   ast->fn.arity = arity;
   ast->fn.body = body;
-  for (int i = 0; i < arity; ++i)
-    ast->fn.args[i] = strdup(args[i]);
+  memcpy(ast->fn.args, args, sizeof(eth_ast_pattern*) * arity);
   eth_ref_ast(body);
   return ast;
+}
+
+eth_ast*
+eth_ast_fn(char **args, int arity, eth_ast *body)
+{
+  eth_ast_pattern *pats[arity];
+  for (int i = 0; i < arity; ++i)
+    pats[i] = eth_ast_ident_pattern(args[i]);
+  return eth_ast_fn_with_patterns(pats, arity, body);
 }
 
 eth_ast*

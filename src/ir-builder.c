@@ -229,6 +229,19 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, int *e)
 
     case ETH_PATTERN_SYMBOL:
       return eth_ir_symbol_pattern(pat->symbol.sym);
+
+    case ETH_PATTERN_RECORD:
+    {
+      int n = pat->record.n;
+      size_t ids[n];
+      eth_ir_pattern *pats[n];
+      for (int i = 0; i < n; ++i)
+      {
+        ids[i] = eth_get_symbol_id(eth_sym(pat->record.fields[i]));
+        pats[i] = build_pattern(bldr, pat->record.subpats[i], e);
+      }
+      return eth_ir_record_pattern(ids, pats, n);
+    }
   }
 
   eth_error("wtf");
@@ -257,9 +270,8 @@ build_let(ir_builder *bldr, int idx, eth_ast *ast, eth_ir_node *const vals[],
 
     eth_ir_node *thenbr = build_let(bldr, idx + 1, ast, vals, nvars0, e);
 
-    eth_ir_node *raise = eth_ir_cval(eth_get_builtin("raise"));
-    eth_ir_node *what = eth_ir_cval(eth_sym("Type_error"));
-    eth_ir_node *elsebr = eth_ir_apply(raise, &what, 1);
+    eth_t exn = eth_exn(eth_sym("Match_failure"));
+    eth_ir_node *elsebr = eth_ir_throw(eth_ir_cval(exn));
 
     eth_ir_node *ret = eth_ir_match(pat, vals[idx], thenbr, elsebr);
     ret->match.toplvl = ETH_TOPLVL_THEN;
@@ -286,7 +298,7 @@ build_letrec(ir_builder *bldr, int idx, eth_ast *ast, int nvars0, int nvars,
     eth_ir_node *thenbr = build_letrec(bldr, idx + 1, ast, nvars0, nvars, pats, e);
 
     eth_ir_node *raise = eth_ir_cval(eth_get_builtin("raise"));
-    eth_ir_node *what = eth_ir_cval(eth_sym("Type_error"));
+    eth_ir_node *what = eth_ir_cval(eth_sym("Match_failure"));
     eth_ir_node *elsebr = eth_ir_apply(raise, &what, 1);
 
     eth_ir_node *ret = eth_ir_match(pats[idx], expr, thenbr, elsebr);
@@ -496,18 +508,31 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       // arguments:
       int nargs = ast->fn.arity;
       int args[nargs];
+      eth_ir_pattern *pats[nargs];
+      // Note: arguments MUST be continuous and start at 0:
       for (int i = 0; i < nargs; ++i)
-      {
         args[i] = new_vid(fnbldr);
-        eth_prepend_var(fnbldr->vars, eth_dyn_var(ast->fn.args[i], args[i]));
-      }
+      for (int i = 0; i < nargs; ++i)
+        pats[i] = build_pattern(fnbldr, ast->fn.args[i], e);
+      int nargvars = fnbldr->vars->len;
 
       // body:
-      eth_ir_node *body_ = build(fnbldr, ast->fn.body, e);
-      eth_ir *body = eth_create_ir(body_, fnbldr->nvars);
+      eth_ir_node *body_acc = build(fnbldr, ast->fn.body, e);
+      eth_ir_node *throw = NULL;
+      for (int i = nargs - 1; i >= 0; --i)
+      {
+        if (throw == NULL)
+        {
+          eth_t exn = eth_exn(eth_sym("Invalid_argument"));
+          throw = eth_ir_throw(eth_ir_cval(exn));
+        }
+        // TODO: mark as likely
+        body_acc = eth_ir_match(pats[i], eth_ir_var(args[i]), body_acc, throw);
+      }
+      eth_ir *body = eth_create_ir(body_acc, fnbldr->nvars);
 
       // resolve captures:
-      eth_pop_var(fnbldr->vars, nargs); // pop args so only captures are left
+      eth_pop_var(fnbldr->vars, nargvars); // pop args so only captures are left
       int ncap = fnbldr->vars->len;
       int caps[ncap];
       int capvars[ncap];
@@ -636,9 +661,9 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       else
         type = ast->mkrcrd.type.ctype;
 
-      if (not eth_is_record(type))
+      if (not eth_is_plain(type))
       {
-        eth_error("%s is not a record-type", type->name);
+        eth_error("%s is not a plain type", type->name);
         *e = 1;
         return eth_ir_error();
       }

@@ -19,10 +19,10 @@ default_display(eth_type *type, eth_t x, FILE *stream)
   type->write(type, x, stream);
 }
 
-eth_type*
-eth_create_type(const char *name)
+static eth_type*
+create_type(const char *name, int nfields)
 {
-  eth_type *type = malloc(sizeof(eth_type));
+  eth_type *type = malloc(sizeof(eth_type) + sizeof(size_t) * (nfields + 1));
   type->name = strdup(name);
   type->destroy = default_destroy;
   type->write = eth_default_write;
@@ -31,20 +31,28 @@ eth_create_type(const char *name)
   type->fields = NULL;
   type->clos = NULL;
   type->dtor = NULL;
+  type->flag = 0;
   return type;
+}
+
+eth_type*
+eth_create_type(const char *name)
+{
+  return create_type(name, 0);
 }
 
 eth_type*
 eth_create_struct_type(const char *name, char *const fields[],
     ptrdiff_t const offs[], int n)
 {
-  eth_type *type = eth_create_type(name);
+  eth_type *type = create_type(name, n);
   type->fields = malloc(sizeof(eth_field) * n);
   type->nfields = n;
   for (int i = 0; i < n; ++i)
   {
     type->fields[i].name = strdup(fields[i]);
     type->fields[i].offs = offs[i];
+    type->fieldids[i] = eth_get_symbol_id(eth_sym(fields[i]));
   }
   return type;
 }

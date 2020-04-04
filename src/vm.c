@@ -241,6 +241,61 @@ fetch_insn:
         r[ip->load.out] = *(eth_t*) ((char*)r[ip->load.vid] + ip->load.offs);
         break;
 
+      case ETH_OPC_LOADRCRD:
+      {
+        eth_t x = r[ip->loadrcrd.src];
+        eth_type *restrict type = x->type;
+        test = type->flag & ETH_TFLAG_PLAIN;
+        if (eth_likely(test))
+        {
+          size_t *restrict ids = type->fieldids;
+          const int n = type->nfields;
+          const int N = ip->loadrcrd.n;
+          int I = 0;
+          size_t id = ip->loadrcrd.ids[I];
+          int i;
+          for (i = 0; i < n; ++i)
+          {
+            if (ids[i] == id)
+            {
+              r[ip->loadrcrd.vids[I++]] = eth_tup_get(x, i);
+              if (I == N) break;
+              id = ip->loadrcrd.ids[I];
+            }
+          }
+          if (eth_unlikely(i == n))
+            test = 0;
+        }
+        break;
+      }
+
+      case ETH_OPC_LOADRCRD1:
+      {
+        eth_t x = r[ip->loadrcrd1.vid];
+        eth_type *restrict type = x->type;
+        test = type->flag & ETH_TFLAG_PLAIN;
+        if (eth_likely(test))
+        {
+          size_t *restrict ids = type->fieldids;
+          const int n = type->nfields;
+          const size_t id = ip->loadrcrd1.id;
+          int i;
+
+          ids[n] = id;
+          for (i = 0; true; ++i)
+          {
+            if (ids[i] == id)
+              break;
+          }
+
+          if (eth_unlikely(i == n))
+            test = 0;
+          else
+            r[ip->loadrcrd1.out] = eth_tup_get(x, i);
+        }
+        break;
+      }
+
       case ETH_OPC_SETEXN:
         exn = r[ip->setexn.vid];
         break;

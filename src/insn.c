@@ -41,6 +41,23 @@ eth_ssa_symbol_pattern(eth_t sym, bool dotest)
   return pat;
 }
 
+eth_ssa_pattern*
+eth_ssa_record_pattern(size_t const ids[], int const vids[],
+    eth_ssa_pattern *const pats[], int n)
+{
+  eth_ssa_pattern *pat = malloc(sizeof(eth_ssa_pattern));
+  pat->tag = ETH_PATTERN_RECORD;
+  pat->record.ids = malloc(sizeof(size_t) * n);
+  pat->record.vids = malloc(sizeof(int) * n);
+  pat->record.subpat = malloc(sizeof(eth_ssa_pattern*) * n);
+  pat->record.n = n;
+  pat->record.dotest = true;
+  memcpy(pat->record.ids, ids, sizeof(size_t) * n);
+  memcpy(pat->record.vids, vids, sizeof(int) * n);
+  memcpy(pat->record.subpat, pats, sizeof(eth_ssa_pattern*) * n);
+  return pat;
+}
+
 void
 eth_destroy_ssa_pattern(eth_ssa_pattern *pat)
 {
@@ -59,6 +76,14 @@ eth_destroy_ssa_pattern(eth_ssa_pattern *pat)
 
     case ETH_PATTERN_SYMBOL:
       eth_unref(pat->symbol.sym);
+      break;
+
+    case ETH_PATTERN_RECORD:
+      free(pat->record.ids);
+      free(pat->record.vids);
+      for (int i = 0; i < pat->record.n; ++i)
+        eth_destroy_ssa_pattern(pat->record.subpat[i]);
+      free(pat->record.subpat);
       break;
   }
   free(pat);

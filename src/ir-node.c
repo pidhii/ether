@@ -36,6 +36,19 @@ eth_ir_symbol_pattern(eth_t sym)
   return pat;
 }
 
+eth_ir_pattern*
+eth_ir_record_pattern(size_t const ids[], eth_ir_pattern *const pats[], int n)
+{
+  eth_ir_pattern *pat = malloc(sizeof(eth_ir_pattern));
+  pat->tag = ETH_PATTERN_RECORD;
+  pat->record.ids = malloc(sizeof(size_t) * n);
+  pat->record.subpats = malloc(sizeof(eth_ir_pattern*) * n);
+  pat->record.n = n;
+  memcpy(pat->record.ids, ids, sizeof(size_t) * n);
+  memcpy(pat->record.subpats, pats, sizeof(eth_ir_pattern*) * n);
+  return pat;
+}
+
 void
 eth_destroy_ir_pattern(eth_ir_pattern *pat)
 {
@@ -53,6 +66,13 @@ eth_destroy_ir_pattern(eth_ir_pattern *pat)
 
     case ETH_PATTERN_SYMBOL:
       eth_unref(pat->symbol.sym);
+      break;
+
+    case ETH_PATTERN_RECORD:
+      free(pat->record.ids);
+      for (int i = 0; i < pat->record.n; ++i)
+        eth_destroy_ir_pattern(pat->record.subpats[i]);
+      free(pat->record.subpats);
       break;
   }
   free(pat);
@@ -142,6 +162,10 @@ destroy_ir_node(eth_ir_node *node)
       for (int i = 0; i < node->mkrcrd.type->nfields; ++i)
         eth_unref_ir_node(node->mkrcrd.fields[i]);
       free(node->mkrcrd.fields);
+      break;
+
+    case ETH_IR_THROW:
+      eth_unref_ir_node(node->throw.exn);
       break;
   }
 
@@ -333,6 +357,14 @@ eth_ir_mkrcrd(eth_type *type, eth_ir_node *const fields[])
   node->mkrcrd.fields = malloc(sizeof(eth_ir_node*) * type->nfields);
   for (int i = 0; i < type->nfields; ++i)
     eth_ref_ir_node(node->mkrcrd.fields[i] = fields[i]);
+  return node;
+}
+
+eth_ir_node*
+eth_ir_throw(eth_ir_node *exn)
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_THROW);
+  eth_ref_ir_node(node->throw.exn = exn);
   return node;
 }
 

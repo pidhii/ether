@@ -51,6 +51,14 @@ int _eth_start_token = -1;
     eth_ast_pattern *pat;
     eth_ast *val;
   } bind;
+  struct {
+    cod_vec(char*) keys;
+    cod_vec(eth_ast*) vals;
+  } record;
+  struct {
+    cod_vec(char*) keys;
+    cod_vec(eth_ast_pattern*) vals;
+  } record_pattern;
   cod_vec(eth_ast*) astvec;
   cod_vec(char*) strvec;
   cod_vec(char) charvec;
@@ -81,6 +89,20 @@ int _eth_start_token = -1;
   cod_vec_destroy($$.pats);
   cod_vec_destroy($$.vals);
 } <binds>
+
+%destructor {
+  cod_vec_iter($$.keys, i, x, free(x));
+  cod_vec_iter($$.vals, i, x, eth_drop_ast(x));
+  cod_vec_destroy($$.keys);
+  cod_vec_destroy($$.vals);
+} <record>
+
+%destructor {
+  cod_vec_iter($$.keys, i, x, free(x));
+  cod_vec_iter($$.vals, i, x, eth_destroy_ast_pattern(x));
+  cod_vec_destroy($$.keys);
+  cod_vec_destroy($$.vals);
+} <record_pattern>
 
 %destructor {
   cod_vec_iter($$, i, x, eth_drop_ast(x));
@@ -127,6 +149,7 @@ int _eth_start_token = -1;
 %right OR
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 // level 0:
+%left PIPE
 %right '$'
 // level 1:
 %right OPOR
@@ -158,13 +181,15 @@ int _eth_start_token = -1;
 %type<bind> bind
 %type<boolean> maybe_pub
 %type<astvec> args
-%type<strvec> fnargs
+%type<patvec> fnargs
 %type<string> string
 %type<charvec> string_aux
 %type<pattern> atomic_pattern pattern
 %type<strvec> maybe_imports import_list
 %type<astvec> list
 %type<patvec> pattern_list
+%type<record> record
+%type<record_pattern> record_pattern
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %start entry
 
@@ -203,19 +228,18 @@ atom
     $$ = eth_ast_make_record_with_type(eth_tuple_type(n), fields, $2.data, n);
     cod_vec_destroy($2);
   }
+  | '{' record '}' {
+    eth_type *type = eth_record_type($2.keys.data, $2.keys.len);
+    $$ = eth_ast_make_record_with_type(type, $2.keys.data, $2.vals.data, $2.keys.len);
+    cod_vec_iter($2.keys, i, x, free(x));
+    cod_vec_destroy($2.keys);
+    cod_vec_destroy($2.vals);
+  }
 ;
 
 form
   : atom
   | atom args {
-    $$ = eth_ast_apply($1, $2.data, $2.len);
-    cod_vec_destroy($2);
-  }
-  | atom '$' expr {
-    $$ = eth_ast_apply($1, &$3, 1);
-  }
-  | atom args '$' expr {
-    cod_vec_push($2, $4);
     $$ = eth_ast_apply($1, $2.data, $2.len);
     cod_vec_destroy($2);
   }
@@ -275,14 +299,31 @@ expr
   | WHEN expr THEN expr { $$ = eth_ast_if($2, $4, eth_ast_cval(eth_nil)); }
   | UNLESS expr THEN expr { $$ = eth_ast_if($2, eth_ast_cval(eth_nil), $4); }
   | FN fnargs RARROW expr {
-    $$ = eth_ast_fn($2.data, $2.len, $4);
-    cod_vec_iter($2, i, x, free(x));
+    $$ = eth_ast_fn_with_patterns($2.data, $2.len, $4);
     cod_vec_destroy($2);
   }
-  | expr ';'        { $$ = $1; }
+  | expr '$' expr {
+    if ($1->tag == ETH_AST_APPLY)
+    {
+      $$ = $1;
+      eth_ast_append_arg($$, $3);
+    }
+    else
+      $$ = eth_ast_apply($1, &$3, 1);
+  }
+  | expr PIPE expr {
+    if ($3->tag == ETH_AST_APPLY)
+    {
+      $$ = $3;
+      eth_ast_append_arg($$, $1);
+    }
+    else
+      $$ = eth_ast_apply($3, &$1, 1);
+  }
   | expr OPAND expr { $$ = eth_ast_and($1, $3); }
   | expr OPOR  expr { $$ = eth_ast_or($1, $3); }
   | expr ';'   expr { $$ = eth_ast_seq($1, $3); }
+  | expr ';'        { $$ = $1; }
   | expr '+'   expr { $$ = eth_ast_binop(ETH_ADD , $1, $3); }
   | expr '-'   expr { $$ = eth_ast_binop(ETH_SUB , $1, $3); }
   | expr '*'   expr { $$ = eth_ast_binop(ETH_MUL , $1, $3); }
@@ -296,8 +337,8 @@ expr
   | expr IS    expr { $$ = eth_ast_binop(ETH_IS  , $1, $3); }
   | expr ':'   expr { $$ = eth_ast_binop(ETH_CONS, $1, $3); }
   | expr '%'   expr { $$ = eth_ast_binop(ETH_MOD , $1, $3); }
-  | expr '^'   expr { $$ = eth_ast_binop(ETH_POW , $1, $3); }
   | expr MOD   expr { $$ = eth_ast_binop(ETH_MOD , $1, $3); }
+  | expr '^'   expr { $$ = eth_ast_binop(ETH_POW , $1, $3); }
   | expr LAND  expr { $$ = eth_ast_binop(ETH_LAND, $1, $3); }
   | expr LOR   expr { $$ = eth_ast_binop(ETH_LOR , $1, $3); }
   | expr LXOR  expr { $$ = eth_ast_binop(ETH_LXOR, $1, $3); }
@@ -363,7 +404,7 @@ args
 
 fnargs
   : { cod_vec_init($$); }
-  | fnargs SYMBOL {
+  | fnargs pattern {
     $$ = $1;
     cod_vec_push($$, $2);
   }
@@ -388,13 +429,12 @@ bind
     $$.pat = $1;
     $$.val = $3;
   }
-  | maybe_pub SYMBOL fnargs SYMBOL '=' expr {
+  | maybe_pub SYMBOL fnargs pattern '=' expr {
     $$.pat = eth_ast_ident_pattern($2);
     $$.pat->ident.pub = $1;
     cod_vec_push($3, $4);
-    $$.val = eth_ast_fn($3.data, $3.len, $6);
+    $$.val = eth_ast_fn_with_patterns($3.data, $3.len, $6);
     free($2);
-    cod_vec_iter($3, i, x, free(x));
     cod_vec_destroy($3);
   }
   | maybe_pub SYMBOL '!' '=' expr {
@@ -447,6 +487,12 @@ atomic_pattern
     // ---
     cod_vec_destroy($2);
   }
+  | '{' record_pattern '}' {
+    $$ = eth_ast_record_pattern($2.keys.data, $2.vals.data, $2.keys.len);
+    cod_vec_iter($2.keys, i, x, free(x));
+    cod_vec_destroy($2.keys);
+    cod_vec_destroy($2.vals);
+  }
 ;
 
 pattern
@@ -466,6 +512,33 @@ pattern_list
   | pattern_list ',' pattern {
     $$ = $1;
     cod_vec_push($$, $3);
+  }
+;
+
+record_pattern
+  : SYMBOL {
+    cod_vec_init($$.keys);
+    cod_vec_init($$.vals);
+    cod_vec_push($$.keys, $1);
+    cod_vec_push($$.vals, eth_ast_ident_pattern($1));
+  }
+  | SYMBOL '=' SYMBOL {
+    cod_vec_init($$.keys);
+    cod_vec_init($$.vals);
+    cod_vec_push($$.keys, $1);
+    cod_vec_push($$.vals, eth_ast_ident_pattern($3));
+    free($3);
+  }
+  | record_pattern ',' SYMBOL {
+    $$ = $1;
+    cod_vec_push($$.keys, $3);
+    cod_vec_push($$.vals, eth_ast_ident_pattern($3));
+  }
+  | record_pattern ',' SYMBOL '=' SYMBOL {
+    $$ = $1;
+    cod_vec_push($$.keys, $3);
+    cod_vec_push($$.vals, eth_ast_ident_pattern($5));
+    free($5);
   }
 ;
 
@@ -493,6 +566,31 @@ list
   | list ',' expr {
     $$ = $1;
     cod_vec_push($$, $3);
+  }
+;
+
+record
+  : SYMBOL '=' expr {
+    cod_vec_init($$.keys);
+    cod_vec_init($$.vals);
+    cod_vec_push($$.keys, $1);
+    cod_vec_push($$.vals, $3);
+  }
+  | SYMBOL {
+    cod_vec_init($$.keys);
+    cod_vec_init($$.vals);
+    cod_vec_push($$.keys, $1);
+    cod_vec_push($$.vals, eth_ast_ident($1));
+  }
+  | record ',' SYMBOL '=' expr {
+    $$ = $1;
+    cod_vec_push($$.keys, $3);
+    cod_vec_push($$.vals, $5);
+  }
+  | record ',' SYMBOL {
+    $$ = $1;
+    cod_vec_push($$.keys, $3);
+    cod_vec_push($$.vals, eth_ast_ident($3));
   }
 ;
 

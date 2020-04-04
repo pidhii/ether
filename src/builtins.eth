@@ -1,6 +1,6 @@
 
-let pub car p = let x:_ = p in x in
-let pub cdr p = let _:x = p in x in
+let pub car x:_ = x in
+let pub cdr _:x = x in
 
 let pub (+) x y = x + y in
 let pub (-) x y = x - y in
@@ -32,9 +32,13 @@ let pub (++) x y = x ++ y in
 
 let pub (not) x = not x in
 
+let pub ($) f x = f x in
+let pub (|>) x f = f x in
+
 
 let pub id x = x in
 let pub flip f x y = f y x in
+let pub const x = fn -> x in
 
 
 let pub reverse xs = revappend xs nil in

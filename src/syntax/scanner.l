@@ -113,6 +113,7 @@ false { yylval->constant = eth_false; return CONST; }
 "*"|"/" |
 "("|")" |
 "["|"]" |
+"{"|"}" |
 "="     |
 ","     |
 ";"     { return yytext[0]; }
@@ -135,6 +136,7 @@ ashr    { return ASHR; }
 not     { return NOT; }
 lnot    { return LNOT; }
 "++"    { return PPLUS; }
+"|>"    { return PIPE; }
 
 
 "("(mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|not|lnot)")" |

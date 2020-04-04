@@ -490,6 +490,19 @@ build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
 
       return eth_ssa_symbol_pattern(pat->symbol.sym, true);
     }
+
+    case ETH_PATTERN_RECORD:
+    {
+      eth_ssa_pattern *pats[pat->record.n];
+      int vids[pat->record.n];
+      for (int i = 0; i < pat->record.n; ++i)
+      {
+        vids[i] = new_val(bldr, RC_RULES_DISABLE);
+        pats[i] = build_pattern(bldr, pat->record.subpats[i], vids[i], true,
+            savs, e);
+      }
+      return eth_ssa_record_pattern(pat->record.ids, vids, pats, pat->record.n);
+    }
   }
 
   eth_error("wtf");
@@ -871,6 +884,13 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
         return out;
       }
     }
+
+    case ETH_IR_THROW:
+    {
+      int vid = build(bldr, tape, ir->throw.exn, false, e);
+      write_throw(bldr, tape, vid);
+      return vid;
+    }
   }
 
   eth_error("undefined IR-node");
@@ -895,6 +915,9 @@ is_dead_end(eth_insn *begin)
       int b = is_dead_end(insn->iff.elsebr);
       return (a && b) || is_dead_end(insn->next);
     }
+
+    if (insn->tag == ETH_INSN_TRY)
+      return is_dead_end(insn->try.catchbr);
 
     // TODO: create marker-function
     if (insn->tag == ETH_INSN_RET or insn->tag == ETH_INSN_CATCH)
@@ -1207,7 +1230,7 @@ kill_value(kill_info *kinfo, eth_insn *begin, int vid)
 
       if (kill_value(kinfo, insn->next, vid))
       {
-        if (is_dead_end(cchbr) and not kill_value(kinfo, cchbr, vid))
+        if (not kill_value(kinfo, cchbr, vid))
         {
           eth_insn *unref = eth_insn_unref(vid);
           eth_insert_insn_before(cchbr, unref);

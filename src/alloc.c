@@ -1,7 +1,5 @@
 #include "ether/ether.h"
 
-/*#define ETH_DEBUG_MODE*/
-
 #if defined(ETH_DEBUG_MODE)
 # warning Using malloc instead of uniform allocators.
 # define ALLOCATOR(n)                                  \

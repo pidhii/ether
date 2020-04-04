@@ -133,20 +133,11 @@ eth_init(void)
   extern void _eth_init_number_type(void);
   _eth_init_number_type();
 
-  extern void _eth_init_function_type(void);
-  _eth_init_function_type();
-
-  extern void _eth_init_exception_type(void);
-  _eth_init_exception_type();
-
   extern void _eth_init_string_type(void);
   _eth_init_string_type();
 
   extern void _eth_init_boolean_type(void);
   _eth_init_boolean_type();
-
-  extern void _eth_init_pair_type(void);
-  _eth_init_pair_type();
 
   extern void _eth_init_nil_type(void);
   _eth_init_nil_type();
@@ -154,8 +145,17 @@ eth_init(void)
   extern void _eth_init_symbol_type(void);
   _eth_init_symbol_type();
 
-  extern void _eth_init_tuple_types(void);
-  _eth_init_tuple_types();
+  extern void _eth_init_pair_type(void);
+  _eth_init_pair_type();
+
+  extern void _eth_init_function_type(void);
+  _eth_init_function_type();
+
+  extern void _eth_init_exception_type(void);
+  _eth_init_exception_type();
+
+  extern void _eth_init_record_types(void);
+  _eth_init_record_types();
 
   extern void _eth_init_builtins(void);
   _eth_init_builtins();
@@ -168,18 +168,18 @@ eth_cleanup(void)
   _eth_cleanup_builtins();
 
   eth_destroy_type(eth_number_type);
-  eth_destroy_type(eth_function_type);
-  eth_destroy_type(eth_exception_type);
   eth_destroy_type(eth_string_type);
   eth_destroy_type(eth_boolean_type);
   eth_destroy_type(eth_nil_type);
   eth_destroy_type(eth_pair_type);
+  eth_destroy_type(eth_function_type);
+  eth_destroy_type(eth_exception_type);
 
   extern void _eth_cleanup_symbol_type(void);
   _eth_cleanup_symbol_type();
 
-  extern void _eth_cleanup_tuple_types(void);
-  _eth_cleanup_tuple_types();
+  extern void _eth_cleanup_record_types(void);
+  _eth_cleanup_record_types();
 
   extern void _eth_cleanup_magic(void);
   _eth_cleanup_magic();

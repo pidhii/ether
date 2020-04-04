@@ -33,18 +33,20 @@ syn match ethSymbol     /\<[A-Z][a-zA-Z0-9_]*\>/
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""'
 " Builtins:
-syn keyword Function number symbol regex svector dvector
-syn keyword Function write display newline print printf fprintf format
+syn keyword Function tonumber tosymbol 
+syn keyword Function tuple?
+syn keyword Function list
+syn keyword Function write display newline print input
+syn keyword Function printf fprintf format
 syn keyword Function car cdr
 syn keyword Function pairs
-syn keyword Function apply vaarg
-syn keyword Function id
+syn keyword Function apply
+syn keyword Function id flip const
 syn keyword Function die raise
-syn keyword Function force
 syn keyword Function system shell
-syn keyword Function loadfile
+syn keyword Function load
 syn keyword Function exit
-syn keyword Function addressof
+syn keyword Function length revappend reverse
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Base:
@@ -58,14 +60,12 @@ syn keyword Function finite nan?
 syn keyword Function min max
 syn keyword Function hypot abs
 syn keyword Function log log10 log2
-syn keyword Function list rlist array table 
-syn keyword Function length
+syn keyword Function list table 
 syn keyword Function strlen substr strstr chop ltrim rtrim trim concat
 syn keyword Function open popen
 syn keyword Function read readline readlines flush rewind getpos setpos
-syn keyword Function flip const uncurry
+syn keyword Function uncurry
 syn keyword Function range
-syn keyword Function revappend reverse
 syn keyword Function any? all?
 syn keyword Function revmap map
 syn keyword Function zip
@@ -79,7 +79,8 @@ syn keyword Function drop take
 syn keyword Function zero? positive? negative? even? odd?
 syn keyword Function match split join
 
-syn match ethModule /\<[A-Z][a-zA-Z0-9_]*\s*\./he=e-1
+syn match ethModule /\<[A-Z][a-zA-Z0-9_]*\s*\./he=e-1 nextgroup=ethModule,ethMember
+syn match ethMember /\<[a-z_][a-zA-Z0-9_]*['?]?\>/
 
 syn keyword ethType fn
 syn region ethTable matchgroup=Type start=/{/ end=/}/ contains=TOP skipwhite skipnl
@@ -95,8 +96,7 @@ hi link ethImportAs Keyword
 syn keyword ethUnqualified unqualified
 hi link ethUnqualified ethKeyword
 
-syn keyword ethKeyword let rec mut and or in return
-syn region ethBegin matchgroup=ethKeyword start=/\<begin\>/ end=/\<end\>/ contains=TOP
+syn keyword ethKeyword let rec mut and or in
 syn keyword ethAssert assert
 
 syn keyword ethKeyword if unless when then else try with

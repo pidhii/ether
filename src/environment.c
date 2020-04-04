@@ -171,45 +171,25 @@ load_from_script(eth_env *env, eth_module *mod, const char *path)
   eth_debug("loading script-module %s", eth_get_module_name(mod));
 
   FILE *file = fopen(path, "r");
-  if (file == NULL)
-  {
-    eth_warning("failed to open file \"%s\"", path);
-    return false;
-  }
+  if (file == NULL) goto error;
 
   eth_ast *ast = eth_parse(file);
   fclose(file);
-  if (ast == NULL)
-  {
-    eth_warning("can't load module %s", eth_get_module_name(mod));
-    return false;
-  }
+  if (ast == NULL) goto error;
 
   eth_ir_defs defs;
   eth_ir *ir = eth_build_module_ir(ast, env, mod, &defs);
   eth_drop_ast(ast);
-  if (ir == NULL)
-  {
-    eth_warning("can't load module %s", eth_get_module_name(mod));
-    return false;
-  }
+  if (ir == NULL) goto error;
 
   eth_ssa *ssa = eth_build_ssa(ir, &defs);
   eth_drop_ir(ir);
   eth_destroy_ir_defs(&defs);
-  if (ssa == NULL)
-  {
-    eth_warning("can't load module %s", eth_get_module_name(mod));
-    return false;
-  }
+  if (ssa == NULL) goto error;
 
   eth_bytecode *bc = eth_build_bytecode(ssa);
   eth_destroy_ssa(ssa);
-  if (bc == NULL)
-  {
-    eth_warning("can't load module %s", eth_get_module_name(mod));
-    return false;
-  }
+  if (bc == NULL) goto error;
 
   eth_t ret = eth_vm(bc);
   eth_ref(ret);
@@ -232,6 +212,10 @@ load_from_script(eth_env *env, eth_module *mod, const char *path)
 
   eth_debug("module %s was succesfully loaded", eth_get_module_name(mod));
   return true;
+
+error:
+  eth_warning("can't load module %s", eth_get_module_name(mod));
+  return false;
 }
 
 bool
