@@ -102,6 +102,7 @@ nil   { yylval->constant = eth_nil;   return CONST; }
 true  { yylval->constant = eth_true;  return CONST; }
 false { yylval->constant = eth_false; return CONST; }
 
+"_"     |
 "%"     |
 "^"     |
 "."     |

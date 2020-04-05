@@ -32,12 +32,12 @@ eth_ssa_unpack_pattern(eth_type *type, int const offs[], int const vids[],
 }
 
 eth_ssa_pattern*
-eth_ssa_symbol_pattern(eth_t sym, bool dotest)
+eth_ssa_constant_pattern(eth_t val, bool dotest)
 {
   eth_ssa_pattern *pat = malloc(sizeof(eth_ssa_pattern));
-  pat->tag = ETH_PATTERN_SYMBOL;
-  eth_ref(pat->symbol.sym = sym);
-  pat->symbol.dotest = dotest;
+  pat->tag = ETH_PATTERN_CONSTANT;
+  eth_ref(pat->constant.val = val);
+  pat->constant.dotest = dotest;
   return pat;
 }
 
@@ -74,8 +74,8 @@ eth_destroy_ssa_pattern(eth_ssa_pattern *pat)
       free(pat->unpack.subpat);
       break;
 
-    case ETH_PATTERN_SYMBOL:
-      eth_unref(pat->symbol.sym);
+    case ETH_PATTERN_CONSTANT:
+      eth_unref(pat->constant.val);
       break;
 
     case ETH_PATTERN_RECORD:

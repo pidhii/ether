@@ -500,15 +500,15 @@ build_pattern(builder *bldr, eth_ssa_pattern *pat, int expr, int_vec *jmps)
       break;
     }
 
-    case ETH_PATTERN_SYMBOL:
-      if (pat->symbol.dotest)
+    case ETH_PATTERN_CONSTANT:
+      if (pat->constant.dotest)
       {
-        write_testis(bldr, expr, pat->symbol.sym);
+        write_testis(bldr, expr, pat->constant.val);
         int jmp = write_jze(bldr, -1);
         cod_vec_push(*jmps, jmp);
       }
       else
-        eth_debug("ommiting EQ test for ~w", pat->symbol.sym);
+        eth_debug("ommiting EQ test for ~w", pat->constant.val);
       break;
 
     case ETH_PATTERN_RECORD:

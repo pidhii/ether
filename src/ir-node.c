@@ -28,11 +28,11 @@ eth_ir_unpack_pattern(eth_type *type, int offs[], eth_ir_pattern *pats[], int n)
 }
 
 eth_ir_pattern*
-eth_ir_symbol_pattern(eth_t sym)
+eth_ir_constant_pattern(eth_t val)
 {
   eth_ir_pattern *pat = malloc(sizeof(eth_ir_pattern));
-  pat->tag = ETH_PATTERN_SYMBOL;
-  eth_ref(pat->symbol.sym = sym);
+  pat->tag = ETH_PATTERN_CONSTANT;
+  eth_ref(pat->constant.val = val);
   return pat;
 }
 
@@ -64,8 +64,8 @@ eth_destroy_ir_pattern(eth_ir_pattern *pat)
       free(pat->unpack.subpats);
       break;
 
-    case ETH_PATTERN_SYMBOL:
-      eth_unref(pat->symbol.sym);
+    case ETH_PATTERN_CONSTANT:
+      eth_unref(pat->constant.val);
       break;
 
     case ETH_PATTERN_RECORD:

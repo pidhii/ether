@@ -147,7 +147,7 @@ function! GetOCamlIndent()
  " Indent if current line begins with 'in':
  elseif line =~ '^\s*in\>'
    if lline !~ '^\s*\(let\|and\)\>'
-     return s:FindPair('\<let\>', '', '\<in\>')
+     return s:FindPair('\<\%(\%(if \+\)\@<!let\|try\)\>', '', '\<in\>')
    endif
 
  " Indent if current line begins with 'else':
@@ -211,7 +211,8 @@ function! GetOCamlIndent()
 
  " Back to normal indent after lines ending with 'in':
  elseif lline =~ '\<in\s*$' && lline !~ '^\s*in\>'
-   let ind = s:FindPair('\<let\>', '', '\<in\>')
+   let ind = s:FindPair('\<\(let\|try\)\>', '', '\<in\>')
+   "let ind = s:FindPair('\<\(\(if\s*\)\@<!let\|try\)\>', '', '\<in\>')
 
  " Back to normal indent after lines ending with 'done':
  elseif lline =~ '\<done\s*$'

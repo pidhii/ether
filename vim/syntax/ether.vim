@@ -76,10 +76,12 @@ syn keyword Function unfold
 syn keyword Function revfilter filter
 syn keyword Function drop take
 syn keyword Function zero? positive? negative? even? odd?
-syn keyword Function match split join
+syn keyword Function split join
 
 syn match ethModule /\<[A-Z][a-zA-Z0-9_]*\s*\./he=e-1 nextgroup=ethModule,ethMember
 syn match ethMember /\<[a-z_][a-zA-Z0-9_]*['?]?\>/
+
+syn match Special /\<_\>/
 
 syn keyword ethType fn
 
@@ -95,12 +97,12 @@ syn match ethDelimiter /[,;()]/
 
 " import [as]:
 syn region ethImport matchgroup=ethKeyword start=/\<import\>/ end=/\<in\>/ contains=ethImportAs,ethDelimiter,ethIdentifier,ethUnqualified
-syn keyword ethImportAs as
-hi link ethImportAs Keyword
-syn keyword ethUnqualified unqualified
+syn keyword ethImportAs as contained
+hi link ethImportAs ethKeyword
+syn keyword ethUnqualified unqualified contained
 hi link ethUnqualified ethKeyword
 
-syn keyword ethKeyword let rec mut and or in
+syn keyword ethKeyword let rec mut and or in as match
 syn keyword ethAssert assert
 
 syn keyword ethKeyword if unless when then else try with

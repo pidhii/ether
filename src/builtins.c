@@ -282,14 +282,19 @@ _input(void)
 {
   eth_t prompt = *eth_sp++;
 
+  bool istty = isatty(STDIN_FILENO);
+
   // Try detect EOF before printing promt:
-  char c = getc(stdin);
-  if (c == EOF)
+  if (not istty)
   {
-    eth_drop(prompt);
-    return eth_exn(eth_sym("End_of_file"));
-  } 
-  ungetc(c, stdin);
+    char c = getc(stdin);
+    if (c == EOF)
+    {
+      eth_drop(prompt);
+      return eth_exn(eth_sym("End_of_file"));
+    } 
+    ungetc(c, stdin);
+  }
 
   eth_display(prompt, stdout);
   eth_drop(prompt);
@@ -314,15 +319,18 @@ _input(void)
     }
   }
 
-  if (not isatty(STDIN_FILENO))
+  // Show entered line when input is fed from pipe:
+  if (not istty)
     fputs(line, stdout);
 
+  // Remove trailing newline-symbol:
   int len = nrd;
   if (line[len - 1] == '\n')
   {
     len = nrd - 1;
     line[len] = 0;
   }
+
   return eth_create_string_from_ptr2(line, len);
 }
 

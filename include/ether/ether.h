@@ -974,7 +974,7 @@ eth_print_location(eth_location *loc, FILE *stream);
 typedef enum {
   ETH_PATTERN_IDENT,
   ETH_PATTERN_UNPACK,
-  ETH_PATTERN_SYMBOL,
+  ETH_PATTERN_CONSTANT,
   ETH_PATTERN_RECORD,
 } eth_pattern_tag;
 
@@ -986,7 +986,7 @@ struct eth_ast_pattern {
     struct { bool isctype; union { char *str; eth_type *ctype; } type; char **fields;
              eth_ast_pattern **subpats; int n; }
       unpack;
-    struct { eth_t sym; } symbol;
+    struct { eth_t val; } constant;
     struct { char **fields; eth_ast_pattern **subpats; int n; } record;
   };
 };
@@ -1003,7 +1003,7 @@ eth_ast_unpack_pattern_with_type(eth_type *type, char *const fields[],
     eth_ast_pattern *pats[], int n);
 
 eth_ast_pattern*
-eth_ast_symbol_pattern(eth_t sym);
+eth_ast_constant_pattern(eth_t sym);
 
 eth_ast_pattern*
 eth_ast_record_pattern(char *const fields[], eth_ast_pattern *pats[], int n);
@@ -1163,7 +1163,7 @@ struct eth_ir_pattern {
   union {
     struct { int varid; } ident;
     struct { eth_type *type; int n, *offs; eth_ir_pattern **subpats; } unpack;
-    struct { eth_t sym; } symbol;
+    struct { eth_t val; } constant;
     struct { size_t *ids; int n; eth_ir_pattern **subpats; } record;
   };
 };
@@ -1175,7 +1175,7 @@ eth_ir_pattern*
 eth_ir_unpack_pattern(eth_type *type, int offs[], eth_ir_pattern *pats[], int n);
 
 eth_ir_pattern*
-eth_ir_symbol_pattern(eth_t sym);
+eth_ir_constant_pattern(eth_t val);
 
 eth_ir_pattern*
 eth_ir_record_pattern(size_t const ids[], eth_ir_pattern *const pats[], int n);
@@ -1414,7 +1414,7 @@ struct eth_ssa_pattern {
     struct { eth_type *type; int *offs, *vids, n; eth_ssa_pattern **subpat;
              bool dotest; }
       unpack;
-    struct { eth_t sym; bool dotest; } symbol;
+    struct { eth_t val; bool dotest; } constant;
     struct { size_t *ids; int *vids, n; eth_ssa_pattern **subpat; bool dotest; }
       record;
   };
@@ -1428,7 +1428,7 @@ eth_ssa_unpack_pattern(eth_type *type, int const offs[], int const vids[],
     eth_ssa_pattern *const pats[], int n, bool dotest);
 
 eth_ssa_pattern*
-eth_ssa_symbol_pattern(eth_t sym, bool dotest);
+eth_ssa_constant_pattern(eth_t val, bool dotest);
 
 eth_ssa_pattern*
 eth_ssa_record_pattern(size_t const ids[], int const vids[],

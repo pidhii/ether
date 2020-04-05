@@ -301,8 +301,8 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
       return eth_ir_unpack_pattern(type, offs, pats, n);
     }
 
-    case ETH_PATTERN_SYMBOL:
-      return eth_ir_symbol_pattern(pat->symbol.sym);
+    case ETH_PATTERN_CONSTANT:
+      return eth_ir_constant_pattern(pat->constant.val);
 
     case ETH_PATTERN_RECORD:
     {
@@ -437,12 +437,12 @@ constexpr_binop(eth_binop op, eth_t lhs, eth_t rhs, eth_location *loc, int *e)
         case ETH_ASHL: ret = eth_num((intmax_t)x << (intmax_t)y); break;
         case ETH_ASHR: ret = eth_num((intmax_t)x >> (intmax_t)y); break;
         // ---
-        case ETH_LT: ret = eth_boolean(lhs < rhs); break;
-        case ETH_LE: ret = eth_boolean(lhs <= rhs); break;
-        case ETH_GT: ret = eth_boolean(lhs > rhs); break;
-        case ETH_GE: ret = eth_boolean(lhs >= rhs); break;
-        case ETH_EQ: ret = eth_boolean(lhs == rhs); break;
-        case ETH_NE: ret = eth_boolean(lhs != rhs); break;
+        case ETH_LT: ret = eth_boolean(x < y); break;
+        case ETH_LE: ret = eth_boolean(x <= y); break;
+        case ETH_GT: ret = eth_boolean(x > y); break;
+        case ETH_GE: ret = eth_boolean(x >= y); break;
+        case ETH_EQ: ret = eth_boolean(x == y); break;
+        case ETH_NE: ret = eth_boolean(x != y); break;
         // ---
         default: abort();
       }

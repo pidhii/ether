@@ -494,12 +494,14 @@ string_aux
 ;
 
 atomic_pattern
-  : maybe_pub SYMBOL {
+  : '_' { $$ = eth_ast_ident_pattern("_"); }
+  | maybe_pub SYMBOL {
     $$ = eth_ast_ident_pattern($2);
     $$->ident.pub = $1;
     free($2);
   }
-  | CAPSYMBOL { $$ = eth_ast_symbol_pattern(eth_sym($1)); free($1); }
+  | CAPSYMBOL { $$ = eth_ast_constant_pattern(eth_sym($1)); free($1); }
+  | CONST { $$ = eth_ast_constant_pattern($1); }
   | '(' pattern ')' { $$ = $2; }
   | '(' pattern_list ',' pattern ')' {
     cod_vec_push($2, $4);

@@ -465,17 +465,17 @@ build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
           pats, pat->unpack.n, dotest);
     }
 
-    case ETH_PATTERN_SYMBOL:
+    case ETH_PATTERN_CONSTANT:
     {
       value_info *vinfo = bldr->vinfo[expr];
 
-      if (vinfo->cval and vinfo->cval == pat->symbol.sym)
-        return eth_ssa_symbol_pattern(pat->symbol.sym, false);
+      if (vinfo->cval and vinfo->cval == pat->constant.val)
+        return eth_ssa_constant_pattern(pat->constant.val, false);
 
-      if (vinfo->type and vinfo->type != eth_symbol_type)
+      if (vinfo->type and vinfo->type != pat->constant.val->type)
       {
         eth_warning("pattern won't match: expect %s, but value is of type %s",
-            eth_symbol_type->name, vinfo->type->name);
+            pat->constant.val->type->name, vinfo->type->name);
         *e = 1;
       }
 
@@ -485,10 +485,10 @@ build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
         .oldcval = bldr->vinfo[expr]->cval,
       };
       cod_vec_push(*savs, save);
-      bldr->vinfo[expr]->type = eth_symbol_type;
-      bldr->vinfo[expr]->cval = pat->symbol.sym;
+      bldr->vinfo[expr]->type = pat->constant.val->type;
+      bldr->vinfo[expr]->cval = pat->constant.val;
 
-      return eth_ssa_symbol_pattern(pat->symbol.sym, true);
+      return eth_ssa_constant_pattern(pat->constant.val, true);
     }
 
     case ETH_PATTERN_RECORD:
@@ -916,9 +916,6 @@ is_dead_end(eth_insn *begin)
       return (a && b) || is_dead_end(insn->next);
     }
 
-    if (insn->tag == ETH_INSN_TRY)
-      return is_dead_end(insn->try.catchbr);
-
     // TODO: create marker-function
     if (insn->tag == ETH_INSN_RET or insn->tag == ETH_INSN_CATCH)
       return true;
@@ -1167,8 +1164,122 @@ last_insn(eth_insn *begin)
   return begin;
 }
 
+static bool kill_value_T(kill_info *kinfo, eth_insn *begin, int vid);
+static void kill_value_F(kill_info *kinfo, eth_insn *begin, int vid);
+
+static void
+force_kill(kill_info *kinfo, eth_insn *br, int vid)
+{
+  eth_insn *unref = eth_insn_unref(vid);
+  eth_insert_insn_before(br, unref);
+  add_killer(kinfo, vid, unref);
+}
+
+static void
+kill_value_F(kill_info *kinfo, eth_insn *begin, int vid)
+{
+  for (eth_insn *insn = begin; insn; insn = insn->next)
+  {
+    if (insn->tag == ETH_INSN_IF)
+    {
+      eth_insn *b1 = insn->iff.thenbr;
+      eth_insn *b2 = insn->iff.elsebr;
+
+      if (is_dead_end(b1) and not kill_value_T(kinfo, b1, vid))
+        force_kill(kinfo, b1, vid);
+      if (is_dead_end(b2) and not kill_value_T(kinfo, b2, vid))
+        force_kill(kinfo, b2, vid);
+    }
+
+    if (insn->tag == ETH_INSN_TRY)
+    {
+      eth_insn *t = insn->try.trybr;
+      eth_insn *c = insn->try.catchbr;
+
+      if (is_dead_end(c) and not kill_value_T(kinfo, c, vid))
+        force_kill(kinfo, c, vid);
+    }
+
+    // TODO: create marker-function
+    if (insn->tag == ETH_INSN_RET or insn->tag == ETH_INSN_CATCH)
+    {
+      eth_error("WTF!?");
+      abort();
+    }
+  }
+}
+
 static bool
-kill_value(kill_info *kinfo, eth_insn *begin, int vid)
+kill_value_T_if(kill_info *kinfo, eth_insn *insn, int vid)
+{
+  eth_insn *b1 = insn->iff.thenbr;
+  eth_insn *b2 = insn->iff.elsebr;
+  bool d1 = is_dead_end(b1);
+  bool d2 = is_dead_end(b2);
+
+  if ((d1 and d2) or not kill_value_T(kinfo, insn->next, vid))
+  {
+    bool k1 = kill_value_T(kinfo, b1, vid);
+    bool k2 = kill_value_T(kinfo, b2, vid);
+    if (k1 or k2)
+    {
+      if (not k1) force_kill(kinfo, b1, vid);
+      if (not k2) force_kill(kinfo, b2, vid);
+      return true;
+    }
+    else
+      return false;
+  }
+  else
+  {
+    if (d1)
+    {
+      if (not kill_value_T(kinfo, b1, vid))
+        force_kill(kinfo, b1, vid);
+      kill_value_F(kinfo, b2, vid);
+    }
+    if (d2)
+    {
+      if (not kill_value_T(kinfo, b2, vid))
+        force_kill(kinfo, b2, vid);
+      kill_value_F(kinfo, b1, vid);
+    }
+    return true;
+  }
+}
+
+static bool
+kill_value_T_try(kill_info *kinfo, eth_insn *insn, int vid)
+{
+  eth_insn *t = insn->try.trybr;
+  eth_insn *c = insn->try.catchbr;
+
+  if (kill_value_T(kinfo, insn->next, vid))
+  {
+    if (is_dead_end(c))
+    {
+      if (not kill_value_T(kinfo, c, vid))
+        force_kill(kinfo, c, vid);
+    }
+    else
+      kill_value_F(kinfo, c, vid);
+    return true;
+  }
+  else if (kill_value_T(kinfo, c, vid))
+  {
+    eth_insn *unref = eth_insn_unref(vid);
+    eth_insert_insn_after(last_insn(t), unref);
+    add_killer(kinfo, vid, unref);
+    return true;
+  }
+  else if (kill_value_T(kinfo, t, vid))
+    return true;
+  else
+    return false;
+}
+
+static bool
+kill_value_T(kill_info *kinfo, eth_insn *begin, int vid)
 {
   eth_insn *lastusr = NULL;
 
@@ -1179,81 +1290,18 @@ kill_value(kill_info *kinfo, eth_insn *begin, int vid)
 
     if (insn->tag == ETH_INSN_IF)
     {
-      eth_insn *thenb = insn->iff.thenbr;
-      eth_insn *elseb = insn->iff.elsebr;
-
-      if (kill_value(kinfo, insn->next, vid))
-      {
-        if (is_dead_end(thenb) and not kill_value(kinfo, thenb, vid))
-        {
-          eth_insn *unref = eth_insn_unref(vid);
-          eth_insert_insn_before(thenb, unref);
-          add_killer(kinfo, vid, unref);
-        }
-        if (is_dead_end(elseb) and not kill_value(kinfo, elseb, vid))
-        {
-          eth_insn *unref = eth_insn_unref(vid);
-          eth_insert_insn_before(elseb, unref);
-          add_killer(kinfo, vid, unref);
-        }
+      if (kill_value_T_if(kinfo, insn, vid))
         return true;
-      }
       else
-      {
-        int thenkill = kill_value(kinfo, thenb, vid);
-        int elsekill = kill_value(kinfo, elseb, vid);
-        if (thenkill || elsekill)
-        {
-          if (not elsekill)
-          {
-            eth_insn *unref = eth_insn_unref(vid);
-            eth_insert_insn_before(elseb, unref);
-            add_killer(kinfo, vid, unref);
-          }
-          if (not thenkill)
-          {
-            eth_insn *unref = eth_insn_unref(vid);
-            eth_insert_insn_before(thenb, unref);
-            add_killer(kinfo, vid, unref);
-          }
-          return true;
-        }
-        else
-          break;
-      }
+        break;
     }
 
     if (insn->tag == ETH_INSN_TRY)
     {
-      eth_insn *trybr = insn->try.trybr;
-      eth_insn *cchbr = insn->try.catchbr;
-
-      if (kill_value(kinfo, insn->next, vid))
-      {
-        if (not kill_value(kinfo, cchbr, vid) and is_dead_end(cchbr))
-        {
-          eth_insn *unref = eth_insn_unref(vid);
-          eth_insert_insn_before(cchbr, unref);
-          add_killer(kinfo, vid, unref);
-        }
+      if (kill_value_T_try(kinfo, insn, vid))
         return true;
-      }
       else
-      {
-        if (kill_value(kinfo, cchbr, vid))
-        {
-          eth_insn *unref = eth_insn_unref(vid);
-          // TODO: can kill earlier: after last IF with CATCH
-          eth_insert_insn_after(last_insn(trybr), unref);
-          add_killer(kinfo, vid, unref);
-          return true;
-        }
-
-        if (kill_value(kinfo, trybr, vid))
-          return true;
-
         break;
-      }
     }
 
     // TODO: create marker-function
@@ -1298,7 +1346,7 @@ kill_value(kill_info *kinfo, eth_insn *begin, int vid)
 static void
 insert_rc_default(kill_info *kinfo, eth_insn *begin, int vid)
 {
-  if (kill_value(kinfo, begin, vid))
+  if (kill_value_T(kinfo, begin, vid))
     eth_insert_insn_after(begin, eth_insn_ref(vid));
   else
     eth_insert_insn_after(begin, eth_insn_drop(vid));
@@ -1329,19 +1377,19 @@ insert_rc_phi(kill_info *kinfo, eth_insn *begin, int vid)
   else
     abort();
 
-  if (not kill_value(kinfo, begin->next, vid))
+  if (not kill_value_T(kinfo, begin->next, vid))
   {
     // TODO: should remove that MOV at all
     eth_insn *mov;
     mov = find_mov(br1, vid);
-    if (not kill_value(kinfo, mov->next, vid))
+    if (not kill_value_T(kinfo, mov->next, vid))
     {
       eth_insn *unref = eth_insn_unref(vid);
       eth_insert_insn_after(mov, unref);
       add_killer(kinfo, vid, unref);
     }
     mov = find_mov(br2, vid);
-    if (not kill_value(kinfo, mov->next, vid))
+    if (not kill_value_T(kinfo, mov->next, vid))
     {
       eth_insn *unref = eth_insn_unref(vid);
       eth_insert_insn_after(mov, unref);
@@ -1353,7 +1401,7 @@ insert_rc_phi(kill_info *kinfo, eth_insn *begin, int vid)
 static void
 insert_rc_unref(kill_info *kinfo, eth_insn *begin, int vid)
 {
-  if (not kill_value(kinfo, begin->next, vid))
+  if (not kill_value_T(kinfo, begin->next, vid))
   {
       eth_insn *unref = eth_insn_unref(vid);
       eth_insert_insn_after(begin, unref);

@@ -63,11 +63,11 @@ eth_ast_record_pattern(char *const fields[], eth_ast_pattern *pats[], int n)
 }
 
 eth_ast_pattern*
-eth_ast_symbol_pattern(eth_t sym)
+eth_ast_constant_pattern(eth_t val)
 {
   eth_ast_pattern *pat = malloc(sizeof(eth_ast_pattern));
-  pat->tag = ETH_PATTERN_SYMBOL;
-  eth_ref(pat->symbol.sym = sym);
+  pat->tag = ETH_PATTERN_CONSTANT;
+  eth_ref(pat->constant.val = val);
   return pat;
 }
 
@@ -92,8 +92,8 @@ eth_destroy_ast_pattern(eth_ast_pattern *pat)
       free(pat->unpack.subpats);
       break;
 
-    case ETH_PATTERN_SYMBOL:
-      eth_unref(pat->symbol.sym);
+    case ETH_PATTERN_CONSTANT:
+      eth_unref(pat->constant.val);
       break;
 
     case ETH_PATTERN_RECORD:
