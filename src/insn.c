@@ -5,6 +5,14 @@
 #include <string.h>
 
 eth_ssa_pattern*
+eth_ssa_dummy_pattern(void)
+{
+  eth_ssa_pattern *pat = malloc(sizeof(eth_ssa_pattern));
+  pat->tag = ETH_PATTERN_DUMMY;
+  return pat;
+}
+
+eth_ssa_pattern*
 eth_ssa_ident_pattern(int vid)
 {
   eth_ssa_pattern *pat = malloc(sizeof(eth_ssa_pattern));
@@ -63,6 +71,9 @@ eth_destroy_ssa_pattern(eth_ssa_pattern *pat)
 {
   switch (pat->tag)
   {
+    case ETH_PATTERN_DUMMY:
+      break;
+
     case ETH_PATTERN_IDENT:
       break;
 
@@ -150,6 +161,14 @@ eth_destroy_insn(eth_insn *insn)
 
     case ETH_INSN_MKRCRD:
       free(insn->mkrcrd.vids);
+      break;
+
+    case ETH_INSN_CAP:
+      free(insn->cap.vids);
+      break;
+
+    case ETH_INSN_POP:
+      free(insn->pop.vids);
       break;
 
     default:
@@ -359,20 +378,22 @@ eth_insn_finfn(int c, int arity, int *caps, int ncap, int *movs, int nmov,
 }
 
 eth_insn*
-eth_insn_pop(int vid0, int n)
+eth_insn_pop(int const vids[], int n)
 {
   eth_insn *insn = create_insn(ETH_INSN_POP);
-  insn->out = vid0;
+  insn->pop.vids = malloc(sizeof(int) * n);
   insn->pop.n = n;
+  memcpy(insn->pop.vids, vids, sizeof(int) * n);
   return insn;
 }
 
 eth_insn*
-eth_insn_cap(int vid0, int n)
+eth_insn_cap(int const vids[], int n)
 {
   eth_insn *insn = create_insn(ETH_INSN_CAP);
-  insn->out = vid0;
+  insn->cap.vids = malloc(sizeof(int) * n);
   insn->cap.n = n;
+  memcpy(insn->cap.vids, vids, sizeof(int) * n);
   return insn;
 }
 

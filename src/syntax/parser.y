@@ -494,7 +494,7 @@ string_aux
 ;
 
 atomic_pattern
-  : '_' { $$ = eth_ast_ident_pattern("_"); }
+  : '_' { $$ = eth_ast_dummy_pattern(); }
   | maybe_pub SYMBOL {
     $$ = eth_ast_ident_pattern($2);
     $$->ident.pub = $1;

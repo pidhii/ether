@@ -5,6 +5,14 @@
 #include <assert.h>
 
 eth_ast_pattern*
+eth_ast_dummy_pattern(void)
+{
+  eth_ast_pattern *pat = malloc(sizeof(eth_ast_pattern));
+  pat->tag = ETH_PATTERN_DUMMY;
+  return pat;
+}
+
+eth_ast_pattern*
 eth_ast_ident_pattern(const char *ident)
 {
   eth_ast_pattern *pat = malloc(sizeof(eth_ast_pattern));
@@ -76,6 +84,9 @@ eth_destroy_ast_pattern(eth_ast_pattern *pat)
 {
   switch (pat->tag)
   {
+    case ETH_PATTERN_DUMMY:
+      break;
+
     case ETH_PATTERN_IDENT:
       free(pat->ident.str);
       break;
@@ -224,6 +235,13 @@ destroy_ast_node(eth_ast *ast)
       }
       free(ast->mkrcrd.fields);
       free(ast->mkrcrd.vals);
+      break;
+
+    case ETH_AST_MULTIMATCH:
+      for (int i = 0; i < ast->multimatch.table->h; ++i)
+        eth_unref_ast(ast->multimatch.exprs[i]);
+      free(ast->multimatch.exprs);
+      eth_destroy_match_table(ast->multimatch.table);
       break;
   }
 
@@ -481,3 +499,50 @@ eth_ast_make_record_with_type(eth_type *type, char *const fields[],
   }
   return ast;
 }
+
+eth_match_table*
+eth_create_match_table(eth_ast_pattern **const *tab, eth_ast *const exprs[],
+    int h, int w)
+{
+  eth_match_table *table = malloc(sizeof(eth_match_table));
+  table->tab = malloc(sizeof(eth_ast_pattern*) * h);
+  for (int i = 0; i < h; ++i)
+  {
+    table->tab[i] = malloc(sizeof(eth_ast_pattern*) * w);
+    memcpy(table->tab[i], tab[i], sizeof(eth_ast_pattern*) * w);
+  }
+  table->exprs = malloc(sizeof(eth_ast*) * h);
+  for (int i = 0; i < h; ++i)
+    eth_ref_ast(table->exprs[i] = exprs[i]);
+  table->w = w;
+  table->h = h;
+  return table;
+}
+
+void
+eth_destroy_match_table(eth_match_table *table)
+{
+  for (int i = 0; i < table->w; ++i)
+  {
+    for (int j = 0; j < table->h; ++j)
+      eth_destroy_ast_pattern(table->tab[i][j]);
+    free(table->tab[i]);
+  }
+  free(table->tab);
+  for (int j = 0; j < table->h; ++j)
+    eth_unref_ast(table->exprs[j]);
+  free(table->exprs);
+  free(table);
+}
+
+eth_ast*
+eth_ast_multimatch(eth_match_table *table, eth_ast *const exprs[])
+{
+  eth_ast *ast = create_ast_node(ETH_AST_MULTIMATCH);
+  ast->multimatch.table = table;
+  ast->multimatch.exprs = malloc(sizeof(eth_ast*) * table->w);
+  for (int i = 0; i < table->w; ++i)
+    eth_ref_ast(ast->multimatch.exprs[i] = exprs[i]);
+  return ast;
+}
+

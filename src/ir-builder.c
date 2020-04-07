@@ -255,6 +255,9 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
 {
   switch (pat->tag)
   {
+    case ETH_PATTERN_DUMMY:
+      return eth_ir_dummy_pattern();
+
     case ETH_PATTERN_IDENT:
     {
       int varid = new_vid(bldr);
@@ -652,6 +655,31 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       eth_ir_node *ret = eth_ir_match(pat, expr, thenbr, elsebr);
       ret->match.toplvl = ast->match.toplvl;
       return ret;
+    }
+
+    case ETH_AST_MULTIMATCH:
+    {
+      eth_match_table *table = ast->multimatch.table;
+      int w = table->w;
+      int h = table->h;
+      eth_ir_node *exprs[w];
+      eth_ir_pattern *ir_table[w][h];
+      eth_ir_node *thenbrs[h];
+
+      for (int i = 0; i < w; ++i)
+        exprs[i] = build(bldr, ast->multimatch.exprs[i], e);
+
+      for (int i = 0; i < h; ++i)
+      {
+        int n1 = bldr->vars->len;
+        for (int j = 0; j < w; ++j)
+          ir_table[i][j] = build_pattern(bldr, table->tab[i][j], ast->loc, e);
+        int n2 = bldr->vars->len;
+        thenbrs[i] = build(bldr, table->exprs[i], e);
+        eth_pop_var(bldr->vars, n2 - n1);
+      }
+      eth_error("unimplemented");
+      abort();
     }
 
     case ETH_AST_IMPORT:

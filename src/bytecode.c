@@ -64,37 +64,56 @@ typedef struct {
 } catch_jmp;
 
 typedef struct {
-  int len, cap; /* Length and capacity of code-tape. */
+  int len, cap; /* Length and capacity of the code tape. */
   eth_bc_insn *arr; /* Code(output)-tape. */
   cod_vec(deff_block) deff; /* Deffered blocks. */
   cod_vec(catch_jmp) cchjmps;
   int *catches;
-} builder;
+  int *vmap; // Map of the SSA-values to registers. */
+  int regcnt;
+} bc_builder;
 
-static builder*
-create_builder(int ntries)
+static bc_builder*
+create_bc_builder(int nvals, int ntries)
 {
-  builder *bldr = malloc(sizeof(builder));
+  bc_builder *bldr = malloc(sizeof(bc_builder));
   bldr->len = 0;
   bldr->cap = 0x40;
   bldr->arr = malloc(sizeof(eth_bc_insn) * bldr->cap);
   cod_vec_init(bldr->deff);
   cod_vec_init(bldr->cchjmps);
   bldr->catches = malloc(sizeof(int) * ntries);
+  bldr->vmap = malloc(sizeof(int) * nvals);
+  bldr->regcnt = 0;
   return bldr;
 }
 
 static void
-destroy_builder(builder *bldr)
+destroy_bc_builder(bc_builder *bldr)
 {
   cod_vec_destroy(bldr->deff);
   cod_vec_destroy(bldr->cchjmps);
   free(bldr->catches);
+  free(bldr->vmap);
   free(bldr);
 }
 
+static int
+new_reg(bc_builder *bldr, int vid)
+{
+  int reg = bldr->regcnt++;
+  bldr->vmap[vid] = reg;
+  return reg;
+}
+
+static int
+get_reg(bc_builder *bldr, int vid)
+{
+  return bldr->vmap[vid];
+}
+
 static eth_bc_insn*
-append_insn(builder *bldr)
+append_insn(bc_builder *bldr)
 {
   if (eth_unlikely(bldr->cap == bldr->len))
   {
@@ -105,7 +124,7 @@ append_insn(builder *bldr)
 }
 
 static int
-write_cval(builder *bldr, int out, eth_t val)
+write_cval(bc_builder *bldr, int out, eth_t val)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_CVAL;
@@ -115,7 +134,7 @@ write_cval(builder *bldr, int out, eth_t val)
 }
 
 static int
-write_push(builder *bldr, int *vids, int n)
+write_push(bc_builder *bldr, int *vids, int n)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_PUSH;
@@ -127,7 +146,7 @@ write_push(builder *bldr, int *vids, int n)
 }
 
 static int
-write_pop(builder *bldr, int vid0, int n)
+write_pop(bc_builder *bldr, int vid0, int n)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_POP;
@@ -137,7 +156,7 @@ write_pop(builder *bldr, int vid0, int n)
 }
 
 static int
-write_apply(builder *bldr, int out, int fn)
+write_apply(bc_builder *bldr, int out, int fn)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_APPLY;
@@ -147,7 +166,7 @@ write_apply(builder *bldr, int out, int fn)
 }
 
 static int
-write_applytc(builder *bldr, int out, int fn)
+write_applytc(bc_builder *bldr, int out, int fn)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_APPLYTC;
@@ -157,7 +176,7 @@ write_applytc(builder *bldr, int out, int fn)
 }
 
 static int
-write_test(builder *bldr, int vid)
+write_test(bc_builder *bldr, int vid)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_TEST;
@@ -166,7 +185,7 @@ write_test(builder *bldr, int vid)
 }
 
 static int
-write_testty(builder *bldr, int vid, eth_type *type)
+write_testty(bc_builder *bldr, int vid, eth_type *type)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_TESTTY;
@@ -176,7 +195,7 @@ write_testty(builder *bldr, int vid, eth_type *type)
 }
 
 static int
-write_testis(builder *bldr, int vid, eth_t cval)
+write_testis(bc_builder *bldr, int vid, eth_t cval)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_TESTIS;
@@ -187,7 +206,7 @@ write_testis(builder *bldr, int vid, eth_t cval)
 }
 
 static int
-write_gettest(builder *bldr, int out)
+write_gettest(bc_builder *bldr, int out)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_GETTEST;
@@ -196,7 +215,7 @@ write_gettest(builder *bldr, int out)
 }
 
 static int
-write_dup(builder *bldr, int out, int vid)
+write_dup(bc_builder *bldr, int out, int vid)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_DUP;
@@ -206,7 +225,7 @@ write_dup(builder *bldr, int out, int vid)
 }
 
 static int
-write_jnz(builder *bldr, ptrdiff_t offs)
+write_jnz(bc_builder *bldr, ptrdiff_t offs)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_JNZ;
@@ -215,7 +234,7 @@ write_jnz(builder *bldr, ptrdiff_t offs)
 }
 
 static int
-write_jze(builder *bldr, ptrdiff_t offs)
+write_jze(bc_builder *bldr, ptrdiff_t offs)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_JZE;
@@ -224,7 +243,7 @@ write_jze(builder *bldr, ptrdiff_t offs)
 }
 
 static int
-write_jmp(builder *bldr, ptrdiff_t offs)
+write_jmp(bc_builder *bldr, ptrdiff_t offs)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_JMP;
@@ -233,7 +252,7 @@ write_jmp(builder *bldr, ptrdiff_t offs)
 }
 
 static int
-write_ref(builder *bldr, int vid)
+write_ref(bc_builder *bldr, int vid)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_REF;
@@ -242,7 +261,7 @@ write_ref(builder *bldr, int vid)
 }
 
 static int
-write_dec(builder *bldr, int vid)
+write_dec(bc_builder *bldr, int vid)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_DEC;
@@ -251,7 +270,7 @@ write_dec(builder *bldr, int vid)
 }
 
 static int
-write_unref(builder *bldr, int vid)
+write_unref(bc_builder *bldr, int vid)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_UNREF;
@@ -260,7 +279,7 @@ write_unref(builder *bldr, int vid)
 }
 
 static int
-write_drop(builder *bldr, int vid)
+write_drop(bc_builder *bldr, int vid)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_DROP;
@@ -269,7 +288,7 @@ write_drop(builder *bldr, int vid)
 }
 
 static int
-write_ret(builder *bldr, int vid)
+write_ret(bc_builder *bldr, int vid)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_RET;
@@ -278,7 +297,7 @@ write_ret(builder *bldr, int vid)
 }
 
 static int
-write_fn(builder *bldr, int out, int arity, eth_ir *ir, eth_bytecode *bc,
+write_fn(bc_builder *bldr, int out, int arity, eth_ir *ir, eth_bytecode *bc,
     int *caps, int ncap)
 {
   eth_bc_insn *insn = append_insn(bldr);
@@ -296,7 +315,7 @@ write_fn(builder *bldr, int out, int arity, eth_ir *ir, eth_bytecode *bc,
 }
 
 static int
-write_alcfn(builder *bldr, int out, int arity)
+write_alcfn(bc_builder *bldr, int out, int arity)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_ALCFN;
@@ -306,7 +325,7 @@ write_alcfn(builder *bldr, int out, int arity)
 }
 
 static int
-write_cap(builder *bldr, int vid0, int n)
+write_cap(bc_builder *bldr, int vid0, int n)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_CAP;
@@ -316,7 +335,7 @@ write_cap(builder *bldr, int vid0, int n)
 }
 
 static int
-write_finfn(builder *bldr, int out, int arity, eth_ir *ir, eth_bytecode *bc,
+write_finfn(bc_builder *bldr, int out, int arity, eth_ir *ir, eth_bytecode *bc,
     int *caps, int ncap)
 {
   eth_bc_insn *insn = append_insn(bldr);
@@ -334,7 +353,7 @@ write_finfn(builder *bldr, int out, int arity, eth_ir *ir, eth_bytecode *bc,
 }
 
 static int
-write_mkscp(builder *bldr, int *clos, int nclos, int *wrefs, int nwref)
+write_mkscp(bc_builder *bldr, int *clos, int nclos, int *wrefs, int nwref)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_MKSCP;
@@ -351,7 +370,7 @@ write_mkscp(builder *bldr, int *clos, int nclos, int *wrefs, int nwref)
 }
 
 static int
-write_load(builder *bldr, int out, int vid, int offs)
+write_load(bc_builder *bldr, int out, int vid, int offs)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_LOAD;
@@ -362,7 +381,7 @@ write_load(builder *bldr, int out, int vid, int offs)
 }
 
 static int
-write_loadrcrd(builder *bldr, size_t *ids, int *vids, int n, int src)
+write_loadrcrd(bc_builder *bldr, size_t *ids, int *vids, int n, int src)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_LOADRCRD;
@@ -379,7 +398,7 @@ write_loadrcrd(builder *bldr, size_t *ids, int *vids, int n, int src)
 }
 
 static int
-write_loadrcrd1(builder *bldr, int out, int vid, size_t id)
+write_loadrcrd1(bc_builder *bldr, int out, int vid, size_t id)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_LOADRCRD1;
@@ -390,7 +409,7 @@ write_loadrcrd1(builder *bldr, int out, int vid, size_t id)
 }
 
 static int
-write_setexn(builder *bldr, int vid)
+write_setexn(bc_builder *bldr, int vid)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_SETEXN;
@@ -399,7 +418,7 @@ write_setexn(builder *bldr, int vid)
 }
 
 static int
-write_getexn(builder *bldr, int out)
+write_getexn(bc_builder *bldr, int out)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_GETEXN;
@@ -408,7 +427,7 @@ write_getexn(builder *bldr, int out)
 }
 
 static int
-write_mkrcrd(builder *bldr, int out, int const vids[], eth_type *type)
+write_mkrcrd(bc_builder *bldr, int out, int const vids[], eth_type *type)
 {
   int n = type->nfields;
   eth_bc_insn *insn = append_insn(bldr);
@@ -421,16 +440,16 @@ write_mkrcrd(builder *bldr, int out, int const vids[], eth_type *type)
   return bldr->len - 1;
 }
 
-#define MAKE_BINOP(name, op)                             \
-  static int                                             \
-  write_##name(builder *bldr, int out, int lhs, int rhs) \
-  {                                                      \
-    eth_bc_insn *insn = append_insn(bldr);               \
-    insn->opc = ETH_OPC_##op;                            \
-    insn->binop.out = out;                               \
-    insn->binop.lhs = lhs;                               \
-    insn->binop.rhs = rhs;                               \
-    return bldr->len - 1;                                \
+#define MAKE_BINOP(name, op)                                \
+  static int                                                \
+  write_##name(bc_builder *bldr, int out, int lhs, int rhs) \
+  {                                                         \
+    eth_bc_insn *insn = append_insn(bldr);                  \
+    insn->opc = ETH_OPC_##op;                               \
+    insn->binop.out = out;                                  \
+    insn->binop.lhs = lhs;                                  \
+    insn->binop.rhs = rhs;                                  \
+    return bldr->len - 1;                                   \
   }
 MAKE_BINOP(add , ADD)
 MAKE_BINOP(sub , SUB)
@@ -454,15 +473,15 @@ MAKE_BINOP(ne  , NE)
 MAKE_BINOP(is  , IS)
 MAKE_BINOP(cons, CONS)
 
-#define MAKE_UNOP(name, op)                     \
-  static int                                    \
-  write_##name(builder *bldr, int out, int vid) \
-  {                                             \
-    eth_bc_insn *insn = append_insn(bldr);      \
-    insn->opc = ETH_OPC_##op;                   \
-    insn->unop.out = out;                       \
-    insn->unop.vid = vid;                       \
-    return bldr->len - 1;                       \
+#define MAKE_UNOP(name, op)                        \
+  static int                                       \
+  write_##name(bc_builder *bldr, int out, int vid) \
+  {                                                \
+    eth_bc_insn *insn = append_insn(bldr);         \
+    insn->opc = ETH_OPC_##op;                      \
+    insn->unop.out = out;                          \
+    insn->unop.vid = vid;                          \
+    return bldr->len - 1;                          \
   }
 MAKE_UNOP(not , NOT)
 MAKE_UNOP(lnot, LNOT)
@@ -473,10 +492,13 @@ typedef cod_vec(int) int_vec;
 
 // TODO: optimize (first unpacks, then idents)
 static void
-build_pattern(builder *bldr, eth_ssa_pattern *pat, int expr, int_vec *jmps)
+build_pattern(bc_builder *bldr, eth_ssa_pattern *pat, int expr, int_vec *jmps)
 {
   switch (pat->tag)
   {
+    case ETH_PATTERN_DUMMY:
+      break;
+
     case ETH_PATTERN_IDENT:
       break;
 
@@ -493,6 +515,8 @@ build_pattern(builder *bldr, eth_ssa_pattern *pat, int expr, int_vec *jmps)
 
       for (int i = 0; i < pat->unpack.n; ++i)
       {
+        if (pat->unpack.subpat[i]->tag == ETH_PATTERN_DUMMY)
+          continue;
         write_load(bldr, pat->unpack.vids[i], expr, pat->unpack.offs[i]);
         build_pattern(bldr, pat->unpack.subpat[i], pat->unpack.vids[i], jmps);
       }
@@ -537,7 +561,7 @@ build_pattern(builder *bldr, eth_ssa_pattern *pat, int expr, int_vec *jmps)
 }
 
 static void
-build(builder *bldr, eth_insn *ssa)
+build(bc_builder *bldr, eth_insn *ssa)
 {
   for (eth_insn *ip = ssa; ip; ip = ip->next)
   {
@@ -730,11 +754,11 @@ end_if:
       }
 
       case ETH_INSN_POP:
-        write_pop(bldr, ip->out, ip->pop.n);
+        write_pop(bldr, ip->pop.vids[0], ip->pop.n);
         break;
 
       case ETH_INSN_CAP:
-        write_cap(bldr, ip->out, ip->cap.n);
+        write_cap(bldr, ip->cap.vids[0], ip->cap.n);
         break;
 
       case ETH_INSN_MKSCP:
@@ -775,7 +799,7 @@ end_if:
 eth_bytecode*
 eth_build_bytecode(eth_ssa *ssa)
 {
-  builder *bldr = create_builder(ssa->ntries);
+  bc_builder *bldr = create_bc_builder(ssa->nvals, ssa->ntries);
 
   build(bldr, ssa->body);
 
@@ -801,7 +825,7 @@ eth_build_bytecode(eth_ssa *ssa)
   bc->nreg = ssa->nvals;
   bc->len = bldr->len;
   bc->code = bldr->arr;
-  destroy_builder(bldr);
+  destroy_bc_builder(bldr);
 
   return bc;
 }

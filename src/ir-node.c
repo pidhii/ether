@@ -5,6 +5,14 @@
 #include <assert.h>
 
 eth_ir_pattern*
+eth_ir_dummy_pattern(void)
+{
+  eth_ir_pattern *pat = malloc(sizeof(eth_ir_pattern));
+  pat->tag = ETH_PATTERN_DUMMY;
+  return pat;
+}
+
+eth_ir_pattern*
 eth_ir_ident_pattern(int varid)
 {
   eth_ir_pattern *pat = malloc(sizeof(eth_ir_pattern));
@@ -54,6 +62,9 @@ eth_destroy_ir_pattern(eth_ir_pattern *pat)
 {
   switch (pat->tag)
   {
+    case ETH_PATTERN_DUMMY:
+      break;
+
     case ETH_PATTERN_IDENT:
       break;
 

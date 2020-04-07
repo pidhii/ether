@@ -74,8 +74,20 @@ typedef struct value_info {
   eth_insn *creatloc;
   bool isrec;
   bool isdummy;
-  int tryid;
 } value_info;
+
+typedef enum {
+  ACTION_SETCVAL,
+  ACTION_SETTYPE,
+} action_tag;
+
+typedef struct {
+  action_tag tag;
+  union {
+    struct { int vid; eth_t new, old; } setcval;
+    struct { int vid; eth_type *new, *old; } settype;
+  };
+} action;
 
 typedef struct  {
   int nvars;
@@ -90,6 +102,7 @@ typedef struct  {
   bool testexn;
   int ntries;
   int istry, tryid;
+  cod_vec(action) actions;
 } ssa_builder;
 
 static value_info*
@@ -120,6 +133,7 @@ create_ssa_builder(int nvars)
   bldr->testexn = true;
   bldr->ntries = 0;
   bldr->istry = 0;
+  cod_vec_init(bldr->actions);
   return bldr;
 }
 
@@ -132,7 +146,69 @@ destroy_ssa_builder(ssa_builder *bldr)
   free(bldr->vinfo);
   cod_vec_destroy(bldr->movs);
   assert(bldr->recscp == NULL);
+  assert(bldr->actions.len == 0);
+  cod_vec_destroy(bldr->actions);
   free(bldr);
+}
+
+static int
+begin_logical_block(ssa_builder *bldr)
+{
+  return bldr->actions.len;
+}
+
+static void
+set_cval(ssa_builder *bldr, int vid, eth_t val)
+{
+  cod_vec_push(bldr->actions, (action) {
+    .tag = ACTION_SETCVAL,
+    .setcval = {
+      .vid = vid,
+      .new = val,
+      .old = bldr->vinfo[vid]->cval,
+    }
+  });
+  bldr->vinfo[vid]->cval = val;
+}
+
+static void
+set_type(ssa_builder *bldr, int vid, eth_type *type)
+{
+  cod_vec_push(bldr->actions, (action) {
+    .tag = ACTION_SETTYPE,
+    .settype = {
+      .vid = vid,
+      .new = type,
+      .old = bldr->vinfo[vid]->type,
+    }
+  });
+  bldr->vinfo[vid]->type = type;
+}
+
+static void
+undo_action(ssa_builder *bldr, action *a)
+{
+  switch (a->tag)
+  {
+    case ACTION_SETCVAL:
+      bldr->vinfo[a->setcval.vid]->cval = a->setcval.old;
+      break;
+
+    case ACTION_SETTYPE:
+      bldr->vinfo[a->settype.vid]->type = a->settype.old;
+      break;
+  }
+}
+
+static void
+end_logical_block(ssa_builder *bldr, int start)
+{
+  int n = bldr->actions.len - start;
+  while (n--)
+  {
+    action a = cod_vec_pop(bldr->actions);
+    undo_action(bldr, &a);
+  }
 }
 
 static int
@@ -184,6 +260,19 @@ build_body(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *body, bool *e);
 #define FN_NEW (-1)
 static int
 build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *fn, int f, bool *e);
+
+static int
+build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e);
+
+static int
+build_logical_block(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir,
+    int istc, bool *e)
+{
+  int lbstart = begin_logical_block(bldr);
+  int ret = build(bldr, tape, ir, istc, e);
+  end_logical_block(bldr, lbstart);
+  return ret;
+}
 
 static rec_scope*
 start_rec_scope(ssa_builder *bldr)
@@ -311,28 +400,32 @@ build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int f, bool *e)
   // declare arguments [0, arity):
   if (arity)
   {
-    eth_insn *pop = eth_insn_pop(0, arity);
-    eth_write_insn(fntape, pop);
+    int fnargs[arity];
     for (int i = 0; i < arity; ++i)
     {
-      int vid = new_val(fnbldr, RC_RULES_DEFAULT);
-      assert(vid == i);
-      fnbldr->vinfo[i]->creatloc = pop;
-      fnbldr->vars[i] = i;
+      fnargs[i] = new_val(fnbldr, RC_RULES_DEFAULT);
+      fnbldr->vars[i] = fnargs[i]; // varids of args are [0 ... arity)
     }
+
+    eth_insn *pop = eth_insn_pop(fnargs, arity);
+    eth_write_insn(fntape, pop);
+
+    for (int i = 0; i < arity; ++i)
+      fnbldr->vinfo[fnargs[i]]->creatloc = pop;
   }
 
   // declare captures [arity, arity + ncap):
   if (ncap > 0)
   {
-    eth_write_insn(fntape, eth_insn_cap(arity, ncap));
+    int fncaps[ncap];
     for (int i = 0; i < ncap; ++i)
     {
-      int vid = new_val(fnbldr, RC_RULES_DISABLE);
-      fnbldr->vars[ir->fn.capvars[i]] = vid;
-      fnbldr->vinfo[vid]->cval = bldr->vinfo[caps[i]]->cval;
-      fnbldr->vinfo[vid]->type = bldr->vinfo[caps[i]]->type;
+      fncaps[i] = new_val(fnbldr, RC_RULES_DISABLE);
+      fnbldr->vars[ir->fn.capvars[i]] = fncaps[i];
+      fnbldr->vinfo[fncaps[i]]->cval = bldr->vinfo[caps[i]]->cval;
+      fnbldr->vinfo[fncaps[i]]->type = bldr->vinfo[caps[i]]->type;
     }
+    eth_write_insn(fntape, eth_insn_cap(fncaps, ncap));
   }
 
   // build body:
@@ -404,15 +497,15 @@ assert_number(ssa_builder *bldr, eth_ssa_tape *tape, int vid, bool *e)
   }
 }
 
-typedef struct { int vid; eth_type *oldtype; eth_t oldcval; } pat_save;
-typedef cod_vec(pat_save) pat_save_vec;
-
 static eth_ssa_pattern*
 build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
-    pat_save_vec *savs, bool *e)
+    bool *e)
 {
   switch (pat->tag)
   {
+    case ETH_PATTERN_DUMMY:
+      return eth_ssa_dummy_pattern();
+
     case ETH_PATTERN_IDENT:
     {
       bldr->vars[pat->ident.varid] = expr;
@@ -444,21 +537,14 @@ build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
       else
         dotest = true;
 
-      pat_save save = {
-        .vid = expr,
-        .oldtype = bldr->vinfo[expr]->type,
-        .oldcval = bldr->vinfo[expr]->cval,
-      };
-      cod_vec_push(*savs, save);
-      bldr->vinfo[expr]->type = pat->unpack.type;
+      set_type(bldr, expr, pat->unpack.type);
 
       eth_ssa_pattern *pats[pat->unpack.n];
       int vids[pat->unpack.n];
       for (int i = 0; i < pat->unpack.n; ++i)
       {
         vids[i] = new_val(bldr, RC_RULES_DISABLE);
-        pats[i] = build_pattern(bldr, pat->unpack.subpats[i], vids[i], true,
-            savs, e);
+        pats[i] = build_pattern(bldr, pat->unpack.subpats[i], vids[i], true, e);
       }
 
       return eth_ssa_unpack_pattern(pat->unpack.type, pat->unpack.offs, vids,
@@ -479,14 +565,8 @@ build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
         *e = 1;
       }
 
-      pat_save save = {
-        .vid = expr,
-        .oldtype = bldr->vinfo[expr]->type,
-        .oldcval = bldr->vinfo[expr]->cval,
-      };
-      cod_vec_push(*savs, save);
-      bldr->vinfo[expr]->type = pat->constant.val->type;
-      bldr->vinfo[expr]->cval = pat->constant.val;
+      set_cval(bldr, expr, pat->constant.val);
+      set_type(bldr, expr, pat->constant.val->type);
 
       return eth_ssa_constant_pattern(pat->constant.val, true);
     }
@@ -498,8 +578,7 @@ build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
       for (int i = 0; i < pat->record.n; ++i)
       {
         vids[i] = new_val(bldr, RC_RULES_DISABLE);
-        pats[i] = build_pattern(bldr, pat->record.subpats[i], vids[i], true,
-            savs, e);
+        pats[i] = build_pattern(bldr, pat->record.subpats[i], vids[i], true, e);
       }
       return eth_ssa_record_pattern(pat->record.ids, vids, pats, pat->record.n);
     }
@@ -590,10 +669,10 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
       int cond = build(bldr, tape, ir->iff.cond, false, e);
 
       eth_ssa_tape *thentape = eth_create_ssa_tape();
-      int thenret = build(bldr, thentape, ir->iff.thenbr, istc, e);
+      int thenret = build_logical_block(bldr, thentape, ir->iff.thenbr, istc, e);
 
       eth_ssa_tape *elsetape = eth_create_ssa_tape();
-      int elseret = build(bldr, elsetape, ir->iff.elsebr, istc, e);
+      int elseret = build_logical_block(bldr, elsetape, ir->iff.elsebr, istc, e);
 
       int ret;
       eth_insn *loc = NULL;
@@ -620,11 +699,11 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
     case ETH_IR_TRY:
     {
       eth_ssa_tape *trytape = eth_create_ssa_tape();
-
+      // ---
       bldr->istry++;
       int oldid = bldr->tryid;
       int tryid = bldr->tryid = new_try(bldr);
-      int tryret = build(bldr, trytape, ir->try.trybr, false, e);
+      int tryret = build_logical_block(bldr, trytape, ir->try.trybr, false, e);
       bldr->istry--;
       bldr->tryid = oldid;
 
@@ -636,7 +715,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
       bldr->vars[ir->try.exnvar] = exnvid;
       eth_write_insn(cchtape, getexn);
       // ---
-      int cchret = build(bldr, cchtape, ir->try.catchbr, istc, e);
+      int cchret = build_logical_block(bldr, cchtape, ir->try.catchbr, istc, e);
 
       int ret;
       eth_insn *loc = NULL;
@@ -807,37 +886,28 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
       if (ir->match.pat->tag == ETH_PATTERN_IDENT)
         // optimize trivial identifier-match
       {
-        eth_ssa_pattern *pat = build_pattern(bldr, ir->match.pat, cond, false,
-            NULL, e);
+        eth_ssa_pattern *pat = build_pattern(bldr, ir->match.pat, cond, false, e);
         eth_destroy_ssa_pattern(pat);
         return build(bldr, tape, ir->match.thenbr, istc, e);
       }
       else
       {
-        pat_save_vec savs;
-        cod_vec_init(savs);
+        int lbstart = begin_logical_block(bldr);
         // --
         int n1 = bldr->vilen;
-        eth_ssa_pattern *pat = build_pattern(bldr, ir->match.pat, cond, false,
-            &savs, e);
+        eth_ssa_pattern *pat = build_pattern(bldr, ir->match.pat, cond, false, e);
         int n2 = bldr->vilen;
         // --
+        eth_ssa_tape *thentape = eth_create_ssa_tape();
         eth_insn *ctor = eth_insn_nop();
         ctor->flag = ETH_IFLAG_NOBEFORE;
-        // --
-        eth_ssa_tape *thentape = eth_create_ssa_tape();
         eth_write_insn(thentape, ctor);
         int thenret = build(bldr, thentape, ir->match.thenbr, istc, e);
         // --
-        // TODO: this recovery must be a separate function
-        cod_vec_iter(savs, i, x,
-            bldr->vinfo[x.vid]->type = x.oldtype;
-            bldr->vinfo[x.vid]->cval = x.oldcval;
-        );
-        cod_vec_destroy(savs);
+        end_logical_block(bldr, lbstart);
 
         eth_ssa_tape *elsetape = eth_create_ssa_tape();
-        int elseret = build(bldr, elsetape, ir->match.elsebr, istc, e);
+        int elseret = build_logical_block(bldr, elsetape, ir->match.elsebr, istc, e);
 
         int ret;
         eth_insn *loc = NULL;
@@ -1489,7 +1559,7 @@ eth_destroy_ssa(eth_ssa *ssa)
 static eth_ssa*
 build_body(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *body, bool *e)
 {
-  int fnret = build(bldr, tape, body, true, e);
+  int fnret = build_logical_block(bldr, tape, body, true, e);
   eth_write_insn(tape, eth_insn_ret(fnret));
   insert_rc(bldr, tape->head);
   return create_ssa(tape->head, bldr->vilen, bldr->ntries);
@@ -1556,7 +1626,7 @@ eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
 
   ssa_builder *bldr = create_ssa_builder(ir->nvars);
   eth_ssa_tape *tape = eth_create_ssa_tape();
-  int ret = build(bldr, tape, ir->body, false, &e);
+  int ret = build_logical_block(bldr, tape, ir->body, false, &e);
   if (e)
   {
     eth_destroy_insn_list(tape->head);

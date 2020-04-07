@@ -972,6 +972,7 @@ eth_print_location(eth_location *loc, FILE *stream);
 //                         ABSTRACT SYNTAX TREE
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 typedef enum {
+  ETH_PATTERN_DUMMY,
   ETH_PATTERN_IDENT,
   ETH_PATTERN_UNPACK,
   ETH_PATTERN_CONSTANT,
@@ -990,6 +991,9 @@ struct eth_ast_pattern {
     struct { char **fields; eth_ast_pattern **subpats; int n; } record;
   };
 };
+
+eth_ast_pattern*
+eth_ast_dummy_pattern(void);
 
 eth_ast_pattern*
 eth_ast_ident_pattern(const char *ident);
@@ -1028,6 +1032,7 @@ typedef enum {
   ETH_AST_OR,
   ETH_AST_TRY,
   ETH_AST_MKRCRD,
+  ETH_AST_MULTIMATCH,
 } eth_ast_tag;
 
 typedef enum {
@@ -1035,6 +1040,19 @@ typedef enum {
   ETH_TOPLVL_THEN,
   ETH_TOPLVL_ELSE,
 } eth_toplvl_flag;
+
+typedef struct {
+  int h, w;
+  eth_ast_pattern ***tab;
+  eth_ast **exprs;
+} eth_match_table;
+
+eth_match_table*
+eth_create_match_table(eth_ast_pattern **const *tab, eth_ast *const exprs[],
+    int h, int w);
+
+void
+eth_destroy_match_table(eth_match_table *table);
 
 struct eth_ast {
   eth_ast_tag tag;
@@ -1060,6 +1078,7 @@ struct eth_ast {
     struct { bool isctype; union { eth_type *ctype; char *str; } type;
              char **fields; eth_ast **vals; int n; }
       mkrcrd;
+    struct { eth_match_table *table; eth_ast **exprs; } multimatch;
   };
   eth_location *loc;
 };
@@ -1139,6 +1158,9 @@ eth_ast*
 eth_ast_make_record_with_type(eth_type *type, char *const fields[],
    eth_ast *const vals[], int n);
 
+eth_ast*
+eth_ast_multimatch(eth_match_table *table, eth_ast *const exprs[]);
+
 typedef struct eth_scanner eth_scanner;
 
 eth_scanner* __attribute__((malloc))
@@ -1167,6 +1189,9 @@ struct eth_ir_pattern {
     struct { size_t *ids; int n; eth_ir_pattern **subpats; } record;
   };
 };
+
+eth_ir_pattern*
+eth_ir_dummy_pattern(void);
 
 eth_ir_pattern*
 eth_ir_ident_pattern(int varid);
@@ -1420,6 +1445,9 @@ struct eth_ssa_pattern {
   };
 };
 
+eth_ssa_pattern*
+eth_ssa_dummy_pattern(void);
+
 eth_ssa_pattern* __attribute__((malloc))
 eth_ssa_ident_pattern(int vid);
 
@@ -1492,8 +1520,8 @@ struct eth_insn {
     struct { int arity, *caps, ncap, *movs, nmov; eth_ir *ir; eth_ssa *ssa; }
       finfn;
     struct { int arity; } alcfn;
-    struct { int n; } pop;
-    struct { int n; } cap;
+    struct { int *vids, n; } pop;
+    struct { int *vids, n; } cap;
     struct { int *clos, nclos, *wrefs, nwref; } mkscp;
     struct { int tryid, vid; } catch;
     struct { int id, likely; eth_insn *trybr, *catchbr; } try;
@@ -1568,10 +1596,10 @@ eth_insn_finfn(int c, int arity, int *caps, int ncap, int *movs, int nmov,
     eth_ir *ir, eth_ssa *ssa);
 
 eth_insn* __attribute__((malloc))
-eth_insn_pop(int vid0, int n);
+eth_insn_pop(int const vids[], int n);
 
 eth_insn* __attribute__((malloc))
-eth_insn_cap(int vid0, int n);
+eth_insn_cap(int const vids[], int n);
 
 eth_insn* __attribute__((malloc))
 eth_insn_mkscp(int *clos, int nclos, int *wrefs, int nwref);
