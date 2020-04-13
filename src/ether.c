@@ -4,19 +4,19 @@
 #include <assert.h>
 #include <limits.h>
 #include <string.h>
+#include <sys/resource.h>
 
-#define STACK_SIZE 0x100000
+#define STACK_SIZE 0x1000
 
 ETH_MODULE("ether")
 
-eth_t *eth_sp;
-
-int eth_nargs;
-
+int eth_nargs = 0;
 eth_function *eth_this;
+eth_t *eth_stack, *eth_reg_stack;
+eth_t *eth_sp, *eth_reg_sp;
 
-static
-eth_t *g_stack;
+ssize_t eth_c_stack_size;
+char *eth_c_stack_start;
 
 
 const char*
@@ -112,7 +112,7 @@ eth_get_siphash_key(void)
 
 
 void
-eth_init(void)
+eth_init(const int *argc)
 {
   if (eth_get_prefix() == NULL)
   {
@@ -121,8 +121,13 @@ eth_init(void)
   }
 
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-  g_stack = malloc(sizeof(eth_t) * STACK_SIZE);
-  eth_sp = g_stack + STACK_SIZE;
+  eth_stack = malloc(sizeof(eth_t) * STACK_SIZE);
+  eth_sp = eth_stack + STACK_SIZE;
+
+  struct rlimit limit;
+  getrlimit(RLIMIT_STACK, &limit);
+  eth_c_stack_size = limit.rlim_cur / 2; // ...I don't know...
+  eth_c_stack_start = (char*)argc;
 
   extern void _eth_init_alloc(void);
   _eth_init_alloc();
@@ -133,8 +138,8 @@ eth_init(void)
   extern void _eth_init_number_type(void);
   _eth_init_number_type();
 
-  extern void _eth_init_string_type(void);
-  _eth_init_string_type();
+  extern void _eth_init_strings(void);
+  _eth_init_strings();
 
   extern void _eth_init_boolean_type(void);
   _eth_init_boolean_type();
@@ -157,6 +162,9 @@ eth_init(void)
   extern void _eth_init_record_types(void);
   _eth_init_record_types();
 
+  extern void _eth_init_file_type(void);
+  _eth_init_file_type();
+
   extern void _eth_init_builtins(void);
   _eth_init_builtins();
 }
@@ -168,12 +176,15 @@ eth_cleanup(void)
   _eth_cleanup_builtins();
 
   eth_destroy_type(eth_number_type);
-  eth_destroy_type(eth_string_type);
   eth_destroy_type(eth_boolean_type);
   eth_destroy_type(eth_nil_type);
   eth_destroy_type(eth_pair_type);
   eth_destroy_type(eth_function_type);
   eth_destroy_type(eth_exception_type);
+  eth_destroy_type(eth_file_type);
+
+  extern void _eth_cleanup_strings(void);
+  _eth_cleanup_strings();
 
   extern void _eth_cleanup_symbol_type(void);
   _eth_cleanup_symbol_type();
@@ -187,9 +198,10 @@ eth_cleanup(void)
   extern void _eth_cleanup_alloc(void);
   _eth_cleanup_alloc();
 
-  if (eth_sp - g_stack != STACK_SIZE)
+  if (eth_sp - eth_stack != STACK_SIZE)
     eth_warning("stack pointer is not on the top of the stack");
-  free(g_stack);
+  free(eth_stack);
+  free(eth_reg_stack);
 }
 
 const char*

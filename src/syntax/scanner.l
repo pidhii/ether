@@ -64,6 +64,12 @@ OPERATOR [-+%^.$:!<>*/=&|]+
 <STRING>"\\t"  { yylval->character = '\t'; return CHAR; }
 <STRING>"\\v"  { yylval->character = '\v'; return CHAR; }
 <STRING>"\\?"  { yylval->character = '\?'; return CHAR; }
+<STRING>"\\x"[0-9a-fA-F]{1,2} {
+  char *endptr;
+  yylval->character = strtol(yytext + 2, &endptr, 16);
+  assert(*endptr == '\0');
+  return CHAR;
+}
 <STRING>"\\%"  { yylval->character = '%'; return CHAR; }
 <STRING>"\\\"" { yylval->character = '"'; return CHAR; }
 <STRING>\"     { BEGIN(INITIAL); return '"'; }
@@ -102,6 +108,7 @@ nil   { yylval->constant = eth_nil;   return CONST; }
 true  { yylval->constant = eth_true;  return CONST; }
 false { yylval->constant = eth_false; return CONST; }
 
+"|"     |
 "_"     |
 "%"     |
 "^"     |
@@ -123,7 +130,9 @@ false { yylval->constant = eth_false; return CONST; }
 "=="    { return EQ; }
 "/="    { return NE; }
 is      { return IS; }
+equal   { return EQUAL; }
 "->"    { return RARROW; }
+"<-"    { return LARROW; }
 "&&"    { return OPAND; }
 "||"    { return OPOR; }
 mod     { return MOD; }
@@ -137,6 +146,7 @@ ashr    { return ASHR; }
 not     { return NOT; }
 lnot    { return LNOT; }
 "++"    { return PPLUS; }
+".."    { return DDOT; }
 "|>"    { return PIPE; }
 "."\s*"(" { return DOT_OPEN; }
 

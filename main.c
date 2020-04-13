@@ -106,7 +106,7 @@ main(int argc, char **argv)
     eth_debug("reading script from standard input");
 
   eth_debug("init");
-  eth_init();
+  eth_init(&argc);
 
   eth_debug("parse input");
   eth_ast *ast;

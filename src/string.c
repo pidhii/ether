@@ -7,6 +7,8 @@
 
 eth_type *eth_string_type;
 
+static eth_t g_chars[256];
+
 static void
 destroy_string(eth_type *type, eth_t x)
 {
@@ -23,7 +25,20 @@ write_string(eth_type *type, eth_t x, FILE *out)
     if (isprint((int)*p))
       putc(*p, out);
     else
-      fprintf(out, "%#hhx", *p);
+    {
+      switch (*p)
+      {
+        case '\0': fputs("\\0", out); break;
+        case '\a': fputs("\\a", out); break;
+        case '\b': fputs("\\b", out); break;
+        case '\f': fputs("\\f", out); break;
+        case '\n': fputs("\\n", out); break;
+        case '\r': fputs("\\r", out); break;
+        case '\t': fputs("\\t", out); break;
+        case '\v': fputs("\\v", out); break;
+        default: fprintf(out, "\\%#hhx", *p);
+      }
+    }
   }
   putc('"', out);
 }
@@ -34,13 +49,38 @@ display_string(eth_type *type, eth_t x, FILE *out)
   fputs(ETH_STRING(x)->cstr, out);
 }
 
+static bool
+string_equal(eth_type *type, eth_t x, eth_t y)
+{
+  return eth_str_len(x) == eth_str_len(y)
+     and strcmp(eth_str_cstr(x), eth_str_cstr(y)) == 0;
+}
+
 void
-_eth_init_string_type(void)
+_eth_init_strings(void)
 {
   eth_string_type = eth_create_type("string");
   eth_string_type->destroy = destroy_string;
   eth_string_type->write = write_string;
   eth_string_type->display = display_string;
+  eth_string_type->equal = string_equal;
+
+  for (int i = 0; i < 256; ++i)
+  {
+    char *s = malloc(2);
+    s[0] = i;
+    s[1] = '\0';
+    g_chars[i] = eth_create_string_from_ptr2(s, 1);
+    eth_ref(g_chars[i]);
+  }
+}
+
+void
+_eth_cleanup_strings(void)
+{
+  for (int i = 0; i < 256; ++i)
+    eth_unref(g_chars[i]);
+  eth_destroy_type(eth_string_type);
 }
 
 eth_t
@@ -75,5 +115,11 @@ eth_create_string2(const char *str, int len)
   memcpy(mystr, str, len);
   mystr[len] = 0;
   return eth_create_string_from_ptr2(mystr, len);
+}
+
+eth_t
+eth_create_string_from_char(char c)
+{
+  return g_chars[(uint8_t)c];
 }
 

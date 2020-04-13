@@ -284,6 +284,11 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
         }
       }
 
+      // aliasing:
+      int alias = new_vid(bldr);
+      if (pat->unpack.alias)
+        eth_prepend_var(bldr->vars, eth_dyn_var(pat->unpack.alias, alias));
+
       int n = pat->unpack.n;
       int offs[n];
       eth_ir_pattern *pats[n];
@@ -301,7 +306,7 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
         offs[i] = fld->offs;
         pats[i] = build_pattern(bldr, pat->unpack.subpats[i], loc, e);
       }
-      return eth_ir_unpack_pattern(type, offs, pats, n);
+      return eth_ir_unpack_pattern(alias, type, offs, pats, n);
     }
 
     case ETH_PATTERN_CONSTANT:
@@ -309,6 +314,11 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
 
     case ETH_PATTERN_RECORD:
     {
+      // aliasing:
+      int alias = new_vid(bldr);
+      if (pat->record.alias)
+        eth_prepend_var(bldr->vars, eth_dyn_var(pat->record.alias, alias));
+
       int n = pat->record.n;
       size_t ids[n];
       eth_ir_pattern *pats[n];
@@ -317,7 +327,7 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
         ids[i] = eth_get_symbol_id(eth_sym(pat->record.fields[i]));
         pats[i] = build_pattern(bldr, pat->record.subpats[i], loc, e);
       }
-      return eth_ir_record_pattern(ids, pats, n);
+      return eth_ir_record_pattern(alias, ids, pats, n);
     }
   }
 
@@ -358,7 +368,7 @@ build_let(ir_builder *bldr, int idx, eth_ast *ast, eth_ir_node *const vals[],
   }
   else
   {
-    int nvars = bldr->nvars - nvars0;
+    int nvars = bldr->vars->len - nvars0;
     eth_ir_node *ret = build(bldr, ast->let.body, e);
     eth_pop_var(bldr->vars, nvars);
     return ret;
@@ -389,16 +399,16 @@ build_letrec(ir_builder *bldr, int idx, eth_ast *ast, int nvars0, int nvars,
   }
   else
   {
-    nvars = bldr->nvars - nvars0;
+    nvars = bldr->vars->len - nvars0;
 
     int varids[nvars];
-    for (int i = 0; i < nvars; ++i)
-      varids[i] = nvars0 + i;
+    eth_var *it = bldr->vars->head;
+    for (int i = nvars-1; i >= 0; --i, it = it->next)
+      varids[i] = it->vid;
 
     eth_ir_node *body = build(bldr, ast->letrec.body, e);
     eth_ir_node *ret = eth_ir_endfix(varids, nvars, body);
 
-    eth_pop_var(bldr->vars, nvars);
     return ret;
   }
 }
@@ -453,6 +463,7 @@ constexpr_binop(eth_binop op, eth_t lhs, eth_t rhs, eth_location *loc, int *e)
     }
 
     case ETH_IS: ret = eth_boolean(lhs == rhs); break;
+    case ETH_EQUAL: ret = eth_boolean(eth_equal(lhs, rhs)); break;
     case ETH_CONS: ret = eth_cons(lhs, rhs); break;
   }
 
@@ -534,24 +545,27 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       eth_ir_node *vals[ast->let.n];
       for (int i = 0; i < ast->let.n; ++i)
         vals[i] = build(bldr, ast->let.vals[i], e);
-      return build_let(bldr, 0, ast, vals, bldr->nvars, e);
+      return build_let(bldr, 0, ast, vals, bldr->vars->len, e);
     }
 
     case ETH_AST_LETREC:
     {
       eth_ir_pattern *pats[ast->letrec.n];
 
-      int n1 = bldr->nvars;
+      int n1 = bldr->vars->len;
       for (int i = 0; i < ast->letrec.n; ++i)
         pats[i] = build_pattern(bldr, ast->letrec.pats[i], ast->loc, e);
-      int n2 = bldr->nvars;
+      int n2 = bldr->vars->len;
       int nvars = n2 - n1;
 
       eth_ir_node *body = build_letrec(bldr, 0, ast, n1, nvars, pats, e);
 
       int varids[nvars];
-      for (int i = 0; i < nvars; ++i)
-        varids[i] = n1 + i;
+      eth_var *it = bldr->vars->head;
+      for (int i = nvars-1; i >= 0; --i, it = it->next)
+        varids[i] = it->vid;
+      eth_pop_var(bldr->vars, nvars);
+
       return eth_ir_startfix(varids, nvars, body);
     }
 

@@ -124,6 +124,18 @@ write_tuple(eth_type *type, eth_t x, FILE *stream)
   putc(')', stream);
 }
 
+static bool
+record_equal(eth_type *type, eth_t x, eth_t y)
+{
+  int n = eth_record_size(type);
+  while (n--)
+  {
+    if (not eth_equal(eth_tup_get(x, n), eth_tup_get(y, n)))
+      return false;
+  }
+  return true;
+}
+
 eth_type*
 eth_tuple_type(size_t n)
 {
@@ -168,6 +180,7 @@ eth_tuple_type(size_t n)
       default: type->destroy = eth_destroy_record_hn; break;
     }
     type->write = write_tuple;
+    type->equal = record_equal;
     type->flag = ETH_TFLAG_TUPLE;
 
     int ok = cod_hash_map_insert(g_tuptab, key, n, type, NULL);
@@ -258,6 +271,7 @@ eth_record_type(char *const fields[], size_t n)
     }
     type->flag = ETH_TFLAG_RECORD;
     type->write = write_record;
+    type->equal = record_equal;
 
     int ok = cod_hash_map_insert(g_rectab, totstr, hash, type, NULL);
     assert(ok);

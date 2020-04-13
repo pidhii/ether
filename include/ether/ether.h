@@ -110,7 +110,7 @@ eth_get_siphash_key(void);
 
 
 void
-eth_init(void);
+eth_init(const int *argc);
 
 void
 eth_cleanup(void);
@@ -139,6 +139,7 @@ typedef enum {
   ETH_NE,
   // ---
   ETH_IS,
+  ETH_EQUAL,
   // ---
   ETH_CONS,
 } eth_binop;
@@ -160,10 +161,12 @@ eth_unop_sym(eth_unop op);
 const char*
 eth_unop_name(eth_unop op);
 
-
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                            CALL PROPAGATION
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+ETH_EXTERN
+eth_t *eth_stack;
+
 ETH_EXTERN
 eth_t *eth_sp;
 
@@ -172,6 +175,12 @@ int eth_nargs;
 
 ETH_EXTERN
 eth_function *eth_this;
+
+ETH_EXTERN
+ssize_t eth_c_stack_size;
+
+ETH_EXTERN
+char *eth_c_stack_start;
 
 static inline void
 eth_reserve_stack(int n)
@@ -185,6 +194,13 @@ eth_pop_stack(int n)
   eth_sp += n;
 }
 
+static inline bool
+eth_reserve_c_stack(ssize_t size)
+{
+  char x;
+  ssize_t avsize = eth_c_stack_size - (eth_c_stack_start - &x);
+  return avsize > size;
+}
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                             ALLOCATORS
@@ -265,8 +281,10 @@ typedef struct {
 struct eth_type {
   char *name;
   void (*destroy)(eth_type *type, eth_t x);
+
   void (*write)(eth_type *type, eth_t x, FILE *out);
   void (*display)(eth_type *type, eth_t x, FILE *out);
+  bool (*equal)(eth_type *type, eth_t x, eth_t y);
 
   uint8_t flag;
 
@@ -330,6 +348,9 @@ eth_write(eth_t x, FILE *out);
 
 void
 eth_display(eth_t x, FILE *out);
+
+bool
+eth_equal(eth_t x, eth_t y);
 
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
@@ -486,12 +507,14 @@ typedef float eth_number_t;
 
 ETH_EXTERN
 eth_type *eth_number_type;
+#define eth_is_num(x) ((x)->type == eth_number_type)
 
 typedef struct {
   eth_header header;
   eth_number_t val;
 } eth_number;
 #define ETH_NUMBER(x) ((eth_number*)(x))
+#define eth_num_val(x) (ETH_NUMBER(x)->val)
 
 static inline eth_t __attribute__((malloc))
 eth_create_number(eth_number_t val)
@@ -594,6 +617,7 @@ eth_create_exception(eth_t what);
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 ETH_EXTERN
 eth_type *eth_string_type;
+#define eth_is_str(x) ((x)->type == eth_string_type)
 
 typedef struct {
   eth_header header;
@@ -616,6 +640,9 @@ eth_create_string_from_ptr(char *cstr);
 
 eth_t __attribute__((malloc))
 eth_create_string_from_ptr2(char *cstr, int len);
+
+eth_t
+eth_create_string_from_char(char c);
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                               boolean
@@ -652,6 +679,7 @@ eth_t eth_nil;
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 ETH_EXTERN
 eth_type *eth_pair_type;
+#define eth_is_pair(x) ((x)->type == eth_pair_type)
 
 typedef struct {
   eth_header header;
@@ -659,6 +687,16 @@ typedef struct {
   eth_t cdr;
 } eth_pair;
 #define ETH_PAIR(x) ((eth_pair*)(x))
+
+static inline eth_t __attribute__((malloc))
+eth_cons_noref(eth_t car, eth_t cdr)
+{
+  eth_pair *pair = eth_alloc_h2();
+  eth_init_header(pair, eth_pair_type);
+  pair->car = car;
+  pair->cdr = cdr;
+  return ETH(pair);
+}
 
 static inline eth_t __attribute__((malloc))
 eth_cons(eth_t car, eth_t cdr)
@@ -860,6 +898,33 @@ eth_destroy_record_h6(eth_type *type, eth_t x);
 void
 eth_destroy_record_hn(eth_type *type, eth_t x);
 
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                                 file
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+ETH_EXTERN
+eth_type *eth_file_type;
+
+ETH_EXTERN
+eth_t eth_stdin, eth_stdout, eth_stderr;
+
+eth_t
+eth_open(const char *path, const char *mod);
+
+eth_t
+eth_open_pipe(const char *command, const char *mod);
+
+int
+eth_is_open(eth_t x);
+
+int
+eth_is_pipe(eth_t x);
+
+int
+eth_close(eth_t x);
+
+FILE*
+eth_get_file_stream(eth_t x);
+
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                       MODULES AND ENVIRONMENT
@@ -982,13 +1047,14 @@ typedef enum {
 typedef struct eth_ast_pattern eth_ast_pattern;
 struct eth_ast_pattern {
   eth_pattern_tag tag;
+  int rc;
   union {
     struct { char *str; bool pub; } ident;
     struct { bool isctype; union { char *str; eth_type *ctype; } type; char **fields;
-             eth_ast_pattern **subpats; int n; }
+             eth_ast_pattern **subpats; int n; char *alias; }
       unpack;
     struct { eth_t val; } constant;
-    struct { char **fields; eth_ast_pattern **subpats; int n; } record;
+    struct { char **fields; eth_ast_pattern **subpats; int n; char *alias; } record;
   };
 };
 
@@ -1013,7 +1079,16 @@ eth_ast_pattern*
 eth_ast_record_pattern(char *const fields[], eth_ast_pattern *pats[], int n);
 
 void
-eth_destroy_ast_pattern(eth_ast_pattern *pat);
+eth_set_pattern_alias(eth_ast_pattern *pat, const char *alias);
+
+void
+eth_ref_ast_pattern(eth_ast_pattern *pat);
+
+void
+eth_unref_ast_pattern(eth_ast_pattern *pat);
+
+void
+eth_drop_ast_pattern(eth_ast_pattern *pat);
 
 typedef enum {
   ETH_AST_CVAL,
@@ -1047,12 +1122,12 @@ typedef struct {
   eth_ast **exprs;
 } eth_match_table;
 
-eth_match_table*
-eth_create_match_table(eth_ast_pattern **const *tab, eth_ast *const exprs[],
-    int h, int w);
+/*eth_match_table**/
+/*eth_create_match_table(eth_ast_pattern **const *tab, eth_ast *const exprs[],*/
+    /*int h, int w);*/
 
-void
-eth_destroy_match_table(eth_match_table *table);
+/*void*/
+/*eth_destroy_match_table(eth_match_table *table);*/
 
 struct eth_ast {
   eth_ast_tag tag;
@@ -1184,9 +1259,10 @@ struct eth_ir_pattern {
   eth_pattern_tag tag;
   union {
     struct { int varid; } ident;
-    struct { eth_type *type; int n, *offs; eth_ir_pattern **subpats; } unpack;
+    struct { eth_type *type; int n, *offs, varid; eth_ir_pattern **subpats; }
+      unpack;
     struct { eth_t val; } constant;
-    struct { size_t *ids; int n; eth_ir_pattern **subpats; } record;
+    struct { size_t *ids; int n, varid; eth_ir_pattern **subpats; } record;
   };
 };
 
@@ -1197,13 +1273,15 @@ eth_ir_pattern*
 eth_ir_ident_pattern(int varid);
 
 eth_ir_pattern*
-eth_ir_unpack_pattern(eth_type *type, int offs[], eth_ir_pattern *pats[], int n);
+eth_ir_unpack_pattern(int varid, eth_type *type, int offs[],
+    eth_ir_pattern *pats[], int n);
 
 eth_ir_pattern*
 eth_ir_constant_pattern(eth_t val);
 
 eth_ir_pattern*
-eth_ir_record_pattern(size_t const ids[], eth_ir_pattern *const pats[], int n);
+eth_ir_record_pattern(int varid, size_t const ids[],
+    eth_ir_pattern *const pats[], int n);
 
 void
 eth_destroy_ir_pattern(eth_ir_pattern *pat);
@@ -1714,6 +1792,7 @@ typedef enum {
   ETH_OPC_NE,
   // ---
   ETH_OPC_IS,
+  ETH_OPC_EQUAL,
   // ---
   ETH_OPC_CONS,
 

@@ -109,6 +109,7 @@ new_reg(bc_builder *bldr, int vid)
 static int
 get_reg(bc_builder *bldr, int vid)
 {
+  assert(vid >= 0);
   return bldr->vmap[vid];
 }
 
@@ -471,6 +472,7 @@ MAKE_BINOP(ge  , GE)
 MAKE_BINOP(eq  , EQ)
 MAKE_BINOP(ne  , NE)
 MAKE_BINOP(is  , IS)
+MAKE_BINOP(equal, EQUAL)
 MAKE_BINOP(cons, CONS)
 
 #define MAKE_UNOP(name, op)                        \
@@ -517,8 +519,9 @@ build_pattern(bc_builder *bldr, eth_ssa_pattern *pat, int expr, int_vec *jmps)
       {
         if (pat->unpack.subpat[i]->tag == ETH_PATTERN_DUMMY)
           continue;
-        write_load(bldr, pat->unpack.vids[i], expr, pat->unpack.offs[i]);
-        build_pattern(bldr, pat->unpack.subpat[i], pat->unpack.vids[i], jmps);
+        int oreg = new_reg(bldr, pat->unpack.vids[i]);
+        write_load(bldr, oreg, expr, pat->unpack.offs[i]);
+        build_pattern(bldr, pat->unpack.subpat[i], oreg, jmps);
       }
 
       break;
@@ -538,11 +541,15 @@ build_pattern(bc_builder *bldr, eth_ssa_pattern *pat, int expr, int_vec *jmps)
     case ETH_PATTERN_RECORD:
     {
       assert(pat->record.n > 0);
+      int n = pat->record.n;
+      int oregs[n];
+      for (int i = 0; i < n; ++i)
+        oregs[i] = new_reg(bldr, pat->record.vids[i]);
 
-      if (pat->record.n == 1)
-        write_loadrcrd1(bldr, pat->record.vids[0], expr, pat->record.ids[0]);
+      if (n == 1)
+        write_loadrcrd1(bldr, oregs[0], expr, pat->record.ids[0]);
       else
-        write_loadrcrd(bldr, pat->record.ids, pat->record.vids, pat->record.n, expr);
+        write_loadrcrd(bldr, pat->record.ids, oregs, n, expr);
 
       if (pat->record.dotest)
       {
@@ -552,8 +559,8 @@ build_pattern(bc_builder *bldr, eth_ssa_pattern *pat, int expr, int_vec *jmps)
       else
         eth_debug("ommiting test for record");
 
-      for (int i = 0; i < pat->record.n; ++i)
-        build_pattern(bldr, pat->record.subpat[i], pat->record.vids[i], jmps);
+      for (int i = 0; i < n; ++i)
+        build_pattern(bldr, pat->record.subpat[i], oregs[i], jmps);
 
       break;
     }
@@ -571,36 +578,60 @@ build(bc_builder *bldr, eth_insn *ssa)
         break;
 
       case ETH_INSN_CVAL:
-        write_cval(bldr, ip->out, ip->cval.val);
+        write_cval(bldr, new_reg(bldr, ip->out), ip->cval.val);
         break;
 
       case ETH_INSN_APPLY:
-        write_push(bldr, ip->apply.args, ip->apply.nargs);
-        write_apply(bldr, ip->out, ip->apply.fn);
+      {
+        int nargs = ip->apply.nargs;
+        int args[nargs];
+        for (int i = 0; i < nargs; ++i)
+          args[i] = get_reg(bldr, ip->apply.args[i]);
+        write_push(bldr, args, nargs);
+
+        int out = new_reg(bldr, ip->out);
+        int fn = get_reg(bldr, ip->apply.fn);
+        write_apply(bldr, out, fn);
         break;
+      }
 
       case ETH_INSN_APPLYTC:
-        write_push(bldr, ip->apply.args, ip->apply.nargs);
-        write_applytc(bldr, ip->out, ip->apply.fn);
+      {
+        int nargs = ip->apply.nargs;
+        int args[nargs];
+        for (int i = 0; i < nargs; ++i)
+          args[i] = get_reg(bldr, ip->apply.args[i]);
+        write_push(bldr, args, nargs);
+
+        int out = new_reg(bldr, ip->out);
+        int fn = get_reg(bldr, ip->apply.fn);
+        write_applytc(bldr, out, fn);
         break;
+      }
 
       case ETH_INSN_IF:
       {
-        // test:
         int_vec jmps;
         cod_vec_init(jmps);
+
+        // create PHI
+        if (ip->out >= 0)
+          new_reg(bldr, ip->out);
+
+        // test:
+        int cond = get_reg(bldr, ip->iff.cond);
         switch (ip->iff.test)
         {
           case ETH_TEST_NOTFALSE:
-            write_test(bldr, ip->iff.cond);
+            write_test(bldr, cond);
             goto if_notfalse;
 
           case ETH_TEST_TYPE:
-            write_testty(bldr, ip->iff.cond, ip->iff.type);
+            write_testty(bldr, cond, ip->iff.type);
             goto if_type;
 
           case ETH_TEST_MATCH:
-            build_pattern(bldr, ip->iff.pat, ip->iff.cond, &jmps);
+            build_pattern(bldr, ip->iff.pat, cond, &jmps);
             goto if_match;
         }
 
@@ -661,36 +692,44 @@ end_if:
       }
 
       case ETH_INSN_MOV:
-        write_dup(bldr, ip->out, ip->var.vid);
+        write_dup(bldr, get_reg(bldr, ip->out), get_reg(bldr, ip->var.vid));
         break;
 
       case ETH_INSN_REF:
-        write_ref(bldr, ip->var.vid);
+        write_ref(bldr, get_reg(bldr, ip->var.vid));
         break;
 
       case ETH_INSN_DEC:
-        write_dec(bldr, ip->var.vid);
+        write_dec(bldr, get_reg(bldr, ip->var.vid));
         break;
 
       case ETH_INSN_UNREF:
-        write_unref(bldr, ip->var.vid);
+        write_unref(bldr, get_reg(bldr, ip->var.vid));
         break;
 
       case ETH_INSN_DROP:
-        write_drop(bldr, ip->var.vid);
+        write_drop(bldr, get_reg(bldr, ip->var.vid));
         break;
 
       case ETH_INSN_RET:
-        write_ret(bldr, ip->var.vid);
+      {
+        if (ip->var.vid >= 0)
+          write_ret(bldr, get_reg(bldr, ip->var.vid));
         break;
+      }
 
       case ETH_INSN_BINOP:
         switch (ip->binop.op)
         {
-#define WRITE_BINOP(name, opc)                                         \
-          case ETH_##opc:                                              \
-            write_##name(bldr, ip->out, ip->binop.lhs, ip->binop.rhs); \
-            break;
+#define WRITE_BINOP(name, opc)                      \
+          case ETH_##opc:                           \
+          {                                         \
+            int out = new_reg(bldr, ip->out);       \
+            int lhs = get_reg(bldr, ip->binop.lhs); \
+            int rhs = get_reg(bldr, ip->binop.rhs); \
+            write_##name(bldr, out, lhs, rhs);      \
+            break;                                  \
+          }
           WRITE_BINOP(add, ADD)
           WRITE_BINOP(sub, SUB)
           WRITE_BINOP(mul, MUL)
@@ -714,60 +753,102 @@ end_if:
           WRITE_BINOP(ne, NE)
           // ---
           WRITE_BINOP(is, IS)
+          WRITE_BINOP(equal, EQUAL)
           // ---
           WRITE_BINOP(cons, CONS)
         }
         break;
 
       case ETH_INSN_UNOP:
+      {
+        int out = new_reg(bldr, ip->out);
+        int reg = get_reg(bldr, ip->unop.vid);
         switch (ip->unop.op)
         {
           case ETH_NOT:
-            write_not(bldr, ip->out, ip->unop.vid);
+            write_not(bldr, out, reg);
             break;
 
           case ETH_LNOT:
-            write_lnot(bldr, ip->out, ip->unop.vid);
+            write_lnot(bldr, out, reg);
             break;
         }
         break;
+      }
 
       case ETH_INSN_FN:
       {
         eth_bytecode *bc = eth_build_bytecode(ip->fn.ssa);
         eth_ir *ir = ip->fn.ir;
-        write_fn(bldr, ip->out, ip->fn.arity, ir, bc, ip->fn.caps, ip->fn.ncap);
+        int out = new_reg(bldr, ip->out);
+        int ncap = ip->fn.ncap;
+        int caps[ncap];
+        for (int i = 0; i < ncap; ++i)
+          caps[i] = get_reg(bldr, ip->fn.caps[i]);
+        write_fn(bldr, out, ip->fn.arity, ir, bc, caps, ncap);
         break;
       }
 
       case ETH_INSN_ALCFN:
-        write_alcfn(bldr, ip->out, ip->alcfn.arity);
+        write_alcfn(bldr, new_reg(bldr, ip->out), ip->alcfn.arity);
         break;
 
       case ETH_INSN_FINFN:
       {
         eth_bytecode *bc = eth_build_bytecode(ip->finfn.ssa);
         eth_ir *ir = ip->finfn.ir;
-        write_finfn(bldr, ip->out, ip->finfn.arity, ir, bc, ip->finfn.caps,
-            ip->finfn.ncap);
+        int out = get_reg(bldr, ip->out);
+        int ncap = ip->fn.ncap;
+        int caps[ncap];
+        for (int i = 0; i < ncap; ++i)
+          caps[i] = get_reg(bldr, ip->finfn.caps[i]);
+        write_finfn(bldr, out, ip->finfn.arity, ir, bc, caps, ncap);
         break;
       }
 
       case ETH_INSN_POP:
-        write_pop(bldr, ip->pop.vids[0], ip->pop.n);
+      {
+        int n = ip->pop.n;
+        int regs[n];
+        for (int i = 0; i < n; ++i)
+        {
+          regs[i] = new_reg(bldr, ip->pop.vids[i]);
+          assert(regs[i] == regs[0] + i);
+        }
+        write_pop(bldr, regs[0], n);
         break;
+      }
 
       case ETH_INSN_CAP:
-        write_cap(bldr, ip->cap.vids[0], ip->cap.n);
+      {
+        int n = ip->pop.n;
+        int regs[n];
+        for (int i = 0; i < n; ++i)
+        {
+          regs[i] = new_reg(bldr, ip->pop.vids[i]);
+          assert(regs[i] == regs[0] + i);
+        }
+        write_cap(bldr, regs[0], n);
         break;
+      }
 
       case ETH_INSN_MKSCP:
-        write_mkscp(bldr, ip->mkscp.clos, ip->mkscp.nclos, ip->mkscp.wrefs,
-            ip->mkscp.nwref);
+      {
+        int nwref = ip->mkscp.nwref;
+        int nclos = ip->mkscp.nclos;
+        int wrefs[nwref], clos[nclos];
+        for (int i = 0; i < nwref; ++i)
+          wrefs[i] = get_reg(bldr, ip->mkscp.wrefs[i]);
+        for (int i = 0; i < nclos; ++i)
+          clos[i] = get_reg(bldr, ip->mkscp.clos[i]);
+        write_mkscp(bldr, clos, nclos, wrefs, nwref);
         break;
+      }
 
       // TODO: handle likely/unlikely
       case ETH_INSN_TRY:
+        if (ip->out >= 0)
+          new_reg(bldr, ip->out);
         build(bldr, ip->try.trybr);
         int jmpidx = write_jmp(bldr, -1);
         int cchidx = jmpidx + 1;
@@ -778,7 +859,7 @@ end_if:
 
       case ETH_INSN_CATCH:
       {
-        write_setexn(bldr, ip->catch.vid);
+        write_setexn(bldr, get_reg(bldr, ip->catch.vid));
         int jmpidx = write_jmp(bldr, -1);
         catch_jmp jmp = { .pos = jmpidx, .tryid = ip->catch.tryid };
         cod_vec_push(bldr->cchjmps, jmp);
@@ -786,12 +867,19 @@ end_if:
       }
 
       case ETH_INSN_GETEXN:
-        write_getexn(bldr, ip->out);
+        write_getexn(bldr, new_reg(bldr, ip->out));
         break;
 
       case ETH_INSN_MKRCRD:
-        write_mkrcrd(bldr, ip->out, ip->mkrcrd.vids, ip->mkrcrd.type);
+      {
+        int n = ip->mkrcrd.type->nfields;
+        int out = new_reg(bldr, ip->out);
+        int regs[n];
+        for (int i = 0; i < n; ++i)
+          regs[i] = get_reg(bldr, ip->mkrcrd.vids[i]);
+        write_mkrcrd(bldr, out, regs, ip->mkrcrd.type);
         break;
+      }
     }
   }
 }

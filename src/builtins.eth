@@ -39,28 +39,187 @@ let pub (|>) x f = f x in
 let pub id x = x in
 let pub flip f x y = f y x in
 let pub const x = fn -> x in
+let pub curry f = fn x y -> f (x, y) in
+let pub uncurry f = fn (x, y) -> f x y in
 
 
-let pub reverse xs = revappend xs nil in
+let pub even? x = x mod 2 == 0 in
+let pub odd?  x = x mod 2 == 1 in
 
-let pub revmap f xs =
+let pub __builtin_inclusive_range from to =
+  let rec loop i acc =
+    if i < from then acc
+    else loop (i - 1) (i : acc)
+  in loop to nil
+in
+
+################################################################################
+#                                  IO
+#-------------------------------------------------------------------------------
+# - open
+# - open_pipe
+# - read_line
+# - read_line_of
+#
+let open = uncurry __builtin_open in
+let open_pipe = uncurry __builtin_open_pipe in
+
+let read_line! = read_line_of stdin in
+
+################################################################################
+#                                 String
+#-------------------------------------------------------------------------------
+# Constructors:
+# - concat (C)
+# - chr (C)
+#
+# Miscelenious:
+# - strlen (C)
+# - to_upper (C)
+# - to_lower (C)
+#
+# Stripping:
+# - chomp (C)
+# - chop (C)
+#
+# Comparison:
+# - strcmp (C)
+# - strcasecmp (C)
+#
+
+################################################################################
+#                                  List
+#-------------------------------------------------------------------------------
+# Constructors:
+# - range
+#
+# Miscelenious:
+# - rev_append (C)
+# - rev
+# - append
+# - flatten
+# - length (C)
+#
+# Iterators:
+# - rev_map
+# - map
+# - for_each
+# - rev_flat_map
+# - flat_map
+# - rev_filter_map
+# - filter_map
+# - fold_left
+# - fold_right
+# - scan_left
+# - scan_right
+#
+# Slicing:
+# - rev_take
+# - take
+# - drop
+#
+# Scanning:
+# - all?
+# - any?
+# - memq?
+#
+# Searching:
+# - rev_filter
+# - filter
+# - find
+# - partition
+#
+# Sorting:
+# - merge
+# - sort
+#
+
+let pub range from to =
+  let rec loop i acc =
+    if i < from then acc
+    else loop (i - 1) (i : acc)
+  in loop (to - 1) nil
+in
+
+let pub rev xs = rev_append xs nil in
+
+let rec pub append xs ys =
+  if let x:xs = xs then
+    x : append xs ys
+  else ys
+in
+
+let pub rev_map f xs =
   let rec loop xs acc =
     if let x:xs = xs then
       loop xs (f x : acc)
     else acc
   in loop xs nil
 in
+let pub map f xs = rev $ rev_map f xs in
 
-let pub map f xs = reverse $ revmap f xs in
-
-let rec pub foreach f xs =
+let rec pub for_each f xs =
   when let x:xs = xs then (
     f x;
-    foreach f xs
+    for_each f xs
   )
 in
 
-let pub revfilter f xs =
+let rec pub rev_flat_map f xs =
+  let rec loop ys xs acc =
+    if let y:ys = ys then
+      loop ys xs (y : acc)
+    else if let x:xs = xs then
+      loop (f x) xs acc
+    else acc
+  in loop nil xs nil
+in
+let rec pub flat_map f xs =
+  if let x:xs = xs then
+    if xs is nil then f x
+    else append (f x) (flat_map f xs)
+  else nil
+in
+
+let pub rev_filter_map f xs =
+  let rec loop xs acc =
+    if let x:xs = xs then
+      loop xs (try (f x : acc) with Filter_out -> acc)
+    else acc
+  in loop xs nil
+in
+let pub filter_map f xs = rev $ rev_filter_map f xs in
+
+let pub fold_left f z xs =
+  let rec loop xs acc =
+    if let x:xs = xs then
+      loop xs (f acc x)
+    else acc
+  in loop xs z
+in
+
+let rec pub fold_right f z xs =
+  if let x:xs = xs then
+    f x (fold_right f z xs)
+  else z
+in
+
+let rec pub scan_left f z xs =
+  if let x:xs = xs then
+    let z = f z x in
+    z : scan_left f z xs
+  else nil
+in
+
+let rec pub scan_right f z xs =
+  if let x:xs = xs then
+    if let z:_ as tl = scan_right f z xs then
+      f x z : tl
+    else [f x z]
+  else nil
+in
+
+let pub rev_filter f xs =
   let rec loop xs acc =
     if let x:xs = xs then
       loop xs (if f x then x : acc else acc)
@@ -68,16 +227,102 @@ let pub revfilter f xs =
   in loop xs nil
 in
 
-let pub filter f xs = reverse $ revfilter f xs in
+let pub filter f xs = rev $ rev_filter f xs in
 
-let pub foldl f acc xs =
-  let rec loop xs acc =
-    if let x:xs = xs then
-      loop xs (f acc x)
-    else acc
-  in loop xs acc
+let pub flatten = flat_map id in
+
+let rec pub find p xs =
+  if let x:xs = xs then
+    if p x then x
+    else find p xs
+  else raise Not_found
 in
 
+let pub merge ord xs ys =
+  let rec loop xs ys acc =
+    if let x:xs' = xs then
+      if let y:ys' = ys then
+        if ord x y
+        then loop xs' ys  (x:acc)
+        else loop xs  ys' (y:acc)
+      else rev_append acc xs
+    else rev_append acc ys
+  in loop xs ys nil
+in
+
+let split_by_half =
+  let rec loop slow fast acc =
+    if let _:_:fast = fast then
+      let x:slow = slow in
+      loop slow fast (x:acc)
+    else (acc, slow)
+  in fn xs -> loop xs xs nil
+in
+
+let rec pub sort ord xs =
+  if let _:_:_ = xs then
+    let (l, r) = split_by_half xs in
+    merge ord (sort ord l) (sort ord r)
+  else xs
+in
+
+let pub partition p xs =
+  let rec loop xs acc1 acc2 =
+    if let x:xs = xs then
+      if p x
+      then loop xs (x : acc1) acc2
+      else loop xs acc1 (x : acc2)
+    else (rev acc1, rev acc2)
+  in loop xs [] []
+in
+
+let rec pub rev_take =
+  let rec loop n xs acc =
+    if n > 0 then
+      let x:xs = xs in
+      loop (n - 1) xs (x : acc)
+    else acc
+  in fn n xs -> loop n xs []
+in
+
+let rec pub take n xs =
+  if n > 0 then
+    let x:xs = xs in
+    x : take (n - 1) xs
+  else []
+in
+
+let rec pub drop n xs =
+  if n > 0 then
+    drop (n - 1) (cdr xs)
+  else xs
+in
+
+let rec pub drop_while p xs =
+  if let x:xs = xs then
+    if p x then
+      drop_while p xs
+    else xs
+  else []
+in
+
+let rec pub all? p xs =
+  if let x:xs = xs then
+    p x && all? p xs
+  else true
+in
+
+let rec pub any? p xs =
+  if let x:xs = xs then
+    p x || any? p xs
+  else false
+in
+
+let rec pub memq? a xs =
+  if let x:xs = xs then
+    x is a || memq? a xs
+  else false
+in
 
 ()
 

@@ -22,10 +22,12 @@ eth_ir_ident_pattern(int varid)
 }
 
 eth_ir_pattern*
-eth_ir_unpack_pattern(eth_type *type, int offs[], eth_ir_pattern *pats[], int n)
+eth_ir_unpack_pattern(int varid, eth_type *type, int offs[],
+    eth_ir_pattern *pats[], int n)
 {
   eth_ir_pattern *pat = malloc(sizeof(eth_ir_pattern));
   pat->tag = ETH_PATTERN_UNPACK;
+  pat->unpack.varid = varid;
   pat->unpack.type = type;
   pat->unpack.offs = malloc(sizeof(int) * n);
   pat->unpack.subpats = malloc(sizeof(eth_ir_pattern*) * n);
@@ -45,10 +47,12 @@ eth_ir_constant_pattern(eth_t val)
 }
 
 eth_ir_pattern*
-eth_ir_record_pattern(size_t const ids[], eth_ir_pattern *const pats[], int n)
+eth_ir_record_pattern(int varid, size_t const ids[],
+    eth_ir_pattern *const pats[], int n)
 {
   eth_ir_pattern *pat = malloc(sizeof(eth_ir_pattern));
   pat->tag = ETH_PATTERN_RECORD;
+  pat->record.varid = varid;
   pat->record.ids = malloc(sizeof(size_t) * n);
   pat->record.subpats = malloc(sizeof(eth_ir_pattern*) * n);
   pat->record.n = n;

@@ -147,7 +147,7 @@ function! GetOCamlIndent()
  " Indent if current line begins with 'in':
  elseif line =~ '^\s*in\>'
    if lline !~ '^\s*\(let\|and\)\>'
-     return s:FindPair('\<\%(\%(if \+\)\@<!let\|try\)\>', '', '\<in\>')
+     return s:FindPair('\<\%(if \+\)\@<!let\>', '', '\<in\>')
    endif
 
  " Indent if current line begins with 'else':

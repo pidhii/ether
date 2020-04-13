@@ -12,7 +12,19 @@ eth_t
 eth_vm(eth_bytecode *bc)
 {
   const int nreg = bc->nreg;
-  eth_t r[nreg];
+
+  if (eth_unlikely(not eth_reserve_c_stack(nreg * sizeof(eth_t))))
+  {
+    eth_warning("stack overflow");
+    for (int i = 0; i < eth_nargs; ++i)
+      eth_ref(eth_sp[i]);
+    for (int i = 0; i < eth_nargs; ++i)
+      eth_unref(eth_sp[i]);
+    eth_pop_stack(eth_nargs);
+    return eth_exn(eth_sym("Stack_overflow"));
+  }
+
+  eth_t *restrict r = alloca(nreg * sizeof(eth_t));
   bool test = 0;
   int nstack = 0;
   eth_t exn = NULL;
@@ -179,6 +191,10 @@ fetch_insn:
 
       case ETH_OPC_IS:
         r[ip->binop.out] = eth_boolean(r[ip->binop.lhs] == r[ip->binop.rhs]);
+        break;
+
+      case ETH_OPC_EQUAL:
+        r[ip->binop.out] = eth_boolean(eth_equal(r[ip->binop.lhs], r[ip->binop.rhs]));
         break;
 
       case ETH_OPC_CONS:

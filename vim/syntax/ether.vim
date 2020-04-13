@@ -33,19 +33,45 @@ syn match ethSymbol     /\<[A-Z][a-zA-Z0-9_]*\>/
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""'
 " Builtins:
-syn keyword Function tonumber tosymbol 
 syn keyword Function pair? symbol? number? string? boolean? function? tuple? record?
+
+syn keyword Function to_number to_symbol 
+
 syn keyword Function list
-syn keyword Function write display newline print input
-syn keyword Function printf fprintf format
+
+syn keyword Function strlen
+syn keyword Function concat chr
+syn keyword Function to_upper to_lower
+syn keyword Function strcmp strcasecmp
+syn keyword Function chomp chop
+
 syn keyword Function car cdr
-syn keyword Function apply
+syn keyword Function length rev_append append rev
+syn keyword Function rev_map map
+syn keyword Function for_each
+syn keyword Function rev_filter_map filter_map
+syn keyword Function rev_flat_map flat_map flatten
+syn keyword Function rev_filter filter find partition
+syn keyword Function fold_left fold_right
+syn keyword Function scan_left scan_right
+syn keyword Function sort merge
+syn keyword Function drop rev_take take
+syn keyword Function any? all? memq?
+
 syn keyword Function id flip const
+syn keyword Function curry uncurry
+
+syn keyword Function write display print input newline
+syn keyword Function open open_pipe
+syn keyword Function close
+syn keyword Function read_line read_line_of
+
+syn keyword Function printf fprintf format
+syn keyword Function apply
 syn keyword Function die raise
 syn keyword Function system shell
 syn keyword Function load
 syn keyword Function exit
-syn keyword Function length revappend reverse
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Base:
@@ -59,22 +85,14 @@ syn keyword Function finite nan?
 syn keyword Function min max
 syn keyword Function hypot abs
 syn keyword Function log log10 log2
-syn keyword Function list table 
-syn keyword Function strlen substr strstr chop ltrim rtrim trim concat
-syn keyword Function open popen
+syn keyword Function table 
+syn keyword Function substr strstr ltrim rtrim trim
 syn keyword Function read readline readlines flush rewind getpos setpos
-syn keyword Function uncurry
 syn keyword Function range
-syn keyword Function any? all?
-syn keyword Function revmap map
 syn keyword Function zip
-syn keyword Function foreach
-syn keyword Function foldl reduce
 syn keyword Function scanl
 syn keyword Function repeat iterate
 syn keyword Function unfold
-syn keyword Function revfilter filter
-syn keyword Function drop take
 syn keyword Function zero? positive? negative? even? odd?
 syn keyword Function split join
 
@@ -110,7 +128,7 @@ syn keyword ethLazy lazy
 
 syn match ethOperator /[-+=*/%><&|.!]\+/
 syn match ethOperator /:\|\$/
-syn keyword ethOperator is eq equal not mod land lor lxor lshl lshr ashl ashr lnot
+syn keyword ethOperator is equal not mod land lor lxor lshl lshr ashl ashr lnot
 
 syn match Keyword /!/
 syn match ethUnit /(\s*)/
@@ -135,7 +153,7 @@ syn match Number '\<\d\+'
 syn match Number '0[xX][0-9a-fA-F]\+'
 
 " Floating point number with decimal no E or e
-syn match Number '\<\d\+\.\d*'
+syn match Number '\<\d\+\.\d\+'
 
 " Floating point like number with E and no decimal point (+,-)
 syn match Number '\<\d[[:digit:]]*[eE][\-+]\=\d\+'
@@ -215,6 +233,7 @@ syn match SpecialChar "\\t" containedin=String contained
 syn match SpecialChar "\\v" containedin=String contained
 syn match SpecialChar "\\?" containedin=String contained
 syn match SpecialChar "\\%" containedin=String contained
+syn match SpecialChar "\\x[0-9a-fA-F]\{1,2}" containedin=String contained
 
 
 

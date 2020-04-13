@@ -52,6 +52,19 @@ write_pair(eth_type *type, eth_t x, FILE *stream)
   }
 }
 
+static bool
+pair_equal(eth_type *type, eth_t x, eth_t y)
+{
+  while (eth_is_pair(x) & eth_is_pair(y))
+  {
+    if (not eth_equal(eth_car(x), eth_car(y)))
+      return false;
+    x = eth_cdr(x);
+    y = eth_cdr(y);
+  }
+  return eth_equal(x, y);
+}
+
 void
 _eth_init_pair_type(void)
 {
@@ -60,5 +73,6 @@ _eth_init_pair_type(void)
   eth_pair_type = eth_create_struct_type("pair", fields, offs, 2);
   eth_pair_type->destroy = destroy_pair;
   eth_pair_type->write = write_pair;
+  eth_pair_type->equal = pair_equal;
 }
 

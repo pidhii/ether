@@ -44,7 +44,14 @@ static bool g_iserror;
 int _eth_start_token = -1;
 %}
 
-%code requires { #include "codeine/vec.h" }
+%code requires {
+  #include "codeine/vec.h"
+  #include <assert.h>
+  typedef struct {
+    eth_ast_pattern *pat;
+    eth_ast *expr;
+  } lc_in;
+}
 
 %union {
   eth_ast *ast;
@@ -69,6 +76,12 @@ int _eth_start_token = -1;
     cod_vec(char*) keys;
     cod_vec(eth_ast_pattern*) vals;
   } record_pattern;
+
+  struct {
+    lc_in in;
+    eth_ast *pred;
+  } lc_aux;
+
   cod_vec(eth_ast*) astvec;
   cod_vec(char*) strvec;
   cod_vec(char) charvec;
@@ -85,16 +98,17 @@ int _eth_start_token = -1;
 } <constant>
 
 %destructor {
-  free($$);
+  if ($$)
+    free($$);
 } <string>
 
 %destructor {
-  eth_destroy_ast_pattern($$.pat);
+  eth_drop_ast_pattern($$.pat);
   eth_drop_ast($$.val);
 } <bind>
 
 %destructor {
-  cod_vec_iter($$.pats, i, x, eth_destroy_ast_pattern(x));
+  cod_vec_iter($$.pats, i, x, eth_drop_ast_pattern(x));
   cod_vec_iter($$.vals, i, x, eth_drop_ast(x));
   cod_vec_destroy($$.pats);
   cod_vec_destroy($$.vals);
@@ -109,7 +123,7 @@ int _eth_start_token = -1;
 
 %destructor {
   cod_vec_iter($$.keys, i, x, free(x));
-  cod_vec_iter($$.vals, i, x, eth_destroy_ast_pattern(x));
+  cod_vec_iter($$.vals, i, x, eth_drop_ast_pattern(x));
   cod_vec_destroy($$.keys);
   cod_vec_destroy($$.vals);
 } <record_pattern>
@@ -132,14 +146,20 @@ int _eth_start_token = -1;
 } <charvec>
 
 %destructor {
-  eth_destroy_ast_pattern($$);
+  eth_drop_ast_pattern($$);
 } <pattern>
 
 %destructor {
-  cod_vec_iter($$, i, x, eth_destroy_ast_pattern(x));
+  cod_vec_iter($$, i, x, eth_drop_ast_pattern(x));
   cod_vec_destroy($$);
 } <patvec>
 
+%destructor {
+  eth_drop_ast_pattern($$.in.pat);
+  eth_drop_ast($$.in.expr);
+  if ($$.pred)
+    eth_drop_ast($$.pred);
+} <lc_aux>
 
 // =============================================================================
 %token UNDEFINED
@@ -152,6 +172,7 @@ int _eth_start_token = -1;
 %nonassoc LET REC AND IN FN IFLET WHENLET
 %nonassoc PUB IMPORT AS UNQUALIFIED
 %nonassoc DOT_OPEN
+%nonassoc DDOT LARROW
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %right RARROW
 %right ';'
@@ -167,7 +188,7 @@ int _eth_start_token = -1;
 // level 2:
 %right OPAND
 // level 3:
-%nonassoc '<' LE '>' GE EQ NE IS
+%nonassoc '<' LE '>' GE EQ NE IS EQUAL
 // level 4:
 %right ':' PPLUS
 // level 5:
@@ -201,6 +222,7 @@ int _eth_start_token = -1;
 %type<patvec> pattern_list
 %type<record> record
 %type<record_pattern> record_pattern
+%type<lc_aux> lc_aux
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %start entry
 
@@ -227,6 +249,42 @@ atom
     LOC($$, @$);
   }
   | '['']' { $$ = eth_ast_cval(eth_nil); }
+  | '[' expr DDOT expr ']' {
+    eth_ast *p[2] = { $2, $4 }; 
+    eth_ast *range = eth_ast_cval(eth_get_builtin("__builtin_inclusive_range"));
+    $$ = eth_ast_apply(range, p, 2);
+  }
+  | '[' expr '|' lc_aux ']' {
+    eth_ast_pattern *fnargs[] = { $4.in.pat };
+    // ---
+    eth_ast *fn;
+    if ($4.pred)
+    {
+      eth_ast *filterout = eth_ast_cval(eth_sym("Filter_out"));
+      eth_ast *raise = eth_ast_cval(eth_get_builtin("raise"));
+      eth_ast *elsebr = eth_ast_apply(raise, &filterout, 1);
+      eth_ast *body = eth_ast_if($4.pred, $2, elsebr);
+      fn = eth_ast_fn_with_patterns(fnargs, 1, body);
+      // ---
+      eth_t mapfn = eth_get_builtin("filter_map");
+      assert(mapfn);
+      eth_ast *map = eth_ast_cval(mapfn);
+      // ---
+      eth_ast *p[] = { fn, $4.in.expr };
+      $$ = eth_ast_apply(map, p, 2);
+    }
+    else
+    {
+      fn = eth_ast_fn_with_patterns(fnargs, 1, $2);
+      // ---
+      eth_t mapfn = eth_get_builtin("map");
+      assert(mapfn);
+      eth_ast *map = eth_ast_cval(mapfn);
+      // ---
+      eth_ast *p[] = { fn, $4.in.expr };
+      $$ = eth_ast_apply(map, p, 2);
+    }
+  }
   | '(' list ',' expr ')' {
     cod_vec_push($2, $4);
     int n = $2.len;
@@ -315,6 +373,10 @@ expr
     $$ = eth_ast_if($2, $4, $6);
     LOC($$, @$);
   }
+  | expr IF expr ELSE expr {
+    $$ = eth_ast_if($3, $1, $5);
+    LOC($$, @$);
+  }
   | WHEN expr THEN expr {
     $$ = eth_ast_if($2, $4, eth_ast_cval(eth_nil));
     LOC($$, @$);
@@ -363,6 +425,7 @@ expr
   | expr EQ    expr { $$ = eth_ast_binop(ETH_EQ  , $1, $3); LOC($$, @$); }
   | expr NE    expr { $$ = eth_ast_binop(ETH_NE  , $1, $3); LOC($$, @$); }
   | expr IS    expr { $$ = eth_ast_binop(ETH_IS  , $1, $3); LOC($$, @$); }
+  | expr EQUAL expr { $$ = eth_ast_binop(ETH_EQUAL,$1, $3); LOC($$, @$); }
   | expr ':'   expr { $$ = eth_ast_binop(ETH_CONS, $1, $3); LOC($$, @$); }
   | expr '%'   expr { $$ = eth_ast_binop(ETH_MOD , $1, $3); LOC($$, @$); }
   | expr MOD   expr { $$ = eth_ast_binop(ETH_MOD , $1, $3); LOC($$, @$); }
@@ -502,6 +565,8 @@ atomic_pattern
   }
   | CAPSYMBOL { $$ = eth_ast_constant_pattern(eth_sym($1)); free($1); }
   | CONST { $$ = eth_ast_constant_pattern($1); }
+  | '('')' { $$ = eth_ast_constant_pattern(eth_nil); }
+  | '['']' { $$ = eth_ast_constant_pattern(eth_nil); }
   | '(' pattern ')' { $$ = $2; }
   | '(' pattern_list ',' pattern ')' {
     cod_vec_push($2, $4);
@@ -534,6 +599,11 @@ pattern
     char *fields[2] = { "car", "cdr" };
     eth_ast_pattern *pats[2] = { $1, $3 };
     $$ = eth_ast_unpack_pattern_with_type(eth_pair_type, fields, pats, 2);
+  }
+  | pattern AS SYMBOL {
+    $$ = $1;
+    eth_set_pattern_alias($$, $3);
+    free($3);
   }
 ;
 
@@ -624,6 +694,19 @@ record
     $$ = $1;
     cod_vec_push($$.keys, $3);
     cod_vec_push($$.vals, eth_ast_ident($3));
+  }
+;
+
+lc_aux
+  : pattern LARROW expr {
+    $$.in.pat = $1;
+    $$.in.expr = $3;
+    $$.pred = NULL;
+  }
+  | pattern LARROW expr ',' expr {
+    $$.in.pat = $1;
+    $$.in.expr = $3;
+    $$.pred = $5;
   }
 ;
 

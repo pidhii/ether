@@ -54,6 +54,12 @@ number_display(eth_type *type, eth_t x, FILE *out)
 #endif
 }
 
+static bool
+number_equal(eth_type *type, eth_t x, eth_t y)
+{
+  return eth_num_val(x) == eth_num_val(y);
+}
+
 void
 _eth_init_number_type(void)
 {
@@ -61,5 +67,6 @@ _eth_init_number_type(void)
   eth_number_type->destroy = number_destroy;
   eth_number_type->write = number_write;
   eth_number_type->display = number_display;
+  eth_number_type->equal = number_equal;
 }
 

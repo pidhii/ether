@@ -27,6 +27,7 @@ create_type(const char *name, int nfields)
   type->destroy = default_destroy;
   type->write = eth_default_write;
   type->display = default_display;
+  type->equal = NULL;
   type->nfields = 0;
   type->fields = NULL;
   type->clos = NULL;
@@ -102,4 +103,18 @@ eth_display(eth_t x, FILE *out)
 {
   x->type->display(x->type, x, out);
 }
+
+bool
+eth_equal(eth_t x, eth_t y)
+{
+  if (x == y)
+    return true;
+  else if (x->type != y->type)
+    return false;
+  else if (x->type->equal)
+    return x->type->equal(x->type, x, y);
+  else
+    return false;
+}
+
 

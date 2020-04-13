@@ -109,6 +109,7 @@ static value_info*
 create_empty_vinfo()
 {
   value_info *vinfo = calloc(1, sizeof(value_info));
+  vinfo->isrec = false;
   return vinfo;
 }
 
@@ -304,6 +305,7 @@ finalize_rec_scope(ssa_builder *bldr, eth_ssa_tape *tape, bool *e)
 {
   rec_scope *scp = bldr->recscp;
 
+  assert(bldr->recscpcnt > 0);
   if (--bldr->recscpcnt > 0)
     return;
 
@@ -537,7 +539,11 @@ build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
       else
         dotest = true;
 
+      // fix type for inner branch
       set_type(bldr, expr, pat->unpack.type);
+
+      // set up aliasing variable
+      bldr->vars[pat->unpack.varid] = expr;
 
       eth_ssa_pattern *pats[pat->unpack.n];
       int vids[pat->unpack.n];
@@ -565,6 +571,7 @@ build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
         *e = 1;
       }
 
+      // fix type and value for inner branch
       set_cval(bldr, expr, pat->constant.val);
       set_type(bldr, expr, pat->constant.val->type);
 
@@ -573,6 +580,9 @@ build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
 
     case ETH_PATTERN_RECORD:
     {
+      // set up aliasing variable
+      bldr->vars[pat->record.varid] = expr;
+
       eth_ssa_pattern *pats[pat->record.n];
       int vids[pat->record.n];
       for (int i = 0; i < pat->record.n; ++i)
@@ -798,8 +808,9 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
           break;
 
         case ETH_IS:
+        case ETH_EQUAL:
           ret = new_val(bldr, RC_RULES_DISABLE);
-          insn = eth_insn_binop(ETH_IS, ret, lhs, rhs);
+          insn = eth_insn_binop(ir->binop.op, ret, lhs, rhs);
 
           testnum = false;
           bldr->vinfo[ret]->type = eth_boolean_type;
@@ -820,6 +831,8 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
       {
         assert_number(bldr, tape, lhs, e);
         assert_number(bldr, tape, rhs, e);
+        set_type(bldr, lhs, eth_number_type);
+        set_type(bldr, rhs, eth_number_type);
       }
 
       eth_write_insn(tape, insn);
