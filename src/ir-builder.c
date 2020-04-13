@@ -320,13 +320,30 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
         eth_prepend_var(bldr->vars, eth_dyn_var(pat->record.alias, alias));
 
       int n = pat->record.n;
+      typedef struct { uintptr_t id; eth_ir_pattern *pat; } field;
+      field fields[n];
+
+      for (int i = 0; i < n; ++i)
+      {
+        fields[i].id = eth_get_symbol_id(eth_sym(pat->record.fields[i]));
+        fields[i].pat = build_pattern(bldr, pat->record.subpats[i], loc, e);
+      }
+      int cmp(const void *p1, const void *p2)
+      {
+        const field *f1 = p1;
+        const field *f2 = p2;
+        return f1->id - f2->id;
+      }
+      qsort(fields, n, sizeof(field), cmp);
+
       size_t ids[n];
       eth_ir_pattern *pats[n];
       for (int i = 0; i < n; ++i)
       {
-        ids[i] = eth_get_symbol_id(eth_sym(pat->record.fields[i]));
-        pats[i] = build_pattern(bldr, pat->record.subpats[i], loc, e);
+        ids[i] = fields[i].id;
+        pats[i] = fields[i].pat;
       }
+
       return eth_ir_record_pattern(alias, ids, pats, n);
     }
   }

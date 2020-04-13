@@ -18,13 +18,15 @@ file (GLOB ETHER_SRC
   ${CMAKE_SOURCE_DIR}/codeine/src/*.c)
 set (ETHER_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 
-
 set (CMAKE_C_STANDARD 99)
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${WARNING_FLAGS} -rdynamic")
 set (CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Og -ggdb -DETH_DEBUG_MODE")
 set (CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -Ofast -flto")
 include_directories (${ETHER_INCLUDE_DIR})
 include_directories (${CMAKE_SOURCE_DIR}/codeine/include)
+
+set_source_files_properties(${CMAKE_SOURCE_DIR}/src/vm.c
+  PROPERTIES COMPILE_FLAGS "-fno-gcse -fno-crossjumping")
 
 string(TOUPPER ${CMAKE_BUILD_TYPE} BLDTYPE)
 add_definitions (

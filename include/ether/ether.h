@@ -1874,7 +1874,7 @@ struct eth_bc_insn {
              struct { eth_type *type; uint64_t vids[]; } *restrict data; }
       mkrcrd;
   };
-} __attribute__((aligned(32)));
+};
 
 struct eth_bytecode {
   int rc;
