@@ -153,7 +153,7 @@ syn match ethLambda /->/
 "syn match ethKey /\k\+/ contained
 
 syn match Comment /#.*$/ contains=ethCommentLabel
-syn region Comment start=/(\*[^)]/ end=/\*)/ contains=Comment
+syn region Comment start=/(\*\%([^)]\|$\)/ end=/\*)/ contains=Comment skipwhite skipnl
 syn match ethCommentLabel /[A-Z]\w*:/ contained
 
 " Integer
