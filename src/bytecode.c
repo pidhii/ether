@@ -48,6 +48,10 @@ destroy_insn(eth_bc_insn *insn)
       free(insn->loadrcrd.ids);
       break;
 
+    case ETH_OPC_LOOP:
+      free(insn->loop.vids);
+      break;
+
     default:
       break;
   }
@@ -71,6 +75,7 @@ typedef struct {
   int *catches;
   int *vmap; // Map of the SSA-values to registers. */
   int regcnt;
+  int entrypoint;
 } bc_builder;
 
 static bc_builder*
@@ -85,6 +90,7 @@ create_bc_builder(int nvals, int ntries)
   bldr->catches = malloc(sizeof(int) * ntries);
   bldr->vmap = malloc(sizeof(int) * nvals);
   bldr->regcnt = 0;
+  bldr->entrypoint = -1;
   return bldr;
 }
 
@@ -173,6 +179,19 @@ write_applytc(bc_builder *bldr, int out, int fn)
   insn->opc = ETH_OPC_APPLYTC;
   insn->apply.out = out;
   insn->apply.fn = fn;
+  return bldr->len - 1;
+}
+
+static int
+write_loop(bc_builder *bldr, ptrdiff_t offs, const int args[], int n)
+{
+  eth_bc_insn *insn = append_insn(bldr);
+  insn->opc = ETH_OPC_LOOP;
+  insn->loop.offs = offs;
+  insn->loop.vids = malloc(sizeof(uint64_t) * n);
+  insn->loop.n = n;
+  for (int i = 0; i < n; ++i)
+    insn->loop.vids[i] = args[i];
   return bldr->len - 1;
 }
 
@@ -572,9 +591,13 @@ build(bc_builder *bldr, eth_insn *ssa)
 {
   for (eth_insn *ip = ssa; ip; ip = ip->next)
   {
+    if (ip->flag & ETH_IFLAG_ENTRYPOINT)
+      bldr->entrypoint = bldr->len;
+
     switch (ip->tag)
     {
       case ETH_INSN_NOP:
+        assert((ip->flag & ETH_IFLAG_ENTRYPOINT) == 0);
         break;
 
       case ETH_INSN_CVAL:
@@ -606,6 +629,18 @@ build(bc_builder *bldr, eth_insn *ssa)
         int out = new_reg(bldr, ip->out);
         int fn = get_reg(bldr, ip->apply.fn);
         write_applytc(bldr, out, fn);
+        break;
+      }
+
+      case ETH_INSN_LOOP:
+      {
+        int n = ip->loop.nargs;
+        int vids[n];
+        for (int i = 0; i < n; ++i)
+          vids[i] = get_reg(bldr, ip->loop.args[i]);
+        assert(bldr->entrypoint >= 0);
+        int offs = bldr->entrypoint - bldr->len;
+        write_loop(bldr, offs, vids, n);
         break;
       }
 
@@ -813,7 +848,7 @@ end_if:
         for (int i = 0; i < n; ++i)
         {
           regs[i] = new_reg(bldr, ip->pop.vids[i]);
-          assert(regs[i] == regs[0] + i);
+          assert(regs[i] == i);
         }
         write_pop(bldr, regs[0], n);
         break;

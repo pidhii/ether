@@ -1620,6 +1620,7 @@ enum eth_insn_tag {
   ETH_INSN_CVAL,
   ETH_INSN_APPLY,
   ETH_INSN_APPLYTC,
+  ETH_INSN_LOOP,
   ETH_INSN_IF,
   ETH_INSN_MOV,
   ETH_INSN_REF,
@@ -1644,6 +1645,7 @@ enum eth_insn_tag {
 enum {
   /* Disable writes BEFORE given instruction. */
   ETH_IFLAG_NOBEFORE = (1 << 0),
+  ETH_IFLAG_ENTRYPOINT = (1 << 1),
 };
 
 typedef enum {
@@ -1660,6 +1662,7 @@ struct eth_insn {
     struct { eth_t val; } cval;
     struct { int vid; } var;
     struct { int fn, *args; int nargs; } apply;
+    struct { int *args; int nargs; } loop;
     struct { int cond, likely; eth_insn *thenbr, *elsebr; eth_test_tag test;
              union { eth_type *type; eth_ssa_pattern *pat; };
              eth_toplvl_flag toplvl; }
@@ -1699,6 +1702,9 @@ eth_insn_apply(int out, int fn, const int *args, int nargs);
 
 eth_insn* __attribute__((malloc))
 eth_insn_applytc(int out, int fn, const int *args, int nargs);
+
+eth_insn*
+eth_insn_loop(const int args[], int nargs);
 
 eth_insn* __attribute__((malloc))
 eth_insn_if(int out, int cond, eth_insn *thenbr, eth_insn *elsebr);
@@ -1833,6 +1839,7 @@ typedef enum {
   ETH_OPC_JNZ,
   ETH_OPC_JZE,
   ETH_OPC_JMP,
+  ETH_OPC_LOOP,
 
   ETH_OPC_REF,
   ETH_OPC_DEC,
@@ -1896,6 +1903,7 @@ struct eth_bc_insn {
   union {
     struct { uint64_t out; eth_t val; } cval;
 
+    // TODO: mege PUSH with APPLY
     struct { uint64_t *vids, n; } push;
     struct { uint64_t vid0, n; } pop;
 
@@ -1909,6 +1917,7 @@ struct eth_bc_insn {
     struct { uint64_t out, vid; } dup;
 
     struct { ptrdiff_t offs; } jnz, jze, jmp;
+    struct { uint64_t *vids, n; ptrdiff_t offs; } loop;
 
     struct { uint64_t vid; } ref;
     struct { uint64_t vid; } dec;

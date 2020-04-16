@@ -44,6 +44,7 @@ eth_vm(eth_bytecode *bc)
     [ETH_OPC_JNZ      ] = &&INSN_JNZ,
     [ETH_OPC_JZE      ] = &&INSN_JZE,
     [ETH_OPC_JMP      ] = &&INSN_JMP,
+    [ETH_OPC_LOOP     ] = &&INSN_LOOP,
     [ETH_OPC_REF      ] = &&INSN_REF,
     [ETH_OPC_DEC      ] = &&INSN_DEC,
     [ETH_OPC_UNREF    ] = &&INSN_UNREF,
@@ -236,6 +237,16 @@ eth_vm(eth_bytecode *bc)
       OP(JMP)
       {
         ip += ip->jmp.offs;
+        FAST_DISPATCH();
+      }
+
+      OP(LOOP)
+      {
+        uint64_t n = ip->loop.n;
+        uint64_t *args = ip->loop.vids;
+        for (uint64_t i = 0; i < n; ++i)
+          r[i] = r[args[i]];
+        ip += ip->loop.offs;
         FAST_DISPATCH();
       }
 

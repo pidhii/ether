@@ -129,6 +129,10 @@ eth_destroy_insn(eth_insn *insn)
       free(insn->apply.args);
       break;
 
+    case ETH_INSN_LOOP:
+      free(insn->loop.args);
+      break;
+
     case ETH_INSN_IF:
       eth_destroy_insn_list(insn->iff.thenbr);
       eth_destroy_insn_list(insn->iff.elsebr);
@@ -227,6 +231,16 @@ eth_insn*
 eth_insn_applytc(int out, int fn, const int *args, int nargs)
 {
   return create_apply(ETH_INSN_APPLYTC, out, fn, args, nargs);
+}
+
+eth_insn*
+eth_insn_loop(const int args[], int nargs)
+{
+  eth_insn *insn = create_insn(ETH_INSN_LOOP);
+  insn->loop.nargs = nargs;
+  insn->loop.args = malloc(sizeof(int) * nargs);
+  memcpy(insn->loop.args, args, sizeof(int) * nargs);
+  return insn;
 }
 
 eth_insn*
@@ -486,6 +500,16 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
       {
         if (i > 0) fputs(", ", stream);
         fprintf(stream, "%%%d", insn->apply.args[i]);
+      }
+      fputs(");\n", stream);
+      break;
+
+    case ETH_INSN_LOOP:
+      fprintf(stream, "loop (");
+      for (int i = 0; i < insn->loop.nargs; ++i)
+      {
+        if (i > 0) fputs(", ", stream);
+        fprintf(stream, "%%%d", insn->loop.args[i]);
       }
       fputs(");\n", stream);
       break;

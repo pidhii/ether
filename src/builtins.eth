@@ -55,28 +55,28 @@ in
 ################################################################################
 #                                  IO
 #-------------------------------------------------------------------------------
-# - open
-# - open_pipe
-# - close
+# - open (C)
+# - open_pipe (C)
+# - close (C)
 #
 # Input:
-# - input
-# - read_of
+# - input (C)
+# - read_of (C)
 # - read
-# - read_line_of
+# - read_line_of (C)
 # - read_line
-# - read_file
+# - read_file (C)
 #
 # Output:
-# - print
-# - newline
-# - printf
-# - write_to
+# - print (C)
+# - newline (C)
+# - printf (C)
+# - write_to (C)
 # - write
 #
 # Miscelenious:
-# - tell
-# - seek
+# - tell (C)
+# - seek (C)
 #
 let pub open x =
   if string? x then __open x "r"

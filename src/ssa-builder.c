@@ -74,6 +74,7 @@ typedef struct value_info {
   eth_insn *creatloc;
   bool isrec;
   bool isdummy;
+  bool isthis;
 } value_info;
 
 typedef enum {
@@ -400,9 +401,9 @@ build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int f, bool *e)
   eth_ssa_tape *fntape = eth_create_ssa_tape();
 
   // declare arguments [0, arity):
+  int fnargs[arity];
   if (arity)
   {
-    int fnargs[arity];
     for (int i = 0; i < arity; ++i)
     {
       fnargs[i] = new_val(fnbldr, RC_RULES_DEFAULT);
@@ -417,21 +418,42 @@ build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int f, bool *e)
   }
 
   // declare captures [arity, arity + ncap):
+  int fncaps[ncap];
   if (ncap > 0)
   {
-    int fncaps[ncap];
     for (int i = 0; i < ncap; ++i)
     {
       fncaps[i] = new_val(fnbldr, RC_RULES_DISABLE);
       fnbldr->vars[ir->fn.capvars[i]] = fncaps[i];
       fnbldr->vinfo[fncaps[i]]->cval = bldr->vinfo[caps[i]]->cval;
       fnbldr->vinfo[fncaps[i]]->type = bldr->vinfo[caps[i]]->type;
+
+      // detect self-capture for loop-detection:
+      if (f != FN_NEW and fncaps[i] == f)
+        fnbldr->vinfo[fncaps[i]]->isthis = true;
     }
     eth_write_insn(fntape, eth_insn_cap(fncaps, ncap));
   }
 
-  // build body:
+  // prepare entry point (if has captures)
+  eth_insn *ent = NULL;
+  if (ncap > 0)
+  {
+    // has captures => have CAP-instruction => point is non-null
+    ent = fntape->point;
+    // move ctor-instruction of arguments to entry point:
+    for (int i = 0; i < arity; ++i)
+      fnbldr->vinfo[fnargs[i]]->creatloc = ent;
+  }
+
+  // build body and set up entry-point (if has captures):
   eth_ssa *ssa = build_body(fnbldr, fntape, ir->fn.body->body, e);
+  if (ncap > 0)
+  {
+    // actual entry point is just after that initial one
+    ent->next->flag |= ETH_IFLAG_ENTRYPOINT;
+  }
+
   eth_destroy_ssa_tape(fntape);
   destroy_ssa_builder(fnbldr);
 
@@ -676,12 +698,26 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
         args[i] = build(bldr, tape, ir->apply.args[i], false, e);
 
       // apply:
-      int ret = new_val(bldr, RC_RULES_DEFAULT);
+      int ret;
       eth_insn *insn;
       if (istc && bldr->vinfo[fn]->rules == RC_RULES_DISABLE)
-        insn = eth_insn_applytc(ret, fn, args, ir->apply.nargs);
+      {
+        if (bldr->vinfo[fn]->isthis)
+        {
+          eth_write_insn(tape, eth_insn_loop(args, ir->apply.nargs));
+          return -1;
+        }
+        else
+        {
+          ret = new_val(bldr, RC_RULES_DEFAULT);
+          insn = eth_insn_applytc(ret, fn, args, ir->apply.nargs);
+        }
+      }
       else
+      {
+        ret = new_val(bldr, RC_RULES_DEFAULT);
         insn = eth_insn_apply(ret, fn, args, ir->apply.nargs);
+      }
       bldr->vinfo[ret]->creatloc = insn;
       eth_write_insn(tape, insn);
 
@@ -1014,29 +1050,6 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
 //                             RC INSERTION
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 /*
- * Check whether the sequence of instructins terminates with RET-instruction.
- */
-static bool
-is_dead_end(eth_insn *begin)
-{
-  for (eth_insn *insn = begin; insn; insn = insn->next)
-  {
-    if (insn->tag == ETH_INSN_IF)
-    {
-      int a = is_dead_end(insn->iff.thenbr);
-      int b = is_dead_end(insn->iff.elsebr);
-      return (a && b) || is_dead_end(insn->next);
-    }
-
-    // TODO: create marker-function
-    if (insn->tag == ETH_INSN_RET or insn->tag == ETH_INSN_CATCH)
-      return true;
-  }
-
-  return false;
-}
-
-/*
  * Check if instruction is referencing the ssa-value.
  */
 static bool
@@ -1057,6 +1070,14 @@ is_using(eth_insn *insn, int vid)
       for (int i = 0; i < insn->apply.nargs; ++i)
       {
         if (insn->apply.args[i] == vid)
+          return true;
+      }
+      return false;
+
+    case ETH_INSN_LOOP:
+      for (int i = 0; i < insn->loop.nargs; ++i)
+      {
+        if (insn->loop.args[i] == vid)
           return true;
       }
       return false;
@@ -1156,6 +1177,14 @@ is_killing(eth_insn *insn, int vid)
       }
       return false;
 
+    case ETH_INSN_LOOP:
+      for (int i = 0; i < insn->loop.nargs; ++i)
+      {
+        if (insn->loop.args[i] == vid)
+          return true;
+      }
+      return false;
+
     case ETH_INSN_RET:
       return insn->var.vid == vid;
 
@@ -1235,6 +1264,15 @@ get_moved_vids(eth_insn *insn, int *n)
   }
 }
 
+static inline bool
+is_end(eth_insn *insn)
+{
+  return insn->tag == ETH_INSN_RET or
+         insn->tag == ETH_INSN_CATCH or
+         insn->tag == ETH_INSN_LOOP
+  ;
+}
+
 typedef struct {
   int nvals;
   struct {
@@ -1276,6 +1314,29 @@ last_insn(eth_insn *begin)
   return begin;
 }
 
+/*
+ * Check whether the sequence of instructins terminates with RET-instruction.
+ */
+static bool
+is_dead_end(eth_insn *begin)
+{
+  for (eth_insn *insn = begin; insn; insn = insn->next)
+  {
+    if (insn->tag == ETH_INSN_IF)
+    {
+      int a = is_dead_end(insn->iff.thenbr);
+      int b = is_dead_end(insn->iff.elsebr);
+      return (a && b) || is_dead_end(insn->next);
+    }
+
+    // TODO: create marker-function
+    if (is_end(insn))
+      return true;
+  }
+
+  return false;
+}
+
 static bool kill_value_T(kill_info *kinfo, eth_insn *begin, int vid);
 static void kill_value_F(kill_info *kinfo, eth_insn *begin, int vid);
 
@@ -1312,8 +1373,7 @@ kill_value_F(kill_info *kinfo, eth_insn *begin, int vid)
         force_kill(kinfo, c, vid);
     }
 
-    // TODO: create marker-function
-    if (insn->tag == ETH_INSN_RET or insn->tag == ETH_INSN_CATCH)
+    if (is_end(insn))
     {
       eth_error("WTF!?");
       abort();
@@ -1416,8 +1476,7 @@ kill_value_T(kill_info *kinfo, eth_insn *begin, int vid)
         break;
     }
 
-    // TODO: create marker-function
-    if (insn->tag == ETH_INSN_RET or insn->tag == ETH_INSN_CATCH)
+    if (is_end(insn))
       break;
   }
 
