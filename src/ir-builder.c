@@ -374,7 +374,7 @@ build_let(ir_builder *bldr, int idx, eth_ast *ast, eth_ir_node *const vals[],
 
     eth_ir_node *thenbr = build_let(bldr, idx + 1, ast, vals, nvars0, e);
 
-    eth_t exn = eth_exn(eth_sym("Match_failure"));
+    eth_t exn = eth_exn(eth_sym("Type_error"));
     eth_ir_node *elsebr = eth_ir_throw(eth_ir_cval(exn));
     eth_set_ir_location(elsebr, ast->loc);
 
@@ -404,9 +404,8 @@ build_letrec(ir_builder *bldr, int idx, eth_ast *ast, int nvars0, int nvars,
 
     eth_ir_node *thenbr = build_letrec(bldr, idx + 1, ast, nvars0, nvars, pats, e);
 
-    eth_ir_node *raise = eth_ir_cval(eth_get_builtin("raise"));
-    eth_ir_node *what = eth_ir_cval(eth_sym("Match_failure"));
-    eth_ir_node *elsebr = eth_ir_apply(raise, &what, 1);
+    eth_t exn = eth_exn(eth_sym("Type_error"));
+    eth_ir_node *elsebr = eth_ir_throw(eth_ir_cval(exn));
     eth_set_ir_location(elsebr, ast->loc);
 
     eth_ir_node *ret = eth_ir_match(pats[idx], expr, thenbr, elsebr);
@@ -531,7 +530,9 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       eth_ir_node *args[ast->apply.nargs];
       for (int i = 0; i < ast->apply.nargs; ++i)
         args[i] = build(bldr, ast->apply.args[i], e);
-      return eth_ir_apply(fn, args, ast->apply.nargs);
+      eth_ir_node *ret = eth_ir_apply(fn, args, ast->apply.nargs);
+      eth_set_ir_location(ret, ast->loc);
+      return ret;
     }
 
     case ETH_AST_IF:
@@ -599,7 +600,10 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         eth_drop_ir_node(rhs);
       }
       else
+      {
         ret = eth_ir_binop(ast->binop.op, lhs, rhs);
+        eth_set_ir_location(ret, ast->loc);
+      }
       return ret;
     }
 
@@ -613,7 +617,10 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         eth_drop_ir_node(expr);
       }
       else
+      {
         ret = eth_ir_unop(ast->unop.op, expr);
+        eth_set_ir_location(ret, ast->loc);
+      }
       return ret;
     }
 
@@ -639,7 +646,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       {
         if (throw == NULL)
         {
-          eth_t exn = eth_exn(eth_sym("Invalid_argument"));
+          eth_t exn = eth_exn(eth_sym("Type_error"));
           throw = eth_ir_throw(eth_ir_cval(exn));
         }
         // TODO: mark as likely
@@ -808,9 +815,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       eth_ir_node *ok = build(bldr, ast->try.catchbr, e);
       eth_pop_var(bldr->vars, n2 - n1);
 
-      eth_ir_node *exn = eth_ir_var(exnvar);
-      eth_ir_node *ris = eth_ir_cval(eth_get_builtin("raise"));
-      eth_ir_node *rethrow = eth_ir_apply(ris, &exn, 1);
+      eth_ir_node *rethrow = eth_ir_throw(eth_ir_var(exnvar));
 
       eth_ir_node *catchbr = eth_ir_match(pat, eth_ir_var(exnvar), ok, rethrow);
 

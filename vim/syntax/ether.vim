@@ -6,10 +6,12 @@ if exists("b:current_syntax")
   finish
 endif
 
-set comments=b:#
+set comments=b:#,sr:(*,mb:*,ex:*)
 
 set iskeyword+=?,'
-syn match ethIdentifier /\<[a-z_][a-zA-Z0-9_]*['?]?\>/
+
+syn match ethIdentifier /\<[a-z_][a-zA-Z0-9_]*[\'?]\?\>/
+
 syn match ethSymbol     /\<[A-Z][a-zA-Z0-9_]*\>/
 
 "syn region ethModuleDef matchgroup=ethModule start=/\<module\>/ end=/\<end\>/ contains=TOP
@@ -33,45 +35,52 @@ syn match ethSymbol     /\<[A-Z][a-zA-Z0-9_]*\>/
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""'
 " Builtins:
-syn keyword Function pair? symbol? number? string? boolean? function? tuple? record?
+syn keyword ethBuiltinFunction pair? symbol? number? string? boolean? function? tuple? record? file?
 
-syn keyword Function to_number to_symbol 
+syn keyword ethBuiltinFunction to_number to_symbol
 
-syn keyword Function list
+syn keyword ethBuiltinFunction list
 
-syn keyword Function strlen
-syn keyword Function concat chr
-syn keyword Function to_upper to_lower
-syn keyword Function strcmp strcasecmp
-syn keyword Function chomp chop
+syn keyword ethBuiltinFunction strlen
+syn keyword ethBuiltinFunction concat chr ord
+syn keyword ethBuiltinFunction to_upper to_lower
+syn keyword ethBuiltinFunction strcmp strcasecmp
+syn keyword ethBuiltinFunction substr
+syn keyword ethBuiltinFunction chomp chop
 
-syn keyword Function car cdr
-syn keyword Function length rev_append append rev
-syn keyword Function rev_map map
-syn keyword Function for_each
-syn keyword Function rev_filter_map filter_map
-syn keyword Function rev_flat_map flat_map flatten
-syn keyword Function rev_filter filter find partition
-syn keyword Function fold_left fold_right
-syn keyword Function scan_left scan_right
-syn keyword Function sort merge
-syn keyword Function drop rev_take take
-syn keyword Function any? all? memq?
+syn keyword ethBuiltinFunction car cdr
+syn keyword ethBuiltinFunction length rev_append append rev
+syn keyword ethBuiltinFunction rev_map map
+syn keyword ethBuiltinFunction for_each
+syn keyword ethBuiltinFunction rev_filter_map filter_map
+syn keyword ethBuiltinFunction rev_flat_map flat_map flatten
+syn keyword ethBuiltinFunction rev_filter filter find partition
+syn keyword ethBuiltinFunction fold_left fold_right
+syn keyword ethBuiltinFunction scan_left scan_right
+syn keyword ethBuiltinFunction sort merge
+syn keyword ethBuiltinFunction drop rev_take take
+syn keyword ethBuiltinFunction any? all? memq?
 
-syn keyword Function id flip const
-syn keyword Function curry uncurry
+syn keyword ethBuiltinFunction id flip const
+syn keyword ethBuiltinFunction curry uncurry
+syn keyword ethBuiltinFunction even? odd?
 
-syn keyword Function write display print input newline
-syn keyword Function open open_pipe
-syn keyword Function close
-syn keyword Function read_line read_line_of
+syn keyword ethBuiltinFunction open open_pipe
+syn keyword ethBuiltinFunction close
+syn keyword ethBuiltinFunction input
+syn keyword ethBuiltinFunction print newline
+syn keyword ethBuiltinFunction write_to write
+syn keyword ethBuiltinFunction read_line read_line_of
+syn keyword ethBuiltinFunction read read_of
+syn keyword ethBuiltinFunction read_file
+syn keyword ethBuiltinFunction tell seek
 
-syn keyword Function printf fprintf format
-syn keyword Function apply
-syn keyword Function die raise
-syn keyword Function system shell
-syn keyword Function load
-syn keyword Function exit
+syn keyword ethBuiltinFunction printf fprintf format
+syn keyword ethBuiltinFunction apply
+syn keyword ethBuiltinFunction die raise
+syn keyword ethBuiltinFunction system shell
+syn keyword ethBuiltinFunction load
+syn keyword ethBuiltinFunction exit
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Base:
@@ -85,7 +94,7 @@ syn keyword Function finite nan?
 syn keyword Function min max
 syn keyword Function hypot abs
 syn keyword Function log log10 log2
-syn keyword Function table 
+syn keyword Function table
 syn keyword Function substr strstr ltrim rtrim trim
 syn keyword Function read readline readlines flush rewind getpos setpos
 syn keyword Function range
@@ -93,7 +102,7 @@ syn keyword Function zip
 syn keyword Function scanl
 syn keyword Function repeat iterate
 syn keyword Function unfold
-syn keyword Function zero? positive? negative? even? odd?
+syn keyword Function zero? positive? negative?
 syn keyword Function split join
 
 syn match ethModule /\<[A-Z][a-zA-Z0-9_]*\s*\./he=e-1 nextgroup=ethModule,ethMember
@@ -128,7 +137,7 @@ syn keyword ethLazy lazy
 
 syn match ethOperator /[-+=*/%><&|.!]\+/
 syn match ethOperator /:\|\$/
-syn keyword ethOperator is equal not mod land lor lxor lshl lshr ashl ashr lnot
+syn keyword ethOperator is eq not mod land lor lxor lshl lshr ashl ashr lnot
 
 syn match Keyword /!/
 syn match ethUnit /(\s*)/
@@ -140,12 +149,11 @@ syn keyword ethConstant stdin stdout stderr
 syn match ethLambda /\\/
 syn match ethLambda /->/
 
-syn keyword ethLoad load
-
-"syn match ethTableRef /::/ nextgroup=ethKey 
+"syn match ethTableRef /::/ nextgroup=ethKey
 "syn match ethKey /\k\+/ contained
 
 syn match Comment /#.*$/ contains=ethCommentLabel
+syn region Comment start=/(\*[^)]/ end=/\*)/ contains=Comment
 syn match ethCommentLabel /[A-Z]\w*:/ contained
 
 " Integer
@@ -258,7 +266,6 @@ hi link ethType Type
 hi link ethDef Type
 hi link ethLambda Operator
 hi link ethOperator Operator
-hi link ethLoad Include
 "hi link ethUnit PreProc
 hi link ethUnit Constant
 hi link ethDelimiter Delimiter
@@ -275,4 +282,5 @@ hi link ethCommentLabel Comment
 
 hi link ethQq Keyword
 
+hi link ethBuiltinFunction Function
 "hi link ethIdentifier Identifier

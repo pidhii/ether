@@ -51,7 +51,7 @@ eth_drop_location(eth_location *loc)
 }
 
 int
-eth_print_location(eth_location *loc, FILE *stream)
+eth_print_location_opt(eth_location *loc, FILE *stream, int opt)
 {
   if (loc == NULL)
     return -1;
@@ -60,14 +60,29 @@ eth_print_location(eth_location *loc, FILE *stream)
   if (fs == NULL)
     return -1;
 
-  putc('\n', stream);
   char buf[PATH_MAX];
   strcpy(buf, loc->filepath);
   char *file = basename(buf);
+
+  if (opt & ETH_LOPT_NEWLINES)
+    putc('\n', stream);
+
   if (loc->fl == loc->ll)
-    fprintf(stream, " %s %d:%d-%d:\n\n", file, loc->fl, loc->fc, loc->lc);
+    fprintf(stream, " %s %d:%d-%d:\n", file, loc->fl, loc->fc, loc->lc);
   else
-    fprintf(stream, " %s %d:%d-%d:%d:\n\n", file, loc->fl, loc->fc, loc->ll, loc->lc);
+    fprintf(stream, " %s %d:%d-%d:%d:\n", file, loc->fl, loc->fc, loc->ll, loc->lc);
+
+  if (opt & ETH_LOPT_NEWLINES)
+    putc('\n', stream);
+
+  int start = loc->fl;
+  int end = loc->ll;
+  if (opt & ETH_LOPT_EXTRALINES)
+  {
+    if (start > 1)
+      start -= 1;
+    end += 1;
+  }
 
   int line = 1;
   int col = 1;
@@ -84,14 +99,12 @@ eth_print_location(eth_location *loc, FILE *stream)
     }
     if (c == EOF)
     {
-      /*eth_error("print location: unexpected end of file\n");*/
-      /*eth_error = 1;*/
       fclose(fs);
       fputs("\e[0m", stream);
       goto end;
     }
 
-    if (line >= loc->fl && line <= loc->ll)
+    if (line >= start && line <= end)
     {
       if (line == loc->fl && col == loc->fc)
       {
@@ -101,7 +114,8 @@ eth_print_location(eth_location *loc, FILE *stream)
 
       if (col == 1)
       {
-        fputs("\e[0m", stream);
+        if (hl)
+          fputs("\e[0m", stream);
         fprintf(stream, " %6d | ", line);
         if (hl)
           fputs("\e[38;5;9;1m", stream);
@@ -110,7 +124,10 @@ eth_print_location(eth_location *loc, FILE *stream)
       putc(c, stream);
 
       if (line == loc->ll && col == loc->lc - 1)
+      {
         fputs("\e[0m", stream);
+        hl = false;
+      }
     }
 
     if (c == '\n')
@@ -123,13 +140,21 @@ eth_print_location(eth_location *loc, FILE *stream)
       col += 1;
     }
 
-    if (line > loc->ll)
+    if (line > end)
       break;
   }
 
   fclose(fs);
 
 end:
-  putc('\n', stream);
+  if (opt & ETH_LOPT_NEWLINES)
+    putc('\n', stream);
   return 0;
+}
+
+int
+eth_print_location(eth_location *loc, FILE *stream)
+{
+  int opt = ETH_LOPT_FILE | ETH_LOPT_NEWLINES | ETH_LOPT_EXTRALINES;
+  return eth_print_location_opt(loc, stream, opt);
 }

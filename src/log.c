@@ -11,6 +11,9 @@ eth_log_aux(bool enable, const char *module, const char *file, const char *func,
 {
   if (not enable) return;
 
+  fflush(stdout);
+  fflush(stderr);
+
 #ifdef ETH_DEBUG_MODE
   fprintf(os, "[%s %s \e[0m] ", style, module);
 #else

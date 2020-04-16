@@ -149,7 +149,15 @@ main(int argc, char **argv)
           clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t2);
 
           if (ret->type == eth_exception_type)
+          {
+            eth_exception *exn = ETH_EXCEPTION(ret);
             eth_error("unhandled exception: ~w", ETH_EXCEPTION(ret)->what);
+            for (int i = exn->tracelen - 1; i >= 0; --i)
+            {
+              eth_trace("trace[%d]:", i);
+              eth_print_location(exn->trace[i], stderr);
+            }
+          }
 
           eth_drop(ret);
           eth_drop_bytecode(bc);

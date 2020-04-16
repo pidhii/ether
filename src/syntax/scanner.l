@@ -26,7 +26,7 @@ ETH_MODULE("ether:scanner");
 #include <string.h>
 
 extern int _eth_start_token;
-
+static int g_comment_cnt = 0;
 
 %}
 
@@ -35,6 +35,7 @@ extern int _eth_start_token;
 /*%option interactive*/
 
 %x STRING
+%x COMMENT
 
 OPERATOR [-+%^.$:!<>*/=&|]+
 
@@ -50,7 +51,23 @@ OPERATOR [-+%^.$:!<>*/=&|]+
 %}
 
 [ \t\n] // white spaces
+
+"(*)"     {
+  yylval->string = strdup("*");
+  return SYMBOL;
+}
+
 "#".*$ // comments
+"(*" { BEGIN(COMMENT); }
+<COMMENT>"(*" { g_comment_cnt += 1; }
+<COMMENT>"*)" {
+  if (g_comment_cnt > 0)
+    g_comment_cnt -= 1;
+  else
+    BEGIN(INITIAL);
+}
+<COMMENT>.
+<COMMENT>\n
 
 \" { BEGIN(STRING); return '"'; }
 <STRING>\\\n
@@ -70,7 +87,6 @@ OPERATOR [-+%^.$:!<>*/=&|]+
   assert(*endptr == '\0');
   return CHAR;
 }
-<STRING>"\\%"  { yylval->character = '%'; return CHAR; }
 <STRING>"\\\"" { yylval->character = '"'; return CHAR; }
 <STRING>\"     { BEGIN(INITIAL); return '"'; }
 <STRING>.      { yylval->character = yytext[0]; return CHAR; }
@@ -130,7 +146,7 @@ false { yylval->constant = eth_false; return CONST; }
 "=="    { return EQ; }
 "/="    { return NE; }
 is      { return IS; }
-equal   { return EQUAL; }
+eq      { return EQUAL; }
 "->"    { return RARROW; }
 "<-"    { return LARROW; }
 "&&"    { return OPAND; }

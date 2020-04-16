@@ -42,7 +42,6 @@ let pub const x = fn -> x in
 let pub curry f = fn x y -> f (x, y) in
 let pub uncurry f = fn (x, y) -> f x y in
 
-
 let pub even? x = x mod 2 == 0 in
 let pub odd?  x = x mod 2 == 1 in
 
@@ -58,29 +57,102 @@ in
 #-------------------------------------------------------------------------------
 # - open
 # - open_pipe
-# - read_line
-# - read_line_of
+# - close
 #
-let open = uncurry __builtin_open in
-let open_pipe = uncurry __builtin_open_pipe in
+# Input:
+# - input
+# - read_of
+# - read
+# - read_line_of
+# - read_line
+# - read_file
+#
+# Output:
+# - print
+# - newline
+# - printf
+# - write_to
+# - write
+#
+# Miscelenious:
+# - tell
+# - seek
+#
+let pub open x =
+  if string? x then __open x "r"
+  else if let (p, m) = x then __open p m
+  else raise Invalid_argument
+in
 
-let read_line! = read_line_of stdin in
+let pub open_pipe x =
+  if string? x then __open_pipe x "r"
+  else if let (c, m) = x then __open_pipe c m
+  else raise Invalid_argument
+in
+
+let pub read_line! = read_line_of stdin in
+let pub read! = read_of stdin in
+
+let pub write = write_to stdout in
+
+#let pub seek file pos = match pos with
+#| Set: k -> __builtin_seek file k 0
+#| Cur: k -> __builtin_seek file k 1
+#| End: k -> __builtin_seek file k 2
+#in
+
+let pub seek file (pos:offs) =
+  let whence =
+    if pos is Set then 0 else
+    if pos is Cur then 1 else
+    if pos is End then 2 else
+    raise Invalid_argument
+  in __seek file offs whence
+in
+
+################################################################################
+#                                 System
+#-------------------------------------------------------------------------------
+
+let pub system fmt =
+  let rec aux x =
+    if not function? x then
+      __system x
+    else fn y -> aux (x y)
+  in aux (format fmt)
+in
+
+#let (*>>) f g =
+  #let rec aux x =
+    #if function? x then
+      #x >> aux
+    #else f x
+  #in aux g
+#in
+
+#let (<<*) = flip (>>*) in
+
+#let pub system = __system <<* format in
 
 ################################################################################
 #                                 String
 #-------------------------------------------------------------------------------
 # Constructors:
 # - concat (C)
-# - chr (C)
 #
 # Miscelenious:
 # - strlen (C)
 # - to_upper (C)
 # - to_lower (C)
+# - chr (C)
+# - ord (C)
 #
 # Stripping:
 # - chomp (C)
 # - chop (C)
+#
+# Slicing (C):
+# - substr
 #
 # Comparison:
 # - strcmp (C)
@@ -238,11 +310,11 @@ let rec pub find p xs =
   else raise Not_found
 in
 
-let pub merge ord xs ys =
+let pub merge cmp xs ys =
   let rec loop xs ys acc =
     if let x:xs' = xs then
       if let y:ys' = ys then
-        if ord x y
+        if cmp x y
         then loop xs' ys  (x:acc)
         else loop xs  ys' (y:acc)
       else rev_append acc xs
@@ -259,10 +331,10 @@ let split_by_half =
   in fn xs -> loop xs xs nil
 in
 
-let rec pub sort ord xs =
+let rec pub sort cmp xs =
   if let _:_:_ = xs then
     let (l, r) = split_by_half xs in
-    merge ord (sort ord l) (sort ord r)
+    merge cmp (sort cmp l) (sort cmp r)
   else xs
 in
 
@@ -296,14 +368,6 @@ let rec pub drop n xs =
   if n > 0 then
     drop (n - 1) (cdr xs)
   else xs
-in
-
-let rec pub drop_while p xs =
-  if let x:xs = xs then
-    if p x then
-      drop_while p xs
-    else xs
-  else []
 in
 
 let rec pub all? p xs =

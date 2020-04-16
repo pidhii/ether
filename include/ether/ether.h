@@ -6,6 +6,9 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <iso646.h>
+#include <limits.h>
+#include <stdint.h>
+#include <float.h>
 
 #define eth_likely(expr) __builtin_expect(!!(expr), 1)
 #define eth_unlikely(expr) __builtin_expect((expr), 0)
@@ -45,6 +48,7 @@ typedef struct eth_bytecode eth_bytecode;
 typedef struct eth_scp eth_scp;
 
 typedef struct eth_function eth_function;
+typedef struct eth_location eth_location;
 
 void
 eth_vfprintf(FILE *out, const char *fmt, va_list arg);
@@ -91,6 +95,12 @@ eth_log_aux(bool enable, const char *module, const char *file, const char *func,
       eth_log_level <= ETH_LOG_ERROR,                \
       eth_this_module, __FILE__, __func__, __LINE__, \
       "\e[38;5;16;48;5;9;1m", stderr, fmt, ##__VA_ARGS__)
+
+#define eth_trace(fmt, ...)                          \
+  eth_log_aux(                                       \
+      true,                                          \
+      eth_this_module, __FILE__, __func__, __LINE__, \
+      "\e[48;5;16;38;5;9;1m", stderr, fmt, ##__VA_ARGS__)
 
 
 const char*
@@ -526,6 +536,52 @@ eth_create_number(eth_number_t val)
 }
 #define eth_num eth_create_number
 
+#define _ETH_TEST_SNUM(name, type)                    \
+  static inline bool                                  \
+  eth_is_##name(eth_t x)                              \
+  {                                                   \
+    eth_number_t num = eth_num_val(x);                \
+    return (num <= type##_MAX) & (num >= type##_MIN); \
+  }
+#define _ETH_TEST_UNUM(name, type)                    \
+  static inline bool                                  \
+  eth_is_##name(eth_t x)                              \
+  {                                                   \
+    eth_number_t num = eth_num_val(x);                \
+    return (num <= type##_MAX) & (num >= 0);          \
+  }
+// native C integer types
+_ETH_TEST_SNUM(char, CHAR)
+_ETH_TEST_SNUM(signed_char, SCHAR)
+_ETH_TEST_UNUM(unsigned_char, UCHAR)
+_ETH_TEST_SNUM(short, SHRT)
+_ETH_TEST_UNUM(unsigned_short, USHRT)
+_ETH_TEST_SNUM(int, INT)
+_ETH_TEST_UNUM(unsigned_int, UINT)
+_ETH_TEST_SNUM(long, LONG)
+_ETH_TEST_UNUM(unsigned_long, ULONG)
+_ETH_TEST_SNUM(long_long, LLONG)
+_ETH_TEST_UNUM(unsigned_long_long, ULLONG)
+// exact-width integer types
+_ETH_TEST_SNUM(int8, INT8)
+_ETH_TEST_UNUM(uint8, UINT8)
+_ETH_TEST_SNUM(int16, INT16)
+_ETH_TEST_UNUM(uint16, UINT16)
+_ETH_TEST_SNUM(int32, INT32)
+_ETH_TEST_UNUM(uint32, UINT32)
+_ETH_TEST_SNUM(int64, INT64)
+_ETH_TEST_UNUM(uint64, UINT64)
+// other integer types
+_ETH_TEST_UNUM(size, SIZE)
+_ETH_TEST_SNUM(intmax, INTMAX)
+_ETH_TEST_UNUM(uintmax, UINTMAX)
+// native C float types
+_ETH_TEST_SNUM(float, FLT)
+_ETH_TEST_SNUM(double, DBL)
+_ETH_TEST_SNUM(long_double, LDBL)
+#undef _ETH_TEST_SNUM
+#undef _ETH_TEST_UNUM
+
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                               function
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -605,12 +661,21 @@ eth_type *eth_exception_type;
 typedef struct {
   eth_header header;
   eth_t what;
+  int tracelen;
+  eth_location **trace;
 } eth_exception;
 #define ETH_EXCEPTION(x) ((eth_exception*)(x))
 
 eth_t __attribute__((malloc))
 eth_create_exception(eth_t what);
 #define eth_exn eth_create_exception
+
+eth_t
+eth_copy_exception(eth_t exn);
+
+void
+eth_push_trace(eth_t exn, eth_location *loc);
+
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                string
@@ -1011,11 +1076,11 @@ eth_get_modules(const eth_env *env, const eth_module *out[], int n);
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                              LOCATIONS
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-typedef struct {
+struct eth_location {
   int rc;
   int fl, fc, ll, lc;
   char *filepath;
-} eth_location;
+};
 
 eth_location*
 eth_create_location(int fl, int fc, int ll, int lc, const char *path);
@@ -1031,6 +1096,13 @@ eth_drop_location(eth_location *loc);
 
 int
 eth_print_location(eth_location *loc, FILE *stream);
+
+#define ETH_LOPT_FILE       (1 << 0)
+#define ETH_LOPT_NEWLINES   (1 << 1)
+#define ETH_LOPT_EXTRALINES (1 << 2)
+
+int
+eth_print_location_opt(eth_location *loc, FILE *stream, int opt);
 
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
@@ -1956,11 +2028,20 @@ _eth_type_error(size_t n, size_t ntot)
 
 #define eth_return(args, ret)           \
   do {                                  \
-    eth_ref(ret);                       \
+    const eth_t _eth_ret = (ret);       \
+    eth_ref(_eth_ret);                  \
     for (size_t i = 0; i < args.n; ++i) \
       eth_unref(*eth_sp++);             \
-    eth_dec(ret);                       \
-    return ret;                         \
+    eth_dec(_eth_ret);                  \
+    return _eth_ret;                    \
   } while (0)
+
+#define eth_throw(args, err) \
+  eth_return(args, eth_exn(err))
+
+#define eth_rethrow(args, exn) \
+  eth_return(args, exn)
+
+
 
 #endif

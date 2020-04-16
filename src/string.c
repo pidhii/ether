@@ -53,7 +53,7 @@ static bool
 string_equal(eth_type *type, eth_t x, eth_t y)
 {
   return eth_str_len(x) == eth_str_len(y)
-     and strcmp(eth_str_cstr(x), eth_str_cstr(y)) == 0;
+     and memcmp(eth_str_cstr(x), eth_str_cstr(y), eth_str_len(x)) == 0;
 }
 
 void

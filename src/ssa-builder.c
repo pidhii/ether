@@ -454,9 +454,41 @@ build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int f, bool *e)
   return ret;
 }
 
-static void
-write_throw(ssa_builder *bldr, eth_ssa_tape *tape, int exnvid)
+static eth_t
+create_tracer(eth_location *loc)
 {
+  eth_t proc(void)
+  {
+    eth_location *loc = eth_this->proc.data;
+    eth_t exn = *eth_sp++;
+    assert(exn->type == eth_exception_type);
+    if (exn->rc > 0)
+      exn = eth_copy_exception(exn);
+    eth_push_trace(exn, loc);
+    return exn;
+  }
+  eth_t tracer = eth_create_proc(proc, 1, loc, (void*)eth_unref_location);
+  eth_ref_location(loc);
+  return tracer;
+}
+
+static void
+write_throw(ssa_builder *bldr, eth_ssa_tape *tape, int exnvid, eth_location *loc)
+{
+  if (loc)
+  {
+    eth_t tracer = create_tracer(loc);
+    int tracervid = new_val(bldr, RC_RULES_DISABLE);
+    eth_write_insn(tape, eth_insn_cval(tracervid, tracer));
+
+    int newexn = new_val(bldr, RC_RULES_DEFAULT);
+    eth_insn *dotrace = eth_insn_apply(newexn, tracervid, &exnvid, 1);
+    bldr->vinfo[newexn]->creatloc = dotrace;
+    eth_write_insn(tape, dotrace);
+
+    exnvid = newexn;
+  }
+
   if (bldr->istry)
   {
     eth_insn *catch = eth_insn_catch(bldr->tryid, exnvid);
@@ -468,7 +500,8 @@ write_throw(ssa_builder *bldr, eth_ssa_tape *tape, int exnvid)
 }
 
 static void
-assert_number(ssa_builder *bldr, eth_ssa_tape *tape, int vid, bool *e)
+assert_number(ssa_builder *bldr, eth_ssa_tape *tape, int vid, eth_location *loc,
+    bool *e)
 {
   if (bldr->vinfo[vid]->type)
   {
@@ -479,7 +512,7 @@ assert_number(ssa_builder *bldr, eth_ssa_tape *tape, int vid, bool *e)
       *e = 1;
       int exn = new_val(bldr, RC_RULES_DISABLE);
       eth_write_insn(tape, eth_insn_cval(exn, eth_exn(eth_sym("Type_error"))));
-      write_throw(bldr, tape, exn);
+      write_throw(bldr, tape, exn, loc);
     }
   }
   else
@@ -488,7 +521,7 @@ assert_number(ssa_builder *bldr, eth_ssa_tape *tape, int vid, bool *e)
     eth_ssa_tape *errtape = eth_create_ssa_tape();
     int exn = new_val(bldr, RC_RULES_DISABLE);
     eth_write_insn(errtape, eth_insn_cval(exn, eth_exn(eth_sym("Type_error"))));
-    write_throw(bldr, errtape, exn);
+    write_throw(bldr, errtape, exn, loc);
     // --
     eth_insn *test = eth_insn_if_test_type(-1, vid, eth_number_type,
         eth_insn_nop(), errtape->head);
@@ -656,18 +689,14 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
       if (bldr->testexn)
       {
         eth_ssa_tape *thentape = eth_create_ssa_tape();
-        write_throw(bldr, thentape, ret);
-
-        eth_ssa_tape *elsetape = eth_create_ssa_tape();
-        eth_write_insn(elsetape, eth_insn_nop());
+        write_throw(bldr, thentape, ret, ir->loc);
 
         eth_insn *test = eth_insn_if_test_type(-1, ret, eth_exception_type,
-            thentape->head, elsetape->head);
+            thentape->head, eth_insn_nop());
         test->iff.likely = -1;
         eth_write_insn(tape, test);
 
         eth_destroy_ssa_tape(thentape);
-        eth_destroy_ssa_tape(elsetape);
       }
 
       return ret;
@@ -829,8 +858,8 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
 
       if (testnum)
       {
-        assert_number(bldr, tape, lhs, e);
-        assert_number(bldr, tape, rhs, e);
+        assert_number(bldr, tape, lhs, ir->loc, e);
+        assert_number(bldr, tape, rhs, ir->loc, e);
         set_type(bldr, lhs, eth_number_type);
         set_type(bldr, rhs, eth_number_type);
       }
@@ -865,7 +894,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
       }
 
       if (testnum)
-        assert_number(bldr, tape, expr, e);
+        assert_number(bldr, tape, expr, ir->loc, e);
 
       eth_write_insn(tape, insn);
       return ret;
@@ -971,7 +1000,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
     case ETH_IR_THROW:
     {
       int vid = build(bldr, tape, ir->throw.exn, false, e);
-      write_throw(bldr, tape, vid);
+      write_throw(bldr, tape, vid, ir->loc);
       return vid;
     }
   }
