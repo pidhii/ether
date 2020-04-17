@@ -12,6 +12,8 @@ create_var(eth_var_cfg cfg)
   if ((var->cval = cfg.cval))
     eth_ref(var->cval);
   var->vid = cfg.vid;
+  if ((var->attr = cfg.attr))
+    eth_ref_attr(var->attr);
   return var;
 }
 
@@ -21,6 +23,8 @@ destroy_var(eth_var *var)
   free(var->ident);
   if (var->cval)
     eth_unref(var->cval);
+  if (var->attr)
+    eth_unref_attr(var->attr);
   free(var);
 }
 

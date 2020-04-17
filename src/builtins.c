@@ -13,6 +13,13 @@
 ETH_MODULE("ether:builtins")
 
 
+static
+eth_env *g_env;
+
+static
+eth_module *g_mod;
+
+
 static eth_t
 _strcat(void)
 {
@@ -540,7 +547,7 @@ _open(void)
 }
 
 static eth_t
-_open_pipe(void)
+_popen(void)
 {
   eth_args args = eth_start(2);
   eth_t path = eth_arg2(args, eth_string_type);
@@ -1111,26 +1118,47 @@ _raise(void)
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                  load
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-//static eth_t
-//_load(void)
-//{
-  //eth_t path = *eth_sp++;
-  //if (eth_unlikely(not eth_is_str(path)))
-  //{
-    //eth_drop(path);
-    //return eth_exn(eth_sym("Type_error"));
-  //}
-//}
+static eth_t
+_load(void)
+{
+  static int cnt = 1;
+
+  eth_t path = *eth_sp++;
+  if (eth_unlikely(not eth_is_str(path)))
+  {
+    eth_drop(path);
+    return eth_exn(eth_sym("Type_error"));
+  }
+
+  char id[42];
+  sprintf(id, "load.%d", cnt++);
+
+  eth_module *mod = eth_create_module(id);
+  eth_t ret;
+  if (not eth_load_module_from_script(g_env, mod, eth_str_cstr(path), &ret))
+  {
+    eth_drop(path);
+    eth_destroy_module(mod);
+    return eth_exn(eth_sym("Failure"));
+  }
+
+  eth_t acc = eth_nil;
+  int ndefs = eth_get_ndefs(mod);
+  eth_def defs[ndefs];
+  eth_get_defs(mod, defs);
+  for (int i = 0; i < ndefs; ++i)
+    acc = eth_cons(eth_tup2(eth_str(defs[i].ident), defs[i].val), acc);
+
+  ret = eth_tup2(ret, acc);
+  eth_drop(path);
+  eth_remove_module(g_env, id);
+  eth_destroy_module(mod);
+  return ret;
+}
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                 module
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-static
-eth_env *g_env;
-
-static
-eth_module *g_mod;
-
 /*
  * NOTE: IR-builder will use builtins ...while loading builtins.
  */
@@ -1142,6 +1170,7 @@ _eth_init_builtins(void)
 
   eth_debug("loading builtins");
 
+  // TODO: `++` should be an instaruction
   eth_define(g_mod,         "++", eth_create_proc(    _strcat, 2, NULL, NULL));
   // ---
   eth_define(g_mod,      "pair?", eth_create_proc(    _pair_p, 1, NULL, NULL));
@@ -1177,7 +1206,7 @@ _eth_init_builtins(void)
   eth_define(g_mod,     "stdout", eth_stdout);
   eth_define(g_mod,     "stderr", eth_stderr);
   eth_define(g_mod,     "__open", eth_create_proc(      _open, 2, NULL, NULL));
-  eth_define(g_mod,"__open_pipe", eth_create_proc( _open_pipe, 2, NULL, NULL));
+  eth_define(g_mod,    "__popen", eth_create_proc(     _popen, 2, NULL, NULL));
   eth_define(g_mod,      "close", eth_create_proc(     _close, 1, NULL, NULL));
   eth_define(g_mod,"read_line_of",eth_create_proc(_read_line_of,1,NULL, NULL));
   eth_define(g_mod,    "read_of", eth_create_proc(   _read_of, 2, NULL, NULL));
@@ -1195,9 +1224,11 @@ _eth_init_builtins(void)
   eth_define(g_mod,     "format", eth_create_proc(    _format, 1, NULL, NULL));
   // ---
   eth_define(g_mod,      "raise", eth_create_proc(     _raise, 1, NULL, NULL));
+  // ---
+  eth_define(g_mod,       "load", eth_create_proc(      _load, 1, NULL, NULL));
 
-  eth_debug("loading \"src/builtins.eth\"");
-  if (not eth_load_module_from_script(g_env, g_mod, "src/builtins.eth"))
+  eth_debug("- loading \"src/builtins.eth\"");
+  if (not eth_load_module_from_script(g_env, g_mod, "src/builtins.eth", NULL))
   {
     eth_error("failed to load builtins");
     abort();

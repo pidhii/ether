@@ -112,7 +112,6 @@ unless { return UNLESS; }
 fn     { return FN; }
 if[ \t\n]+let   { return IFLET; }
 when[ \t\n]+let { return WHENLET; }
-pub    { return PUB; }
 import { return IMPORT; }
 as     { return AS; }
 unqualified { return UNQUALIFIED; }
@@ -123,6 +122,9 @@ or     { return OR; }
 nil   { yylval->constant = eth_nil;   return CONST; }
 true  { yylval->constant = eth_true;  return CONST; }
 false { yylval->constant = eth_false; return CONST; }
+
+pub       { return PUB; }
+__builtin { return BUILTIN; }
 
 "|"     |
 "_"     |

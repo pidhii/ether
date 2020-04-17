@@ -50,7 +50,7 @@ syn keyword ethBuiltinFunction chomp chop
 
 syn keyword ethBuiltinFunction car cdr
 syn keyword ethBuiltinFunction length rev_append append rev
-syn keyword ethBuiltinFunction rev_map map
+syn keyword ethBuiltinFunction rev_map map rev_zip zip
 syn keyword ethBuiltinFunction for_each
 syn keyword ethBuiltinFunction rev_filter_map filter_map
 syn keyword ethBuiltinFunction rev_flat_map flat_map flatten
@@ -60,12 +60,14 @@ syn keyword ethBuiltinFunction scan_left scan_right
 syn keyword ethBuiltinFunction sort merge
 syn keyword ethBuiltinFunction drop rev_take take
 syn keyword ethBuiltinFunction any? all? memq?
+syn keyword ethBuiltinFunction assoc assq
 
 syn keyword ethBuiltinFunction id flip const
 syn keyword ethBuiltinFunction curry uncurry
 syn keyword ethBuiltinFunction even? odd?
 
-syn keyword ethBuiltinFunction open open_pipe
+syn keyword ethBuiltinFunction open_in open_out open_append
+syn keyword ethBuiltinFunction open_pipe_in open_pipe_out
 syn keyword ethBuiltinFunction close
 syn keyword ethBuiltinFunction input
 syn keyword ethBuiltinFunction print newline
@@ -75,7 +77,7 @@ syn keyword ethBuiltinFunction read read_of
 syn keyword ethBuiltinFunction read_file
 syn keyword ethBuiltinFunction tell seek
 
-syn keyword ethBuiltinFunction printf fprintf format
+syn keyword ethBuiltinFunction printf format
 syn keyword ethBuiltinFunction apply
 syn keyword ethBuiltinFunction die raise
 syn keyword ethBuiltinFunction system shell
@@ -98,7 +100,6 @@ syn keyword Function table
 syn keyword Function substr strstr ltrim rtrim trim
 syn keyword Function read readline readlines flush rewind getpos setpos
 syn keyword Function range
-syn keyword Function zip
 syn keyword Function scanl
 syn keyword Function repeat iterate
 syn keyword Function unfold
@@ -119,6 +120,7 @@ syn region ethList matchgroup=Type start=/\[/ end=/\]/ skipwhite skipnl contains
 syn region ethArray matchgroup=Type start=/\[\s*|/ end=/|\s*\]/ skipwhite skipnl contains=TOP
 
 syn keyword StorageClass pub
+syn keyword Special __builtin
 
 syn match ethDelimiter /[,;()]/
 
@@ -129,7 +131,7 @@ hi link ethImportAs ethKeyword
 syn keyword ethUnqualified unqualified contained
 hi link ethUnqualified ethKeyword
 
-syn keyword ethKeyword let rec mut and or in as match
+syn keyword ethKeyword let rec mut and or in as match otherwize
 syn keyword ethAssert assert
 
 syn keyword ethKeyword if unless when then else try with

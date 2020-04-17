@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+
+ETH_MODULE("ether:module")
+
+
 // TODO: use hash table
 struct eth_module {
   char *name;
@@ -27,11 +31,14 @@ eth_create_module(const char *name)
 void
 eth_destroy_module(eth_module *mod)
 {
+  /*eth_debug("destroying module %s:", mod->name);*/
   free(mod->name);
   for (int i = 0; i < mod->ndefs; ++i)
   {
+    /*eth_debug("- delete '%s'", mod->defs[i].ident);*/
     free(mod->defs[i].ident);
     eth_unref(mod->defs[i].val);
+    eth_unref_attr(mod->defs[i].attr);
   }
   free(mod->defs);
   eth_destroy_env(mod->env);
@@ -64,15 +71,28 @@ eth_get_env(const eth_module *mod)
 }
 
 void
-eth_define(eth_module *mod, const char *ident, eth_t val)
+eth_define_attr(eth_module *mod, const char *ident, eth_t val, eth_attr *attr)
 {
   if (eth_unlikely(mod->ndefs == mod->defscap))
   {
     mod->defscap <<= 1;
     mod->defs = realloc(mod->defs, sizeof(eth_def) * mod->defscap);
   }
-  mod->defs[mod->ndefs++] = (eth_def) { strdup(ident), val };
+  eth_def def =  {
+    .ident = strdup(ident),
+    .val = val,
+    .attr = attr,
+  };
+  mod->defs[mod->ndefs++] = def;
+  eth_ref_attr(def.attr);
   eth_ref(val);
+}
+
+
+void
+eth_define(eth_module *mod, const char *ident, eth_t val)
+{
+  eth_define_attr(mod, ident, val, eth_create_attr());
 }
 
 eth_def*

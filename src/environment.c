@@ -130,8 +130,8 @@ add_dl_module(eth_env *env, eth_module *mod, void* dl,  int flag)
   return ent;
 }
 
-static bool
-unregister_module(eth_env *env, const char *name)
+bool
+eth_remove_module(eth_env *env, const char *name)
 {
   return cod_hash_map_erase(env->mods, name, hash(name), free);
 }
@@ -142,7 +142,7 @@ eth_add_module(eth_env *env, eth_module *mod)
   return add_module(env, mod, ETH_MFLAG_READY);
 }
 
-module_entry*
+static module_entry*
 get_module_entry(const eth_env *env, const char *name)
 {
   cod_hash_map_elt* elt = cod_hash_map_find(env->mods, name, hash(name));
@@ -166,49 +166,67 @@ eth_get_modules(const eth_env *env, const eth_module *out[], int n)
 }
 
 static bool
-load_from_script(eth_env *env, eth_module *mod, const char *path)
+load_from_script(eth_env *env, eth_module *mod, const char *path, eth_t *retptr)
 {
   eth_debug("loading script-module %s", eth_get_module_name(mod));
 
   FILE *file = fopen(path, "r");
-  if (file == NULL) goto error;
+  if (file == NULL)
+    goto error;
 
   eth_ast *ast = eth_parse(file);
   fclose(file);
-  if (ast == NULL) goto error;
+  if (ast == NULL)
+    goto error;
 
   eth_ir_defs defs;
   eth_ir *ir = eth_build_module_ir(ast, env, mod, &defs);
   eth_drop_ast(ast);
-  if (ir == NULL) goto error;
+  if (ir == NULL)
+    goto error;
 
   eth_ssa *ssa = eth_build_ssa(ir, &defs);
   eth_drop_ir(ir);
-  eth_destroy_ir_defs(&defs);
-  if (ssa == NULL) goto error;
+  if (ssa == NULL)
+  {
+    eth_destroy_ir_defs(&defs);
+    goto error;
+  }
 
   eth_bytecode *bc = eth_build_bytecode(ssa);
   eth_destroy_ssa(ssa);
-  if (bc == NULL) goto error;
+  if (bc == NULL)
+  {
+    eth_destroy_ir_defs(&defs);
+    goto error;
+  }
 
   eth_t ret = eth_vm(bc);
   eth_ref(ret);
   eth_drop_bytecode(bc);
   if (ret->type == eth_exception_type)
   {
+    eth_destroy_ir_defs(&defs);
     eth_warning("failed to load module %s (~w)", eth_get_module_name(mod), ret);
     eth_unref(ret);
     return false;
   }
 
-  for (eth_t it = ret; it != eth_nil; it = eth_cdr(it))
+  // get defs:
+  int i = 0;
+  for (eth_t it = eth_tup_get(ret, 1); it != eth_nil; it = eth_cdr(it), ++i)
+    eth_define_attr(mod, defs.idents[i], eth_car(it), defs.attrs[i]);
+  eth_destroy_ir_defs(&defs);
+  // get return-value:
+  if (retptr)
   {
-    eth_t x = eth_car(it);
-    char *ident = ETH_STRING(eth_car(x))->cstr;
-    eth_t value = eth_cdr(x);
-    eth_define(mod, ident, value);
+    *retptr = eth_tup_get(ret, 0);
+    eth_ref(*retptr);
+    eth_unref(ret);
+    eth_dec(*retptr);
   }
-  eth_unref(ret);
+  else
+    eth_unref(ret);
 
   eth_debug("module %s was succesfully loaded", eth_get_module_name(mod));
   return true;
@@ -219,7 +237,8 @@ error:
 }
 
 bool
-eth_load_module_from_script(eth_env *env, eth_module *mod, const char *path)
+eth_load_module_from_script(eth_env *env, eth_module *mod, const char *path,
+    eth_t *ret)
 {
   char fullpath[PATH_MAX];
   if (not realpath(path, fullpath))
@@ -228,10 +247,16 @@ eth_load_module_from_script(eth_env *env, eth_module *mod, const char *path)
     return false;
   }
 
-  if (get_module_entry(env, eth_get_module_name(mod)))
+  module_entry *ent = get_module_entry(env, eth_get_module_name(mod));
+  if (ent)
   {
-    eth_warning("module with name '%s' already present", eth_get_module_name(mod));
-    return false;
+    if (ent->mod == mod)
+      eth_debug("updating module '%s'", eth_get_module_name(mod));
+    else
+    {
+      eth_warning("module with name '%s' already present", eth_get_module_name(mod));
+      return false;
+    }
   }
 
   char cwd[PATH_MAX];
@@ -241,15 +266,19 @@ eth_load_module_from_script(eth_env *env, eth_module *mod, const char *path)
   strcpy(dirbuf, fullpath);
   char *dir = dirname(dirbuf);
 
+  if (ent)
+    ; // will update existing module
+  else
+    ent = add_module(env, mod, 0);
+
   chdir(dir);
-  module_entry *ent = add_module(env, mod, 0);
-  int ok = load_from_script(env, mod, fullpath);
+  int ok = load_from_script(env, mod, fullpath, ret);
   ent->flag |= ETH_MFLAG_READY;
   chdir(cwd);
 
   if (not ok)
   {
-    unregister_module(env, eth_get_module_name(mod));
+    eth_remove_module(env, eth_get_module_name(mod));
     return false;
   }
 
@@ -319,7 +348,7 @@ eth_load_module_from_elf(eth_env *env, eth_module *mod, const char *path)
 
   if (not dl)
   {
-    unregister_module(env, eth_get_module_name(mod));
+    eth_remove_module(env, eth_get_module_name(mod));
     return false;
   }
 
@@ -459,7 +488,7 @@ load_module(eth_env *env, const char *name)
   if (is_elf(path))
     ok = eth_load_module_from_elf(env, mod, path);
   else
-    ok = eth_load_module_from_script(env, mod, path);
+    ok = eth_load_module_from_script(env, mod, path, NULL);
 
   if (not ok)
   {

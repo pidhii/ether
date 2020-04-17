@@ -24,7 +24,7 @@ eth_ast_ident_pattern(const char *ident)
   pat->rc = 0;
   pat->tag = ETH_PATTERN_IDENT;
   pat->ident.str = strdup(ident);
-  pat->ident.pub = false;
+  pat->ident.attr = 0;
   return pat;
 }
 

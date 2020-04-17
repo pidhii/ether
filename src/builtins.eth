@@ -1,40 +1,38 @@
+let pub __builtin (+) x y = x + y in
+let pub __builtin (-) x y = x - y in
+let pub __builtin (*) x y = x * y in
+let pub __builtin (/) x y = x / y in
+let pub __builtin (mod) x y = x mod y in
+let pub __builtin (^) x y = x ^ y in
 
-let pub car x:_ = x in
-let pub cdr _:x = x in
+let pub __builtin (land) x y = x land y in
+let pub __builtin (lor) x y = x lor y in
+let pub __builtin (lxor) x y = x lxor y in
+let pub __builtin (lshl) x y = x lshl y in
+let pub __builtin (lshr) x y = x lshr y in
+let pub __builtin (ashl) x y = x ashl y in
+let pub __builtin (ashr) x y = x ashr y in
+let pub __builtin (lnot) x = lnot x in
 
-let pub (+) x y = x + y in
-let pub (-) x y = x - y in
-let pub (*) x y = x * y in
-let pub (/) x y = x / y in
-let pub (mod) x y = x mod y in
-let pub (^) x y = x ^ y in
+let pub __builtin (<) x y = x < y in
+let pub __builtin (>) x y = x > y in
+let pub __builtin (<=) x y = x <= y in
+let pub __builtin (>=) x y = x >= y in
+let pub __builtin (==) x y = x == y in
+let pub __builtin (/=) x y = x /= y in
 
-let pub (land) x y = x land y in
-let pub (lor) x y = x lor y in
-let pub (lxor) x y = x lxor y in
-let pub (lshl) x y = x lshl y in
-let pub (lshr) x y = x lshr y in
-let pub (ashl) x y = x ashl y in
-let pub (ashr) x y = x ashr y in
-let pub (lnot) x = lnot x in
+let pub __builtin (is) x y = x is y in
 
-let pub (<) x y = x < y in
-let pub (>) x y = x > y in
-let pub (<=) x y = x <= y in
-let pub (>=) x y = x >= y in
-let pub (==) x y = x == y in
-let pub (/=) x y = x /= y in
-
-let pub (is) x y = x is y in
-
-let pub (:) x y = x : y in
+let pub __builtin (:) x y = x : y in
 let pub (++) x y = x ++ y in
 
-let pub (not) x = not x in
+let pub __builtin (not) x = not x in
 
 let pub ($) f x = f x in
 let pub (|>) x f = f x in
 
+let pub car x:_ = x in
+let pub cdr _:x = x in
 
 let pub id x = x in
 let pub flip f x y = f y x in
@@ -52,10 +50,23 @@ let pub __builtin_inclusive_range from to =
   in loop to nil
 in
 
+#let (*<<) f g =
+let compose_va f g =
+  let rec aux x =
+    if function? x then
+      fn y -> aux (x y)
+      #x >> aux
+    else f x
+  in aux g
+in
+#let (>>*) = flip (<<*) in
+
 ################################################################################
 #                                  IO
 #-------------------------------------------------------------------------------
-# - open (C)
+# - open_in
+# - open_out
+# - open_append
 # - open_pipe (C)
 # - close (C)
 #
@@ -78,28 +89,16 @@ in
 # - tell (C)
 # - seek (C)
 #
-let pub open x =
-  if string? x then __open x "r"
-  else if let (p, m) = x then __open p m
-  else raise Invalid_argument
-in
-
-let pub open_pipe x =
-  if string? x then __open_pipe x "r"
-  else if let (c, m) = x then __open_pipe c m
-  else raise Invalid_argument
-in
+let pub open_in path = __open path "r" in
+let pub open_out path = __open path "w" in
+let pub open_append path = __open path "a" in
+let pub open_pipe_in = compose_va (fn cmd -> __popen cmd "r") format in
+let pub open_pipe_out = compose_va (fn cmd -> __popen cmd "w") format in
 
 let pub read_line! = read_line_of stdin in
 let pub read! = read_of stdin in
 
 let pub write = write_to stdout in
-
-#let pub seek file pos = match pos with
-#| Set: k -> __builtin_seek file k 0
-#| Cur: k -> __builtin_seek file k 1
-#| End: k -> __builtin_seek file k 2
-#in
 
 let pub seek file (pos:offs) =
   let whence =
@@ -109,29 +108,17 @@ let pub seek file (pos:offs) =
     raise Invalid_argument
   in __seek file offs whence
 in
+#let pub seek file pos = match pos with
+#| Set: k -> __builtin_seek file k 0
+#| Cur: k -> __builtin_seek file k 1
+#| End: k -> __builtin_seek file k 2
+#in
 
 ################################################################################
 #                                 System
 #-------------------------------------------------------------------------------
 
-let pub system fmt =
-  let rec aux x =
-    if not function? x then
-      __system x
-    else fn y -> aux (x y)
-  in aux (format fmt)
-in
-
-#let (*>>) f g =
-  #let rec aux x =
-    #if function? x then
-      #x >> aux
-    #else f x
-  #in aux g
-#in
-
-#let (<<*) = flip (>>*) in
-
+let pub system = compose_va __system format in
 #let pub system = __system <<* format in
 
 ################################################################################
@@ -175,6 +162,7 @@ in
 # Iterators:
 # - rev_map
 # - map
+# - zip
 # - for_each
 # - rev_flat_map
 # - flat_map
@@ -229,6 +217,30 @@ let pub rev_map f xs =
   in loop xs nil
 in
 let pub map f xs = rev $ rev_map f xs in
+
+let rec pub rev_zip f xs ys =
+  let rec loop xs ys acc =
+    if let x:xs = xs then
+      if let y:ys = ys then
+        loop xs ys (f x y : acc)
+      else acc
+    else acc
+    #match xs, ys with
+    #| x:xs, y:ys -> loop xs ys (f x y : acc)
+    #| otherwize  -> acc
+  in loop xs ys []
+in
+
+let rec pub zip f xs ys =
+  if let x:xs = xs then
+    if let y:ys = ys then
+      f x y : zip f xs ys
+    else []
+  else []
+  #match xs, ys with
+  #| x:xs, y:ys -> f x y : loop xs ys
+  #| otherwize  -> []
+in
 
 let rec pub for_each f xs =
   when let x:xs = xs then (
@@ -386,6 +398,24 @@ let rec pub memq? a xs =
   if let x:xs = xs then
     x is a || memq? a xs
   else false
+in
+
+let rec pub assoc x l =
+  if let kv:l = l then
+    if let (k, v) = kv then
+      if k eq x then v
+      else assoc x l
+    else raise Invalid_argument
+  else raise Not_found
+in
+
+let rec pub assq x l =
+  if let kv:l = l then
+    if let (k, v) = kv then
+      if k is x then v
+      else assoc x l
+    else raise Invalid_argument
+  else raise Not_found
 in
 
 ()

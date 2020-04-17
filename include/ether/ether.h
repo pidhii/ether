@@ -992,6 +992,30 @@ eth_get_file_stream(eth_t x);
 
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
+//                             ATTRIBUTES
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+#define ETH_ATTR_BUILTIN (1 << 0)
+#define ETH_ATTR_PUB     (1 << 1)
+
+typedef struct {
+  int rc;
+  int flag;
+} eth_attr;
+
+eth_attr*
+eth_create_attr(void);
+
+void
+eth_ref_attr(eth_attr *attr);
+
+void
+eth_unref_attr(eth_attr *attr);
+
+void
+eth_drop_attr(eth_attr *attr);
+
+
+// ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                       MODULES AND ENVIRONMENT
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                              module
@@ -999,6 +1023,7 @@ eth_get_file_stream(eth_t x);
 typedef struct {
   char *ident;
   eth_t val;
+  eth_attr *attr;
 } eth_def;
 
 eth_module* __attribute__((malloc))
@@ -1021,6 +1046,9 @@ eth_get_env(const eth_module *mod);
 
 void
 eth_define(eth_module *mod, const char *ident, eth_t val);
+
+void
+eth_define_attr(eth_module *mod, const char *ident, eth_t val, eth_attr *attr);
 
 eth_def*
 eth_find_def(const eth_module *mod, const char *ident);
@@ -1057,11 +1085,15 @@ eth_resolve_path(eth_env *env, const char *path, char *fullpath);
 bool
 eth_add_module(eth_env *env, eth_module *mod);
 
+bool
+eth_remove_module(eth_env *env, const char *name);
+
 eth_module*
 eth_require_module(eth_env *env, const char *name);
 
 bool
-eth_load_module_from_script(eth_env *env, eth_module *mod, const char *path);
+eth_load_module_from_script(eth_env *env, eth_module *mod, const char *path,
+    eth_t *ret);
 
 bool
 eth_load_module_from_elf(eth_env *env, eth_module *mod, const char *path);
@@ -1121,7 +1153,7 @@ struct eth_ast_pattern {
   eth_pattern_tag tag;
   int rc;
   union {
-    struct { char *str; bool pub; } ident;
+    struct { char *str; int attr; } ident;
     struct { bool isctype; union { char *str; eth_type *ctype; } type; char **fields;
              eth_ast_pattern **subpats; int n; char *alias; }
       unpack;
@@ -1485,18 +1517,19 @@ struct eth_var_cfg {
   char *ident;
   eth_t cval;
   int vid;
+  eth_attr *attr;
 };
 
 static inline eth_var_cfg
-eth_dyn_var(char *ident, int vid)
+eth_dyn_var(char *ident, int vid, eth_attr *attr)
 {
-  return (eth_var_cfg) { .ident = ident, .cval = NULL, .vid = vid };
+  return (eth_var_cfg) { .ident = ident, .cval = NULL, .vid = vid, .attr = attr };
 }
 
 static inline eth_var_cfg
-eth_const_var(char *ident, eth_t cval)
+eth_const_var(char *ident, eth_t cval, eth_attr *attr)
 {
-  return (eth_var_cfg) { .ident = ident, .cval = cval, .vid = -1 };
+  return (eth_var_cfg) { .ident = ident, .cval = cval, .vid = -1, .attr = attr };
 }
 
 struct eth_var {
@@ -1504,6 +1537,7 @@ struct eth_var {
   eth_t cval;
   int vid;
   eth_var *next;
+  eth_attr *attr;
 };
 
 static inline eth_var_cfg
@@ -1513,6 +1547,7 @@ eth_copy_var_cfg(eth_var* var, int vid)
     .ident = var->ident,
     .cval = var->cval,
     .vid = vid,
+    .attr = var->attr,
   };
 }
 
@@ -1561,6 +1596,7 @@ eth_find_var(eth_var *head, const char *ident, int *cnt);
 typedef struct {
   char **idents;
   int *varids;
+  eth_attr **attrs;
   int n;
 } eth_ir_defs;
 

@@ -60,6 +60,7 @@ int _eth_start_token = -1;
   char *string;
   char character;
   bool boolean;
+  int integer;
   struct {
     cod_vec(eth_ast_pattern*) pats;
     cod_vec(eth_ast*) vals;
@@ -170,9 +171,10 @@ int _eth_start_token = -1;
 %token<character> CHAR
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %nonassoc LET REC AND IN FN IFLET WHENLET
-%nonassoc PUB IMPORT AS UNQUALIFIED
+%nonassoc IMPORT AS UNQUALIFIED
 %nonassoc DOT_OPEN
 %nonassoc DDOT LARROW
+%nonassoc PUB BUILTIN
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %right RARROW
 %right ';'
@@ -211,7 +213,7 @@ int _eth_start_token = -1;
 %type<string> capident
 %type<binds> binds
 %type<bind> bind
-%type<boolean> maybe_pub
+%type<integer> attribute
 %type<astvec> args
 %type<patvec> fnargs
 %type<string> string
@@ -250,7 +252,7 @@ atom
   }
   | '['']' { $$ = eth_ast_cval(eth_nil); }
   | '[' expr DDOT expr ']' {
-    eth_ast *p[2] = { $2, $4 }; 
+    eth_ast *p[2] = { $2, $4 };
     eth_ast *range = eth_ast_cval(eth_get_builtin("__builtin_inclusive_range"));
     $$ = eth_ast_apply(range, p, 2);
   }
@@ -523,23 +525,27 @@ bind
     $$.pat = $1;
     $$.val = $3;
   }
-  | maybe_pub SYMBOL fnargs pattern '=' expr {
+  | attribute SYMBOL fnargs pattern '=' expr {
     $$.pat = eth_ast_ident_pattern($2);
-    $$.pat->ident.pub = $1;
+    $$.pat->ident.attr = $1;
     cod_vec_push($3, $4);
     $$.val = eth_ast_fn_with_patterns($3.data, $3.len, $6);
     free($2);
     cod_vec_destroy($3);
   }
-  | maybe_pub SYMBOL '!' '=' expr {
+  | attribute SYMBOL '!' '=' expr {
     $$.pat = eth_ast_ident_pattern($2);
-    $$.pat->ident.pub = $1;
+    $$.pat->ident.attr = $1;
     $$.val = eth_ast_fn(NULL, 0, $5);
     free($2);
   }
 ;
 
-maybe_pub: { $$ = false; } | PUB { $$ = true; };
+attribute
+  : { $$ = 0; }
+  | attribute PUB     { $$ = $1 | ETH_ATTR_PUB;     }
+  | attribute BUILTIN { $$ = $1 | ETH_ATTR_BUILTIN; }
+;
 
 string
   : '"' string_aux '"' {
@@ -558,9 +564,9 @@ string_aux
 
 atomic_pattern
   : '_' { $$ = eth_ast_dummy_pattern(); }
-  | maybe_pub SYMBOL {
+  | attribute SYMBOL {
     $$ = eth_ast_ident_pattern($2);
-    $$->ident.pub = $1;
+    $$->ident.attr = $1;
     free($2);
   }
   | CAPSYMBOL { $$ = eth_ast_constant_pattern(eth_sym($1)); free($1); }
