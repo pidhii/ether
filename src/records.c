@@ -163,8 +163,8 @@ eth_tuple_type(size_t n)
     ptrdiff_t offs[n];
     for (size_t i = 0; i < n; ++i)
     {
-      fields[i] = malloc(21);
-      sprintf(fields[i], "%ju", i+1);
+      fields[i] = malloc(22);
+      sprintf(fields[i], "_%ju", i+1);
       offs[i] = offsetof(eth_tuple, data[i]);
     }
     eth_type *type = eth_create_struct_type(name, fields, offs, n);

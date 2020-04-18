@@ -45,7 +45,7 @@ write_pair(eth_type *type, eth_t x, FILE *stream)
       eth_write(eth_car(x), stream);
       if (eth_car(x)->type == eth_pair_type)
         putc(')', stream);
-      putc(':', stream);
+      fputs("::", stream);
       x = eth_cdr(x);
     }
     eth_write(x, stream);

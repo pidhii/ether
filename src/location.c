@@ -50,6 +50,21 @@ eth_drop_location(eth_location *loc)
     destroy_location(loc);
 }
 
+char*
+eth_get_location_file(eth_location *loc, char *out)
+{
+  char buf[PATH_MAX];
+  strcpy(buf, loc->filepath);
+  char *file = basename(buf);
+
+  if (loc->fl == loc->ll)
+    sprintf(out, " %s %d:%d-%d", file, loc->fl, loc->fc, loc->lc);
+  else
+    sprintf(out, " %s %d:%d-%d:%d", file, loc->fl, loc->fc, loc->ll, loc->lc);
+
+  return out;
+}
+
 int
 eth_print_location_opt(eth_location *loc, FILE *stream, int opt)
 {
@@ -60,20 +75,15 @@ eth_print_location_opt(eth_location *loc, FILE *stream, int opt)
   if (fs == NULL)
     return -1;
 
-  char buf[PATH_MAX];
-  strcpy(buf, loc->filepath);
-  char *file = basename(buf);
+  if (opt & ETH_LOPT_FILE)
+  {
+    char buf[PATH_MAX];
+    eth_get_location_file(loc, buf);
+    fprintf(stream, "%s:\n", buf);
 
-  if (opt & ETH_LOPT_NEWLINES)
-    putc('\n', stream);
-
-  if (loc->fl == loc->ll)
-    fprintf(stream, " %s %d:%d-%d:\n", file, loc->fl, loc->fc, loc->lc);
-  else
-    fprintf(stream, " %s %d:%d-%d:%d:\n", file, loc->fl, loc->fc, loc->ll, loc->lc);
-
-  if (opt & ETH_LOPT_NEWLINES)
-    putc('\n', stream);
+    if (opt & ETH_LOPT_NEWLINES)
+      putc('\n', stream);
+  }
 
   int start = loc->fl;
   int end = loc->ll;
@@ -87,7 +97,7 @@ eth_print_location_opt(eth_location *loc, FILE *stream, int opt)
   int line = 1;
   int col = 1;
   int hl = false;
-  while (true)
+  do
   {
     errno = 0;
     int c = fgetc(fs);
@@ -140,9 +150,7 @@ eth_print_location_opt(eth_location *loc, FILE *stream, int opt)
       col += 1;
     }
 
-    if (line > end)
-      break;
-  }
+  } while (line <= end);
 
   fclose(fs);
 

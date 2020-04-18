@@ -82,8 +82,19 @@ install(DIRECTORY DESTINATION "lib/ether")
 if (CMAKE_INSTALL_PREFIX)
   set (ETHER_PREFIX "${CMAKE_INSTALL_PREFIX}")
   configure_file (${CMAKE_SOURCE_DIR}/ether.pc ${CMAKE_BINARY_DIR}/ether.pc @ONLY)
-  install (
-    FILES ${CMAKE_BINARY_DIR}/ether.pc
-    DESTINATION lib/pkgconfig)
+  install (FILES ${CMAKE_BINARY_DIR}/ether.pc DESTINATION lib/pkgconfig)
 endif (CMAKE_INSTALL_PREFIX)
+
+
+# Install scripts and libraries
+install (PROGRAMS ${CMAKE_SOURCE_DIR}/dope.eth RENAME "dope" DESTINATION bin)
+file (GLOB STD_LIBS ${CMAKE_SOURCE_DIR}/libs/*)
+install (FILES ${STD_LIBS} DESTINATION lib/ether)
+
+
+# Tests
+enable_testing ()
+add_test (TestFuzzy ether ${CMAKE_SOURCE_DIR}/t/test.eth)
+add_test (TestBuiltins ether ${CMAKE_SOURCE_DIR}/t/builtins.eth)
+add_test (TestOptions ether ${CMAKE_SOURCE_DIR}/t/options.eth)
 

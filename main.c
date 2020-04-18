@@ -1,4 +1,5 @@
 #include "ether/ether.h"
+#include "codeine/vec.h"
 
 #include <stdlib.h>
 #include <assert.h>
@@ -23,12 +24,24 @@ help_and_exit(char *argv0)
   puts("                           'error'   - show only error messages.");
   puts("  --version    -v          Show version and configuration and exit.");
   puts("  --prefix                 Show installation prefix and exit.");
+  puts("               -L <dir>    Add direcory to the module path.");
   exit(EXIT_SUCCESS);
+}
+
+static eth_t
+argv_to_list(int argc, char **argv, int offs)
+{
+  eth_t acc = eth_nil;
+  for (int i = argc - 1; i >= offs; --i)
+    acc = eth_cons(eth_str(argv[i]), acc);
+  return acc;
 }
 
 int
 main(int argc, char **argv)
 {
+  int err = EXIT_SUCCESS;
+
   struct option longopts[] = {
     { "help", false, NULL, 'h' },
     { "bytecode", false, NULL, 0x1FF },
@@ -39,8 +52,10 @@ main(int argc, char **argv)
   };
   bool showbc = false;
   int opt;
+  cod_vec(char*) L;
+  cod_vec_init(L);
   /*opterr = 0;*/
-  while ((opt = getopt_long(argc, argv, "+hv", longopts, NULL)) > 0)
+  while ((opt = getopt_long(argc, argv, "+hv:L:", longopts, NULL)) > 0)
   {
     switch (opt)
     {
@@ -54,6 +69,10 @@ main(int argc, char **argv)
         if (eth_get_prefix())
           printf("prefix: %s\n", eth_get_prefix());
         exit(EXIT_SUCCESS);
+
+      case 'L':
+        cod_vec_push(L, optarg);
+        break;
 
       case 0x1FF:
         showbc = true;
@@ -99,6 +118,7 @@ main(int argc, char **argv)
     if (input == NULL)
     {
       eth_error("failed to open file \"%s\", %s", path, strerror(errno));
+      cod_vec_destroy(L);
       exit(EXIT_FAILURE);
     }
   }
@@ -116,11 +136,14 @@ main(int argc, char **argv)
 
   if (ast)
   {
-
     eth_env *env = eth_create_env();
-
+    cod_vec_iter(L, i, path, eth_add_module_path(env, path));
+    // --
+    eth_module *extravars = eth_create_module("");
+    eth_define(extravars, "command_line", argv_to_list(argc, argv, optind));
+    // --
     eth_debug("build IR");
-    eth_ir *ir = eth_build_ir(ast, env);
+    eth_ir *ir = eth_build_ir(ast, env, extravars);
     eth_drop_ast(ast);
     if (ir)
     {
@@ -138,7 +161,7 @@ main(int argc, char **argv)
 
         eth_debug("build bytecode");
         eth_bytecode *bc = eth_build_bytecode(ssa);
-        eth_destroy_ssa(ssa);
+        eth_drop_ssa(ssa);
         if (bc)
         {
           eth_debug("run VM");
@@ -148,14 +171,26 @@ main(int argc, char **argv)
           eth_t ret = eth_vm(bc);
           clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t2);
 
-          if (ret->type == eth_exception_type)
+          if (eth_is_exn(ret))
           {
-            eth_exception *exn = ETH_EXCEPTION(ret);
-            eth_error("unhandled exception: ~w", ETH_EXCEPTION(ret)->what);
-            for (int i = exn->tracelen - 1; i >= 0; --i)
+            eth_t what = eth_what(ret);
+            if (what->type == eth_exit_type)
+              err = eth_get_exit_status(what);
+            else
             {
-              eth_trace("trace[%d]:", i);
-              eth_print_location(exn->trace[i], stderr);
+              err = EXIT_FAILURE;
+              eth_exception *exn = ETH_EXCEPTION(ret);
+              eth_error("unhandled exception: ~w", what);
+              char buf[PATH_MAX];
+              for (int i = exn->tracelen - 1; i >= 0; --i)
+              {
+                eth_get_location_file(exn->trace[i], buf);
+                eth_trace("trace[%d]: %s", exn->tracelen - i - 1, buf);
+                if (i == exn->tracelen - 1)
+                  eth_print_location_opt(exn->trace[i], stderr, ETH_LOPT_EXTRALINES);
+                else
+                  eth_print_location_opt(exn->trace[i], stderr, 0);
+              }
             }
           }
 
@@ -178,13 +213,15 @@ main(int argc, char **argv)
       eth_error("failed to build IR");
 
     eth_destroy_env(env);
+    eth_destroy_module(extravars);
   }
   else
     eth_error("failed to build AST");
 
 
+  cod_vec_destroy(L);
   eth_debug("cleanup");
   eth_cleanup();
 
-  exit(EXIT_SUCCESS);
+  exit(err);
 }

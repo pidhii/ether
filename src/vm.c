@@ -331,7 +331,7 @@ eth_vm(eth_bytecode *bc)
 
       OP(CONS)
       {
-        r[ip->binop.out] = eth_cons(r[ip->binop.lhs], r[ip->binop.rhs]);
+        r[ip->binop.out] = eth_cons_noref(r[ip->binop.lhs], r[ip->binop.rhs]);
         FAST_DISPATCH_NEXT();
       }
 
@@ -353,7 +353,7 @@ eth_vm(eth_bytecode *bc)
         eth_t *cap = malloc(sizeof(eth_t) * ncap);
         for (size_t i = 0; i < ncap; ++i)
           cap[i] = r[ip->fn.data->caps[i]];
-        eth_t fn = eth_create_clos(ip->fn.data->ir, ip->fn.data->bc, cap, ncap,
+        eth_t fn = eth_create_clos(ip->fn.data->src, ip->fn.data->bc, cap, ncap,
             ip->fn.data->arity);
         r[ip->fn.out] = fn;
         FAST_DISPATCH_NEXT();
@@ -366,7 +366,7 @@ eth_vm(eth_bytecode *bc)
         for (size_t i = 0; i < ncap; ++i)
           cap[i] = r[ip->fn.data->caps[i]];
         eth_function *fn = ETH_FUNCTION(r[ip->fn.out]);
-        eth_finalize_clos(fn, ip->fn.data->ir, ip->fn.data->bc, cap, ncap,
+        eth_finalize_clos(fn, ip->fn.data->src, ip->fn.data->bc, cap, ncap,
             ip->fn.data->arity);
         FAST_DISPATCH_NEXT();
       }
@@ -462,10 +462,7 @@ eth_vm(eth_bytecode *bc)
 
       OP(GETEXN)
       {
-        eth_t what = ETH_EXCEPTION(exn)->what;
-        eth_ref(what);
-        eth_unref(exn);
-        r[ip->getexn.out] = what;
+        r[ip->getexn.out] = exn;
         FAST_DISPATCH_NEXT();
       }
 

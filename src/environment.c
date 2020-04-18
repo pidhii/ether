@@ -180,7 +180,7 @@ load_from_script(eth_env *env, eth_module *mod, const char *path, eth_t *retptr)
     goto error;
 
   eth_ir_defs defs;
-  eth_ir *ir = eth_build_module_ir(ast, env, mod, &defs);
+  eth_ir *ir = eth_build_module_ir(ast, env, mod, &defs, NULL);
   eth_drop_ast(ast);
   if (ir == NULL)
     goto error;
@@ -194,7 +194,7 @@ load_from_script(eth_env *env, eth_module *mod, const char *path, eth_t *retptr)
   }
 
   eth_bytecode *bc = eth_build_bytecode(ssa);
-  eth_destroy_ssa(ssa);
+  eth_drop_ssa(ssa);
   if (bc == NULL)
   {
     eth_destroy_ir_defs(&defs);
@@ -371,8 +371,15 @@ resolve_path_by_name(eth_env *env, const char *name, char *path)
   if (eth_resolve_path(env, name, path))
   {
     mode_t mode = get_file_mode(path);
+    if (S_ISREG(mode))
+      return true;
+
     if (S_ISDIR(mode))
     {
+      sprintf(buf, "%s/__main__.eth", path);
+      if (realpath(buf, path))
+        return true;
+
       sprintf(buf, "%s/%s.eth", path, name);
       if (realpath(buf, path))
         return true;

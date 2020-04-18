@@ -8,6 +8,49 @@ ETH_MODULE("ether:function")
 
 eth_type* eth_function_type;
 
+
+eth_source*
+eth_create_source(eth_ast *ast, eth_ir *ir, eth_ssa *ssa)
+{
+  eth_source *src = malloc(sizeof(eth_source));
+  src->rc = 0;
+  eth_ref_ast(src->ast = ast);
+  eth_ref_ir(src->ir = ir);
+  eth_ref_ssa(src->ssa = ssa);
+  return src;
+}
+
+static inline void
+destroy_source(eth_source *src)
+{
+  eth_unref_ast(src->ast);
+  eth_unref_ir(src->ir);
+  eth_unref_ssa(src->ssa);
+  free(src);
+}
+
+void
+eth_ref_source(eth_source *src)
+{
+  src->rc += 1;
+}
+
+void
+eth_unref_source(eth_source *src)
+{
+  if (--src->rc == 0)
+    destroy_source(src);
+}
+
+void
+eth_drop_source(eth_source *src)
+{
+  if (src->rc == 0)
+    destroy_source(src);
+}
+
+
+
 static void
 function_destroy(eth_type *type, eth_t x)
 {
@@ -17,7 +60,7 @@ function_destroy(eth_type *type, eth_t x)
     for (int i = 0; i < func->clos.ncap; ++i)
       eth_unref(func->clos.cap[i]);
     free(func->clos.cap);
-    eth_unref_ir(func->clos.ir);
+    eth_unref_source(func->clos.src);
     eth_unref_bytecode(func->clos.bc);
   }
   else
@@ -38,7 +81,7 @@ eth_deactivate_clos(eth_function *func)
       eth_unref(func->clos.cap[i]);
   }
   free(func->clos.cap);
-  eth_unref_ir(func->clos.ir);
+  eth_unref_source(func->clos.src);
   eth_unref_bytecode(func->clos.bc);
 
   // replace with dummy proc
@@ -76,17 +119,17 @@ eth_create_proc(eth_t (*f)(void), int n, void *data, void (*dtor)(void*))
 }
 
 eth_t
-eth_create_clos(eth_ir *ir, eth_bytecode *bc, eth_t *cap, int ncap, int arity)
+eth_create_clos(eth_source *src, eth_bytecode *bc, eth_t *cap, int ncap, int arity)
 {
   eth_function *func = create_function();
   func->islam = true;
   func->arity = arity;
-  func->clos.ir = ir;
+  func->clos.src = src;
   func->clos.bc = bc;
   func->clos.cap = cap;
   func->clos.ncap = ncap;
   func->clos.scp = NULL;
-  eth_ref_ir(ir);
+  eth_ref_source(src);
   eth_ref_bytecode(bc);
   return ETH(func);
 }
@@ -105,18 +148,18 @@ eth_create_dummy_func(int arity)
 }
 
 void
-eth_finalize_clos(eth_function *func, eth_ir *ir, eth_bytecode *bc, eth_t *cap,
-    int ncap, int arity)
+eth_finalize_clos(eth_function *func, eth_source *src, eth_bytecode *bc,
+    eth_t *cap, int ncap, int arity)
 {
   assert(arity == func->arity);
   func->islam = true;
   func->arity = arity;
-  func->clos.ir = ir;
+  func->clos.src = src;
   func->clos.bc = bc;
   func->clos.cap = cap;
   func->clos.ncap = ncap;
   func->clos.scp = NULL;
-  eth_ref_ir(ir);
+  eth_ref_source(src);
   eth_ref_bytecode(bc);
 }
 

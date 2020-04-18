@@ -301,11 +301,10 @@ destroy_ast_node(eth_ast *ast)
       break;
 
     case ETH_AST_MULTIMATCH:
-      abort();
-      /*for (int i = 0; i < ast->multimatch.table->h; ++i)*/
-        /*eth_unref_ast(ast->multimatch.exprs[i]);*/
-      /*free(ast->multimatch.exprs);*/
-      /*eth_destroy_match_table(ast->multimatch.table);*/
+      for (int i = 0; i < ast->multimatch.table->h; ++i)
+        eth_unref_ast(ast->multimatch.exprs[i]);
+      free(ast->multimatch.exprs);
+      eth_destroy_match_table(ast->multimatch.table);
       break;
   }
 
@@ -522,12 +521,28 @@ eth_ast_or(eth_ast *lhs, eth_ast *rhs)
 eth_ast*
 eth_ast_try(eth_ast_pattern *pat, eth_ast *try, eth_ast *catch, int likely)
 {
+  // inner pattern must non-dummy because we will need that value
+  // to test for exit-object
+  if (pat == NULL)
+    pat = eth_ast_ident_pattern("");
+  else if (pat->tag == ETH_PATTERN_DUMMY)
+  {
+    eth_drop_ast_pattern(pat);
+    pat = eth_ast_ident_pattern("");
+  }
+  bool check_exit = eth_is_wildcard(pat->tag);
+
+  // use exception-pattern so that user is actually matching with `what'
+  char *what = "what";
+  pat = eth_ast_unpack_pattern_with_type(eth_exception_type, &what, &pat, 1);
+
   eth_ast *ast = create_ast_node(ETH_AST_TRY);
-  ast->try.pat = pat ? pat : eth_ast_ident_pattern("");
+  ast->try.pat = pat;
   eth_ref_ast_pattern(ast->try.pat);
   eth_ref_ast(ast->try.trybr = try);
   eth_ref_ast(ast->try.catchbr = catch);
   ast->try.likely = likely;
+  ast->try._check_exit = check_exit;
   return ast;
 }
 
@@ -567,49 +582,50 @@ eth_ast_make_record_with_type(eth_type *type, char *const fields[],
   return ast;
 }
 
-/*eth_match_table**/
-/*eth_create_match_table(eth_ast_pattern **const *tab, eth_ast *const exprs[],*/
-    /*int h, int w)*/
-/*{*/
-  /*eth_match_table *table = malloc(sizeof(eth_match_table));*/
-  /*table->tab = malloc(sizeof(eth_ast_pattern*) * h);*/
-  /*for (int i = 0; i < h; ++i)*/
-  /*{*/
-    /*table->tab[i] = malloc(sizeof(eth_ast_pattern*) * w);*/
-    /*memcpy(table->tab[i], tab[i], sizeof(eth_ast_pattern*) * w);*/
-  /*}*/
-  /*table->exprs = malloc(sizeof(eth_ast*) * h);*/
-  /*for (int i = 0; i < h; ++i)*/
-    /*eth_ref_ast(table->exprs[i] = exprs[i]);*/
-  /*table->w = w;*/
-  /*table->h = h;*/
-  /*return table;*/
-/*}*/
+eth_match_table*
+eth_create_match_table(eth_ast_pattern **const tab[], eth_ast *const exprs[],
+    int h, int w)
+{
+  eth_match_table *table = malloc(sizeof(eth_match_table));
+  table->tab = malloc(sizeof(eth_ast_pattern*) * h);
+  for (int i = 0; i < h; ++i)
+  {
+    table->tab[i] = malloc(sizeof(eth_ast_pattern*) * w);
+    for (int j = 0; j < w; ++j)
+      eth_ref_ast_pattern(table->tab[i][j] = tab[i][j]);
+  }
+  table->exprs = malloc(sizeof(eth_ast*) * h);
+  for (int i = 0; i < h; ++i)
+    eth_ref_ast(table->exprs[i] = exprs[i]);
+  table->w = w;
+  table->h = h;
+  return table;
+}
 
-/*void*/
-/*eth_destroy_match_table(eth_match_table *table)*/
-/*{*/
-  /*for (int i = 0; i < table->w; ++i)*/
-  /*{*/
-    /*for (int j = 0; j < table->h; ++j)*/
-      /*eth_unref_ast_pattern(table->tab[i][j]);*/
-    /*free(table->tab[i]);*/
-  /*}*/
-  /*free(table->tab);*/
-  /*for (int j = 0; j < table->h; ++j)*/
-    /*eth_unref_ast(table->exprs[j]);*/
-  /*free(table->exprs);*/
-  /*free(table);*/
-/*}*/
+void
+eth_destroy_match_table(eth_match_table *table)
+{
+  for (int i = 0; i < table->w; ++i)
+  {
+    for (int j = 0; j < table->h; ++j)
+      eth_unref_ast_pattern(table->tab[i][j]);
+    free(table->tab[i]);
+  }
+  free(table->tab);
+  for (int j = 0; j < table->h; ++j)
+    eth_unref_ast(table->exprs[j]);
+  free(table->exprs);
+  free(table);
+}
 
-/*eth_ast**/
-/*eth_ast_multimatch(eth_match_table *table, eth_ast *const exprs[])*/
-/*{*/
-  /*eth_ast *ast = create_ast_node(ETH_AST_MULTIMATCH);*/
-  /*ast->multimatch.table = table;*/
-  /*ast->multimatch.exprs = malloc(sizeof(eth_ast*) * table->w);*/
-  /*for (int i = 0; i < table->w; ++i)*/
-    /*eth_ref_ast(ast->multimatch.exprs[i] = exprs[i]);*/
-  /*return ast;*/
-/*}*/
+eth_ast*
+eth_ast_multimatch(eth_match_table *table, eth_ast *const exprs[])
+{
+  eth_ast *ast = create_ast_node(ETH_AST_MULTIMATCH);
+  ast->multimatch.table = table;
+  ast->multimatch.exprs = malloc(sizeof(eth_ast*) * table->w);
+  for (int i = 0; i < table->w; ++i)
+    eth_ref_ast(ast->multimatch.exprs[i] = exprs[i]);
+  return ast;
+}
 

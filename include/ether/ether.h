@@ -588,6 +588,25 @@ _ETH_TEST_SNUM(long_double, LDBL)
 ETH_EXTERN
 eth_type *eth_function_type;
 
+typedef struct {
+  int rc;
+  eth_ast *ast;
+  eth_ir *ir;
+  eth_ssa *ssa;
+} eth_source;
+
+eth_source*
+eth_create_source(eth_ast *ast, eth_ir *ir, eth_ssa *ssa);
+
+void
+eth_ref_source(eth_source *src);
+
+void
+eth_unref_source(eth_source *src);
+
+void
+eth_drop_source(eth_source *src);
+
 struct eth_function {
   eth_header header;
   bool islam;
@@ -602,7 +621,7 @@ struct eth_function {
 
     struct {
       int ncap;
-      eth_ir *ir;
+      eth_source *src;
       eth_bytecode *bc;
       eth_t *cap;
       eth_scp *scp;
@@ -617,14 +636,14 @@ eth_create_proc(eth_t (*f)(void), int n, void *data, void (*dtor)(void*));
 #define eth_proc eth_create_proc
 
 eth_t __attribute__((malloc))
-eth_create_clos(eth_ir *ir, eth_bytecode *bc, eth_t *cap, int ncap, int arity);
+eth_create_clos(eth_source *src, eth_bytecode *bc, eth_t *cap, int ncap, int arity);
 
 eth_t __attribute__((malloc))
 eth_create_dummy_func(int arity);
 
 void
-eth_finalize_clos(eth_function *func, eth_ir *ir, eth_bytecode *bc, eth_t *cap,
-    int ncap, int arity);
+eth_finalize_clos(eth_function *func, eth_source *src, eth_bytecode *bc,
+    eth_t *cap, int ncap, int arity);
 
 void
 eth_deactivate_clos(eth_function *func);
@@ -658,6 +677,12 @@ eth_apply(eth_t fn, int narg)
 ETH_EXTERN
 eth_type *eth_exception_type;
 
+static inline bool
+eth_is_exn(eth_t x)
+{
+  return x->type == eth_exception_type;
+}
+
 typedef struct {
   eth_header header;
   eth_t what;
@@ -665,6 +690,7 @@ typedef struct {
   eth_location **trace;
 } eth_exception;
 #define ETH_EXCEPTION(x) ((eth_exception*)(x))
+#define eth_what(x) (ETH_EXCEPTION(x)->what)
 
 eth_t __attribute__((malloc))
 eth_create_exception(eth_t what);
@@ -676,6 +702,20 @@ eth_copy_exception(eth_t exn);
 void
 eth_push_trace(eth_t exn, eth_location *loc);
 
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                              exit-object
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+ETH_EXTERN
+eth_type *eth_exit_type;
+
+typedef struct {
+  eth_header header;
+  int status;
+} eth_exit_object;
+#define eth_get_exit_status(x) (((eth_exit_object*)(x))->status)
+
+eth_t
+eth_create_exit_object(int status);
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                string
@@ -990,6 +1030,39 @@ eth_close(eth_t x);
 FILE*
 eth_get_file_stream(eth_t x);
 
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                                ranges
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+ETH_EXTERN
+eth_type *eth_rangelr_type, *eth_rangel_type, *eth_ranger_type;
+
+typedef struct {
+  eth_header header;
+  eth_t l, r;
+} eth_rangelr;
+#define ETH_RANGELR(x) ((eth_rangelr*)(x))
+
+typedef struct {
+  eth_header header;
+  eth_t l;
+} eth_rangel;
+#define ETH_RANGEL(x) ((eth_rangel*)(x))
+
+typedef struct {
+  eth_header header;
+  eth_t r;
+} eth_ranger;
+#define ETH_RANGER(x) ((eth_ranger*)(x))
+
+static inline bool
+eth_is_range(eth_t x)
+{
+  return x->type == eth_rangelr_type
+      or x->type == eth_rangel_type
+      or x->type == eth_ranger_type
+  ;
+}
+
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                             ATTRIBUTES
@@ -1126,6 +1199,9 @@ eth_unref_location(eth_location *loc);
 void
 eth_drop_location(eth_location *loc);
 
+char*
+eth_get_location_file(eth_location *loc, char *out);
+
 int
 eth_print_location(eth_location *loc, FILE *stream);
 
@@ -1147,6 +1223,12 @@ typedef enum {
   ETH_PATTERN_CONSTANT,
   ETH_PATTERN_RECORD,
 } eth_pattern_tag;
+
+static inline bool
+eth_is_wildcard(eth_pattern_tag tag)
+{
+  return tag == ETH_PATTERN_DUMMY or tag == ETH_PATTERN_IDENT;
+}
 
 typedef struct eth_ast_pattern eth_ast_pattern;
 struct eth_ast_pattern {
@@ -1226,12 +1308,12 @@ typedef struct {
   eth_ast **exprs;
 } eth_match_table;
 
-/*eth_match_table**/
-/*eth_create_match_table(eth_ast_pattern **const *tab, eth_ast *const exprs[],*/
-    /*int h, int w);*/
+eth_match_table*
+eth_create_match_table(eth_ast_pattern **const tab[], eth_ast *const exprs[],
+    int h, int w);
 
-/*void*/
-/*eth_destroy_match_table(eth_match_table *table);*/
+void
+eth_destroy_match_table(eth_match_table *table);
 
 struct eth_ast {
   eth_ast_tag tag;
@@ -1253,7 +1335,9 @@ struct eth_ast {
     struct { char *module; eth_ast *body; char *alias; char **nams; int nnam; }
       import;
     struct { eth_ast *lhs, *rhs; } scand, scor;
-    struct { eth_ast_pattern *pat; eth_ast *trybr, *catchbr; int likely; } try;
+    struct { eth_ast_pattern *pat; eth_ast *trybr, *catchbr; int likely;
+             bool _check_exit; }
+      try;
     struct { bool isctype; union { eth_type *ctype; char *str; } type;
              char **fields; eth_ast **vals; int n; }
       mkrcrd;
@@ -1402,11 +1486,25 @@ enum eth_ir_tag {
   ETH_IR_UNOP,
   ETH_IR_FN,
   ETH_IR_MATCH,
+  ETH_IR_MULTIMATCH,
   ETH_IR_STARTFIX,
   ETH_IR_ENDFIX,
   ETH_IR_MKRCRD,
   ETH_IR_THROW,
 };
+
+typedef struct {
+  int h, w;
+  eth_ir_pattern ***tab;
+  eth_ir_node **exprs;
+} eth_ir_match_table;
+
+eth_ir_match_table*
+eth_create_ir_match_table(eth_ir_pattern **const tab[],
+    eth_ir_node *const exprs[], int h, int w);
+
+void
+eth_destroy_ir_match_table(eth_ir_match_table *table);
 
 struct eth_ir_node {
   eth_ir_tag tag;
@@ -1420,7 +1518,7 @@ struct eth_ir_node {
     struct { eth_ir_node *e1, *e2; } seq;
     struct { eth_binop op; eth_ir_node *lhs, *rhs; } binop;
     struct { eth_unop op; eth_ir_node *expr; } unop;
-    struct { int arity, *caps, *capvars, ncap; eth_ir *body; } fn;
+    struct { int arity, *caps, *capvars, ncap; eth_ast *ast; eth_ir *body; } fn;
     struct { eth_ir_pattern *pat; eth_ir_node *expr, *thenbr, *elsebr;
              eth_toplvl_flag toplvl; }
       match;
@@ -1428,6 +1526,7 @@ struct eth_ir_node {
     struct { int *vars, n; eth_ir_node *body; } endfix;
     struct { eth_type *type; eth_ir_node **fields; } mkrcrd;
     struct { eth_ir_node *exn; } throw;
+    struct { eth_ir_match_table *table; eth_ir_node **exprs; } multimatch;
   };
   eth_location *loc;
 };
@@ -1472,11 +1571,15 @@ eth_ir_node* __attribute__((malloc))
 eth_ir_unop(eth_unop op, eth_ir_node *expr);
 
 eth_ir_node* __attribute__((malloc))
-eth_ir_fn(int arity, int *caps, int *capvars, int ncap, eth_ir *body);
+eth_ir_fn(int arity, int *caps, int *capvars, int ncap, eth_ir *body,
+    eth_ast *ast);
 
 eth_ir_node* __attribute__((malloc))
 eth_ir_match(eth_ir_pattern *pat, eth_ir_node *expr, eth_ir_node *thenbr,
     eth_ir_node *elsebr);
+
+eth_ir_node*
+eth_ir_multimatch(eth_ir_match_table *table, eth_ir_node *const exprs[]);
 
 eth_ir_node* __attribute__((malloc))
 eth_ir_startfix(int const vars[], int n, eth_ir_node *body);
@@ -1604,11 +1707,11 @@ void
 eth_destroy_ir_defs(eth_ir_defs *defs);
 
 eth_ir*
-eth_build_ir(eth_ast *ast, eth_env *env);
+eth_build_ir(eth_ast *ast, eth_env *env, eth_module *uservars);
 
 eth_ir*
 eth_build_module_ir(eth_ast *ast, eth_env *env, eth_module *mod,
-    eth_ir_defs *defs);
+    eth_ir_defs *defs, eth_module *uservars);
 
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
@@ -1651,6 +1754,70 @@ eth_ssa_record_pattern(size_t const ids[], int const vids[],
 void
 eth_destroy_ssa_pattern(eth_ssa_pattern *pat);
 
+enum {
+  /* Disable writes BEFORE given instruction. */
+  ETH_IFLAG_NOBEFORE = (1 << 0),
+  ETH_IFLAG_ENTRYPOINT = (1 << 1),
+};
+
+typedef struct eth_mtree eth_mtree;
+
+typedef enum {
+  ETH_MTREE_CONST,
+  ETH_MTREE_UNPACK,
+} eth_mtree_ctor_tag;
+
+typedef struct {
+  eth_mtree_ctor_tag tag;
+  union {
+    eth_t cval;
+    struct { eth_type *type; int *offs, *vids, n; } unpack;
+  };
+} eth_mtree_ctor;
+
+eth_mtree_ctor*
+eth_create_const_ctor(eth_t cval);
+
+eth_mtree_ctor*
+eth_create_unpack_ctor(eth_type *type, int *offs, int *vids, int n);
+
+void
+eth_destroy_mtree_ctor(eth_mtree_ctor *ctor);
+
+typedef struct {
+  eth_mtree_ctor *ctor;
+  eth_mtree *tree;
+} eth_mtree_case;
+
+typedef enum {
+  ETH_MTREE_FAIL,
+  ETH_MTREE_LEAF,
+  ETH_MTREE_SWITCH,
+} eth_mtree_tag;
+
+struct eth_mtree {
+  eth_mtree_tag tag;
+  union {
+    eth_insn *leaf;
+    struct {
+      int n;
+      eth_mtree_case *L;
+    } swtch;
+  };
+};
+
+eth_mtree*
+eth_create_fail(void);
+
+eth_mtree*
+eth_create_leaf(eth_insn *body);
+
+eth_mtree*
+eth_create_switch(const eth_mtree_case L[], int n);
+
+void
+eth_destroy_mtree(eth_mtree *t);
+
 enum eth_insn_tag {
   ETH_INSN_NOP,
   ETH_INSN_CVAL,
@@ -1678,12 +1845,6 @@ enum eth_insn_tag {
   ETH_INSN_MKRCRD,
 };
 
-enum {
-  /* Disable writes BEFORE given instruction. */
-  ETH_IFLAG_NOBEFORE = (1 << 0),
-  ETH_IFLAG_ENTRYPOINT = (1 << 1),
-};
-
 typedef enum {
   ETH_TEST_NOTFALSE,
   ETH_TEST_TYPE,
@@ -1705,8 +1866,10 @@ struct eth_insn {
       iff;
     struct { eth_binop op; int lhs, rhs; } binop;
     struct { eth_unop op; int vid; } unop;
-    struct { int arity, *caps, ncap; eth_ir *ir; eth_ssa *ssa; } fn;
-    struct { int arity, *caps, ncap, *movs, nmov; eth_ir *ir; eth_ssa *ssa; }
+    struct { int arity, *caps, ncap; eth_ast *ast; eth_ir *ir; eth_ssa *ssa; }
+      fn;
+    struct { int arity, *caps, ncap, *movs, nmov; eth_ast *ast; eth_ir *ir;
+             eth_ssa *ssa; }
       finfn;
     struct { int arity; } alcfn;
     struct { int *vids, n; } pop;
@@ -1778,14 +1941,15 @@ eth_insn* __attribute__((malloc))
 eth_insn_unop(eth_unop op, int out, int vid);
 
 eth_insn* __attribute__((malloc))
-eth_insn_fn(int out, int arity, int *caps, int ncap, eth_ir *ir, eth_ssa *ssa);
+eth_insn_fn(int out, int arity, int *caps, int ncap, eth_ast *ast, eth_ir *ir,
+    eth_ssa *ssa);
 
 eth_insn* __attribute__((malloc))
 eth_insn_alcfn(int out, int arity);
 
 eth_insn* __attribute__((malloc))
 eth_insn_finfn(int c, int arity, int *caps, int ncap, int *movs, int nmov,
-    eth_ir *ir, eth_ssa *ssa);
+    eth_ast *ast, eth_ir *ir, eth_ssa *ssa);
 
 eth_insn* __attribute__((malloc))
 eth_insn_pop(int const vids[], int n);
@@ -1848,7 +2012,13 @@ eth_ssa* __attribute__((malloc))
 eth_build_ssa(eth_ir *ir, eth_ir_defs *defs);
 
 void
-eth_destroy_ssa(eth_ssa *ssa);
+eth_ref_ssa(eth_ssa *ssa);
+
+void
+eth_unref_ssa(eth_ssa *ssa);
+
+void
+eth_drop_ssa(eth_ssa *ssa);
 
 void
 eth_dump_ssa(const eth_insn *insn, FILE *stream);
@@ -1969,7 +2139,7 @@ struct eth_bc_insn {
       uint64_t out;
       struct {
         int arity;
-        eth_ir *ir;
+        eth_source *src;
         eth_bytecode *bc;
         int ncap;
         int caps[];
@@ -1981,6 +2151,7 @@ struct eth_bc_insn {
       mkscp;
 
     struct { uint64_t out; uint32_t vid, offs; } load;
+    // TODO: flatten vids
     struct { uint32_t src, n; uint64_t *vids; size_t *ids; } loadrcrd;
     struct { uint64_t out, vid; size_t id; } loadrcrd1;
 
@@ -2087,6 +2258,11 @@ _eth_type_error(size_t n, size_t ntot)
 #define eth_rethrow(args, exn) \
   eth_return(args, exn)
 
+
+#define eth_use_symbol(ident) \
+  static eth_t ident = NULL; \
+  if (eth_unlikely(ident == NULL)) \
+    ident = eth_sym(#ident);
 
 
 #endif

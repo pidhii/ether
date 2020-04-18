@@ -142,15 +142,17 @@ eth_destroy_insn(eth_insn *insn)
 
     case ETH_INSN_FN:
       free(insn->fn.caps);
+      eth_unref_ast(insn->fn.ast);
       eth_unref_ir(insn->fn.ir);
-      eth_destroy_ssa(insn->fn.ssa);
+      eth_unref_ssa(insn->fn.ssa);
       break;
 
     case ETH_INSN_FINFN:
       free(insn->finfn.caps);
       free(insn->finfn.movs);
+      eth_unref_ast(insn->finfn.ast);
       eth_unref_ir(insn->finfn.ir);
-      eth_destroy_ssa(insn->finfn.ssa);
+      eth_unref_ssa(insn->finfn.ssa);
       break;
 
     case ETH_INSN_MKSCP:
@@ -349,16 +351,20 @@ eth_insn_unop(eth_unop op, int out, int vid)
 }
 
 eth_insn*
-eth_insn_fn(int out, int arity, int *caps, int ncap, eth_ir *ir, eth_ssa *ssa)
+eth_insn_fn(int out, int arity, int *caps, int ncap, eth_ast *ast, eth_ir *ir,
+    eth_ssa *ssa)
 {
   eth_insn *insn = create_insn(ETH_INSN_FN);
   insn->out = out;
   insn->fn.arity = arity;
   insn->fn.caps = malloc(sizeof(int) * ncap);
   insn->fn.ncap = ncap;
+  insn->fn.ast = ast;
   insn->fn.ir = ir;
   insn->fn.ssa = ssa;
+  eth_ref_ast(ast);
   eth_ref_ir(ir);
+  eth_ref_ssa(ssa);
   memcpy(insn->fn.caps, caps, sizeof(int) * ncap);
   return insn;
 }
@@ -374,16 +380,19 @@ eth_insn_alcfn(int out, int arity)
 
 eth_insn*
 eth_insn_finfn(int c, int arity, int *caps, int ncap, int *movs, int nmov,
-    eth_ir *ir, eth_ssa *ssa)
+    eth_ast *ast, eth_ir *ir, eth_ssa *ssa)
 {
   eth_insn *insn = create_insn(ETH_INSN_FINFN);
   insn->out = c;
   insn->finfn.arity = arity;
   insn->finfn.caps = malloc(sizeof(int) * ncap);
   insn->finfn.ncap = ncap;
+  insn->finfn.ast = ast;
   insn->finfn.ir = ir;
   insn->finfn.ssa = ssa;
+  eth_ref_ast(ast);
   eth_ref_ir(ir);
+  eth_ref_ssa(ssa);
   memcpy(insn->finfn.caps, caps, sizeof(int) * ncap);
   insn->finfn.nmov = nmov;
   insn->finfn.movs = malloc(sizeof(int) * nmov);
@@ -611,35 +620,21 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
       break;
 
     case ETH_INSN_POP:
-      if (insn->pop.n == 1)
+      for (int i = 0; i < insn->pop.n; ++i)
       {
-        fprintf(stream, "%%%d = pop;\n", insn->out);
+        if (i > 0) fputs(", ", stream);
+        fprintf(stream, "%%%d", insn->pop.vids[i]);
       }
-      else
-      {
-        for (int i = 0; i < insn->pop.n; ++i)
-        {
-          if (i > 0) fputs(", ", stream);
-          fprintf(stream, "%%%d", insn->out + i);
-        }
-        fprintf(stream, " = pop;\n");
-      }
+      fprintf(stream, " = pop;\n");
       break;
 
     case ETH_INSN_CAP:
-      if (insn->cap.n == 1)
+      for (int i = 0; i < insn->cap.n; ++i)
       {
-        fprintf(stream, "%%%d = cap;\n", insn->out);
+        if (i > 0) fputs(", ", stream);
+        fprintf(stream, "%%%d", insn->cap.vids[i]);
       }
-      else
-      {
-        for (int i = 0; i < insn->cap.n; ++i)
-        {
-          if (i > 0) fputs(", ", stream);
-          fprintf(stream, "%%%d", insn->out + i);
-        }
-        fprintf(stream, " = cap;\n");
-      }
+      fprintf(stream, " = cap;\n");
       break;
 
     case ETH_INSN_MKSCP:

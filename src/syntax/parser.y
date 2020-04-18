@@ -173,8 +173,9 @@ int _eth_start_token = -1;
 %nonassoc LET REC AND IN FN IFLET WHENLET
 %nonassoc IMPORT AS UNQUALIFIED
 %nonassoc DOT_OPEN
-%nonassoc DDOT LARROW
+%nonassoc LARROW
 %nonassoc PUB BUILTIN
+%nonassoc LIST_DDOT
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %right RARROW
 %right ';'
@@ -190,9 +191,9 @@ int _eth_start_token = -1;
 // level 2:
 %right OPAND
 // level 3:
-%nonassoc '<' LE '>' GE EQ NE IS EQUAL
+%nonassoc '<' LE '>' GE EQ NE IS EQUAL DDOT DDDOT
 // level 4:
-%right ':' PPLUS
+%right CONS PPLUS
 // level 5:
 %left '+' '-'
 // level 6:
@@ -220,7 +221,7 @@ int _eth_start_token = -1;
 %type<charvec> string_aux
 %type<pattern> atomic_pattern pattern
 %type<strvec> maybe_imports import_list
-%type<astvec> list
+%type<astvec> list list_with_coma
 %type<patvec> pattern_list
 %type<record> record
 %type<record_pattern> record_pattern
@@ -244,16 +245,16 @@ atom
   | '('')' { $$ = eth_ast_cval(eth_nil); LOC($$, @$); }
   | '(' expr ')' { $$ = $2; }
   | atom '!' { $$ = eth_ast_apply($1, NULL, 0); LOC($$, @$); }
-  | '[' list ']' {
+  | '[' list_with_coma ']' {
     $$ = eth_ast_cval(eth_nil);
     cod_vec_riter($2, i, x, $$ = eth_ast_binop(ETH_CONS, x, $$));
     cod_vec_destroy($2);
     LOC($$, @$);
   }
   | '['']' { $$ = eth_ast_cval(eth_nil); }
-  | '[' expr DDOT expr ']' {
+  | '[' expr DDOT expr ']' %prec LIST_DDOT {
     eth_ast *p[2] = { $2, $4 };
-    eth_ast *range = eth_ast_cval(eth_get_builtin("__builtin_inclusive_range"));
+    eth_ast *range = eth_ast_cval(eth_get_builtin("__inclusive_range"));
     $$ = eth_ast_apply(range, p, 2);
   }
   | '[' expr '|' lc_aux ']' {
@@ -295,7 +296,7 @@ atom
     for (int i = 0; i < n; ++i)
     {
       fields[i] = fieldsbuf[i];
-      sprintf(fields[i], "%d", i+1);
+      sprintf(fields[i], "_%d", i+1);
     }
     $$ = eth_ast_make_record_with_type(eth_tuple_type(n), fields, $2.data, n);
     cod_vec_destroy($2);
@@ -383,8 +384,16 @@ expr
     $$ = eth_ast_if($2, $4, eth_ast_cval(eth_nil));
     LOC($$, @$);
   }
+  | expr WHEN expr {
+    $$ = eth_ast_if($3, $1, eth_ast_cval(eth_nil));
+    LOC($$, @$);
+  }
   | UNLESS expr THEN expr {
     $$ = eth_ast_if($2, eth_ast_cval(eth_nil), $4);
+    LOC($$, @$);
+  }
+  | expr UNLESS expr {
+    $$ = eth_ast_if($3, eth_ast_cval(eth_nil), $1);
     LOC($$, @$);
   }
   | FN fnargs RARROW expr {
@@ -428,7 +437,7 @@ expr
   | expr NE    expr { $$ = eth_ast_binop(ETH_NE  , $1, $3); LOC($$, @$); }
   | expr IS    expr { $$ = eth_ast_binop(ETH_IS  , $1, $3); LOC($$, @$); }
   | expr EQUAL expr { $$ = eth_ast_binop(ETH_EQUAL,$1, $3); LOC($$, @$); }
-  | expr ':'   expr { $$ = eth_ast_binop(ETH_CONS, $1, $3); LOC($$, @$); }
+  | expr CONS  expr { $$ = eth_ast_binop(ETH_CONS, $1, $3); LOC($$, @$); }
   | expr '%'   expr { $$ = eth_ast_binop(ETH_MOD , $1, $3); LOC($$, @$); }
   | expr MOD   expr { $$ = eth_ast_binop(ETH_MOD , $1, $3); LOC($$, @$); }
   | expr '^'   expr { $$ = eth_ast_binop(ETH_POW , $1, $3); LOC($$, @$); }
@@ -444,6 +453,21 @@ expr
     eth_ast *fn = eth_ast_cval(eth_get_builtin("++"));
     $$ = eth_ast_apply(fn, args, 2);
     LOC($$, @$);
+  }
+  | expr DDOT expr {
+    char *fields[] = { "l", "r" };
+    eth_ast *vals[] = { $1, $3 };
+    $$ = eth_ast_make_record_with_type(eth_rangelr_type, fields, vals, 2);
+  }
+  | expr DDDOT {
+    char *fields[] = { "l" };
+    eth_ast *vals[] = { $1 };
+    $$ = eth_ast_make_record_with_type(eth_rangel_type, fields, vals, 1);
+  }
+  | DDDOT expr {
+    char *fields[] = { "r" };
+    eth_ast *vals[] = { $2 };
+    $$ = eth_ast_make_record_with_type(eth_ranger_type, fields, vals, 1);
   }
   | '-' expr %prec UMINUS {
     $$ = eth_ast_binop(ETH_SUB, eth_ast_cval(eth_num(0)), $2);
@@ -486,6 +510,8 @@ capident
     free($3);
   }
 ;
+
+list_with_coma: list | list ',';
 
 args
   : atom {
@@ -583,7 +609,7 @@ atomic_pattern
     for (int i = 0; i < n; ++i)
     {
       fields[i] = fldbufs[i];
-      sprintf(fields[i], "%d", i+1);
+      sprintf(fields[i], "_%d", i+1);
     }
     // ---
     eth_type *type = eth_tuple_type(n);
@@ -601,10 +627,25 @@ atomic_pattern
 
 pattern
   : atomic_pattern
-  | pattern ':' pattern {
+  | pattern CONS pattern {
     char *fields[2] = { "car", "cdr" };
     eth_ast_pattern *pats[2] = { $1, $3 };
     $$ = eth_ast_unpack_pattern_with_type(eth_pair_type, fields, pats, 2);
+  }
+  | pattern DDOT pattern {
+    char *fields[2] = { "l", "r" };
+    eth_ast_pattern *pats[2] = { $1, $3 };
+    $$ = eth_ast_unpack_pattern_with_type(eth_rangelr_type, fields, pats, 2);
+  }
+  | pattern DDDOT {
+    char *fields[1] = { "l" };
+    eth_ast_pattern *pats[1] = { $1 };
+    $$ = eth_ast_unpack_pattern_with_type(eth_rangel_type, fields, pats, 1);
+  }
+  | DDDOT pattern {
+    char *fields[1] = { "r" };
+    eth_ast_pattern *pats[1] = { $2 };
+    $$ = eth_ast_unpack_pattern_with_type(eth_ranger_type, fields, pats, 1);
   }
   | pattern AS SYMBOL {
     $$ = $1;

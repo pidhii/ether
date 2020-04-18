@@ -155,7 +155,7 @@ resolve_var_path(const eth_module *mod, const char *path)
       return NULL;
     }
 
-    return resolve_var_path(submod, p);
+    return resolve_var_path(submod, p + 1);
   }
 
   eth_def *def = eth_find_def(mod, path);
@@ -192,7 +192,7 @@ require_var(ir_builder *bldr, const char *ident)
       return NULL;
     }
 
-    eth_t val = resolve_var_path(mod, p);
+    eth_t val = resolve_var_path(mod, p + 1);
     static eth_var ret;
     ret.ident = NULL;
     ret.cval = val;
@@ -753,7 +753,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       }
 
       destroy_ir_builder(fnbldr);
-      return eth_ir_fn(ast->fn.arity, caps, capvars, ncap, body);
+      return eth_ir_fn(ast->fn.arity, caps, capvars, ncap, body, ast);
     }
 
     case ETH_AST_MATCH:
@@ -783,7 +783,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       int w = table->w;
       int h = table->h;
       eth_ir_node *exprs[w];
-      eth_ir_pattern *ir_table[w][h];
+      eth_ir_pattern *ir_table[h][w];
       eth_ir_node *thenbrs[h];
 
       for (int i = 0; i < w; ++i)
@@ -798,8 +798,13 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         thenbrs[i] = build(bldr, table->exprs[i], e);
         eth_pop_var(bldr->vars, n2 - n1);
       }
-      eth_error("unimplemented");
-      abort();
+
+      eth_ir_pattern **tabpats[h];
+      for (int i = 0; i < h; ++i)
+        tabpats[i] = ir_table[i];
+
+      eth_ir_match_table *tab = eth_create_ir_match_table(tabpats, thenbrs, h, w);
+      return eth_ir_multimatch(tab, exprs);
     }
 
     case ETH_AST_IMPORT:
@@ -888,20 +893,31 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
     {
       eth_ir_node *trybr = build(bldr, ast->try.trybr, e);
 
-      int exnvar = new_vid(bldr);
+      int exnvid = new_vid(bldr);
+      eth_ir_node *exnvar = eth_ir_var(exnvid);
 
       int n1 = bldr->vars->len - bldr->capoffs;
       eth_ir_pattern *pat = build_pattern(bldr, ast->try.pat, ast->loc, e);
       int n2 = bldr->vars->len - bldr->capoffs;
       int nvars = n2 - n1;
       eth_ir_node *ok = build(bldr, ast->try.catchbr, e);
-      eth_pop_var(bldr->vars, n2 - n1);
+      eth_pop_var(bldr->vars, nvars);
 
-      eth_ir_node *rethrow = eth_ir_throw(eth_ir_var(exnvar));
+      eth_ir_node *rethrow = eth_ir_throw(exnvar);
 
-      eth_ir_node *catchbr = eth_ir_match(pat, eth_ir_var(exnvar), ok, rethrow);
+      // don't allow to handle exit-object:
+      if (ast->try._check_exit)
+      {
+        assert(pat->unpack.subpats[0]->tag == ETH_PATTERN_IDENT);
+        int what = pat->unpack.subpats[0]->ident.varid;
+        int dummy = new_vid(bldr);
+        eth_ir_pattern *exitpat = eth_ir_unpack_pattern(dummy, eth_exit_type,
+            NULL, NULL, 0);
+        ok = eth_ir_match(exitpat, eth_ir_var(what), rethrow, ok);
+      }
 
-      return eth_ir_try(exnvar, trybr, catchbr, ast->try.likely);
+      eth_ir_node *catchbr = eth_ir_match(pat, exnvar, ok, rethrow);
+      return eth_ir_try(exnvid, trybr, catchbr, ast->try.likely);
     }
 
     case ETH_AST_MKRCRD:
@@ -984,7 +1000,8 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
 }
 
 static eth_ir*
-build_ir(eth_ast *ast, eth_env *env, eth_module *mod, eth_ir_defs *defs)
+build_ir(eth_ast *ast, eth_env *env, eth_module *mod, eth_ir_defs *defs,
+    eth_module *uservars)
 {
   eth_ir *ret;
   int e = 0;
@@ -996,6 +1013,10 @@ build_ir(eth_ast *ast, eth_env *env, eth_module *mod, eth_ir_defs *defs)
 
   // import builtins:
   import_unqualified(bldr, eth_builtins());
+
+  // add extra variables supplied by user
+  if (uservars)
+    import_unqualified(bldr, uservars);
 
   eth_ir_node *body = build(bldr, ast, &e);
   if (e)
@@ -1026,16 +1047,16 @@ build_ir(eth_ast *ast, eth_env *env, eth_module *mod, eth_ir_defs *defs)
 }
 
 eth_ir*
-eth_build_ir(eth_ast *ast, eth_env *env)
+eth_build_ir(eth_ast *ast, eth_env *env, eth_module *uservars)
 {
-  return build_ir(ast, env, NULL, NULL);
+  return build_ir(ast, env, NULL, NULL, uservars);
 }
 
 eth_ir*
 eth_build_module_ir(eth_ast *ast, eth_env *env, eth_module *mod,
-    eth_ir_defs *defs)
+    eth_ir_defs *defs, eth_module *uservars)
 {
-  return build_ir(ast, env, mod, defs);
+  return build_ir(ast, env, mod, defs, uservars);
 }
 
 void

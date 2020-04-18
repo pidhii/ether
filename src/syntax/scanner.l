@@ -132,7 +132,6 @@ __builtin { return BUILTIN; }
 "^"     |
 "."     |
 "$"     |
-":"     |
 "!"     |
 ">"|"<" |
 "+"|"-" |
@@ -143,6 +142,7 @@ __builtin { return BUILTIN; }
 "="     |
 ","     |
 ";"     { return yytext[0]; }
+"::"    { return CONS; }
 "<="    { return LE; }
 ">="    { return GE; }
 "=="    { return EQ; }
@@ -165,6 +165,7 @@ not     { return NOT; }
 lnot    { return LNOT; }
 "++"    { return PPLUS; }
 ".."    { return DDOT; }
+"..."   { return DDDOT; }
 "|>"    { return PIPE; }
 "."\s*"(" { return DOT_OPEN; }
 

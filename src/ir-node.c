@@ -166,6 +166,7 @@ destroy_ir_node(eth_ir_node *node)
       free(node->fn.caps);
       free(node->fn.capvars);
       eth_unref_ir(node->fn.body);
+      eth_unref_ast(node->fn.ast);
       break;
 
     case ETH_IR_MATCH:
@@ -193,6 +194,13 @@ destroy_ir_node(eth_ir_node *node)
 
     case ETH_IR_THROW:
       eth_unref_ir_node(node->throw.exn);
+      break;
+
+    case ETH_IR_MULTIMATCH:
+      for (int i = 0; i < node->multimatch.table->h; ++i)
+        eth_unref_ir_node(node->multimatch.exprs[i]);
+      free(node->multimatch.exprs);
+      eth_destroy_ir_match_table(node->multimatch.table);
       break;
   }
 
@@ -307,7 +315,8 @@ eth_ir_unop(eth_unop op, eth_ir_node *expr)
 }
 
 eth_ir_node*
-eth_ir_fn(int arity, int *caps, int *capvars, int ncap, eth_ir *body)
+eth_ir_fn(int arity, int *caps, int *capvars, int ncap, eth_ir *body,
+    eth_ast *ast)
 {
   eth_ir_node *node = create_ir_node(ETH_IR_FN);
   node->fn.arity = arity;
@@ -315,9 +324,11 @@ eth_ir_fn(int arity, int *caps, int *capvars, int ncap, eth_ir *body)
   node->fn.capvars = malloc(sizeof(int) * ncap);
   node->fn.ncap = ncap;
   node->fn.body = body;
+  node->fn.ast = ast;
   memcpy(node->fn.caps, caps, sizeof(int) * ncap);
   memcpy(node->fn.capvars, capvars, sizeof(int) * ncap);
   eth_ref_ir(body);
+  eth_ref_ast(ast);
   return node;
 }
 
@@ -394,6 +405,53 @@ eth_ir_throw(eth_ir_node *exn)
 {
   eth_ir_node *node = create_ir_node(ETH_IR_THROW);
   eth_ref_ir_node(node->throw.exn = exn);
+  return node;
+}
+
+eth_ir_match_table*
+eth_create_ir_match_table(eth_ir_pattern **const tab[],
+    eth_ir_node *const exprs[], int h, int w)
+{
+  eth_ir_match_table *table = malloc(sizeof(eth_ir_match_table));
+  table->tab = malloc(sizeof(eth_ir_pattern*) * h);
+  for (int i = 0; i < h; ++i)
+  {
+    table->tab[i] = malloc(sizeof(eth_ir_pattern*) * w);
+    for (int j = 0; j < w; ++j)
+      table->tab[i][j] = tab[i][j];
+  }
+  table->exprs = malloc(sizeof(eth_ir_node*) * h);
+  for (int i = 0; i < h; ++i)
+    eth_ref_ir_node(table->exprs[i] = exprs[i]);
+  table->w = w;
+  table->h = h;
+  return table;
+}
+
+void
+eth_destroy_ir_match_table(eth_ir_match_table *table)
+{
+  for (int i = 0; i < table->w; ++i)
+  {
+    for (int j = 0; j < table->h; ++j)
+      eth_destroy_ir_pattern(table->tab[i][j]);
+    free(table->tab[i]);
+  }
+  free(table->tab);
+  for (int j = 0; j < table->h; ++j)
+    eth_unref_ir_node(table->exprs[j]);
+  free(table->exprs);
+  free(table);
+}
+
+eth_ir_node*
+eth_ir_multimatch(eth_ir_match_table *table, eth_ir_node *const exprs[])
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_MULTIMATCH);
+  node->multimatch.table = table;
+  node->multimatch.exprs = malloc(sizeof(eth_ir_node*) * table->w);
+  for (int i = 0; i < table->w; ++i)
+    eth_ref_ir_node(node->multimatch.exprs[i] = exprs[i]);
   return node;
 }
 

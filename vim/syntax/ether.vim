@@ -38,23 +38,28 @@ syn match ethSymbol     /\<[A-Z][a-zA-Z0-9_]*\>/
 syn keyword ethBuiltinFunction pair? symbol? number? string? boolean? function? tuple? record? file?
 
 syn keyword ethBuiltinFunction to_number to_symbol
-
 syn keyword ethBuiltinFunction list
 
+syn keyword ethBuiltinFunction dump
+
 syn keyword ethBuiltinFunction strlen
-syn keyword ethBuiltinFunction concat chr ord
+syn keyword ethBuiltinFunction concat concat_with chr ord
 syn keyword ethBuiltinFunction to_upper to_lower
-syn keyword ethBuiltinFunction strcmp strcasecmp
-syn keyword ethBuiltinFunction substr
+syn keyword ethBuiltinFunction strcmp strcasecmp strncmp strncasecmp
+syn keyword ethBuiltinFunction substr strstr strcasestr
 syn keyword ethBuiltinFunction chomp chop
 
 syn keyword ethBuiltinFunction car cdr
+syn keyword ethBuiltinFunction first second third
+
+syn keyword ethBuiltinFunction range
+syn keyword ethBuiltinFunction unfold_left unfold_right
 syn keyword ethBuiltinFunction length rev_append append rev
 syn keyword ethBuiltinFunction rev_map map rev_zip zip
 syn keyword ethBuiltinFunction for_each
 syn keyword ethBuiltinFunction rev_filter_map filter_map
 syn keyword ethBuiltinFunction rev_flat_map flat_map flatten
-syn keyword ethBuiltinFunction rev_filter filter find partition
+syn keyword ethBuiltinFunction rev_filter filter remove find partition
 syn keyword ethBuiltinFunction fold_left fold_right
 syn keyword ethBuiltinFunction scan_left scan_right
 syn keyword ethBuiltinFunction sort merge
@@ -77,34 +82,36 @@ syn keyword ethBuiltinFunction read read_of
 syn keyword ethBuiltinFunction read_file
 syn keyword ethBuiltinFunction tell seek
 
-syn keyword ethBuiltinFunction printf format
+syn keyword ethBuiltinFunction printf eprintf format
 syn keyword ethBuiltinFunction apply
-syn keyword ethBuiltinFunction die raise
+syn keyword ethBuiltinFunction die raise exit
 syn keyword ethBuiltinFunction system shell
 syn keyword ethBuiltinFunction load
-syn keyword ethBuiltinFunction exit
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Base:
-syn keyword Function sin cos tan
-syn keyword Function asin acos atan atan2
-syn keyword Function sinh cosh tanh
-syn keyword Function asinh acosh atanh
-syn keyword Function floor ceil trunc round
-syn keyword Function sqrt cbrt
-syn keyword Function finite nan?
-syn keyword Function min max
-syn keyword Function hypot abs
-syn keyword Function log log10 log2
-syn keyword Function table
-syn keyword Function substr strstr ltrim rtrim trim
-syn keyword Function read readline readlines flush rewind getpos setpos
-syn keyword Function range
-syn keyword Function scanl
-syn keyword Function repeat iterate
-syn keyword Function unfold
-syn keyword Function zero? positive? negative?
-syn keyword Function split join
+"syn keyword Function sin cos tan
+"syn keyword Function asin acos atan atan2
+"syn keyword Function sinh cosh tanh
+"syn keyword Function asinh acosh atanh
+"syn keyword Function floor ceil trunc round
+"syn keyword Function sqrt cbrt
+"syn keyword Function finite nan?
+"syn keyword Function min max
+"syn keyword Function hypot abs
+"syn keyword Function log log10 log2
+"syn keyword Function table
+"syn keyword Function substr strstr ltrim rtrim trim
+"syn keyword Function read readline readlines flush rewind getpos setpos
+"syn keyword Function scanl
+"syn keyword Function repeat iterate
+"syn keyword Function unfold
+"syn keyword Function zero? positive? negative?
+"syn keyword Function split join
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""'
+" Miscelenious:
+syn keyword Special command_line
 
 syn match ethModule /\<[A-Z][a-zA-Z0-9_]*\s*\./he=e-1 nextgroup=ethModule,ethMember
 syn match ethMember /\<[a-z_][a-zA-Z0-9_]*['?]?\>/
@@ -131,10 +138,14 @@ hi link ethImportAs ethKeyword
 syn keyword ethUnqualified unqualified contained
 hi link ethUnqualified ethKeyword
 
-syn keyword ethKeyword let rec mut and or in as match otherwize
+syn match ethKeyword /\<let\>/
+syn match ethConditional /\<if\%(\s\+let\)\?\>/
+syn region ethTryWith matchgroup=ethException start=/\<try\>/ end=/\<with\>/ contains=TOP skipwhite skipnl
+syn region ethMatch matchgroup=ethConditional start=/\<match\>/ end=/\<with\>/ contains=TOP skipwhite skipnl
+syn keyword ethKeyword let rec and or in as
+syn keyword ethConditional unless when then else otherwize
 syn keyword ethAssert assert
 
-syn keyword ethKeyword if unless when then else try with
 syn keyword ethLazy lazy
 
 syn match ethOperator /[-+=*/%><&|.!]\+/
@@ -189,39 +200,39 @@ syn region String matchgroup=ethQq start=+\<qq|+ skip=+\\|+ end=+|+ skipnl skipw
 " qq+...+
 syn region String matchgroup=ethQq start=/\<qq+/ skip=/\\+/ end=/+/ skipnl skipwhite contains=ethFormat
 
-" Shell
-syn region String matchgroup=ethOperator start=/`/ skip=/\\`/ end=/\`/ skipnl skipwhite contains=ethFormat
+"" Shell
+"syn region String matchgroup=ethOperator start=/`/ skip=/\\`/ end=/\`/ skipnl skipwhite contains=ethFormat
 
-"RerEx
-" qq[...]
-syn region String matchgroup=ethQq start=/\<qr\[/ skip=/\\]/ end=/\]/ skipnl skipwhite contains=ethFormat
-" qr(...)
-syn region String matchgroup=ethQq start=/\<qr(/ skip=/\\)/ end=/)[a-zA-Z]*/ skipnl skipwhite contains=ethFormat
-" qr{...}
-syn region String matchgroup=ethQq start=/\<qr{/ skip=/\\}/ end=/}[a-zA-Z]*/ skipnl skipwhite contains=ethFormat
-" qr/.../
-syn region String matchgroup=ethQq start=+\<qr/+ skip=+\\/+ end=+/[a-zA-Z]*+ skipnl skipwhite contains=ethFormat
-" qr|...|
-syn region String matchgroup=ethQq start=+\<qr|+ skip=+\\|+ end=+|[a-zA-Z]*+ skipnl skipwhite contains=ethFormat
-" qr+...+
-syn region String matchgroup=ethQq start=/\<qr+/ skip=/\\+/ end=/+[a-zA-Z]*/ skipnl skipwhite contains=ethFormat
+""RerEx
+"" qq[...]
+"syn region String matchgroup=ethQq start=/\<qr\[/ skip=/\\]/ end=/\]/ skipnl skipwhite contains=ethFormat
+"" qr(...)
+"syn region String matchgroup=ethQq start=/\<qr(/ skip=/\\)/ end=/)[a-zA-Z]*/ skipnl skipwhite contains=ethFormat
+"" qr{...}
+"syn region String matchgroup=ethQq start=/\<qr{/ skip=/\\}/ end=/}[a-zA-Z]*/ skipnl skipwhite contains=ethFormat
+"" qr/.../
+"syn region String matchgroup=ethQq start=+\<qr/+ skip=+\\/+ end=+/[a-zA-Z]*+ skipnl skipwhite contains=ethFormat
+"" qr|...|
+"syn region String matchgroup=ethQq start=+\<qr|+ skip=+\\|+ end=+|[a-zA-Z]*+ skipnl skipwhite contains=ethFormat
+"" qr+...+
+"syn region String matchgroup=ethQq start=/\<qr+/ skip=/\\+/ end=/+[a-zA-Z]*/ skipnl skipwhite contains=ethFormat
 
-"Search Replace
-" /../../
-syn region String matchgroup=ethQq start="\<s[g]*/" skip=+\\/+ end=+/+ nextgroup=ethSrPattern1,ethSrPattern1End skipnl skipwhite contains=ethFormat
-syn region ethSrPattern1 start=+.+ matchgroup=ethQq skip=+\\/+ end=+/[a-zA-Z]*+ skipnl skipwhite contains=ethFormat contained
-syn match ethSrPattern1End +/[a-zA-Z]*+ contained
-hi link ethSrPattern1End ethQq
-" |..|..|
-syn region String matchgroup=ethQq start="\<s[g]*|" skip=+\\|+ end=+|+ nextgroup=ethSrPattern2,ethSrPattern2End skipnl skipwhite contains=ethFormat
-syn region ethSrPattern2 start=+.+ matchgroup=ethQq skip=+\\|+ end=+|[a-zA-Z]*+ skipnl skipwhite contains=ethFormat contained
-syn match ethSrPattern2End +|[a-zA-Z]*+ contained
-hi link ethSrPattern2End ethQq
-" +..+..+
-syn region String matchgroup=ethQq start="\<s[g]*+" skip=/\\+/ end=/+/ nextgroup=ethSrPattern3,ethSrPattern3End skipnl skipwhite contains=ethFormat
-syn region ethSrPattern3 start=+.+ matchgroup=ethQq skip=/\\+/ end=/+[a-zA-Z]*/ skipnl skipwhite contains=ethFormat contained
-syn match ethSrPattern3End /+[a-zA-Z]*/ contained
-hi link ethSrPattern3End ethQq
+""Search Replace
+"" /../../
+"syn region String matchgroup=ethQq start="\<s[g]*/" skip=+\\/+ end=+/+ nextgroup=ethSrPattern1,ethSrPattern1End skipnl skipwhite contains=ethFormat
+"syn region ethSrPattern1 start=+.+ matchgroup=ethQq skip=+\\/+ end=+/[a-zA-Z]*+ skipnl skipwhite contains=ethFormat contained
+"syn match ethSrPattern1End +/[a-zA-Z]*+ contained
+"hi link ethSrPattern1End ethQq
+"" |..|..|
+"syn region String matchgroup=ethQq start="\<s[g]*|" skip=+\\|+ end=+|+ nextgroup=ethSrPattern2,ethSrPattern2End skipnl skipwhite contains=ethFormat
+"syn region ethSrPattern2 start=+.+ matchgroup=ethQq skip=+\\|+ end=+|[a-zA-Z]*+ skipnl skipwhite contains=ethFormat contained
+"syn match ethSrPattern2End +|[a-zA-Z]*+ contained
+"hi link ethSrPattern2End ethQq
+"" +..+..+
+"syn region String matchgroup=ethQq start="\<s[g]*+" skip=/\\+/ end=/+/ nextgroup=ethSrPattern3,ethSrPattern3End skipnl skipwhite contains=ethFormat
+"syn region ethSrPattern3 start=+.+ matchgroup=ethQq skip=/\\+/ end=/+[a-zA-Z]*/ skipnl skipwhite contains=ethFormat contained
+"syn match ethSrPattern3End /+[a-zA-Z]*/ contained
+"hi link ethSrPattern3End ethQq
 
 syn match  SpecialChar /\\\d\+/ containedin=ethSrPattern1,ethSrPattern2,ethSrPattern3 contained
 hi link ethSrPattern1 String
@@ -261,6 +272,9 @@ hi link ethStructName StorageClass
 hi link ethSpecial Special
 
 hi link ethKeyword Statement
+hi link ethConditional Conditional
+hi link ethException Exception
+
 hi link ethAssert Keyword
 hi link ethLazy Keyword
 

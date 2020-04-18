@@ -159,11 +159,17 @@ eth_init(const int *argc)
   extern void _eth_init_exception_type(void);
   _eth_init_exception_type();
 
+  extern void _eth_init_exit_type(void);
+  _eth_init_exit_type();
+
   extern void _eth_init_record_types(void);
   _eth_init_record_types();
 
   extern void _eth_init_file_type(void);
   _eth_init_file_type();
+
+  extern void _eth_init_range_types(void);
+  _eth_init_range_types();
 
   extern void _eth_init_builtins(void);
   _eth_init_builtins();
@@ -181,7 +187,11 @@ eth_cleanup(void)
   eth_destroy_type(eth_pair_type);
   eth_destroy_type(eth_function_type);
   eth_destroy_type(eth_exception_type);
+  eth_destroy_type(eth_exit_type);
   eth_destroy_type(eth_file_type);
+  eth_destroy_type(eth_rangelr_type);
+  eth_destroy_type(eth_rangel_type);
+  eth_destroy_type(eth_ranger_type);
 
   extern void _eth_cleanup_strings(void);
   _eth_cleanup_strings();
@@ -208,11 +218,11 @@ const char*
 eth_binop_sym(eth_binop op)
 {
   static char sym[][5] = {
-    "+", "-", "*", "/", "%", "^",
+    "+", "-", "*", "/", "mod", "^",
     "land", "lor", "lxor", "lshl", "lshr", "ashl", "ashr",
     "<", "<=", ">", ">=", "==", "/=",
-    "is",
-    "cons"
+    "is", "eq",
+    "::"
   };
   return sym[op];
 }
@@ -224,7 +234,7 @@ eth_binop_name(eth_binop op)
     "add", "sub", "mul", "div", "mod", "pow",
     "land", "lor", "lxor", "lshl", "lshr", "ashl", "ashr",
     "lt", "le", "gt", "ge", "eq", "ne",
-    "is",
+    "is", "eq",
     "cons"
   };
   return sym[op];

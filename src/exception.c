@@ -26,7 +26,9 @@ write_exception(eth_type *type, eth_t x, FILE *out)
 void
 _eth_init_exception_type(void)
 {
-  eth_exception_type = eth_create_type("exception");
+  char *what = "what";
+  ptrdiff_t offs = offsetof(eth_exception, what);
+  eth_exception_type = eth_create_struct_type("exception", &what, &offs, 1);
   eth_exception_type->destroy = destroy_exception;
   eth_exception_type->write = write_exception;
 }

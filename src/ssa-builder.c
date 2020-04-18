@@ -247,6 +247,7 @@ static eth_ssa*
 create_ssa(eth_insn *body, int nvals, int ntries)
 {
   eth_ssa *ssa = malloc(sizeof(eth_ssa));
+  ssa->rc = 0;
   ssa->nvals = nvals;
   ssa->ntries = ntries;
   ssa->body = body;
@@ -264,7 +265,7 @@ static int
 build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *fn, int f, bool *e);
 
 static int
-build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e);
+build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e);
 
 static int
 build_logical_block(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir,
@@ -429,7 +430,7 @@ build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int f, bool *e)
       fnbldr->vinfo[fncaps[i]]->type = bldr->vinfo[caps[i]]->type;
 
       // detect self-capture for loop-detection:
-      if (f != FN_NEW and fncaps[i] == f)
+      if (f != FN_NEW and caps[i] == f)
         fnbldr->vinfo[fncaps[i]]->isthis = true;
     }
     eth_write_insn(fntape, eth_insn_cap(fncaps, ncap));
@@ -463,13 +464,14 @@ build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int f, bool *e)
   {
     assert(nmov == ncap);
     ret = new_val(bldr, RC_RULES_DEFAULT);
-    insn = eth_insn_fn(ret, arity, caps, ncap, ir->fn.body, ssa);
+    insn = eth_insn_fn(ret, arity, caps, ncap, ir->fn.ast, ir->fn.body, ssa);
     bldr->vinfo[ret]->creatloc = insn;
   }
   else
   {
     ret = -1;
-    insn = eth_insn_finfn(f, arity, caps, ncap, movs, nmov, ir->fn.body, ssa);
+    insn = eth_insn_finfn(f, arity, caps, ncap, movs, nmov, ir->fn.ast,
+        ir->fn.body, ssa);
   }
   eth_write_insn(tape, insn);
   trace_mov(bldr, insn);
@@ -653,11 +655,139 @@ build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
   abort();
 }
 
+static inline bool
+is_wildcard(const eth_ir_pattern *pat)
+{
+  return pat->tag == ETH_PATTERN_DUMMY
+      or pat->tag == ETH_PATTERN_IDENT
+  ;
+}
+
+/*
+ * Select column following `First Row'-heuristic.
+ */
+static inline int
+select_column(eth_ir_match_table *P)
+{
+  assert(P->h > 0);
+  for (int i = 0; i < P->w; ++i)
+  {
+    if (not is_wildcard(P->tab[0][i]))
+      return i;
+  }
+  abort();
+}
+
+static bool
+cmp_patterns(const eth_ir_pattern *p1, const eth_ir_pattern *p2)
+{
+  if (is_wildcard(p1) or is_wildcard(p2))
+  {
+    return true;
+  }
+  else if (p1->tag != p2->tag)
+  {
+    return false;
+  }
+  else
+  {
+    switch (p1->tag)
+    {
+      case ETH_PATTERN_UNPACK:
+      {
+        if (p1->unpack.type != p2->unpack.type)
+          return false;
+        if (p1->unpack.n != p1->unpack.type->nfields or
+            p2->unpack.n == p2->unpack.type->nfields)
+        {
+          eth_error("unsupported multimatch pattern");
+          abort();
+        }
+        return true;
+      }
+
+      default:
+        eth_error("unsupported multimatch pattern");
+        abort();
+    }
+  }
+}
+
+static eth_mtree*
+build_mtree(ssa_builder *bldr, eth_ir_match_table *P, eth_ir_node *o[], int phi,
+    bool istc, bool *e)
+{
+  /*
+   * If matrix P has no row then matching always fails, since there is not row
+   * to match.
+   *
+   *   CC(o, Ø → A) = Fail
+   */
+  if (P->h == 0)
+    return eth_create_fail();
+
+  /*
+   * If the first row of P exists and is constituted by wildcards, then matching
+   * always succeeds and yeilds the first action.
+   *
+   *         _   ... _   → a1
+   *   CC(o,     ...          ) = Leaf(a1)
+   *         pm1 ... pmn → am
+   */
+  bool allwild = true;
+  for (int i = 0; i < P->w; ++i)
+  {
+    if (not is_wildcard(P->tab[0][i]))
+    {
+      allwild = false;
+      break;
+    }
+  }
+  if (allwild)
+  {
+    eth_ssa_tape *tape = eth_create_ssa_tape();
+    // --
+    eth_insn *entry = eth_insn_nop();
+    entry->flag |= ETH_IFLAG_NOBEFORE;
+    eth_write_insn(tape, entry);
+    int ret = build(bldr, tape, P->exprs[0], istc, e);
+    // --
+    if (istc)
+      eth_write_insn(tape, eth_insn_ret(ret));
+    else
+      move_to_phi_default(bldr, tape, phi, ret);
+    // --
+    eth_mtree *leaf = eth_create_leaf(tape->head);
+    eth_destroy_ssa_tape(tape);
+    return leaf;
+  }
+
+  /*
+   * Build Switch.
+   */
+  int col = select_column(P);
+  // --
+  bool visited[P->h];
+  memset(visited, 0, sizeof visited);
+  // --
+  for (int i = 0; i < P->h; ++i)
+  {
+    if (not visited[i])
+    {
+      for (int j = 0; j < P->h; ++j)
+      {
+        // ...
+        abort();
+      }
+    }
+  }
+}
+
 /*
  * Translate tree-IR into SSA-instructions.
  */
 static int
-build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
+build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e)
 {
   switch (ir->tag)
   {
@@ -785,6 +915,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
       eth_ssa_tape *cchtape = eth_create_ssa_tape();
       // ---
       int exnvid = new_val(bldr, RC_RULES_UNREF);
+      bldr->vinfo[exnvid]->type = eth_exception_type;
       eth_insn *getexn = eth_insn_getexn(exnvid);
       bldr->vinfo[exnvid]->creatloc = getexn;
       bldr->vars[ir->try.exnvar] = exnvid;
@@ -885,6 +1016,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
         case ETH_CONS:
           ret = new_val(bldr, RC_RULES_DEFAULT);
           insn = eth_insn_binop(ETH_CONS, ret, lhs, rhs);
+          trace_mov(bldr, insn);
 
           testnum = false;
           bldr->vinfo[ret]->type = eth_pair_type;
@@ -978,7 +1110,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
         // --
         eth_ssa_tape *thentape = eth_create_ssa_tape();
         eth_insn *ctor = eth_insn_nop();
-        ctor->flag = ETH_IFLAG_NOBEFORE;
+        ctor->flag |= ETH_IFLAG_NOBEFORE;
         eth_write_insn(thentape, ctor);
         int thenret = build(bldr, thentape, ir->match.thenbr, istc, e);
         // --
@@ -1016,21 +1148,21 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
 
         return ret;
       }
+    }
 
-      case ETH_IR_MKRCRD:
-      {
-        int n = ir->mkrcrd.type->nfields;
-        int vids[n];
-        for (int i = 0; i < n; ++i)
-          vids[i] = build(bldr, tape, ir->mkrcrd.fields[i], false, e);
-        int out = new_val(bldr, RC_RULES_DEFAULT);
-        eth_insn *insn = eth_insn_mkrcrd(out, vids, ir->mkrcrd.type);
-        bldr->vinfo[out]->creatloc = insn;
-        bldr->vinfo[out]->type = ir->mkrcrd.type;
-        eth_write_insn(tape, insn);
-        trace_mov(bldr, insn);
-        return out;
-      }
+    case ETH_IR_MKRCRD:
+    {
+      int n = ir->mkrcrd.type->nfields;
+      int vids[n];
+      for (int i = 0; i < n; ++i)
+        vids[i] = build(bldr, tape, ir->mkrcrd.fields[i], false, e);
+      int out = new_val(bldr, RC_RULES_DEFAULT);
+      eth_insn *insn = eth_insn_mkrcrd(out, vids, ir->mkrcrd.type);
+      bldr->vinfo[out]->creatloc = insn;
+      bldr->vinfo[out]->type = ir->mkrcrd.type;
+      eth_write_insn(tape, insn);
+      trace_mov(bldr, insn);
+      return out;
     }
 
     case ETH_IR_THROW:
@@ -1038,6 +1170,11 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int istc, bool *e)
       int vid = build(bldr, tape, ir->throw.exn, false, e);
       write_throw(bldr, tape, vid, ir->loc);
       return vid;
+    }
+
+    case ETH_IR_MULTIMATCH:
+    {
+      abort();
     }
   }
 
@@ -1228,6 +1365,12 @@ is_moving(eth_insn *insn, int vid)
       }
       return false;
 
+    case ETH_INSN_BINOP:
+      if (insn->binop.op == ETH_CONS)
+        return insn->binop.lhs == vid or insn->binop.rhs == vid;
+      else
+        return false;
+
     default:
       return false;
   }
@@ -1257,6 +1400,15 @@ get_moved_vids(eth_insn *insn, int *n)
     case ETH_INSN_MKRCRD:
       *n = insn->mkrcrd.type->nfields;
       return insn->mkrcrd.vids;
+
+    case ETH_INSN_BINOP:
+    {
+      static int buf[2];
+      buf[0] = insn->binop.lhs;
+      buf[1] = insn->binop.rhs;
+      *n = 2;
+      return buf;
+    }
 
     default:
       eth_error("wtf");
@@ -1360,8 +1512,11 @@ kill_value_F(kill_info *kinfo, eth_insn *begin, int vid)
 
       if (is_dead_end(b1) and not kill_value_T(kinfo, b1, vid))
         force_kill(kinfo, b1, vid);
+      else kill_value_F(kinfo, b1, vid);
+
       if (is_dead_end(b2) and not kill_value_T(kinfo, b2, vid))
         force_kill(kinfo, b2, vid);
+      else kill_value_F(kinfo, b2, vid);
     }
 
     if (insn->tag == ETH_INSN_TRY)
@@ -1371,6 +1526,7 @@ kill_value_F(kill_info *kinfo, eth_insn *begin, int vid)
 
       if (is_dead_end(c) and not kill_value_T(kinfo, c, vid))
         force_kill(kinfo, c, vid);
+      else kill_value_F(kinfo, c, vid);
     }
 
     if (is_end(insn))
@@ -1650,11 +1806,31 @@ insert_rc(ssa_builder *bldr, eth_insn *body)
 }
 
 
-void
-eth_destroy_ssa(eth_ssa *ssa)
+static inline void
+destroy_ssa(eth_ssa *ssa)
 {
   eth_destroy_insn_list(ssa->body);
   free(ssa);
+}
+
+void
+eth_ref_ssa(eth_ssa *ssa)
+{
+  ssa->rc += 1;
+}
+
+void
+eth_unref_ssa(eth_ssa *ssa)
+{
+  if (--ssa->rc == 0)
+    destroy_ssa(ssa);
+}
+
+void
+eth_drop_ssa(eth_ssa *ssa)
+{
+  if (ssa->rc == 0)
+    destroy_ssa(ssa);
 }
 
 static eth_ssa*

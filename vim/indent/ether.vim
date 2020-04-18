@@ -150,6 +150,13 @@ function! GetOCamlIndent()
      return s:FindPair('\<\%(if \+\)\@<!let\>', '', '\<in\>')
    endif
 
+ " Indent if current line begins with 'and':
+ elseif line =~ '^\s*and\>'
+   if lline !~ '^\s*\(and\|let\|type\)\>\|\<end\s*$'
+     return ind - shiftwidth()
+     "return s:FindPair('\<\%(if \+\)\@<!let\>', '', '\<and\>')
+   endif
+
  " Indent if current line begins with 'else':
  elseif line =~ '^\s*else\>'
    if lline !~ '^\s*\(if\|then\)\>'
@@ -160,12 +167,6 @@ function! GetOCamlIndent()
  elseif line =~ '^\s*then\>'
    if lline !~ '^\s*\(if\|else\)\>'
      return s:FindPair('\<if\>', '', '\<then\>')
-   endif
-
- " Indent if current line begins with 'and':
- elseif line =~ '^\s*and\>'
-   if lline !~ '^\s*\(and\|let\|type\)\>\|\<end\s*$'
-     return ind - shiftwidth()
    endif
 
  " Indent if current line begins with 'with':

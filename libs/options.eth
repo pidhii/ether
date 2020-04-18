@@ -1,0 +1,58 @@
+
+let get_options cfg os =
+
+  let get_rules opt =
+    try find (fn {name} -> name eq opt) cfg
+    with Not_found -> raise Undefined_option
+  in
+
+  let rec loop os kws pos =
+    if let o::os = os then
+      if o eq "--" then (kws, rev_append pos os)
+      else if strncmp o "--" 2 == 0 then handle_long_option o os kws pos
+      else if strncmp o "-" 1 == 0 then handle_short_option o os kws pos
+      else loop os kws (o :: pos)
+    else (kws, rev pos)
+
+  and handle_long_option o os kws pos =
+    let brk = strstr o "=" in
+    if brk then
+      (* Long option with '=' *)
+      let lopt = substr o (2 .. brk-1) in
+      let { has_arg, val } = get_rules lopt in
+      if has_arg then
+        let arg = substr o (brk + 1 ...) in
+        loop os ((val, arg) :: kws) pos
+      else raise Unexpected_argument
+    else
+      let lopt = substr o (2...) in
+      let { has_arg, val } = get_rules lopt in
+      if has_arg then
+        if let arg::os = os then
+          loop os ((val, arg) :: kws) pos
+        else raise Missing_argument
+      else loop os ((val, true) :: kws) pos
+
+  and handle_short_option o os kws pos =
+    let shopt = substr o 1 1 in
+    let { has_arg, val } = get_rules shopt in
+    if strlen o > 2 then
+      (* Option and argument are merged *)
+      if has_arg then
+        let arg = substr o (2...) in
+        loop os ((val, arg) :: kws) pos
+      else raise Unexpected_argument
+    else
+      if has_arg then
+        if let arg::os = os then
+          loop os ((val, arg) :: kws) pos
+        else raise Missing_argument
+      else loop os ((val, true) :: kws) pos
+  in
+
+  loop os [] []
+in
+
+let pub get = get_options in
+
+()

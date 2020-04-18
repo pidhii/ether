@@ -24,7 +24,7 @@ destroy_insn(eth_bc_insn *insn)
 
     case ETH_OPC_FN:
     case ETH_OPC_FINFN:
-      eth_unref_ir(insn->fn.data->ir);
+      eth_unref_source(insn->fn.data->src);
       eth_unref_bytecode(insn->fn.data->bc);
       free(insn->fn.data);
       break;
@@ -317,7 +317,7 @@ write_ret(bc_builder *bldr, int vid)
 }
 
 static int
-write_fn(bc_builder *bldr, int out, int arity, eth_ir *ir, eth_bytecode *bc,
+write_fn(bc_builder *bldr, int out, int arity, eth_source *src, eth_bytecode *bc,
     int *caps, int ncap)
 {
   eth_bc_insn *insn = append_insn(bldr);
@@ -325,10 +325,10 @@ write_fn(bc_builder *bldr, int out, int arity, eth_ir *ir, eth_bytecode *bc,
   insn->fn.out = out;
   insn->fn.data = malloc(sizeof(insn->fn.data[0]) + sizeof(int) * ncap);
   insn->fn.data->arity = arity;
-  insn->fn.data->ir = ir;
+  insn->fn.data->src = src;
   insn->fn.data->bc = bc;
   insn->fn.data->ncap = ncap;
-  eth_ref_ir(ir);
+  eth_ref_source(src);
   eth_ref_bytecode(bc);
   memcpy(insn->fn.data->caps, caps, sizeof(int) * ncap);
   return bldr->len - 1;
@@ -355,18 +355,18 @@ write_cap(bc_builder *bldr, int vid0, int n)
 }
 
 static int
-write_finfn(bc_builder *bldr, int out, int arity, eth_ir *ir, eth_bytecode *bc,
-    int *caps, int ncap)
+write_finfn(bc_builder *bldr, int out, int arity, eth_source *src,
+    eth_bytecode *bc, int *caps, int ncap)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_FINFN;
   insn->fn.out = out;
   insn->fn.data = malloc(sizeof(insn->fn.data[0]) + sizeof(int) * ncap);
   insn->fn.data->arity = arity;
-  insn->fn.data->ir = ir;
+  insn->fn.data->src = src;
   insn->fn.data->bc = bc;
   insn->fn.data->ncap = ncap;
-  eth_ref_ir(ir);
+  eth_ref_source(src);
   eth_ref_bytecode(bc);
   memcpy(insn->fn.data->caps, caps, sizeof(int) * ncap);
   return bldr->len - 1;
@@ -820,7 +820,8 @@ end_if:
         int caps[ncap];
         for (int i = 0; i < ncap; ++i)
           caps[i] = get_reg(bldr, ip->fn.caps[i]);
-        write_fn(bldr, out, ip->fn.arity, ir, bc, caps, ncap);
+        eth_source *src = eth_create_source(ip->fn.ast, ip->fn.ir, ip->fn.ssa);
+        write_fn(bldr, out, ip->fn.arity, src, bc, caps, ncap);
         break;
       }
 
@@ -837,7 +838,9 @@ end_if:
         int caps[ncap];
         for (int i = 0; i < ncap; ++i)
           caps[i] = get_reg(bldr, ip->finfn.caps[i]);
-        write_finfn(bldr, out, ip->finfn.arity, ir, bc, caps, ncap);
+        eth_source *src = eth_create_source(ip->finfn.ast, ip->finfn.ir,
+            ip->finfn.ssa);
+        write_finfn(bldr, out, ip->finfn.arity, src, bc, caps, ncap);
         break;
       }
 
