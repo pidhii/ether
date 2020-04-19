@@ -1,4 +1,11 @@
 
+let _MODE =
+  if member? "testmode" command_line
+  then Test
+  else Default
+in
+
+
 let fac =
   let rec loop x acc =
     if x == 0 then acc
@@ -50,13 +57,14 @@ let (_, b, _, d) = t in
 print ("b:", b);
 print ("d:", d);
 
-#try
-  #let a = to_number $ input "Enter a: " in
-  #let b = to_number $ input "Enter b: " in
-  #let name = input "Enter your name: " in
-  #print (name ++ ", a + b = ", a + b);
-#with End_of_file ->
-  #print "Oh, fuck you, bastard.";
+when _MODE is Default then
+  try
+    let a = to_number $ input "Enter a: " in
+    let b = to_number $ input "Enter b: " in
+    let name = input "Enter your name: " in
+    print (name ++ ", a + b = ", a + b);
+  with End_of_file ->
+    print "Oh, fuck you, bastard.";
 
 
 print ("test tuple:", tuple? (A,B), tuple? ());
@@ -70,7 +78,7 @@ let { name = nam } = r in
 print ("name:", nam);
 print ("list record:", list r);
 
-let head x::_ = x in
+let head (x::_) = x in
 print ("head:", head [A,B,C,D,E]);
 
 print ("match NIL:", if let _::nil = id [1] then true else false);
@@ -121,8 +129,9 @@ let elf? x =
   hdr eq "\x7fELF";
 in
 
-let path = "Debug/install/bin/ether" in
-printf "elf? ~w: ~w\n" path (elf? path);
+when _MODE is Default then
+  let path = "Debug/install/bin/ether" in
+  printf "elf? ~w: ~w\n" path (elf? path);
 
 let path = "out.txt" in
 let file = open_out path in
@@ -130,7 +139,6 @@ write_to file "Hello there!";
 close file;
 print ("out.txt:", read_file $ open_in path);
 system "rm -v ~d" path ;
-
 
 (
   let list? x = x is nil || pair? x in
@@ -151,4 +159,14 @@ system "rm -v ~d" path ;
 
 print ("argv:", concat_with ", " command_line);
 
+let option = id (Some 42) in
+print ("variant:", option);
+let Some x = option in
+print ("variant value:", x);
+
+for_eachi [0x61 .. 0x70] (fn i x ->
+  print (i, chr x)
+);
+
 13;
+

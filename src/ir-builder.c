@@ -286,8 +286,7 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
       eth_attr *attr = NULL;
       if (pat->ident.attr)
       {
-        attr = eth_create_attr();
-        attr->flag = pat->ident.attr;
+        attr = eth_create_attr(pat->ident.attr);
         // handle PUB
         if (pat->ident.attr & ETH_ATTR_PUB)
           trace_pub_var(bldr, pat->ident.str, varid, attr, loc, e);
@@ -406,7 +405,7 @@ build_let(ir_builder *bldr, int idx, eth_ast *ast, eth_ir_node *const vals[],
 
     eth_t exn = eth_exn(eth_sym("Type_error"));
     eth_ir_node *elsebr = eth_ir_throw(eth_ir_cval(exn));
-    eth_set_ir_location(elsebr, ast->loc);
+    eth_set_ir_location(elsebr, ast->let.vals[idx]->loc);
 
     eth_ir_node *ret = eth_ir_match(pat, vals[idx], thenbr, elsebr);
     eth_set_ir_location(ret, ast->loc);
@@ -436,7 +435,7 @@ build_letrec(ir_builder *bldr, int idx, eth_ast *ast, int nvars0, int nvars,
 
     eth_t exn = eth_exn(eth_sym("Type_error"));
     eth_ir_node *elsebr = eth_ir_throw(eth_ir_cval(exn));
-    eth_set_ir_location(elsebr, ast->loc);
+    eth_set_ir_location(elsebr, ast->letrec.vals[idx]->loc);
 
     eth_ir_node *ret = eth_ir_match(pats[idx], expr, thenbr, elsebr);
     eth_set_ir_location(ret, ast->loc);
@@ -478,6 +477,18 @@ is_unop_redefined(ir_builder *bldr, eth_unop op)
   if (var == NULL)
     return false;
   if (var->attr && (var->attr->flag & ETH_ATTR_BUILTIN))
+    return false;
+  else
+    return true;
+}
+
+static bool
+is_redefined(ir_builder *bldr, const char *ident)
+{
+  eth_var *var = find_var_deep(bldr, ident);
+  if (var == NULL)
+    return false;
+  else if (var->attr && (var->attr->flag & ETH_ATTR_BUILTIN))
     return false;
   else
     return true;
@@ -813,11 +824,13 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
 
       char *p;
       char topname[256];
+      bool istop = true;
       if ((p = strchr(ast->import.module, '.')))
       {
         int len = p - ast->import.module;
         memcpy(topname, ast->import.module, len);
         topname[len] = '\0';
+        istop = false;
       }
       else
         strcpy(topname, ast->import.module);
@@ -828,21 +841,26 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       if (bldr->mod)
       {
         topmod = eth_require_module(eth_get_env(bldr->mod), topname);
-        mod = eth_require_module(eth_get_env(bldr->mod), ast->import.module);
+        if (not istop)
+          mod = eth_require_module(eth_get_env(bldr->mod), ast->import.module);
       }
       if (not mod)
       {
         topmod = eth_require_module(bldr->env, topname);
-        mod = eth_require_module(bldr->env, ast->import.module);
+        if (not istop)
+          mod = eth_require_module(bldr->env, ast->import.module);
       }
 
-      if (not topmod or not mod)
+      if (not topmod or not istop and not mod)
       {
         eth_warning("failed to import module %s", ast->import.module);
         *e = 1;
         eth_print_location(ast->loc, stderr);
         return eth_ir_error();
       }
+
+      if (istop)
+        mod = topmod;
 
       int n1 = bldr->vars->len - bldr->capoffs;
       int nm1 = bldr->mods.len;
@@ -869,24 +887,52 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
 
     case ETH_AST_AND:
     {
-      eth_ir_node *lhs = build(bldr, ast->scand.lhs, e);
-      eth_ir_node *rhs = build(bldr, ast->scand.rhs, e);
-      int tmpvar = new_vid(bldr);
-      eth_ir_node *ret =
-        eth_ir_bind(&tmpvar, &lhs, 1,
-          eth_ir_if(eth_ir_var(tmpvar), rhs, eth_ir_cval(eth_false)));
-      return ret;
+      if (is_redefined(bldr, "&&"))
+      { // user-defined operator -> build as application
+        eth_debug("redefined operator '&&'");
+        eth_ast *f = eth_ast_ident("&&");
+        eth_ast *xs[] = { ast->scand.lhs, ast->scand.rhs };
+        eth_ast *apply = eth_ast_apply(f, xs, 2);
+        eth_set_ast_location(apply, ast->loc);
+        eth_ir_node *ret = build(bldr, apply, e);
+        eth_drop_ast(apply);
+        return ret;
+      }
+      else
+      {
+        eth_ir_node *lhs = build(bldr, ast->scand.lhs, e);
+        eth_ir_node *rhs = build(bldr, ast->scand.rhs, e);
+        int tmpvar = new_vid(bldr);
+        eth_ir_node *ret =
+          eth_ir_bind(&tmpvar, &lhs, 1,
+            eth_ir_if(eth_ir_var(tmpvar), rhs, eth_ir_cval(eth_false)));
+        return ret;
+      }
     }
 
     case ETH_AST_OR:
     {
-      eth_ir_node *lhs = build(bldr, ast->scand.lhs, e);
-      eth_ir_node *rhs = build(bldr, ast->scand.rhs, e);
-      int tmpvar = new_vid(bldr);
-      eth_ir_node *ret =
-        eth_ir_bind(&tmpvar, &lhs, 1,
-          eth_ir_if(eth_ir_var(tmpvar), eth_ir_var(tmpvar), rhs));
-      return ret;
+      if (is_redefined(bldr, "||"))
+      { // user-defined operator -> build as application
+        eth_debug("redefined operator '||'");
+        eth_ast *f = eth_ast_ident("||");
+        eth_ast *xs[] = { ast->scor.lhs, ast->scor.rhs };
+        eth_ast *apply = eth_ast_apply(f, xs, 2);
+        eth_set_ast_location(apply, ast->loc);
+        eth_ir_node *ret = build(bldr, apply, e);
+        eth_drop_ast(apply);
+        return ret;
+      }
+      else
+      {
+        eth_ir_node *lhs = build(bldr, ast->scor.lhs, e);
+        eth_ir_node *rhs = build(bldr, ast->scor.rhs, e);
+        int tmpvar = new_vid(bldr);
+        eth_ir_node *ret =
+          eth_ir_bind(&tmpvar, &lhs, 1,
+              eth_ir_if(eth_ir_var(tmpvar), eth_ir_var(tmpvar), rhs));
+        return ret;
+      }
     }
 
     case ETH_AST_TRY:

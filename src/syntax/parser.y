@@ -172,7 +172,7 @@ int _eth_start_token = -1;
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %nonassoc LET REC AND IN FN IFLET WHENLET
 %nonassoc IMPORT AS UNQUALIFIED
-%nonassoc DOT_OPEN
+%nonassoc DOT_OPEN1 DOT_OPEN2
 %nonassoc LARROW
 %nonassoc PUB BUILTIN
 %nonassoc LIST_DDOT
@@ -206,7 +206,7 @@ int _eth_start_token = -1;
 
 
 // =============================================================================
-%type<ast> atom
+%type<ast> fn_atom atom
 %type<ast> form
 %type<ast> expr
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -219,7 +219,7 @@ int _eth_start_token = -1;
 %type<patvec> fnargs
 %type<string> string
 %type<charvec> string_aux
-%type<pattern> atomic_pattern pattern
+%type<pattern> atomic_pattern form_pattern pattern
 %type<strvec> maybe_imports import_list
 %type<astvec> list list_with_coma
 %type<patvec> pattern_list
@@ -236,22 +236,41 @@ entry
   : expr { g_result = $1; }
 ;
 
-atom
-  : NUMBER { $$ = eth_ast_cval(eth_create_number($1)); LOC($$, @$); }
-  | ident { $$ = eth_ast_ident($1); free($1); LOC($$, @$); }
-  | CONST  { $$ = eth_ast_cval($1); LOC($$, @$); }
-  | string { $$ = eth_ast_cval(eth_create_string($1)); free($1); LOC($$, @$); }
-  | CAPSYMBOL { $$ = eth_ast_cval(eth_sym($1)); free($1); LOC($$, @$); }
-  | '('')' { $$ = eth_ast_cval(eth_nil); LOC($$, @$); }
+fn_atom
+  : ident { $$ = eth_ast_ident($1); free($1); LOC($$, @$); }
   | '(' expr ')' { $$ = $2; }
   | atom '!' { $$ = eth_ast_apply($1, NULL, 0); LOC($$, @$); }
+  | capident DOT_OPEN1 expr ')' {
+    $$ = eth_ast_import($1, "", NULL, 0, $3);
+    LOC($$, @$);
+    free($1);
+  }
+  | capident DOT_OPEN2 list_with_coma ']' {
+    eth_ast *acc = eth_ast_cval(eth_nil);
+    cod_vec_riter($3, i, x, acc = eth_ast_binop(ETH_CONS, x, acc));
+    cod_vec_destroy($3);
+    LOC(acc, $3);
+
+    $$ = eth_ast_import($1, "", NULL, 0, acc);
+    LOC($$, @$);
+    free($1);
+  }
+;
+
+atom
+  : fn_atom
+  | CAPSYMBOL { $$ = eth_ast_cval(eth_sym($1)); free($1); LOC($$, @$); }
+  | NUMBER { $$ = eth_ast_cval(eth_create_number($1)); LOC($$, @$); }
+  | CONST  { $$ = eth_ast_cval($1); LOC($$, @$); }
+  | string { $$ = eth_ast_cval(eth_create_string($1)); free($1); LOC($$, @$); }
+  | '('')' { $$ = eth_ast_cval(eth_nil); LOC($$, @$); }
+  | '['']' { $$ = eth_ast_cval(eth_nil); }
   | '[' list_with_coma ']' {
     $$ = eth_ast_cval(eth_nil);
     cod_vec_riter($2, i, x, $$ = eth_ast_binop(ETH_CONS, x, $$));
     cod_vec_destroy($2);
     LOC($$, @$);
   }
-  | '['']' { $$ = eth_ast_cval(eth_nil); }
   | '[' expr DDOT expr ']' %prec LIST_DDOT {
     eth_ast *p[2] = { $2, $4 };
     eth_ast *range = eth_ast_cval(eth_get_builtin("__inclusive_range"));
@@ -308,19 +327,21 @@ atom
     cod_vec_destroy($2.keys);
     cod_vec_destroy($2.vals);
   }
-  | capident DOT_OPEN expr ')' {
-    $$ = eth_ast_import($1, "", NULL, 0, $3);
-    LOC($$, @$);
-    free($1);
-  }
 ;
 
 form
   : atom
-  | atom args {
+  | fn_atom args {
     $$ = eth_ast_apply($1, $2.data, $2.len);
     LOC($$, @$);
     cod_vec_destroy($2);
+  }
+  | CAPSYMBOL atom {
+    eth_type *type = eth_variant_type($1);
+    char *_0 = "_0";
+    $$ = eth_ast_make_record_with_type(type, &_0, &$2, 1);
+    free($1);
+    LOC($$, @$);
   }
 ;
 
@@ -526,7 +547,7 @@ args
 
 fnargs
   : { cod_vec_init($$); }
-  | fnargs pattern {
+  | fnargs atomic_pattern {
     $$ = $1;
     cod_vec_push($$, $2);
   }
@@ -551,7 +572,7 @@ bind
     $$.pat = $1;
     $$.val = $3;
   }
-  | attribute SYMBOL fnargs pattern '=' expr {
+  | attribute SYMBOL fnargs atomic_pattern '=' expr {
     $$.pat = eth_ast_ident_pattern($2);
     $$.pat->ident.attr = $1;
     cod_vec_push($3, $4);
@@ -625,8 +646,18 @@ atomic_pattern
   }
 ;
 
-pattern
+form_pattern
   : atomic_pattern
+  | CAPSYMBOL atomic_pattern {
+    eth_type *type = eth_variant_type($1);
+    char *_0 = "_0";
+    $$ = eth_ast_unpack_pattern_with_type(type, &_0, &$2, 1);
+    free($1);
+  }
+;
+
+pattern
+  : form_pattern
   | pattern CONS pattern {
     char *fields[2] = { "car", "cdr" };
     eth_ast_pattern *pats[2] = { $1, $3 };

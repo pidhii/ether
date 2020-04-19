@@ -1510,13 +1510,21 @@ kill_value_F(kill_info *kinfo, eth_insn *begin, int vid)
       eth_insn *b1 = insn->iff.thenbr;
       eth_insn *b2 = insn->iff.elsebr;
 
-      if (is_dead_end(b1) and not kill_value_T(kinfo, b1, vid))
-        force_kill(kinfo, b1, vid);
-      else kill_value_F(kinfo, b1, vid);
+      if (is_dead_end(b1))
+      {
+         if (not kill_value_T(kinfo, b1, vid))
+          force_kill(kinfo, b1, vid);
+      }
+      else
+        kill_value_F(kinfo, b1, vid);
 
-      if (is_dead_end(b2) and not kill_value_T(kinfo, b2, vid))
-        force_kill(kinfo, b2, vid);
-      else kill_value_F(kinfo, b2, vid);
+      if (is_dead_end(b2))
+      {
+         if (not kill_value_T(kinfo, b2, vid))
+          force_kill(kinfo, b2, vid);
+      }
+      else
+        kill_value_F(kinfo, b2, vid);
     }
 
     if (insn->tag == ETH_INSN_TRY)
@@ -1524,9 +1532,13 @@ kill_value_F(kill_info *kinfo, eth_insn *begin, int vid)
       eth_insn *t = insn->try.trybr;
       eth_insn *c = insn->try.catchbr;
 
-      if (is_dead_end(c) and not kill_value_T(kinfo, c, vid))
-        force_kill(kinfo, c, vid);
-      else kill_value_F(kinfo, c, vid);
+      if (is_dead_end(c))
+      {
+         if (not kill_value_T(kinfo, c, vid))
+          force_kill(kinfo, c, vid);
+      }
+      else
+        kill_value_F(kinfo, c, vid);
     }
 
     if (is_end(insn))
@@ -1560,18 +1572,22 @@ kill_value_T_if(kill_info *kinfo, eth_insn *insn, int vid)
   }
   else
   {
-    if (d1)
+    if (is_dead_end(b1))
     {
-      if (not kill_value_T(kinfo, b1, vid))
+       if (not kill_value_T(kinfo, b1, vid))
         force_kill(kinfo, b1, vid);
-      kill_value_F(kinfo, b2, vid);
     }
-    if (d2)
-    {
-      if (not kill_value_T(kinfo, b2, vid))
-        force_kill(kinfo, b2, vid);
+    else
       kill_value_F(kinfo, b1, vid);
+
+    if (is_dead_end(b2))
+    {
+       if (not kill_value_T(kinfo, b2, vid))
+        force_kill(kinfo, b2, vid);
     }
+    else
+      kill_value_F(kinfo, b2, vid);
+
     return true;
   }
 }

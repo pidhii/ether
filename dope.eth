@@ -1,6 +1,7 @@
 #!/bin/env ether
 
 import Options in
+import Os in
 
 (* Get direcory containing modules *)
 let module_path =
@@ -13,7 +14,8 @@ in
 
 (* Checks whether a file exists in the file system *)
 let exist? path =
-  system "test -e ~d" path == 0
+  try Os.(access path f_ok)
+  with System_error ENOENT -> false
 in
 
 let mkdir path =
@@ -65,6 +67,13 @@ let update_db db =
   write_to dbfile (format "~w\n" db);
 in
 
+let do_in dir thunk =
+  let cwd = Os.getcwd! in
+  Os.chdir dir;
+  thunk!;
+  Os.chdir cwd;
+in
+
 
 let install dir =
   let (_, conf) =
@@ -74,17 +83,23 @@ let install dir =
       raise Failure;
     )
   in
-  let name = assoc "name" conf in
-  let files = assoc "files" conf or [] in
-  let main = assoc "main" conf in
+  let Some name = assoc "name" conf in
+  let Some files = Maybe.(assoc "files" conf || Some []) in
+  let Some main = assoc "main" conf in
 
   let db = load_db! in
 
   (* Check if module name is unique *)
-  try
-    get_module name db;
-    raise Module_already_present;
-  with Not_found -> ();
+  when get_module name db then (
+    eprintf "> error: module already present\n";
+    raise Failure;
+  );
+
+  (* Build *)
+  when let Some build = assoc "build" conf then do_in dir (fn ->
+    printf "> building module ~d\n" name;
+    build!;
+  );
 
   printf "> installing module ~d\n" name;
 
@@ -109,27 +124,30 @@ let install dir =
   let install_dir = realpath moddir or "<undefined>" in
   let db = {name, date, source_dir, install_dir} :: db in
   update_db db;
+
+  when let Some post_install = assoc "post_install" conf then do_in dir (fn ->
+    printf "> running post-install hooks\n";
+    post_install!;
+  );
 in
 
 
 let uninstall name =
   let db = load_db! in
 
-  (* Remove module directory *)
-  let {install_dir} =
-    try get_module name db
-    with Not_found -> (
-      eprintf "> error: no such module\n";
-      raise Failure;
-    )
-  in
-  printf "> uninstalling module '~d'\n" name;
-  unlink install_dir;
+  if let Some {install_dir} = get_module name db then (
+    (* Remove module directory *)
+    printf "> uninstalling module '~d'\n" name;
+    unlink install_dir;
+    (* Update registry *)
+    printf "> updating registry\n";
+    let db = remove (fn {name = name'} -> strcasecmp name' name == 0) db in
+    update_db db;
 
-  (* Update registry *)
-  printf "> updating registry\n";
-  let db = remove (fn {name = name'} -> strcasecmp name' name == 0) db in
-  update_db db;
+  ) else (
+    eprintf "> error: no such module\n";
+    raise Failure;
+  )
 in
 
 
@@ -141,7 +159,7 @@ let reinstall dir =
       raise Failure;
     )
   in
-  let name = assoc "name" conf in
+  let Some name = assoc "name" conf in
   uninstall name;
   install dir;
 in
@@ -194,7 +212,7 @@ for_each opts (fn (opt, arg) ->
     if opt eq "l" then list_modules! else ()
   with Failure -> (
     eprintf "> failure\n";
-    exit 1;
+    #exit 1;
   )
 );
 

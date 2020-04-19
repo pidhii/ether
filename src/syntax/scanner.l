@@ -167,7 +167,8 @@ lnot    { return LNOT; }
 ".."    { return DDOT; }
 "..."   { return DDDOT; }
 "|>"    { return PIPE; }
-"."\s*"(" { return DOT_OPEN; }
+"."\s*"(" { return DOT_OPEN1; }
+"."\s*"[" { return DOT_OPEN2; }
 
 
 "("(mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|not|lnot)")" |

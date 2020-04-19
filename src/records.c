@@ -141,9 +141,8 @@ eth_tuple_type(size_t n)
 {
   assert(n > 1);
 
-  char key[sizeof(size_t) + 1];
-  memcpy(key, &n, sizeof(size_t));
-  key[sizeof key - 1] = 0;
+  char key[22];
+  sprintf(key, "%ju", n);
 
   cod_hash_map_elt *elt;
   if ((elt = cod_hash_map_find(g_tuptab, key, n)))

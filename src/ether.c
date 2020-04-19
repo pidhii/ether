@@ -165,6 +165,9 @@ eth_init(const int *argc)
   extern void _eth_init_record_types(void);
   _eth_init_record_types();
 
+  extern void _eth_init_variant_types(void);
+  _eth_init_variant_types();
+
   extern void _eth_init_file_type(void);
   _eth_init_file_type();
 
@@ -201,6 +204,9 @@ eth_cleanup(void)
 
   extern void _eth_cleanup_record_types(void);
   _eth_cleanup_record_types();
+
+  extern void _eth_cleanup_variant_types(void);
+  _eth_cleanup_variant_types();
 
   extern void _eth_cleanup_magic(void);
   _eth_cleanup_magic();

@@ -92,7 +92,7 @@ eth_define_attr(eth_module *mod, const char *ident, eth_t val, eth_attr *attr)
 void
 eth_define(eth_module *mod, const char *ident, eth_t val)
 {
-  eth_define_attr(mod, ident, val, eth_create_attr());
+  eth_define_attr(mod, ident, val, eth_create_attr(0));
 }
 
 eth_def*

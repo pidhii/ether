@@ -119,6 +119,10 @@ const uint8_t*
 eth_get_siphash_key(void);
 
 
+const char*
+eth_errno_to_str(int e);
+
+
 void
 eth_init(const int *argc);
 
@@ -170,6 +174,7 @@ eth_unop_sym(eth_unop op);
 
 const char*
 eth_unop_name(eth_unop op);
+
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                            CALL PROPAGATION
@@ -284,9 +289,10 @@ typedef struct {
   ptrdiff_t offs;
 } eth_field;
 
-#define ETH_TFLAG_PLAIN  0x1
-#define ETH_TFLAG_TUPLE  0x3
-#define ETH_TFLAG_RECORD 0x5
+#define ETH_TFLAG_PLAIN   0x01
+#define ETH_TFLAG_TUPLE   0x03
+#define ETH_TFLAG_RECORD  0x05
+#define ETH_TFLAG_VARIANT 0x09
 
 struct eth_type {
   char *name;
@@ -332,6 +338,12 @@ static inline bool
 eth_is_record(eth_type *type)
 {
   return type->flag == ETH_TFLAG_RECORD;
+}
+
+static inline bool
+eth_is_variant(eth_type *type)
+{
+  return type->flag == ETH_TFLAG_VARIANT;
 }
 
 eth_field* __attribute__((pure))
@@ -867,6 +879,26 @@ const char*
 eth_get_symbol_cstr(eth_t x);
 #define eth_sym_cstr eth_get_symbol_cstr
 
+eth_hash_t
+eth_get_symbol_hash(eth_t x);
+#define eth_sym_hash eth_get_symbol_hash
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                             variants
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+typedef struct {
+  eth_header header;
+  eth_t val;
+} eth_variant;
+#define ETH_VARIANT(x) ((eth_variant*)(x))
+#define eth_var_val(x) (ETH_VARIANT(x)->val)
+
+eth_type*
+eth_variant_type(const char *tag);
+
+eth_t
+eth_create_variant(eth_type *type, eth_t val);
+
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                         records & tuples
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -1076,7 +1108,7 @@ typedef struct {
 } eth_attr;
 
 eth_attr*
-eth_create_attr(void);
+eth_create_attr(int flag);
 
 void
 eth_ref_attr(eth_attr *attr);
@@ -1167,6 +1199,10 @@ eth_require_module(eth_env *env, const char *name);
 bool
 eth_load_module_from_script(eth_env *env, eth_module *mod, const char *path,
     eth_t *ret);
+
+bool
+eth_load_module_from_script2(eth_env *env, eth_module *mod, const char *path,
+    eth_t *ret, eth_module *uservars);
 
 bool
 eth_load_module_from_elf(eth_env *env, eth_module *mod, const char *path);
@@ -2259,10 +2295,22 @@ _eth_type_error(size_t n, size_t ntot)
   eth_return(args, exn)
 
 
-#define eth_use_symbol(ident) \
-  static eth_t ident = NULL; \
-  if (eth_unlikely(ident == NULL)) \
-    ident = eth_sym(#ident);
+#define eth_use_symbol_as(ident, sym) \
+  static eth_t ident = NULL;          \
+  if (eth_unlikely(ident == NULL))    \
+    ident = eth_sym(sym);
 
+#define eth_use_symbol(ident) eth_use_symbol_as(ident, #ident)
+
+#define eth_use_variant_as(ident, var)          \
+  static eth_type *ident##_type;                \
+  if (eth_unlikely(ident##_type == NULL))       \
+    ident##_type = eth_variant_type(var);       \
+  eth_t ident(eth_t x)                          \
+  {                                             \
+    return eth_create_variant(ident##_type, x); \
+  }
+
+#define eth_use_variant(ident) eth_use_variant_as(ident, #ident)
 
 #endif

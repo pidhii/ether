@@ -166,10 +166,9 @@ eth_get_modules(const eth_env *env, const eth_module *out[], int n)
 }
 
 static bool
-load_from_script(eth_env *env, eth_module *mod, const char *path, eth_t *retptr)
+load_from_script(eth_env *env, eth_module *mod, const char *path, eth_t *retptr,
+    eth_module *uservars)
 {
-  eth_debug("loading script-module %s", eth_get_module_name(mod));
-
   FILE *file = fopen(path, "r");
   if (file == NULL)
     goto error;
@@ -180,7 +179,7 @@ load_from_script(eth_env *env, eth_module *mod, const char *path, eth_t *retptr)
     goto error;
 
   eth_ir_defs defs;
-  eth_ir *ir = eth_build_module_ir(ast, env, mod, &defs, NULL);
+  eth_ir *ir = eth_build_module_ir(ast, env, mod, &defs, uservars);
   eth_drop_ast(ast);
   if (ir == NULL)
     goto error;
@@ -237,14 +236,22 @@ error:
 }
 
 bool
-eth_load_module_from_script(eth_env *env, eth_module *mod, const char *path,
-    eth_t *ret)
+eth_load_module_from_script2(eth_env *env, eth_module *mod, const char *path,
+    eth_t *ret, eth_module *uservars)
 {
+  bool status = true;
+
+  // create temporary environment if one is not supplied
+  bool isnullenv = env == NULL;
+  if (env == NULL)
+    env = eth_create_empty_env();
+
   char fullpath[PATH_MAX];
   if (not realpath(path, fullpath))
   {
     eth_warning("no such file \"%s\"", path);
-    return false;
+    status = false;
+    goto error;
   }
 
   module_entry *ent = get_module_entry(env, eth_get_module_name(mod));
@@ -255,9 +262,12 @@ eth_load_module_from_script(eth_env *env, eth_module *mod, const char *path,
     else
     {
       eth_warning("module with name '%s' already present", eth_get_module_name(mod));
-      return false;
+      status = false;
+      goto error;
     }
   }
+  else
+    eth_debug("loading script-module %s", eth_get_module_name(mod));
 
   char cwd[PATH_MAX];
   getcwd(cwd, PATH_MAX);
@@ -272,17 +282,30 @@ eth_load_module_from_script(eth_env *env, eth_module *mod, const char *path,
     ent = add_module(env, mod, 0);
 
   chdir(dir);
-  int ok = load_from_script(env, mod, fullpath, ret);
+  int ok = load_from_script(env, mod, fullpath, ret, uservars);
   ent->flag |= ETH_MFLAG_READY;
   chdir(cwd);
-
   if (not ok)
   {
     eth_remove_module(env, eth_get_module_name(mod));
-    return false;
+    status = false;
+    goto error;
   }
 
-  return true;
+error:
+  if (isnullenv)
+  {
+    eth_remove_module(env, eth_get_module_name(mod));
+    eth_destroy_env(env);
+  }
+  return status;
+}
+
+bool
+eth_load_module_from_script(eth_env *env, eth_module *mod, const char *path,
+    eth_t *ret)
+{
+  return eth_load_module_from_script2(env, mod, path, ret, NULL);
 }
 
 void*
@@ -367,7 +390,9 @@ get_file_mode(const char *path)
 static bool
 resolve_path_by_name(eth_env *env, const char *name, char *path)
 {
-  char buf[4101]; // to suppress gcc warning
+  eth_debug("searching for '%s'", name);
+
+  static char buf[4109]; // to suppress gcc warning
   if (eth_resolve_path(env, name, path))
   {
     mode_t mode = get_file_mode(path);
@@ -376,15 +401,18 @@ resolve_path_by_name(eth_env *env, const char *name, char *path)
 
     if (S_ISDIR(mode))
     {
-      sprintf(buf, "%s/__main__.eth", path);
+      char dir[PATH_MAX];
+      strcpy(dir, path);
+
+      sprintf(buf, "%s/__main__.eth", dir);
       if (realpath(buf, path))
         return true;
 
-      sprintf(buf, "%s/%s.eth", path, name);
+      sprintf(buf, "%s/%s.eth", dir, name);
       if (realpath(buf, path))
         return true;
 
-      sprintf(buf, "%s/%s.so", path, name);
+      sprintf(buf, "%s/%s.so", dir, name);
       if (realpath(buf, path))
         return true;
     }

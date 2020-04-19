@@ -13,7 +13,7 @@ ETH_MODULE("ether:main")
 void __attribute__((noreturn))
 help_and_exit(char *argv0)
 {
-  printf("usage: %s [OPTIONS] <script>\n", argv0);
+  printf("usage: %s [OPTIONS] [<script>]\n", argv0);
   puts("");
   puts("OPTIONS:");
   puts("  --help       -h          Show this message and exit.");

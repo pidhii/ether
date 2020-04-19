@@ -1,0 +1,5 @@
+
+let pub (&&) x y = if let Some _ = x then y else nil in
+let pub (||) x y = if let Some _ = x then x else y in
+
+()

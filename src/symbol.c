@@ -86,3 +86,10 @@ eth_get_symbol_cstr(eth_t x)
   return sym->str;
 }
 
+eth_hash_t
+eth_get_symbol_hash(eth_t x)
+{
+  symbol *sym = (void*)x;
+  return sym->hash;
+}
+

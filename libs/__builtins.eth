@@ -31,8 +31,8 @@ let pub __builtin (not) x = not x in
 let pub ($) f x = f x in
 let pub (|>) x f = f x in
 
-let pub car x::_ = x in
-let pub cdr _::x = x in
+let pub car (x::_) = x in
+let pub cdr (_::x) = x in
 
 let pub first  { _1 = x } = x in
 let pub second { _2 = x } = x in
@@ -145,9 +145,15 @@ let pub system = compose_va __system format in
 #
 # Iterators:
 # - rev_map (C)
+# - rev_mapi (C)
+# - rev_zip (C)
+# - rev_zipi (C)
 # - map
+# - mapi
 # - zip
+# - zipi
 # - for_each
+# - for_eachi
 # - rev_flat_map
 # - flat_map
 # - rev_filter_map (C)
@@ -171,12 +177,17 @@ let pub system = compose_va __system format in
 # - rev_filter
 # - filter
 # - remove
+# - insert
 # - find
 # - partition
 #
 # Sorting:
 # - merge
 # - sort
+#
+# Assosiation lists:
+# - assoc
+# - assq
 #
 
 let pub unfold_left f z =
@@ -208,44 +219,25 @@ let rec pub append xs ys =
   else ys
 in
 
-#let pub rev_map f xs =
-  #let rec loop xs acc =
-    #if let x::xs = xs then
-      #loop xs (f x :: acc)
-    #else acc
-  #in loop xs nil
-#in
 let pub map f xs = rev $ rev_map f xs in
-
-let rec pub rev_zip f xs ys =
-  let rec loop xs ys acc =
-    if let x::xs = xs then
-      if let y::ys = ys then
-        loop xs ys (f x y :: acc)
-      else acc
-    else acc
-    #match xs, ys with
-    #| x::xs, y::ys -> loop xs ys (f x y :: acc)
-    #| otherwize  -> acc
-  in loop xs ys []
-in
-
-let rec pub zip f xs ys =
-  if let x::xs = xs then
-    if let y::ys = ys then
-      f x y :: zip f xs ys
-    else []
-  else []
-  #match xs, ys with
-  #| x::xs, y::ys -> f x y :: loop xs ys
-  #| otherwize  -> []
-in
+let pub mapi f xs = rev $ rev_mapi f xs in
+let pub zip f xs ys = rev $ rev_zip f xs ys in
+let pub zipi f xs ys = rev $ rev_zipi f xs ys in
 
 let rec pub for_each xs f =
   when let x::xs = xs then (
     f x;
     for_each xs f
   )
+in
+
+let rec pub for_eachi xs f =
+  let rec loop i xs =
+    when let x::xs = xs then (
+      f i x;
+      loop (i + 1) xs f
+    )
+  in loop 0 xs
 in
 
 let rec pub rev_flat_map f xs =
@@ -257,6 +249,7 @@ let rec pub rev_flat_map f xs =
     else acc
   in loop nil xs nil
 in
+
 let rec pub flat_map f xs =
   if let x::xs = xs then
     if xs is nil then f x
@@ -304,7 +297,7 @@ in
 
 let pub rev_filter f xs =
   let rec loop xs acc =
-    if let x::xs = xs then
+    if let x :: xs = xs then
       loop xs (if f x then x :: acc else acc)
     else acc
   in loop xs nil
@@ -313,19 +306,26 @@ in
 let pub filter f xs = rev $ rev_filter f xs in
 
 let rec pub remove f xs =
-  if let x :: xs = xs then
+  if let x::xs = xs then
     if f x then xs
     else x :: remove f xs
   else []
+in
+
+let rec pub insert cmp x ys =
+  if let y::ys' = ys then
+    if cmp x y then x :: ys
+    else y :: insert cmp x ys'
+  else [x]
 in
 
 let pub flatten = flat_map id in
 
 let rec pub find p xs =
   if let x::xs = xs then
-    if p x then x
+    if p x then Some x
     else find p xs
-  else raise Not_found
+  else false
 in
 
 let pub merge cmp xs ys =
@@ -400,6 +400,12 @@ let rec pub any? p xs =
   else false
 in
 
+let rec pub member? a xs =
+  if let x::xs = xs then
+    x eq a || member? a xs
+  else false
+in
+
 let rec pub memq? a xs =
   if let x::xs = xs then
     x is a || memq? a xs
@@ -409,19 +415,19 @@ in
 let rec pub assoc x l =
   if let kv::l = l then
     if let (k, v) = kv then
-      if k eq x then v
+      if k eq x then Some v
       else assoc x l
     else raise Invalid_argument
-  else raise Not_found
+  else false
 in
 
 let rec pub assq x l =
   if let kv::l = l then
     if let (k, v) = kv then
-      if k is x then v
-      else assoc x l
+      if k is x then Some v
+      else assq x l
     else raise Invalid_argument
-  else raise Not_found
+  else false
 in
 
 ################################################################################

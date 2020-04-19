@@ -45,10 +45,10 @@ let tests = [
   let (kw, pos) = Options.get options cmd in
   ("test-1", fn -> all? id [
       pos eq ["first", "second", "third"],
-      assoc "long-arg" kw eq "arg" or false,
-      assoc "long-no-arg" kw is true or false,
-      assoc "short-arg" kw eq "1" or false,
-      assoc "short-no-arg" kw is true or false
+      assoc "long-arg" kw eq Some "arg",
+      assoc "long-no-arg" kw eq Some true,
+      assoc "short-arg" kw eq Some "1",
+      assoc "short-no-arg" kw eq Some true,
     ]),
 
   (* test-2 *)
@@ -58,16 +58,16 @@ let tests = [
   let (kw, pos) = Options.get options cmd in
   ("test-2", fn -> all? id [
       pos eq ["first", "second", "third"],
-      assoc "long-arg" kw eq "arg" or false,
-      assoc "long-no-arg" kw is true or false,
-      assoc "short-arg" kw eq "1" or false,
-      assoc "short-no-arg" kw is true or false
+      assoc "long-arg" kw eq Some "arg",
+      assoc "long-no-arg" kw eq Some true,
+      assoc "short-arg" kw eq Some "1",
+      assoc "short-no-arg" kw eq Some true,
     ]),
 
   (* test-3 *)
   let cmd = ["--long-arg="] in
   let (kw, pos) = Options.get options cmd in
-  ("test-3", fn -> assoc "long-arg" kw eq "" or false),
+  ("test-3", fn -> assoc "long-arg" kw eq Some ""),
 
   (* test-4 *)
   let cmd = ["--long-arg"] in
@@ -118,7 +118,7 @@ printf "- failed: \x1b[38;5;1;1m~d\x1b[0m\n" nfail;
 
 newline!;
 
-when nfail > 0 then raise Failure;
+exit 1 when nfail > 0;
 
 ()
 

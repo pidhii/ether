@@ -2,8 +2,8 @@
 let get_options cfg os =
 
   let get_rules opt =
-    try find (fn {name} -> name eq opt) cfg
-    with Not_found -> raise Undefined_option
+    if let Some x = find (fn {name} -> name eq opt) cfg then x
+    else raise Undefined_option
   in
 
   let rec loop os kws pos =

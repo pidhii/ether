@@ -40,6 +40,48 @@ _strcat(void)
 }
 
 static eth_t
+_and(void)
+{
+  eth_t x = *eth_sp++;
+  eth_ref(x);
+  eth_t y = *eth_sp++;
+  eth_ref(y);
+  if (x == eth_false)
+  {
+    eth_unref(y);
+    eth_dec(x);
+    return eth_false;
+  }
+  else
+  {
+    eth_dec(x);
+    eth_dec(y);
+    return y;
+  }
+}
+
+static eth_t
+_or(void)
+{
+  eth_t x = *eth_sp++;
+  eth_ref(x);
+  eth_t y = *eth_sp++;
+  eth_ref(y);
+  if (x == eth_false)
+  {
+    eth_dec(x);
+    eth_dec(y);
+    return y;
+  }
+  else
+  {
+    eth_unref(y);
+    eth_dec(x);
+    return x;
+  }
+}
+
+static eth_t
 _pair_p(void)
 {
   eth_t x = *eth_sp++;
@@ -673,6 +715,114 @@ _rev_map(void)
     acc = eth_cons(v, acc);
   }
   if (eth_unlikely(it != eth_nil))
+  {
+    eth_drop(acc);
+    eth_throw(args, Improper_list);
+  }
+
+  eth_return(args, acc);
+}
+
+static eth_t
+_rev_mapi(void)
+{
+  eth_use_symbol(Improper_list)
+
+  eth_args args = eth_start(2);
+  const eth_t f = eth_arg2(args, eth_function_type);
+  const eth_t l = eth_arg(args);
+
+  eth_t acc = eth_nil;
+  eth_t it;
+  eth_number_t i = 0;
+  for (it = l; eth_is_pair(it); it = eth_cdr(it), ++i)
+  {
+    eth_reserve_stack(2);
+    eth_sp[0] = eth_num(i);
+    eth_sp[1] = eth_car(it);
+    const eth_t v = eth_apply(f, 2);
+    if (eth_unlikely(eth_is_exn(v)))
+    {
+      eth_drop(acc);
+      eth_rethrow(args, v);
+    }
+    acc = eth_cons(v, acc);
+  }
+  if (eth_unlikely(it != eth_nil))
+  {
+    eth_drop(acc);
+    eth_throw(args, Improper_list);
+  }
+
+  eth_return(args, acc);
+}
+
+static eth_t
+_rev_zip(void)
+{
+  eth_use_symbol(Improper_list)
+
+  eth_args args = eth_start(3);
+  const eth_t f = eth_arg2(args, eth_function_type);
+  const eth_t xs = eth_arg(args);
+  const eth_t ys = eth_arg(args);
+
+  eth_t acc = eth_nil;
+  eth_t it1, it2;
+  for (it1 = xs, it2 = ys; eth_is_pair(it1) and eth_is_pair(it2);
+      it1 = eth_cdr(it1), it2 = eth_cdr(it2))
+  {
+    eth_reserve_stack(2);
+    eth_sp[0] = eth_car(it1);
+    eth_sp[1] = eth_car(it2);
+    const eth_t v = eth_apply(f, 2);
+    if (eth_unlikely(eth_is_exn(v)))
+    {
+      eth_drop(acc);
+      eth_rethrow(args, v);
+    }
+    acc = eth_cons(v, acc);
+  }
+  if (eth_unlikely(not eth_is_pair(it1) and it1 != eth_nil or
+                   not eth_is_pair(it2) and it2 != eth_nil))
+  {
+    eth_drop(acc);
+    eth_throw(args, Improper_list);
+  }
+
+  eth_return(args, acc);
+}
+
+static eth_t
+_rev_zipi(void)
+{
+  eth_use_symbol(Improper_list)
+
+  eth_args args = eth_start(3);
+  const eth_t f = eth_arg2(args, eth_function_type);
+  const eth_t xs = eth_arg(args);
+  const eth_t ys = eth_arg(args);
+
+  eth_t acc = eth_nil;
+  eth_t it1, it2;
+  eth_number_t i = 0;
+  for (it1 = xs, it2 = ys; eth_is_pair(it1) and eth_is_pair(it2);
+      it1 = eth_cdr(it1), it2 = eth_cdr(it2), ++i)
+  {
+    eth_reserve_stack(3);
+    eth_sp[0] = eth_num(i);
+    eth_sp[1] = eth_car(it1);
+    eth_sp[2] = eth_car(it2);
+    const eth_t v = eth_apply(f, 3);
+    if (eth_unlikely(eth_is_exn(v)))
+    {
+      eth_drop(acc);
+      eth_rethrow(args, v);
+    }
+    acc = eth_cons(v, acc);
+  }
+  if (eth_unlikely(not eth_is_pair(it1) and it1 != eth_nil or
+                   not eth_is_pair(it2) and it2 != eth_nil))
   {
     eth_drop(acc);
     eth_throw(args, Improper_list);
@@ -1381,6 +1531,10 @@ _eth_init_builtins(void)
 
   eth_debug("loading builtins");
 
+  eth_attr *attr = eth_create_attr(ETH_ATTR_BUILTIN);
+
+  eth_define_attr(g_mod,    "&&", eth_create_proc(_and, 2, NULL, NULL), attr);
+  eth_define_attr(g_mod,    "||", eth_create_proc( _or, 2, NULL, NULL), attr);
   // TODO: `++` should be an instaruction
   eth_define(g_mod,         "++", eth_create_proc(    _strcat, 2, NULL, NULL));
   // ---
@@ -1422,6 +1576,9 @@ _eth_init_builtins(void)
   eth_define(g_mod, "rev_append", eth_create_proc(_rev_append, 2, NULL, NULL));
   eth_define(g_mod, "__inclusive_range", eth_create_proc(_inclusive_range, 2, NULL, NULL));
   eth_define(g_mod,    "rev_map", eth_create_proc(   _rev_map, 2, NULL, NULL));
+  eth_define(g_mod,   "rev_mapi", eth_create_proc(  _rev_mapi, 2, NULL, NULL));
+  eth_define(g_mod,    "rev_zip", eth_create_proc(   _rev_zip, 3, NULL, NULL));
+  eth_define(g_mod,   "rev_zipi", eth_create_proc(  _rev_zipi, 3, NULL, NULL));
   eth_define(g_mod, "rev_filter_map", eth_create_proc(_rev_filter_map, 2, NULL, NULL));
   // ---
   eth_define(g_mod,      "stdin", eth_stdin);

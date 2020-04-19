@@ -56,15 +56,17 @@ syn keyword ethBuiltinFunction range
 syn keyword ethBuiltinFunction unfold_left unfold_right
 syn keyword ethBuiltinFunction length rev_append append rev
 syn keyword ethBuiltinFunction rev_map map rev_zip zip
-syn keyword ethBuiltinFunction for_each
+syn keyword ethBuiltinFunction rev_mapi mapi rev_zipi zipi
+syn keyword ethBuiltinFunction for_each for_eachi
 syn keyword ethBuiltinFunction rev_filter_map filter_map
 syn keyword ethBuiltinFunction rev_flat_map flat_map flatten
-syn keyword ethBuiltinFunction rev_filter filter remove find partition
+syn keyword ethBuiltinFunction rev_filter filter find partition
+syn keyword ethBuiltinFunction remove insert
 syn keyword ethBuiltinFunction fold_left fold_right
 syn keyword ethBuiltinFunction scan_left scan_right
 syn keyword ethBuiltinFunction sort merge
 syn keyword ethBuiltinFunction drop rev_take take
-syn keyword ethBuiltinFunction any? all? memq?
+syn keyword ethBuiltinFunction any? all? member? memq?
 syn keyword ethBuiltinFunction assoc assq
 
 syn keyword ethBuiltinFunction id flip const
@@ -112,6 +114,8 @@ syn keyword ethBuiltinFunction load
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""'
 " Miscelenious:
 syn keyword Special command_line
+
+syn region ethOf matchgroup=StorageClass start=/\<of\>/ matchgroup=ethType end=/\[\?\<[a-z]\k\+\>]\?/ skipwhite skipnl contains=ethSymbol,ethIdentifier
 
 syn match ethModule /\<[A-Z][a-zA-Z0-9_]*\s*\./he=e-1 nextgroup=ethModule,ethMember
 syn match ethMember /\<[a-z_][a-zA-Z0-9_]*['?]?\>/

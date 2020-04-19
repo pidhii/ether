@@ -3,12 +3,12 @@
 #include <stdlib.h>
 
 eth_attr*
-eth_create_attr(void)
+eth_create_attr(int flag)
 {
   eth_attr *attr = malloc(sizeof(eth_attr));
   *attr = (eth_attr) {
     .rc = 0,
-    .flag = 0,
+    .flag = flag,
   };
   return attr;
 }
