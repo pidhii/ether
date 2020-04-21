@@ -52,6 +52,13 @@ let string_tests = [
 ]
 in
 
+let regexp_tests = [
+  ("=~", fn -> "as foo so do bar" =~ \foo/),
+  (">~", fn -> ("a bu c" >~ \[^^]\K(\w+)\s+(\w)/) eq ["bu c", "bu", "c"]),
+  ("split", fn -> split \\s+/ "asd asdf asdf " eq ["asd", "asdf", "asdf", ""]),
+]
+in
+
 let list_tests = [
   ("[..]", fn -> [1..10] eq [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
   ("[.|.,.]", fn -> [x | x <- [1..10], even? x] eq [2, 4, 6, 8, 10]),
@@ -121,6 +128,10 @@ let res = (0, 0) in
 newline!;
 printf "\x1b[1mTest string\x1b[0m\n";
 let res = sumres res $ test string_tests in
+
+newline!;
+printf "\x1b[1mTest regexp\x1b[0m\n";
+let res = sumres res $ test regexp_tests in
 
 newline!;
 printf "\x1b[1mTest list\x1b[0m\n";

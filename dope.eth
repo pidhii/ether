@@ -24,8 +24,7 @@ let mkdir path =
 in
 
 let copy_file src dst =
-  unless system "cp -v '~d' '~d'" src dst == 0 then
-    raise System_error;
+  open_in src |> read_file |> write_to (open_out dst)
 in
 
 let create_symlink src dst =
@@ -46,7 +45,7 @@ let utc_date! =
 in
 
 let realpath path =
-  let pipe = open_pipe_in "realpath '~d'" path in
+  let pipe = open_pipe_in (format "realpath '~d'" path) in
   let line = read_line_of pipe in
   if close pipe /= 0 then System_error
   else chomp line

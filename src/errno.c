@@ -5,7 +5,7 @@ const char*
 eth_errno_to_str(int e)
 {
   if (e >= g_ncodes or g_codes[e] == NULL)
-    return "<undefined>";
+    return "UNDEFINED";
   else
     return g_codes[e];
 }

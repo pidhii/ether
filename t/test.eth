@@ -85,10 +85,10 @@ print ("match NIL:", if let _::nil = id [1] then true else false);
 
 print ("range:", [1..10]);
 print ("flat-map:", [[1..3], [4..6], [7..9]] |> flatten);
-try
-  print ("flat-map:",
-    fold_left (+) 0 $ flatten $ [[1..100], [101..1000], [1001..200000], [1]]);
-with Stack_overflow -> print "no-no-no";
+#try
+  #print ("flat-map:",
+    #fold_left (+) 0 $ flatten $ [[1..100], [101..1000], [1001..200000], [1]]);
+#with Stack_overflow -> print "no-no-no";
 
 print ("list-comprehension:", [x + x | x <- [1..3], odd? x]);
 
@@ -129,9 +129,10 @@ let elf? x =
   hdr eq "\x7fELF";
 in
 
-when _MODE is Default then
+when _MODE is Default then (
   let path = "Debug/install/bin/ether" in
   printf "elf? ~w: ~w\n" path (elf? path);
+);
 
 let path = "out.txt" in
 let file = open_out path in
@@ -167,6 +168,14 @@ print ("variant value:", x);
 for_eachi [0x61 .. 0x70] (fn i x ->
   print (i, chr x)
 );
+
+print ("=~:", "as foo so do bar" =~ \foo/);
+
+let [_0, foo, bar] = "as foo so do bar" >~ \as\s+(\w+).*do\s+(\w+)/ in
+print (">~:");
+print ("  _0:", _0);
+print ("  foo:", foo);
+print ("  bar:", bar);
 
 13;
 

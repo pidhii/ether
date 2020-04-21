@@ -169,6 +169,8 @@ int _eth_start_token = -1;
 %token<string> SYMBOL CAPSYMBOL
 %token<constant> CONST
 %token<character> CHAR
+%token START_REGEXP
+%token<integer> END_REGEXP
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %nonassoc LET REC AND IN FN IFLET WHENLET
 %nonassoc IMPORT AS UNQUALIFIED
@@ -176,6 +178,7 @@ int _eth_start_token = -1;
 %nonassoc LARROW
 %nonassoc PUB BUILTIN
 %nonassoc LIST_DDOT
+%nonassoc BEGINN END
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %right RARROW
 %right ';'
@@ -191,7 +194,7 @@ int _eth_start_token = -1;
 // level 2:
 %right OPAND
 // level 3:
-%nonassoc '<' LE '>' GE EQ NE IS EQUAL DDOT DDDOT
+%nonassoc '<' LE '>' GE EQ NE IS EQUAL DDOT DDDOT EQ_TILD LT_TILD
 // level 4:
 %right CONS PPLUS
 // level 5:
@@ -218,11 +221,13 @@ int _eth_start_token = -1;
 %type<astvec> args
 %type<patvec> fnargs
 %type<string> string
+%type<ast> regexp
 %type<charvec> string_aux
 %type<pattern> atomic_pattern form_pattern pattern
 %type<strvec> maybe_imports import_list
 %type<astvec> list list_with_coma
 %type<patvec> pattern_list
+%type<boolean> maybe_coma_dots
 %type<record> record
 %type<record_pattern> record_pattern
 %type<lc_aux> lc_aux
@@ -239,6 +244,7 @@ entry
 fn_atom
   : ident { $$ = eth_ast_ident($1); free($1); LOC($$, @$); }
   | '(' expr ')' { $$ = $2; }
+  | BEGINN expr END { $$ = $2; }
   | atom '!' { $$ = eth_ast_apply($1, NULL, 0); LOC($$, @$); }
   | capident DOT_OPEN1 expr ')' {
     $$ = eth_ast_import($1, "", NULL, 0, $3);
@@ -263,6 +269,7 @@ atom
   | NUMBER { $$ = eth_ast_cval(eth_create_number($1)); LOC($$, @$); }
   | CONST  { $$ = eth_ast_cval($1); LOC($$, @$); }
   | string { $$ = eth_ast_cval(eth_create_string($1)); free($1); LOC($$, @$); }
+  | regexp
   | '('')' { $$ = eth_ast_cval(eth_nil); LOC($$, @$); }
   | '['']' { $$ = eth_ast_cval(eth_nil); }
   | '[' list_with_coma ']' {
@@ -471,7 +478,19 @@ expr
   | expr ASHR  expr { $$ = eth_ast_binop(ETH_ASHR, $1, $3); LOC($$, @$); }
   | expr PPLUS expr {
     eth_ast *args[] = { $1, $3 };
-    eth_ast *fn = eth_ast_cval(eth_get_builtin("++"));
+    eth_ast *fn = eth_ast_ident("++");
+    $$ = eth_ast_apply(fn, args, 2);
+    LOC($$, @$);
+  }
+  | expr EQ_TILD expr {
+    eth_ast *args[] = { $1, $3 };
+    eth_ast *fn = eth_ast_ident("=~");
+    $$ = eth_ast_apply(fn, args, 2);
+    LOC($$, @$);
+  }
+  | expr LT_TILD expr {
+    eth_ast *args[] = { $1, $3 };
+    eth_ast *fn = eth_ast_ident(">~");
     $$ = eth_ast_apply(fn, args, 2);
     LOC($$, @$);
   }
@@ -601,6 +620,21 @@ string
   }
 ;
 
+regexp
+  : START_REGEXP string_aux END_REGEXP {
+    cod_vec_push($2, 0);
+    eth_t regexp = eth_create_regexp($2.data, $3, NULL, NULL);
+    if (regexp == NULL)
+    {
+      eth_error("invalid regular expression");
+      abort();
+    }
+    $$ = eth_ast_cval(regexp);
+    free($2.data);
+    LOC($$, @$);
+  }
+;
+
 string_aux
   : { cod_vec_init($$); }
   | string_aux CHAR {
@@ -644,6 +678,26 @@ atomic_pattern
     cod_vec_destroy($2.keys);
     cod_vec_destroy($2.vals);
   }
+  | '[' pattern_list maybe_coma_dots ']' {
+    int n = $2.len;
+    // ---
+    if ($3) $$ = eth_ast_dummy_pattern();
+    else $$ = eth_ast_constant_pattern(eth_nil);
+    // ---
+    for (int i = n - 1; i >= 0; --i)
+    {
+      char *fields[2] = { "car", "cdr" };
+      eth_ast_pattern *pats[2] = { $2.data[i], $$ };
+      $$ = eth_ast_unpack_pattern_with_type(eth_pair_type, fields, pats, 2);
+    }
+    // ---
+    cod_vec_destroy($2);
+  }
+;
+
+maybe_coma_dots
+  : { $$ = false; }
+  | ',' DDDOT { $$ = true; }
 ;
 
 form_pattern

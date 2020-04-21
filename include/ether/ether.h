@@ -762,6 +762,29 @@ eth_t
 eth_create_string_from_char(char c);
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                               regexp
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+ETH_EXTERN
+eth_type *eth_regexp_type;
+
+typedef struct eth_regexp eth_regexp;
+
+const int*
+eth_ovector(void);
+
+eth_t
+eth_create_regexp(const char *pat, int opts, const char **eptr, int *eoffs);
+
+int
+eth_get_regexp_ncaptures(eth_t x);
+
+int
+eth_exec_regexp(eth_t x, const char *str, int len, int opts);
+
+#ifdef _PCRE_H
+#endif
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                               boolean
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 ETH_EXTERN
@@ -2312,5 +2335,8 @@ _eth_type_error(size_t n, size_t ntot)
   }
 
 #define eth_use_variant(ident) eth_use_variant_as(ident, #ident)
+
+eth_t
+eth_system_error(int err);
 
 #endif

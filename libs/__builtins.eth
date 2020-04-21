@@ -71,7 +71,8 @@ in
 # - open_in
 # - open_out
 # - open_append
-# - open_pipe (C)
+# - open_pipe_in
+# - open_pipe_out
 # - close (C)
 #
 # Input:
@@ -97,8 +98,8 @@ in
 let pub open_in path = __open path "r" in
 let pub open_out path = __open path "w" in
 let pub open_append path = __open path "a" in
-let pub open_pipe_in = compose_va (fn cmd -> __popen cmd "r") format in
-let pub open_pipe_out = compose_va (fn cmd -> __popen cmd "w") format in
+let pub open_pipe_in cmd = __popen cmd "r" in
+let pub open_pipe_out cmd = __popen cmd "w" in
 
 let pub read_line! = read_line_of stdin in
 let pub read! = read_of stdin in
@@ -477,6 +478,15 @@ let pub substr s x =
   else fn y -> __substr s x y;
 in
 
+################################################################################
+#                                 Regexp
+#-------------------------------------------------------------------------------
+# - =~ (C)
+# - >~ (C)
+# - rev_split (C)
+# - split
+#
+let pub split re str = rev $ rev_split re str in
 
 ()
 

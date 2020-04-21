@@ -1,6 +1,6 @@
 %{
+#include <pcre.h>
 #include "ether/ether.h"
-
 
 ETH_MODULE("ether:scanner");
 
@@ -35,6 +35,7 @@ static int g_comment_cnt = 0;
 /*%option interactive*/
 
 %x STRING
+%x REGEXP
 %x COMMENT
 
 OPERATOR [-+%^.$:!<>*/=&|]+
@@ -56,6 +57,10 @@ OPERATOR [-+%^.$:!<>*/=&|]+
   yylval->string = strdup("*");
   return SYMBOL;
 }
+"(/)"     {
+  yylval->string = strdup("/");
+  return SYMBOL;
+}
 
 "#".*$ // comments
 "(*" { BEGIN(COMMENT); }
@@ -70,6 +75,11 @@ OPERATOR [-+%^.$:!<>*/=&|]+
 <COMMENT>\n
 
 \" { BEGIN(STRING); return '"'; }
+"\\" {
+  BEGIN(REGEXP);
+  yylval->character = yytext[yyleng-1];
+  return START_REGEXP;
+}
 <STRING>\\\n
 <STRING>"\\0"  { yylval->character = '\0'; return CHAR; }
 <STRING>"\\a"  { yylval->character = '\a'; return CHAR; }
@@ -88,8 +98,26 @@ OPERATOR [-+%^.$:!<>*/=&|]+
   return CHAR;
 }
 <STRING>"\\\"" { yylval->character = '"'; return CHAR; }
+<REGEXP>"\\/"  { yylval->character = '/'; return CHAR; }
 <STRING>\"     { BEGIN(INITIAL); return '"'; }
-<STRING>.      { yylval->character = yytext[0]; return CHAR; }
+<REGEXP>"/"[a-zA-Z]* {
+  int flag = 0;
+  for (char *p = yytext + 1; *p; ++p)
+  {
+    switch (*p)
+    {
+      case 'i': flag |= PCRE_CASELESS ; break;
+      case 'm': flag |= PCRE_MULTILINE; break;
+      case 's': flag |= PCRE_DOTALL   ; break;
+      case 'x': flag |= PCRE_EXTENDED ; break;
+
+    }
+  }
+  BEGIN(INITIAL);
+  yylval->integer = flag;
+  return END_REGEXP;
+}
+<STRING,REGEXP>. { yylval->character = yytext[0]; return CHAR; }
 <STRING>\n     { yylval->character = yytext[0]; return CHAR; }
 
 nan                                 |
@@ -118,6 +146,8 @@ unqualified { return UNQUALIFIED; }
 try    { return TRY; }
 with   { return WITH; }
 or     { return OR; }
+begin  { return BEGINN; }
+end    { return END; }
 
 nil   { yylval->constant = eth_nil;   return CONST; }
 true  { yylval->constant = eth_true;  return CONST; }
@@ -147,6 +177,8 @@ __builtin { return BUILTIN; }
 ">="    { return GE; }
 "=="    { return EQ; }
 "/="    { return NE; }
+"=~"    { return EQ_TILD; }
+">~"    { return LT_TILD; }
 is      { return IS; }
 eq      { return EQUAL; }
 "->"    { return RARROW; }

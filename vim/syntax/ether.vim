@@ -49,6 +49,8 @@ syn keyword ethBuiltinFunction strcmp strcasecmp strncmp strncasecmp
 syn keyword ethBuiltinFunction substr strstr strcasestr
 syn keyword ethBuiltinFunction chomp chop
 
+syn keyword ethBuiltinFunction rev_split split
+
 syn keyword ethBuiltinFunction car cdr
 syn keyword ethBuiltinFunction first second third
 
@@ -146,13 +148,16 @@ syn match ethKeyword /\<let\>/
 syn match ethConditional /\<if\%(\s\+let\)\?\>/
 syn region ethTryWith matchgroup=ethException start=/\<try\>/ end=/\<with\>/ contains=TOP skipwhite skipnl
 syn region ethMatch matchgroup=ethConditional start=/\<match\>/ end=/\<with\>/ contains=TOP skipwhite skipnl
+syn match ethConditional /\<then\>/
+syn region ethBegin matchgroup=ethConditional start=/\<then\s\+begin\>/ end=/\<end\>/ contains=TOP skipwhite skipnl
+syn region ethBegin matchgroup=ethKeyword start=/\<begin\>/ end=/\<end\>/ contains=TOP skipwhite skipnl
 syn keyword ethKeyword let rec and or in as
-syn keyword ethConditional unless when then else otherwize
+syn keyword ethConditional unless when else otherwize
 syn keyword ethAssert assert
 
 syn keyword ethLazy lazy
 
-syn match ethOperator /[-+=*/%><&|.!]\+/
+syn match ethOperator /[-+=*/%><&|.!^]\+/
 syn match ethOperator /:\|\$/
 syn keyword ethOperator is eq not mod land lor lxor lshl lshr ashl ashr lnot
 
@@ -189,20 +194,10 @@ syn match Number '\<\d[[:digit:]]*\.\d*[eE][\-+]\=\d\+'
 syn keyword Number nan inf
 
 " String
-" "..."
 syn region String start=/"/ skip=/\\"/ end=/"/ skipnl skipwhite contains=ethFormat
-" qq[...]
-syn region String matchgroup=ethQq start=/\<qq\[/ skip=/\\]/ end=/\]/ skipnl skipwhite contains=ethFormat
-" qq(...)
-syn region String matchgroup=ethQq start=/\<qq(/ skip=/\\)/ end=/)/ skipnl skipwhite contains=ethFormat
-" qq{...}
-syn region String matchgroup=ethQq start=/\<qq{/ skip=/\\}/ end=/}/ skipnl skipwhite contains=ethFormat
-" qq/.../
-syn region String matchgroup=ethQq start=+\<qq/+ skip=+\\/+ end=+/+ skipnl skipwhite contains=ethFormat
-" qq|...|
-syn region String matchgroup=ethQq start=+\<qq|+ skip=+\\|+ end=+|+ skipnl skipwhite contains=ethFormat
-" qq+...+
-syn region String matchgroup=ethQq start=/\<qq+/ skip=/\\+/ end=/+/ skipnl skipwhite contains=ethFormat
+" Regexp
+syn region String matchgroup=ethRegexp start=+\\+ skip=+\\/+ end=+/[a-zA-Z]*+ skipnl skipwhite
+hi link ethRegexp Type
 
 "" Shell
 "syn region String matchgroup=ethOperator start=/`/ skip=/\\`/ end=/\`/ skipnl skipwhite contains=ethFormat

@@ -203,20 +203,32 @@ main(int argc, char **argv)
           eth_debug("evaluation time: %f [cpu sec.]", dtsec);
         }
         else
+        {
           eth_error("failed to build bytecode");
+          err = EXIT_FAILURE;
+        }
 
       }
       else
+      {
         eth_error("failed to build SSA");
+        err = EXIT_FAILURE;
+      }
     }
     else
+    {
       eth_error("failed to build IR");
+      err = EXIT_FAILURE;
+    }
 
     eth_destroy_env(env);
     eth_destroy_module(extravars);
   }
   else
+  {
     eth_error("failed to build AST");
+    err = EXIT_FAILURE;
+  }
 
 
   cod_vec_destroy(L);

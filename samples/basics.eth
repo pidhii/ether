@@ -1,0 +1,94 @@
+
+(* Simple function *)
+let square x = x * x in
+print (square 2);
+
+
+(* Recursive function *)
+let rec factorial x =
+  if x <= 1 then 1
+  else x * factorial (x - 1)
+in
+print (factorial 3);
+
+
+(* Multiple cross-referencing functions *)
+let rec even? x =
+  x == 0 || odd? (x - 1)
+and odd? x =
+  x /= 0 && even? (x - 1)
+in
+print (even? 42);
+
+
+(* Better way to write factorial: tail-recursion *)
+let rec factorial2 x acc =
+  if x <= 1 then acc
+  else factorial2 (x - 1) (acc * x)
+in
+print (factorial2 1000000 1);
+
+
+(* Symbols *)
+print Symbols_begin_with_UpperCase_character;
+
+
+(* Exception handling *)
+try factorial 1000000
+with Stack_overflow -> print "Stack overflow";
+
+
+(* Currying *)
+let add x y = x + y in
+let increment = add 1 in
+print (increment 3);
+
+
+(* Lists *)
+print ([1, 2, 3] eq 1 :: 2 :: 3 :: []);
+
+
+(* Pattern matching *)
+let x :: xs = [1, 2, 3] in
+print (x, xs);
+
+
+(* Higher order functions *)
+let rec map f xs =
+  if let x :: xs' = xs then
+    f x :: map f xs'
+  else []
+in
+print (map increment [1, 2, 3]);
+
+
+(* Closures *)
+print (map (fn x -> x^2) [1, 2, 3]);
+
+
+(* Tuples *)
+let (a, b) = (A, B) in
+print (a, b);
+
+
+(* Records *)
+let { login } = { name = "Jill", login = "Mikle Jackson" } in
+print login;
+
+
+(* Variants (tagged wrapper-types) *)
+let safe_div x y = Some (x / y) if y /= 0 else false in
+let Some x = safe_div 1 2 in
+print x;
+
+
+(* FizzBuzz
+ *
+ * Note a `()`: this is a synonim for `nil`.
+ *)
+for_each [1 .. 100] (fn i ->
+  when i mod 3 /= 0 && i mod 5 /= 0 then print i;
+  when i mod 3 == 0 then print "Fizz";
+  when i mod 5 == 0 then print "Buzz";
+);
+

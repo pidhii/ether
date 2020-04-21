@@ -257,6 +257,86 @@ _list(void)
 }
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                                  regexp
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+static eth_t
+_regexp_eq(void)
+{
+  eth_use_symbol(Regexp_error)
+  eth_args args = eth_start(2);
+  eth_t str = eth_arg2(args, eth_string_type);
+  eth_t reg = eth_arg2(args, eth_regexp_type);
+  int n = eth_exec_regexp(reg, eth_str_cstr(str), eth_str_len(str), 0);
+  if (n == 0)
+    eth_throw(args, Regexp_error);
+  else
+    eth_return(args, n < 0 ? eth_false : eth_num(n));
+}
+
+static eth_t
+_regexp_match(void)
+{
+  eth_use_symbol(Regexp_error)
+
+  eth_args args = eth_start(2);
+  eth_t str = eth_arg2(args, eth_string_type);
+  eth_t reg = eth_arg2(args, eth_regexp_type);
+  int n = eth_exec_regexp(reg, eth_str_cstr(str), eth_str_len(str), 0);
+  if (n < 0)
+    eth_return(args, eth_false);
+  else if (n == 0)
+    eth_throw(args, Regexp_error);
+  else
+  {
+    eth_t acc = eth_nil;
+    const int *ovec = eth_ovector();
+    for (int cnt = n - 1; cnt >= 0; --cnt)
+    {
+      int i = cnt * 2;
+      char *p = eth_str_cstr(str) + ovec[i];
+      int len = ovec[i+1] - ovec[i];
+      eth_t s = eth_create_string2(p, len);
+      acc = eth_cons(s, acc);
+    }
+    eth_return(args, acc);
+  }
+}
+
+static eth_t
+_rev_split(void)
+{
+  eth_use_symbol(Regexp_error)
+
+  eth_args args = eth_start(2);
+  eth_t reg = eth_arg2(args, eth_regexp_type);
+  eth_t str = eth_arg2(args, eth_string_type);
+
+  eth_t acc = eth_nil;
+  const int *ovec = eth_ovector();
+  const char *p = eth_str_cstr(str);
+  const char *pend = p + eth_str_len(str);
+  while (true)
+  {
+    int n = eth_exec_regexp(reg, p, pend - p, 0);
+    if (n < 0)
+    {
+      acc = eth_cons(eth_create_string2(p, pend - p), acc);
+      eth_return(args, acc);
+    }
+    else if (n == 0)
+    {
+      eth_drop(acc);
+      eth_throw(args, Regexp_error);
+    }
+    else
+    {
+      acc = eth_cons(eth_create_string2(p, ovec[0]), acc);
+      p += ovec[1];
+    }
+  }
+}
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                   dupm
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 static eth_t
@@ -868,6 +948,8 @@ _rev_filter_map(void)
 static eth_t
 _open(void)
 {
+  eth_use_variant(System_error);
+
   eth_args args = eth_start(2);
   eth_t path = eth_arg2(args, eth_string_type);
   eth_t mode = eth_arg2(args, eth_string_type);
@@ -878,8 +960,7 @@ _open(void)
     switch (errno)
     {
       case EINVAL: exn = eth_exn(eth_sym("Invalid_argument")); break;
-      case ENOMEM: exn = eth_exn(eth_sym("Out_of_memory")); break;
-      default: exn = eth_exn(eth_sym("System_error")); break;
+      default: exn = eth_system_error(errno); break;
     }
     eth_return(args, exn);
   }
@@ -899,7 +980,7 @@ _popen(void)
     switch (errno)
     {
       case EINVAL: exn = eth_exn(eth_sym("Invalid_argument")); break;
-      default: exn = eth_exn(eth_sym("System_error")); break;
+      default: exn = eth_system_error(errno); break;
     }
     eth_return(args, exn);
   }
@@ -924,7 +1005,7 @@ _close(void)
       int err = errno;
       eth_drop(file);
       if (err)
-        return eth_exn(eth_sym("System_error"));
+        return eth_system_error(err);
       else
         return eth_num(ret);
     }
@@ -939,7 +1020,7 @@ _close(void)
         switch (err)
         {
           case EBADF: return eth_exn(eth_sym("Invalid_argument"));
-          default: return eth_exn(eth_sym("System_error"));
+          default: return eth_system_error(err);
         }
       }
       else
@@ -1040,8 +1121,7 @@ _input(void)
       switch (err)
       {
         case EINVAL: return eth_exn(eth_sym("Invalid_argument"));
-        case ENOMEM: return eth_exn(eth_sym("Out_of_memory"));
-        default: abort();
+        default: return eth_system_error(err);
       }
     }
   }
@@ -1091,8 +1171,7 @@ _read_line_of(void)
       {
         case EBADF:
         case EINVAL: return eth_exn(eth_sym("Invalid_argument"));
-        case ENOMEM: return eth_exn(eth_sym("Out_of_memory"));
-        default: abort();
+        default: return eth_system_error(err);
       }
     }
   }
@@ -1137,7 +1216,7 @@ _read_of(void)
     {
       eth_unref(file);
       eth_unref(n);
-      return eth_exn(eth_sym("System_error"));
+      return eth_system_error(0);
     }
   }
   eth_unref(file);
@@ -1180,7 +1259,7 @@ _read_file(void)
     else if (ferror(stream))
     {
       eth_drop(file);
-      return eth_exn(eth_sym("System_error"));
+      return eth_system_error(0);
     }
   }
   eth_drop(file);
@@ -1197,7 +1276,7 @@ error:;
     case EBADF:
       return eth_exn(eth_sym("Invalid_argument"));
     default:
-      return eth_exn(eth_sym("System_error"));
+      return eth_system_error(err);
   }
 }
 
@@ -1571,6 +1650,10 @@ _eth_init_builtins(void)
   eth_define(g_mod,       "chop", eth_create_proc(      _chop, 1, NULL, NULL));
   eth_define(g_mod,        "chr", eth_create_proc(       _chr, 1, NULL, NULL));
   eth_define(g_mod,        "ord", eth_create_proc(       _ord, 1, NULL, NULL));
+  // ---
+  eth_define(g_mod,         "=~", eth_create_proc( _regexp_eq, 2, NULL, NULL));
+  eth_define(g_mod,         ">~", eth_create_proc( _regexp_match, 2, NULL, NULL));
+  eth_define(g_mod,  "rev_split", eth_create_proc( _rev_split, 2, NULL, NULL));
   // ---
   eth_define(g_mod,     "length", eth_create_proc(    _length, 1, NULL, NULL));
   eth_define(g_mod, "rev_append", eth_create_proc(_rev_append, 2, NULL, NULL));

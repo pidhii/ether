@@ -141,6 +141,9 @@ eth_init(const int *argc)
   extern void _eth_init_strings(void);
   _eth_init_strings();
 
+  extern void _eth_init_regexp_type(void);
+  _eth_init_regexp_type();
+
   extern void _eth_init_boolean_type(void);
   _eth_init_boolean_type();
 
@@ -195,6 +198,7 @@ eth_cleanup(void)
   eth_destroy_type(eth_rangelr_type);
   eth_destroy_type(eth_rangel_type);
   eth_destroy_type(eth_ranger_type);
+  eth_destroy_type(eth_regexp_type);
 
   extern void _eth_cleanup_strings(void);
   _eth_cleanup_strings();
@@ -303,5 +307,12 @@ _eth_delete_magic(eth_t x)
     // release magic
     eth_unref_magic(magic);
   }
+}
+
+eth_t
+eth_system_error(int err)
+{
+  eth_use_variant(System_error)
+  return System_error(eth_sym(eth_errno_to_str(err)));
 }
 
