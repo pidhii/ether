@@ -274,13 +274,13 @@ _regexp_eq(void)
 }
 
 static eth_t
-_regexp_match(void)
+_match(void)
 {
   eth_use_symbol(Regexp_error)
 
   eth_args args = eth_start(2);
-  eth_t str = eth_arg2(args, eth_string_type);
   eth_t reg = eth_arg2(args, eth_regexp_type);
+  eth_t str = eth_arg2(args, eth_string_type);
   int n = eth_exec_regexp(reg, eth_str_cstr(str), eth_str_len(str), 0);
   if (n < 0)
     eth_return(args, eth_false);
@@ -303,9 +303,85 @@ _regexp_match(void)
 }
 
 static eth_t
+_gsub(void)
+{
+  eth_use_symbol(Regexp_error)
+  eth_use_symbol(Invalid_argument)
+  eth_use_symbol(Type_error)
+
+  eth_args args = eth_start(3);
+  eth_t reg = eth_arg2(args, eth_regexp_type);
+  eth_t f = eth_arg2(args, eth_function_type);
+  eth_t str = eth_arg2(args, eth_string_type);
+
+  char *ptr = NULL;
+  size_t size = 0;
+  FILE *buf = open_memstream(&ptr, &size);
+
+  const int *ovec = eth_ovector();
+  const char *p = eth_str_cstr(str);
+  const char *pend = p + eth_str_len(str);
+  while (true)
+  {
+    int n = eth_exec_regexp(reg, p, pend - p, 0);
+    if (n < 0)
+    {
+      fwrite(p, 1, pend - p, buf);
+      break;
+    }
+    else if (n == 0)
+    {
+      fclose(buf);
+      free(ptr);
+      eth_throw(args, Regexp_error);
+    }
+    else
+    {
+      if (ovec[0] == 0 && ovec[1] == 0)
+      {
+        fclose(buf);
+        free(ptr);
+        eth_throw(args, Invalid_argument);
+      }
+      else
+      {
+        fwrite(p, 1, ovec[0], buf);
+        // --
+        eth_t x = eth_create_string2(p + ovec[0], ovec[1] - ovec[0]);
+        eth_reserve_stack(1);
+        eth_sp[0] = x;
+        eth_t r = eth_apply(f, 1);
+        // --
+        if (eth_unlikely(eth_is_exn(r)))
+        {
+          fclose(buf);
+          free(ptr);
+          eth_rethrow(args, r);
+        }
+        if (eth_unlikely(not eth_is_str(r)))
+        {
+          fclose(buf);
+          free(ptr);
+          eth_drop(r);
+          eth_throw(args, Type_error);
+        }
+        fwrite(eth_str_cstr(r), 1, eth_str_len(r), buf);
+        eth_drop(r);
+        p += ovec[1];
+      }
+    }
+  }
+
+  fclose(buf);
+  eth_t ret = eth_create_string_from_ptr2(ptr, size);
+  eth_return(args, ret);
+}
+
+static eth_t
 _rev_split(void)
 {
   eth_use_symbol(Regexp_error)
+  eth_use_symbol(Invalid_argument)
 
   eth_args args = eth_start(2);
   eth_t reg = eth_arg2(args, eth_regexp_type);
@@ -330,8 +406,16 @@ _rev_split(void)
     }
     else
     {
-      acc = eth_cons(eth_create_string2(p, ovec[0]), acc);
-      p += ovec[1];
+      if (ovec[0] == 0 && ovec[1] == 0)
+      {
+        eth_drop(acc);
+        eth_throw(args, Invalid_argument);
+      }
+      else
+      {
+        acc = eth_cons(eth_create_string2(p, ovec[0]), acc);
+        p += ovec[1];
+      }
     }
   }
 }
@@ -1652,7 +1736,8 @@ _eth_init_builtins(void)
   eth_define(g_mod,        "ord", eth_create_proc(       _ord, 1, NULL, NULL));
   // ---
   eth_define(g_mod,         "=~", eth_create_proc( _regexp_eq, 2, NULL, NULL));
-  eth_define(g_mod,         ">~", eth_create_proc( _regexp_match, 2, NULL, NULL));
+  eth_define(g_mod,      "match", eth_create_proc(     _match, 2, NULL, NULL));
+  eth_define(g_mod,       "gsub", eth_create_proc(      _gsub, 3, NULL, NULL));
   eth_define(g_mod,  "rev_split", eth_create_proc( _rev_split, 2, NULL, NULL));
   // ---
   eth_define(g_mod,     "length", eth_create_proc(    _length, 1, NULL, NULL));

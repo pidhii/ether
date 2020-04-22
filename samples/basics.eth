@@ -81,14 +81,13 @@ let safe_div x y = Some (x / y) if y /= 0 else false in
 let Some x = safe_div 1 2 in
 print x;
 
-
 (* FizzBuzz
  *
  * Note a `()`: this is a synonim for `nil`.
  *)
 for_each [1 .. 100] (fn i ->
-  when i mod 3 /= 0 && i mod 5 /= 0 then print i;
-  when i mod 3 == 0 then print "Fizz";
-  when i mod 5 == 0 then print "Buzz";
+  print i if i mod 3 /= 0 && i mod 5 /= 0 else
+  print "Fizz" if i mod 3 == 0 else
+  print "Buzz" if i mod 5 == 0 else ()
 );
 

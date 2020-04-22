@@ -205,10 +205,10 @@ in
 
 for_each opts (fn (opt, arg) ->
   try
-    if opt eq "i" then install arg else
-    if opt eq "u" then uninstall arg else
-    if opt eq "r" then reinstall arg else
-    if opt eq "l" then list_modules! else ()
+    install arg   if opt eq "i" else
+    uninstall arg if opt eq "u" else
+    reinstall arg if opt eq "r" else
+    list_modules! if opt eq "l" else ()
   with Failure -> (
     eprintf "> failure\n";
     #exit 1;

@@ -183,6 +183,7 @@ int _eth_start_token = -1;
 %right RARROW
 %right ';'
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+%right TERNARY
 %nonassoc IF THEN ELSE WHEN UNLESS TRY WITH
 %right OR
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -194,7 +195,7 @@ int _eth_start_token = -1;
 // level 2:
 %right OPAND
 // level 3:
-%nonassoc '<' LE '>' GE EQ NE IS EQUAL DDOT DDDOT EQ_TILD LT_TILD
+%nonassoc '<' LE '>' GE EQ NE IS EQUAL DDOT DDDOT EQ_TILD
 // level 4:
 %right CONS PPLUS
 // level 5:
@@ -220,12 +221,13 @@ int _eth_start_token = -1;
 %type<integer> attribute
 %type<astvec> args
 %type<patvec> fnargs
-%type<string> string
+%type<charvec> string
 %type<ast> regexp
 %type<charvec> string_aux
 %type<pattern> atomic_pattern form_pattern pattern
 %type<strvec> maybe_imports import_list
-%type<astvec> list list_with_coma
+%type<boolean> maybe_coma
+%type<astvec> list
 %type<patvec> pattern_list
 %type<boolean> maybe_coma_dots
 %type<record> record
@@ -245,13 +247,13 @@ fn_atom
   : ident { $$ = eth_ast_ident($1); free($1); LOC($$, @$); }
   | '(' expr ')' { $$ = $2; }
   | BEGINN expr END { $$ = $2; }
-  | atom '!' { $$ = eth_ast_apply($1, NULL, 0); LOC($$, @$); }
+  | fn_atom '!' { $$ = eth_ast_apply($1, NULL, 0); LOC($$, @$); }
   | capident DOT_OPEN1 expr ')' {
     $$ = eth_ast_import($1, "", NULL, 0, $3);
     LOC($$, @$);
     free($1);
   }
-  | capident DOT_OPEN2 list_with_coma ']' {
+  | capident DOT_OPEN2 list maybe_coma ']' {
     eth_ast *acc = eth_ast_cval(eth_nil);
     cod_vec_riter($3, i, x, acc = eth_ast_binop(ETH_CONS, x, acc));
     cod_vec_destroy($3);
@@ -268,11 +270,15 @@ atom
   | CAPSYMBOL { $$ = eth_ast_cval(eth_sym($1)); free($1); LOC($$, @$); }
   | NUMBER { $$ = eth_ast_cval(eth_create_number($1)); LOC($$, @$); }
   | CONST  { $$ = eth_ast_cval($1); LOC($$, @$); }
-  | string { $$ = eth_ast_cval(eth_create_string($1)); free($1); LOC($$, @$); }
+  | string {
+    cod_vec_push($1, 0);
+    $$ = eth_ast_cval(eth_create_string_from_ptr2($1.data, $1.len - 1));
+    LOC($$, @$);
+  }
   | regexp
   | '('')' { $$ = eth_ast_cval(eth_nil); LOC($$, @$); }
   | '['']' { $$ = eth_ast_cval(eth_nil); }
-  | '[' list_with_coma ']' {
+  | '[' list maybe_coma ']' {
     $$ = eth_ast_cval(eth_nil);
     cod_vec_riter($2, i, x, $$ = eth_ast_binop(ETH_CONS, x, $$));
     cod_vec_destroy($2);
@@ -327,7 +333,7 @@ atom
     $$ = eth_ast_make_record_with_type(eth_tuple_type(n), fields, $2.data, n);
     cod_vec_destroy($2);
   }
-  | '{' record '}' {
+  | '{' record maybe_coma '}' {
     eth_type *type = eth_record_type($2.keys.data, $2.keys.len);
     $$ = eth_ast_make_record_with_type(type, $2.keys.data, $2.vals.data, $2.keys.len);
     cod_vec_iter($2.keys, i, x, free(x));
@@ -404,7 +410,7 @@ expr
     $$ = eth_ast_if($2, $4, $6);
     LOC($$, @$);
   }
-  | expr IF expr ELSE expr {
+  | expr IF expr ELSE expr %prec TERNARY {
     $$ = eth_ast_if($3, $1, $5);
     LOC($$, @$);
   }
@@ -412,7 +418,7 @@ expr
     $$ = eth_ast_if($2, $4, eth_ast_cval(eth_nil));
     LOC($$, @$);
   }
-  | expr WHEN expr {
+  | expr WHEN expr %prec TERNARY {
     $$ = eth_ast_if($3, $1, eth_ast_cval(eth_nil));
     LOC($$, @$);
   }
@@ -420,7 +426,7 @@ expr
     $$ = eth_ast_if($2, eth_ast_cval(eth_nil), $4);
     LOC($$, @$);
   }
-  | expr UNLESS expr {
+  | expr UNLESS expr %prec TERNARY {
     $$ = eth_ast_if($3, eth_ast_cval(eth_nil), $1);
     LOC($$, @$);
   }
@@ -488,12 +494,6 @@ expr
     $$ = eth_ast_apply(fn, args, 2);
     LOC($$, @$);
   }
-  | expr LT_TILD expr {
-    eth_ast *args[] = { $1, $3 };
-    eth_ast *fn = eth_ast_ident(">~");
-    $$ = eth_ast_apply(fn, args, 2);
-    LOC($$, @$);
-  }
   | expr DDOT expr {
     char *fields[] = { "l", "r" };
     eth_ast *vals[] = { $1, $3 };
@@ -550,8 +550,6 @@ capident
     free($3);
   }
 ;
-
-list_with_coma: list | list ',';
 
 args
   : atom {
@@ -614,10 +612,7 @@ attribute
 ;
 
 string
-  : '"' string_aux '"' {
-    cod_vec_push($2, 0);
-    $$ = $2.data;
-  }
+  : '"' string_aux '"' { $$ = $2; }
 ;
 
 regexp
@@ -840,6 +835,11 @@ lc_aux
     $$.in.expr = $3;
     $$.pred = $5;
   }
+;
+
+maybe_coma
+  : { $$ = false; }
+  | ',' { $$ = true; }
 ;
 
 %%

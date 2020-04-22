@@ -20,13 +20,14 @@ static void
 write_string(eth_type *type, eth_t x, FILE *out)
 {
   putc('"', out);
-  for (char *p = ETH_STRING(x)->cstr; *p; ++p)
+  const char *p = eth_str_cstr(x);
+  for (int i = 0; i < eth_str_len(x); ++i)
   {
-    if (isprint((int)*p))
-      putc(*p, out);
+    if (isprint(p[i]))
+      putc(p[i], out);
     else
     {
-      switch (*p)
+      switch (p[i])
       {
         case '\0': fputs("\\0", out); break;
         case '\a': fputs("\\a", out); break;
@@ -36,7 +37,7 @@ write_string(eth_type *type, eth_t x, FILE *out)
         case '\r': fputs("\\r", out); break;
         case '\t': fputs("\\t", out); break;
         case '\v': fputs("\\v", out); break;
-        default: fprintf(out, "\\%#hhx", *p);
+        default: fprintf(out, "\\%#hhx", p[i]);
       }
     }
   }
@@ -46,7 +47,7 @@ write_string(eth_type *type, eth_t x, FILE *out)
 static void
 display_string(eth_type *type, eth_t x, FILE *out)
 {
-  fputs(ETH_STRING(x)->cstr, out);
+  fwrite(eth_str_cstr(x), 1, eth_str_len(x), out);
 }
 
 static bool

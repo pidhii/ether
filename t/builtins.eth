@@ -54,7 +54,8 @@ in
 
 let regexp_tests = [
   ("=~", fn -> "as foo so do bar" =~ \foo/),
-  (">~", fn -> ("a bu c" >~ \[^^]\K(\w+)\s+(\w)/) eq ["bu c", "bu", "c"]),
+  ("match", fn -> match \[^^]\K(\w+)\s+(\w)/ "a bu c" eq ["bu c", "bu", "c"]),
+  ("gsub", fn -> gsub \\s+/ (const "-") "a   s f  f f   " eq "a-s-f-f-f-"),
   ("split", fn -> split \\s+/ "asd asdf asdf " eq ["asd", "asdf", "asdf", ""]),
 ]
 in

@@ -6,7 +6,7 @@ if exists("b:current_syntax")
   finish
 endif
 
-set comments=b:#,sr:(*,mb:*,ex:*)
+set comments=sr:(*,mb:*,ex:*)
 
 set iskeyword+=?,'
 
@@ -49,7 +49,7 @@ syn keyword ethBuiltinFunction strcmp strcasecmp strncmp strncasecmp
 syn keyword ethBuiltinFunction substr strstr strcasestr
 syn keyword ethBuiltinFunction chomp chop
 
-syn keyword ethBuiltinFunction rev_split split
+syn keyword ethBuiltinFunction match gsub rev_split split
 
 syn keyword ethBuiltinFunction car cdr
 syn keyword ethBuiltinFunction first second third
@@ -147,7 +147,7 @@ hi link ethUnqualified ethKeyword
 syn match ethKeyword /\<let\>/
 syn match ethConditional /\<if\%(\s\+let\)\?\>/
 syn region ethTryWith matchgroup=ethException start=/\<try\>/ end=/\<with\>/ contains=TOP skipwhite skipnl
-syn region ethMatch matchgroup=ethConditional start=/\<match\>/ end=/\<with\>/ contains=TOP skipwhite skipnl
+syn region ethMatch matchgroup=ethConditional start=/\<case\>/ end=/\<of\>/ contains=TOP skipwhite skipnl
 syn match ethConditional /\<then\>/
 syn region ethBegin matchgroup=ethConditional start=/\<then\s\+begin\>/ end=/\<end\>/ contains=TOP skipwhite skipnl
 syn region ethBegin matchgroup=ethKeyword start=/\<begin\>/ end=/\<end\>/ contains=TOP skipwhite skipnl
@@ -157,7 +157,7 @@ syn keyword ethAssert assert
 
 syn keyword ethLazy lazy
 
-syn match ethOperator /[-+=*/%><&|.!^]\+/
+syn match ethOperator /[-+=*/%><&|.!^~#]\+/
 syn match ethOperator /:\|\$/
 syn keyword ethOperator is eq not mod land lor lxor lshl lshr ashl ashr lnot
 
@@ -174,7 +174,7 @@ syn match ethLambda /->/
 "syn match ethTableRef /::/ nextgroup=ethKey
 "syn match ethKey /\k\+/ contained
 
-syn match Comment /#.*$/ contains=ethCommentLabel
+syn region Comment start=/^#!/ end=/$/ contains=ethCommentLabel
 syn region Comment start=/(\*\%([^)]\|$\)/ end=/\*)/ contains=Comment skipwhite skipnl
 syn match ethCommentLabel /[A-Z]\w*:/ contained
 

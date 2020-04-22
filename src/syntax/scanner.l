@@ -62,7 +62,7 @@ OPERATOR [-+%^.$:!<>*/=&|]+
   return SYMBOL;
 }
 
-"#".*$ // comments
+"^#!".*$ // comments
 "(*" { BEGIN(COMMENT); }
 <COMMENT>"(*" { g_comment_cnt += 1; }
 <COMMENT>"*)" {
@@ -178,7 +178,6 @@ __builtin { return BUILTIN; }
 "=="    { return EQ; }
 "/="    { return NE; }
 "=~"    { return EQ_TILD; }
-">~"    { return LT_TILD; }
 is      { return IS; }
 eq      { return EQUAL; }
 "->"    { return RARROW; }

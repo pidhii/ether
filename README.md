@@ -1,28 +1,33 @@
-# [Contents](contents)
-- [Examples](examples)
-  - [basics](basics)
-  - [merge sort](merge-sort)
-- [Build and installation](installation)
-- [Syntax higlighting](syntax-higlighting)
-  - [Vim](vim)
-- [Builtin types and functions](builtins)
-  - [booleans](booleans)
-  - [numbers](numbers)
-  - [strings](strings)
-  - [symbols](symbols)
-  - [nil](nil)
-  - [pairs and lists](pairs-and-cons-lists)
-  - [regular expressions](regular-expressions)
-  - [ranges](ranges)
-  - [tuples](tuples)
-  - [records](records)
-  - [variants](variants)
-  - [functions](functions)
-- [Builtin operators](builtin-operators)
-- [Exceptions and error handling](exceptions-and-error-handling)
-- [IO](io)
+# [Contents](#contents)
+- [Examples](#examples)
+  - [basics](#basics)
+  - [merge sort](#merge-sort)
+- [Build and installation](#build-and-installations)
+- [Syntax higlighting](#syntax-higlighting)
+  - [Vim](#vim)
+- [Builtin types and functions](#builtin-types-and-functions)
+  - [booleans](#booleans)
+  - [numbers](#numbers)
+  - [strings](#strings)
+  - [symbols](#symbols)
+  - [nil](#nil)
+  - [pairs and lists](#pairs-and-cons-lists)
+  - [regular expressions](#regular-expressions)
+  - [ranges](#ranges)
+  - [tuples](#tuples)
+  - [records](#records)
+  - [variants](#variants)
+  - [functions](#functions)
+- [Other functions](#other-functions)
+  - [type predicates](#type-predicates)
+  - [list](#list)
+  - [higher order functions](#higher-order-functions)
+  - [math](#math)
+  - [miscelenious](#miscelenious)
+- [Exceptions and error handling](#exceptions-and-error-handling)
+- [I/O](#io)
 
-# [Check-list](check-list)
+# [Check-list](#check-list)
 - [ ] REPL
 - [x] Pattern matching
 - [x] Closures
@@ -40,6 +45,7 @@
 - [ ] Named arguments
 - [x] Exceptions
 - [x] Modules
+<!--- [ ] Builtin libuv-->
 - [x] Memory management with naїve reference counting ONLY
 - [x] No memory leaks
 - [ ] `match` like in Caml
@@ -47,7 +53,7 @@
 - [ ] Fuck Python, I'm the queen
 
 
-# [Examples](examples)
+# [Examples](#examples)
 
 ## Basics
 ```ocaml
@@ -139,9 +145,9 @@ print x;
  * Note a `()`: this is a synonim for `nil`.
  *)
 for_each [1 .. 100] (fn i ->
-  when i mod 3 /= 0 && i mod 5 /= 0 then print i;
-  when i mod 3 == 0 then print "Fizz";
-  when i mod 5 == 0 then print "Buzz";
+  print i if i mod 3 /= 0 && i mod 5 /= 0 else
+  print "Fizz" if i mod 3 == 0 else
+  print "Buzz" if i mod 5 == 0 else ()
 );
 ```
 
@@ -248,13 +254,13 @@ print ("Given list:", l);
 print ("Sorted list:", sort l);
 ```
 
-# [Build and installation](installation)
+# [Build and installation](#build-and-installation)
 Build and install with [CMake](https://cmake.org/runningcmake/).  
 *Debug* and *Release* build types are supported.
 
 To build *Release* configuration do
 - create directory for temporary files:  
-  ```
+  ```sh
   mkdir build
   ```
 - run CMake to generate build-scripts:  
@@ -278,8 +284,12 @@ To build *Release* configuration do
   export PATH=$prefix/bin:path
   export PKG_CONFIG_PATH=${PKG_CONFIG_PATH:+${PKG_CONFIG_PATH}:}$prefix/lib/pkgconfig
   ```
+  or you can use [env.sh](./env.sh) to setup environment in current shell:
+  ```sh
+  source env.sh <path-to-installation>
+  ```
 
-# [Syntax higlighting](syntax-higlighting)
+# [Syntax higlighting](#syntax-higlighting)
 As you may have noticed, ether syntax is wery similar to ML's one, so generaly
 you can just set your editor to treat it like OCaml for examle. However there
 are differences, and some of ether-only expressions tend to appear very often
@@ -287,8 +297,8 @@ in the code (e.g. `if let <pattern>`).
 
 ## Vim
 I'm maintaining native syntax configuration only Vim (not familiar with other
-editors). Sytax and indentation can be loaded from [vim/syntax/ether.vim](vim/syntax/ether.vim)
-and [vim/indent/ether.vim](vim/indent/ether.vim), respectively.
+editors). Sytax and indentation can be loaded from [vim/syntax/ether.vim](./vim/syntax/ether.vim)
+and [vim/indent/ether.vim](./vim/indent/ether.vim), respectively.
 
 To make Vim recognise ether scripts you can add following line to your .vimrc:
 ```vim
@@ -299,13 +309,13 @@ If you use [NERDCommenter](https://www.vim.org/scripts/script.php?script_id=1218
 you can also add:
 ```vim
 let g:NERDCustomDelimiters = {
-  \ 'ether': { 'left': '#', 'leftAlt': '(*', 'rightAlt': '*)', 'nested': 1 }
+  \ 'ether': { 'left': '(*', 'right': '*)', 'nested': 1 }
   \ }
 ```
 
-# [Builtin types and functions](builtins)
+# [Builtin types and functions](#builtin-types-and-functions)
 
-## Booleans
+## [Booleans](#booleans)
 Guess what!
 Ether have 2 objects of this type, namely:
 * `true`, and
@@ -314,8 +324,17 @@ Ether have 2 objects of this type, namely:
 Note, unlike in many common programming languages, all conditional expressions
 test exactly on being *"not false"*, rather than *"not false or non-null"*.
 
+These are singleton objects, thus you can use comparison on physical equality
+for these. Also you can use `true` and `false` in patterns.
+```ocaml
+not true is false;
+not false is true;
 
-## Numbers
+let (true, false) = (true, false) in
+...
+```
+
+## [Numbers](#numbers)
 By default numbers are internally represented with `long double` type in C.
 Also, one can compile Ether to use other C types.
 Being `long double` on my PC means to have 80-bit representation with 64 significand bits.
@@ -359,13 +378,109 @@ Operator | Description | Exceptions
 
 **Note:** so these will work ONLY for numbers, don't try to plug strings in there.
 
-## Strings
+
+## [Strings](#strings)
+Strings are implemented similar to `std::string` in C++:
+- compatible with C strings (terminating null-byte)
+- however, length is stored staticly, and, as result
+- string can contain null-bytes
+
+#### `<str> ++ <str>`
+Concatenate two strings.  
+```ocaml
+"foo" ++ "bar" (* => "foobar" *)
+```
+Exceptions: `Type_error`
+
+#### `format <format> <x> ...*`
+Format string.  Available formats currently are:
+- ~w - "native" representation of the object
+- ~d - "beautiful" representation of the object
+```ocaml
+format "this gives ~w" "str" (* => "this gives \"str\"" *)
+format "this gives ~d" "str" (* => "this gives str" *)
+```
+Use ~~ to escape '~'-character.  
+Exceptions: `Type_error`, `Format_error`
+
+#### `concat <list>`
+Concatenate *list* of strings.
+```ocaml
+concat ["a", "b", "c"] (* => "abc" *)
+concat ["str"] (* => "str" *)
+concat [] (* => "" *)
+```
+Exceptions: `Type_error`, `Invalid_argument`
+
+#### `concat_with <sep> <list>`
+Concatenate *list* of strings iserting *sep* inbetween.
+```ocaml
+concat_with " " ["Hello", "World"] (* => "Hello World" *)
+concat_with "_" ["str"] (* => "str" *)
+concat_with "_" [] (* => "" *)
+```
+Exceptions: `Type_error`, `Invalid_argument`
+
+#### `strlen <str>`
+Return string length.
+```ocaml
+strlen "abc" (* => 3 *)
+strlen "abc\x00abc" (* => 7 *)
+```
+Exceptions: `Type_error`
+
+#### `to_upper <str>`
+Return string with all chracters taken from *str* but set in upper case.
+```ocaml
+to_upper "foo_Bar-bazZZ" (* => FOO_BAR-BAZZZ *)
+```
+Exceptions: `Type_error`
+
+#### `to_lower <str>`
+Return string with all chracters taken from *str* but set in lower case.
+```ocaml
+to_lower "foo_Bar-bazZZ" (* => foo_bar-bazzz *)
+```
+Exceptions: `Type_error`
+
+#### `chr <num>`
+Return character dfined by the code of *num*.
+```ocaml
+chr 0x61 (* => "a" *)
+```
+Exceptions: `Type_error`, `Invalid_argument`
+
+#### `ord <char>`
+Return character code.
+```ocaml
+ord "a" (* => 97 (0x61) *)
+```
+Exceptions: `Type_error`, `Invalid_argument`
+
+#### `chomp <str>`
+#### `chop <str>`
+
+#### `substr <str> <range>`
+#### `substr <str> <offs> <len>`
+
+#### `strcmp <str> <str>`
+#### `strcasecmp <str> <str>`
+#### `strncmp <str> <str>`
+#### `strncasecmp <str> <str>`
+
+#### `to_number <string>`
+#### `to_symbol <string>`
 
 ## Symbols
 
 ## Nil
 
 ## Pairs and cons-lists
+
+#### `<x> :: <y>`
+
+#### `car <x>`
+#### `cdr <x>`
 
 ## Regular expressions
 Regular expressions are using PCRE as backend, so refer to the PCRE documentation for the syntax of patterns.
@@ -382,17 +497,21 @@ where
 Operator | Description | Exceptions
 ---------|-------------|-----------
 `<string> =~ <regexp>` | Check if string matches regexp. | `Regexp_error`
-`<string> >~ <regexp>` | Get all matches from the string. Return [false](booleans) if match failed. | `Regexp_error`
 
 ### Functions
 Function | Description | Exceptions
 ---------|-------------|-----------
 `split <regexp> <string>`| Split string at positions where regexp matches. Matched pattern is excluded from the string. Return a list of substrings. | `Regexp_error`
 `rev_split <regexp> <string>` | Same as `split` but order of substring is reversed. | `Regexp_error`
+`match <regexp> <string>` | Get list of matches. Return [false](#booleans) if match failed. | `Regexp_error`
 
 ## Ranges
 
 ## Tuples
+
+#### `first <x>`
+#### `second <x>`
+#### `third <x>`
 
 ## Records
 
@@ -400,31 +519,113 @@ Function | Description | Exceptions
 
 ## Functions
 
-# Builtin operators
+# [Other functions](#other-functions)
 
-# Exceptions and error handling
+## Type predicates
+- `pari? <x>`
+- `symbol? <x>`
+- `number? <x>`
+- `string? <x>`
+- `boolean? <x>`
+- `function? <x>`
+- `tuple? <x>`
+- `record? <x>`
+- `file? <x>`
 
-# IO
+## List
+#### `list <x>`
+- [string](#string)
+- [tuple](#tuples)
+- [record](#records)
+
+## Higher order functions
+#### `id <x>`
+#### `flip <f>`
+#### `const <x>`
+#### `curry <f>`
+#### `uncurry <f>`
+
+## Math
+#### `even? <x>`
+#### `odd? <x>`
+
+## Miscelenious
+#### `system <cmd-format> <x> ...*`
+#### `dump <x>`
+
+# [Exceptions and error handling](#exceptions-and-error-handling)
+
+#### `raise <x>`
+
+# [I/O](#io)
+
+- `stdin`
+- `stdout`
+- `stderr`
 
 ### Functions
-Function | Description | Exceptions
----------|-------------|-----------
-`open_in <path>` | Same as `fopen(<path>, "r")`. Return [file](file) object.| `Type_error`, `Invalid_argument`, `System_error <errno>`
-`open_out <path>` | Same as `fopen(<path>, "w")`. Return [file](file) object. | `Type_error`, `Invalid_argument`, `System_error <errno>`
-`open_append <path>`  | Same as `fopen(<path>, "a")`. Return [file](file) object. | `Type_error`, `Invalid_argument`, `System_error <errno>`
-`open_pipe_in <command>` | Same as `popen(<command>, "r")`. Return [file](file) object. | `Type_error`, `Invalid_argument`, `System_error <errno>`
-`open_pipe_out <command>` |  Same as `popen(<command>, "w")`. Return [file](file) object. | `Type_error`, `Invalid_argument`, `System_error <errno>`
-`close <file>` | Close file. For files opened with `open_pipe_*` return exit status of the subprocess. (otherwize - [nil](nil)) | `Type_error`, `Invalid_argument`, `System_error <errno>`
+#### `open_in <path>`
+Return file object for reading. Same as `fopen(<path>, "r")`.  
+Exceptions: `Type_error`, `Invalid_argument`, `System_error <errno>`.
 
-#### Input
-Function | Description | Exceptions
----------|-------------|-----------
-`input <prompt>` | Print prompt and read a line from standard input. | `End_of_file`, `Type_error`, `Invalid_argument`, `System_error <errno>`
-`read_of <file> <n>` | Read *n* bytes from the file to be returned as a string. | `End_of_file`, `Type_error`, `Invalid_argument`, `System_error UNDEFINED`
-`read <n>` | Equivalent to `read_of stdin`. | `End_of_file`, `Type_error`, `Invalid_argument`, `System_error UNDEFINED`
-`read_line_of <file>` | Read a line from the file. Trailing newline-character is NOT removed. | `End_of_file`, `Type_error`, `Invalid_argument`, `System_error <errno>`
-`read_line !` | Equivalent to `read_line_of stdin` | `End_of_file`, `Type_error`, `Invalid_argument`, `System_error <errno>`
-`read_file <file>` | Read whole line into a string. (ONLY WORKS WITH **FILES**) | `End_of_file`, `Type_error`, `Invalid_argument`, `System_error <errno>`
+#### `open_out <path>`
+Return file object for writing. Same as `fopen(<path>, "w")`.  
+Exceptions: `Type_error`, `Invalid_argument`, `System_error <errno>`.
 
-#### Output
+#### `open_append <path>`
+Return file object for writing. Same as `fopen(<path>, "a")`.  
+Exceptions: `Type_error`, `Invalid_argument`, `System_error <errno>`.
+
+#### `open_pipe_in <command>`
+Return file object for reading. Same as `popen(<command>, "r")`.  
+Exceptions: `Type_error`, `Invalid_argument`, `System_error <errno>`.
+
+#### `open_pipe_out <command>`
+Return file object for writing. Same as `popen(<command>, "w")`.  
+Exceptions: `Type_error`, `Invalid_argument`, `System_error <errno>`.
+
+#### `close <file>`
+Close the file.
+For files opened with `open_pipe_*` return exit status of the subprocess (otherwize - [nil](#nil)).  
+Exceptions: `Type_error`, `Invalid_argument`, `System_error <errno>`.
+
+### Input
+
+#### `input <prompt>`
+Print prompt and read a line from standard input.  
+Exceptions: `End_of_file`, `Type_error`, `Invalid_argument`, `System_error <errno>`.
+
+#### `read_of <file> <n>`
+Read *n* bytes from the file to be returned as a string.  
+Exceptions: `End_of_file`, `Type_error`, `Invalid_argument`, `System_error UNDEFINED`.
+
+#### `read <n>`
+Equivalent to `read_of stdin`.  
+Exceptions: `End_of_file`, `Type_error`, `Invalid_argument`, `System_error UNDEFINED`.
+
+#### `read_line_of <file>`
+Read a line from the file. Trailing newline-character is NOT removed.  
+Exceptions: `End_of_file`, `Type_error`, `Invalid_argument`, `System_error <errno>`.
+
+#### `read_line !`
+Equivalent to `read_line_of stdin`.  
+Exceptions: `End_of_file`, `Type_error`, `Invalid_argument`, `System_error <errno>`.
+
+#### `read_file <file>`
+Read whole line into a string. (ONLY WORKS WITH *FILES*)  
+Exceptions: `End_of_file`, `Type_error`, `Invalid_argument`, `System_error <errno>`.
+
+### Output
+
+#### `print <tuple>`
+#### `newline !`
+#### `write_to <file> <string>`
+#### `write <string>`
+#### `printf <format> <x> ...*`
+#### `eprintf <format> <x> ...*`
+
+### Seeking
+
+#### `tell <file>`
+#### `seek <file> <pos>`
 
