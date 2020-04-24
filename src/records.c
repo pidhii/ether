@@ -103,6 +103,10 @@ eth_destroy_record_h6(eth_type *type, eth_t x)
 void
 eth_destroy_record_hn(eth_type *type, eth_t x)
 {
+  if (eth_unlikely(type->nfields <= 6))
+  {
+    eth_error("invalid free for record %s (%d fields)", type->name, type->nfields);
+  }
   assert(type->flag & ETH_TFLAG_PLAIN);
   eth_tuple *tup = ETH_TUPLE(x);
   for (int i = 0; i < type->nfields; ++i)
@@ -261,6 +265,7 @@ eth_record_type(char *const fields[], size_t n)
     eth_type *type = eth_create_struct_type(totstr, sortedfields, offsets, n);
     switch (n)
     {
+      case 1:  type->destroy = eth_destroy_record_h1; break;
       case 2:  type->destroy = eth_destroy_record_h2; break;
       case 3:  type->destroy = eth_destroy_record_h3; break;
       case 4:  type->destroy = eth_destroy_record_h4; break;
@@ -284,6 +289,7 @@ eth_create_tuple_n(eth_type *type, eth_t const data[])
 {
   assert(eth_is_tuple(type));
   int n = type->nfields;
+  assert(n > 1);
   switch (n)
   {
     case 2: return eth_tup2(data[0], data[1]); break;
