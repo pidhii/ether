@@ -86,6 +86,18 @@ eth_get_field(eth_type *type, const char *field)
   return NULL;
 }
 
+size_t
+eth_get_field_id_by_offs(const eth_type *type, ptrdiff_t offs)
+{
+  int n = type->nfields;
+  for (int i = 0; i < n; ++i)
+  {
+    if (type->fields[i].offs == offs)
+      return type->fieldids[i];
+  }
+  abort();
+}
+
 void
 eth_default_write(eth_type *type, eth_t x, FILE *out)
 {
@@ -116,5 +128,4 @@ eth_equal(eth_t x, eth_t y)
   else
     return false;
 }
-
 

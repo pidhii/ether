@@ -405,7 +405,7 @@ eth_vm(eth_bytecode *bc)
       {
         eth_t x = r[ip->loadrcrd.src];
         eth_type *restrict type = x->type;
-        test = type->flag & ETH_TFLAG_PLAIN;
+        test = type->flag == ETH_TFLAG_RECORD;
         if (eth_likely(test))
         {
           size_t *restrict ids = type->fieldids;
@@ -429,6 +429,7 @@ eth_vm(eth_bytecode *bc)
         FAST_DISPATCH_NEXT();
       }
 
+      // TODO: should it realy work for any plane type (not records only)?
       OP(LOADRCRD1)
       {
         eth_t x = r[ip->loadrcrd1.vid];

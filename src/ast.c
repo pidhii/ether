@@ -282,6 +282,11 @@ destroy_ast_node(eth_ast *ast)
       eth_unref_ast(ast->scor.rhs);
       break;
 
+    case ETH_AST_ACCESS:
+      eth_unref_ast(ast->access.expr);
+      free(ast->access.field);
+      break;
+
     case ETH_AST_TRY:
       eth_unref_ast_pattern(ast->try.pat);
       eth_unref_ast(ast->try.trybr);
@@ -519,6 +524,16 @@ eth_ast_or(eth_ast *lhs, eth_ast *rhs)
 }
 
 eth_ast*
+eth_ast_access(eth_ast *expr, const char *field)
+{
+  eth_ast *ast = create_ast_node(ETH_AST_ACCESS);
+  eth_ref_ast(ast->access.expr = expr);
+  ast->access.field = strdup(field);
+  return ast;
+}
+
+
+eth_ast*
 eth_ast_try(eth_ast_pattern *pat, eth_ast *try, eth_ast *catch, int likely)
 {
   // inner pattern must non-dummy because we will need that value
@@ -581,7 +596,71 @@ eth_ast_make_record_with_type(eth_type *type, char *const fields[],
   }
   return ast;
 }
+/*
+static eth_ast*
+build_do(eth_ast *ast)
+{
+  switch (ast->tag)
+  {
+    case ETH_AST_APPLY:
+    {
+      int n = ast->apply.nargs;
+      eth_ast *args[n];
+      for (int i = 0; i < n; ++i)
+        args[i] = build_do(ast->apply.args[i]);
+      eth_ast *fn = build_do(ast->apply.fn);
+      return eth_ast_apply(fn, args, n);
+    }
 
+    case ETH_AST_IF:
+    {
+      eth_ast *cond = build_do(ast->iff.cond);
+      eth_ast *then = build_do(ast->iff.then);
+      eth_ast *els = build_do(ast->iff.els);
+      eth_ast *iff = eth_ast_if(cond, then, els);
+      iff->iff.toplvl = ast->iff.toplvl;
+      return iff;
+    }
+
+    case ETH_AST_SEQ:
+    {
+    }
+
+    case ETH_AST_LET:
+
+    case ETH_AST_LETREC:
+
+    case ETH_AST_BINOP:
+
+    case ETH_AST_MATCH:
+
+    case ETH_AST_IMPORT:
+
+    case ETH_AST_AND:
+
+    case ETH_AST_OR:
+
+    case ETH_AST_ACCESS:
+
+    case ETH_AST_TRY:
+
+    case ETH_AST_MKRCRD:
+
+    case ETH_AST_MULTIMATCH:
+      eth_error("unimplemented");
+      abort();
+
+    default:
+      return ast;
+  }
+}
+
+eth_ast*
+eth_ast_do(eth_ast *expr)
+{
+  return build_do(expr);
+}
+*/
 eth_match_table*
 eth_create_match_table(eth_ast_pattern **const tab[], eth_ast *const exprs[],
     int h, int w)

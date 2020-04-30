@@ -179,6 +179,8 @@ int _eth_start_token = -1;
 %nonassoc PUB BUILTIN
 %nonassoc LIST_DDOT
 %nonassoc BEGINN END
+%nonassoc DO DONE
+%nonassoc CASE OF
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %right RARROW
 %right ';'
@@ -204,9 +206,12 @@ int _eth_start_token = -1;
 %left '*' '/' '%' MOD LAND LOR LXOR
 // level 7:
 %right '^' LSHL LSHR ASHL ASHR
+// level 8:
+%left<string> USROP
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %left UMINUS UPLUS NOT LNOT
 %nonassoc '!'
+%left '.'
 
 
 // =============================================================================
@@ -262,6 +267,10 @@ fn_atom
     $$ = eth_ast_import($1, "", NULL, 0, acc);
     LOC($$, @$);
     free($1);
+  }
+  | atom '.' SYMBOL {
+    $$ = eth_ast_access($1, $3);
+    free($3);
   }
 ;
 
@@ -519,6 +528,13 @@ expr
   }
   | NOT  expr { $$ = eth_ast_unop(ETH_NOT , $2); LOC($$, @$); }
   | LNOT expr { $$ = eth_ast_unop(ETH_LNOT, $2); LOC($$, @$); }
+  | expr USROP expr {
+    eth_ast *args[] = { $1, $3 };
+    eth_ast *fn = eth_ast_ident($2);
+    $$ = eth_ast_apply(fn, args, 2);
+    LOC($$, @$);
+    free($2);
+  }
 ;
 
 ident

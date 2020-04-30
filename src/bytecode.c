@@ -523,6 +523,17 @@ build_pattern(bc_builder *bldr, eth_ssa_pattern *pat, int expr, int_vec *jmps)
     case ETH_PATTERN_IDENT:
       break;
 
+    case ETH_PATTERN_CONSTANT:
+      if (pat->constant.dotest)
+      {
+        write_testis(bldr, expr, pat->constant.val);
+        int jmp = write_jze(bldr, -1);
+        cod_vec_push(*jmps, jmp);
+      }
+      else
+        eth_debug("ommiting EQ test for ~w", pat->constant.val);
+      break;
+
     case ETH_PATTERN_UNPACK:
     {
       if (pat->unpack.dotest)
@@ -546,25 +557,17 @@ build_pattern(bc_builder *bldr, eth_ssa_pattern *pat, int expr, int_vec *jmps)
       break;
     }
 
-    case ETH_PATTERN_CONSTANT:
-      if (pat->constant.dotest)
-      {
-        write_testis(bldr, expr, pat->constant.val);
-        int jmp = write_jze(bldr, -1);
-        cod_vec_push(*jmps, jmp);
-      }
-      else
-        eth_debug("ommiting EQ test for ~w", pat->constant.val);
-      break;
-
     case ETH_PATTERN_RECORD:
     {
       assert(pat->record.n > 0);
+      // --
       int n = pat->record.n;
       int oregs[n];
+      // --
       for (int i = 0; i < n; ++i)
         oregs[i] = new_reg(bldr, pat->record.vids[i]);
 
+      // only load non-reused fields
       if (n == 1)
         write_loadrcrd1(bldr, oregs[0], expr, pat->record.ids[0]);
       else

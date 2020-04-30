@@ -177,6 +177,9 @@ eth_init(const int *argc)
   extern void _eth_init_range_types(void);
   _eth_init_range_types();
 
+  extern void _eth_init_ref_type(void);
+  _eth_init_ref_type();
+
   extern void _eth_init_builtins(void);
   _eth_init_builtins();
 }
@@ -199,6 +202,7 @@ eth_cleanup(void)
   eth_destroy_type(eth_rangel_type);
   eth_destroy_type(eth_ranger_type);
   eth_destroy_type(eth_regexp_type);
+  eth_destroy_type(eth_ref_type);
 
   extern void _eth_cleanup_strings(void);
   _eth_cleanup_strings();

@@ -67,11 +67,17 @@ typedef enum {
   RC_RULES_UNREF,
 } rc_rules;
 
-typedef struct value_info {
+typedef struct {
+  int vid;
+  size_t fid;
+} field_info;
+
+typedef struct {
   rc_rules rules;
   eth_t cval;
   eth_type *type;
   eth_insn *creatloc;
+  cod_vec(field_info) fields;
   bool isrec;
   bool isdummy;
   bool isthis;
@@ -80,6 +86,7 @@ typedef struct value_info {
 typedef enum {
   ACTION_SETCVAL,
   ACTION_SETTYPE,
+  ACTION_SETFIELD,
 } action_tag;
 
 typedef struct {
@@ -87,6 +94,7 @@ typedef struct {
   union {
     struct { int vid; eth_t new, old; } setcval;
     struct { int vid; eth_type *new, *old; } settype;
+    struct { int vid; size_t fid; } setfield;
   };
 } action;
 
@@ -110,6 +118,7 @@ static value_info*
 create_empty_vinfo()
 {
   value_info *vinfo = calloc(1, sizeof(value_info));
+  cod_vec_init(vinfo->fields);
   vinfo->isrec = false;
   return vinfo;
 }
@@ -117,6 +126,7 @@ create_empty_vinfo()
 static void
 destroy_vinfo(value_info *vinfo)
 {
+  cod_vec_destroy(vinfo->fields);
   free(vinfo);
 }
 
@@ -188,6 +198,20 @@ set_type(ssa_builder *bldr, int vid, eth_type *type)
 }
 
 static void
+set_field(ssa_builder *bldr, int vid, size_t fid, int fldvid)
+{
+  cod_vec_push(bldr->actions, (action) {
+    .tag = ACTION_SETFIELD,
+    .setfield = {
+      .vid = vid,
+      .fid = fid,
+    }
+  });
+  field_info info = { .fid = fid, .vid = fldvid };
+  cod_vec_push(bldr->vinfo[vid]->fields, info);
+}
+
+static void
 undo_action(ssa_builder *bldr, action *a)
 {
   switch (a->tag)
@@ -199,6 +223,20 @@ undo_action(ssa_builder *bldr, action *a)
     case ACTION_SETTYPE:
       bldr->vinfo[a->settype.vid]->type = a->settype.old;
       break;
+
+    case ACTION_SETFIELD:
+    {
+      value_info *vinfo = bldr->vinfo[a->setfield.vid];
+      for (size_t i = 0; i < vinfo->fields.len; ++i)
+      {
+        if (vinfo->fields.data[i].fid == a->setfield.fid)
+        {
+          cod_vec_erase(vinfo->fields, i);
+          return;
+        }
+      }
+      assert(!"ωτφ");
+    }
   }
 }
 
@@ -1760,6 +1798,7 @@ handle_movs(ssa_builder *bldr, kill_info *kinfo)
     eth_insn *mov = bldr->movs.data[imov];
     int n;
     const int *vids = get_moved_vids(mov, &n);
+    
     for (int i = 0; i < n; ++i)
     {
       int vid = vids[i];
@@ -1776,7 +1815,17 @@ handle_movs(ssa_builder *bldr, kill_info *kinfo)
         {
           if (kinfo->vals[vid].killers.data[ikill] == mov)
           {
+            // Still do REF if move-semantics was already applied to this value
+            // for this instruction
             doref = false;
+            for (int j = i - 1; j >= 0; --j)
+            {
+              if (vids[j] == vid)
+              {
+                doref = true;
+                break;
+              }
+            }
             break;
           }
         }

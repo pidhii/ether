@@ -55,7 +55,7 @@ syn keyword ethBuiltinFunction car cdr
 syn keyword ethBuiltinFunction first second third
 
 syn keyword ethBuiltinFunction range
-syn keyword ethBuiltinFunction unfold_left unfold_right
+syn keyword ethBuiltinFunction unfold_left unfold_right init
 syn keyword ethBuiltinFunction length rev_append append rev
 syn keyword ethBuiltinFunction rev_map map rev_zip zip
 syn keyword ethBuiltinFunction rev_mapi mapi rev_zipi zipi
@@ -151,13 +151,21 @@ syn region ethMatch matchgroup=ethConditional start=/\<case\>/ end=/\<of\>/ cont
 syn match ethConditional /\<then\>/
 syn region ethBegin matchgroup=ethConditional start=/\<then\s\+begin\>/ end=/\<end\>/ contains=TOP skipwhite skipnl
 syn region ethBegin matchgroup=ethKeyword start=/\<begin\>/ end=/\<end\>/ contains=TOP skipwhite skipnl
-syn keyword ethKeyword let rec and or in as
+syn region ethObject matchgroup=ethKeyword start=/\<object\>/ end=/\<end\>/ contains=TOP skipnl skipwhite
+syn keyword ethMethod method contained containedin=ethObject
+hi link ethMethod Keyword
+syn keyword ethInherit inherit contained containedin=ethObject
+hi link ethInherit Keyword
+syn keyword ethVal val contained containedin=ethObject
+hi link ethVal Keyword
+syn region ethDo matchgroup=ethKeyword start=/\<do\>/ end=/\<done\>/ contains=TOP skipwhite skipnl
+syn keyword ethKeyword let rec and or in as with
 syn keyword ethConditional unless when else otherwize
 syn keyword ethAssert assert
 
 syn keyword ethLazy lazy
 
-syn match ethOperator /[-+=*/%><&|.!^~#]\+/
+syn match ethOperator /[-+=*/%><&|.!^~]\+/
 syn match ethOperator /:\|\$/
 syn keyword ethOperator is eq not mod land lor lxor lshl lshr ashl ashr lnot
 

@@ -148,6 +148,10 @@ with   { return WITH; }
 or     { return OR; }
 begin  { return BEGINN; }
 end    { return END; }
+do     { return DO; }
+done   { return DONE; }
+case   { return CASE; }
+of     { return OF; }
 
 nil   { yylval->constant = eth_nil;   return CONST; }
 true  { yylval->constant = eth_true;  return CONST; }
@@ -209,6 +213,11 @@ lnot    { return LNOT; }
   buf[yyleng - 2] = 0;
   yylval->string = buf;
   return SYMBOL;
+}
+
+{OPERATOR} {
+  yylval->string = strdup(yytext);
+  return USROP;
 }
 
 [_a-z][_a-zA-Z0-9]*['?]? {

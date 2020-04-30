@@ -935,6 +935,32 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       }
     }
 
+    /*--------------*
+     * Field access *
+     *--------------*
+     *
+     * Build as
+     *
+     *   MATCH <expr> WTIH { <field> = *tmp* }
+     *   THEN *tmp*
+     *   ELSE THROW Type_error
+     */
+    case ETH_AST_ACCESS:
+    {
+      eth_use_symbol(Type_error)
+
+      eth_ir_node *expr = build(bldr, ast->access.expr, e);
+      // --
+      size_t fid = eth_get_symbol_id(eth_sym(ast->access.field));
+      int tmpvar = new_vid(bldr);
+      eth_ir_pattern *tmp = eth_ir_ident_pattern(tmpvar);
+      eth_ir_pattern *pat = eth_ir_record_pattern(new_vid(bldr), &fid, &tmp, 1);
+      // --
+      eth_ir_node *exn = eth_ir_cval(eth_exn(Type_error));
+      // --
+      return eth_ir_match(pat, expr, eth_ir_var(tmpvar), eth_ir_throw(exn));
+    }
+
     case ETH_AST_TRY:
     {
       eth_ir_node *trybr = build(bldr, ast->try.trybr, e);

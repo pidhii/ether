@@ -22,6 +22,16 @@ eth_ssa_ident_pattern(int vid)
 }
 
 eth_ssa_pattern*
+eth_ssa_constant_pattern(eth_t val, bool dotest)
+{
+  eth_ssa_pattern *pat = malloc(sizeof(eth_ssa_pattern));
+  pat->tag = ETH_PATTERN_CONSTANT;
+  eth_ref(pat->constant.val = val);
+  pat->constant.dotest = dotest;
+  return pat;
+}
+
+eth_ssa_pattern*
 eth_ssa_unpack_pattern(eth_type *type, int const offs[], int const vids[],
     eth_ssa_pattern *const pats[], int n, bool dotest)
 {
@@ -36,16 +46,6 @@ eth_ssa_unpack_pattern(eth_type *type, int const offs[], int const vids[],
   memcpy(pat->unpack.offs, offs, sizeof(int) * n);
   memcpy(pat->unpack.vids, vids, sizeof(int) * n);
   memcpy(pat->unpack.subpat, pats, sizeof(eth_ssa_pattern*) * n);
-  return pat;
-}
-
-eth_ssa_pattern*
-eth_ssa_constant_pattern(eth_t val, bool dotest)
-{
-  eth_ssa_pattern *pat = malloc(sizeof(eth_ssa_pattern));
-  pat->tag = ETH_PATTERN_CONSTANT;
-  eth_ref(pat->constant.val = val);
-  pat->constant.dotest = dotest;
   return pat;
 }
 
@@ -77,16 +77,16 @@ eth_destroy_ssa_pattern(eth_ssa_pattern *pat)
     case ETH_PATTERN_IDENT:
       break;
 
+    case ETH_PATTERN_CONSTANT:
+      eth_unref(pat->constant.val);
+      break;
+
     case ETH_PATTERN_UNPACK:
       free(pat->unpack.offs);
       free(pat->unpack.vids);
       for (int i = 0; i < pat->unpack.n; ++i)
         eth_destroy_ssa_pattern(pat->unpack.subpat[i]);
       free(pat->unpack.subpat);
-      break;
-
-    case ETH_PATTERN_CONSTANT:
-      eth_unref(pat->constant.val);
       break;
 
     case ETH_PATTERN_RECORD:

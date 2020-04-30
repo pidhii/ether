@@ -63,6 +63,7 @@ in
 let list_tests = [
   ("[..]", fn -> [1..10] eq [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
   ("[.|.,.]", fn -> [x | x <- [1..10], even? x] eq [2, 4, 6, 8, 10]),
+  ("init", fn -> init 3 id eq [0, 1, 2]),
   ("unfold_left", fn -> unfold_left (fn i -> (i+1, i) when i < 3) 1 eq [2, 1]),
   ("unfold_right", fn -> unfold_right (fn i -> (i, i+1) when i < 3) 1 eq [1, 2]),
   ("range", fn -> range (0..9) eq [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),

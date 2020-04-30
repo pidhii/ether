@@ -48,6 +48,8 @@ typedef struct eth_bytecode eth_bytecode;
 typedef struct eth_scp eth_scp;
 
 typedef struct eth_function eth_function;
+typedef struct eth_mut_ref eth_mut_ref;
+
 typedef struct eth_location eth_location;
 
 void
@@ -361,6 +363,9 @@ eth_get_field_by_id(eth_type *restrict type, size_t id)
       return i;
   }
 }
+
+size_t
+eth_get_field_id_by_offs(const eth_type *type, ptrdiff_t offs);
 
 void
 eth_destroy_type(eth_type *type);
@@ -1059,6 +1064,14 @@ void
 eth_destroy_record_hn(eth_type *type, eth_t x);
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                                object
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+ETH_EXTERN
+eth_type *eth_object_type;
+
+typedef struct eth_object eth_object;
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                 file
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 ETH_EXTERN
@@ -1117,6 +1130,30 @@ eth_is_range(eth_t x)
       or x->type == eth_ranger_type
   ;
 }
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                                 ref
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+ETH_EXTERN
+eth_type *eth_ref_type;
+
+struct eth_mut_ref {
+  eth_header header;
+  eth_t val;
+};
+#define ETH_REF(x) ((eth_mut_ref*)(x))
+#define eth_ref_get(x) (ETH_REF(x)->val)
+
+static inline void
+eth_set_ref(eth_t ref, eth_t x)
+{
+  eth_ref(x);
+  eth_unref(eth_ref_get(ref));
+  ETH_REF(ref)->val = x;
+}
+
+eth_t
+eth_create_ref(eth_t init);
 
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
@@ -1180,6 +1217,9 @@ eth_define_attr(eth_module *mod, const char *ident, eth_t val, eth_attr *attr);
 
 eth_def*
 eth_find_def(const eth_module *mod, const char *ident);
+
+void
+eth_add_destructor(eth_module *mod, void *data, void (*dtor)(void*));
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                            builtins
@@ -1350,6 +1390,7 @@ typedef enum {
   ETH_AST_IMPORT,
   ETH_AST_AND,
   ETH_AST_OR,
+  ETH_AST_ACCESS,
   ETH_AST_TRY,
   ETH_AST_MKRCRD,
   ETH_AST_MULTIMATCH,
@@ -1394,6 +1435,7 @@ struct eth_ast {
     struct { char *module; eth_ast *body; char *alias; char **nams; int nnam; }
       import;
     struct { eth_ast *lhs, *rhs; } scand, scor;
+    struct { eth_ast *expr; char *field; } access;
     struct { eth_ast_pattern *pat; eth_ast *trybr, *catchbr; int likely;
              bool _check_exit; }
       try;
@@ -1401,6 +1443,7 @@ struct eth_ast {
              char **fields; eth_ast **vals; int n; }
       mkrcrd;
     struct { eth_match_table *table; eth_ast **exprs; } multimatch;
+    struct { eth_ast *expr; } doo;
   };
   eth_location *loc;
 };
@@ -1470,6 +1513,9 @@ eth_ast* __attribute__((malloc))
 eth_ast_or(eth_ast *lhs, eth_ast *rhs);
 
 eth_ast* __attribute__((malloc))
+eth_ast_access(eth_ast *expr, const char *field);
+
+eth_ast* __attribute__((malloc))
 eth_ast_try(eth_ast_pattern *pat, eth_ast *try, eth_ast *catch, int likely);
 
 eth_ast*
@@ -1479,7 +1525,10 @@ eth_ast_make_record(const char *type, char *const fields[],
 eth_ast*
 eth_ast_make_record_with_type(eth_type *type, char *const fields[],
    eth_ast *const vals[], int n);
-
+/*
+eth_ast*
+eth_ast_do(eth_ast *expr);
+*/
 eth_ast*
 eth_ast_multimatch(eth_match_table *table, eth_ast *const exprs[]);
 
@@ -2335,6 +2384,11 @@ _eth_type_error(size_t n, size_t ntot)
   }
 
 #define eth_use_variant(ident) eth_use_variant_as(ident, #ident)
+
+#define eth_use_tuple_as(ident, n) \
+  static eth_type *ident;          \
+  if (eth_unlikely(ident == NULL)) \
+    ident = eth_tuple_type(n);     \
 
 eth_t
 eth_system_error(int err);

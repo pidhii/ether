@@ -33,6 +33,10 @@
 - [x] Closures
 - [x] Variant-types
 - [x] Lightweight record-types
+- [ ] Objects
+  - [ ] *fields?*
+  - [ ] methods
+  - [ ] inheritance
 - [x] Tuples
 - [ ] Persistent tables
 - [ ] Persistent vectors
@@ -45,13 +49,32 @@
 - [ ] Named arguments
 - [x] Exceptions
 - [x] Modules
-<!--- [ ] Builtin libuv-->
 - [x] Memory management with naїve reference counting ONLY
 - [x] No memory leaks
 - [ ] `match` like in Caml
+- [ ] `do`*-natation for monads?*
 - [ ] Coroutines
+- [ ] Builtin libuv
 - [ ] Fuck Python, I'm the queen
 
+# [Optimization](optimizations)
+- [x] Smart reference counting
+- [ ] Capture unpacked fields if available
+- [ ] Unpack structs outside closure (if applicable)
+- [ ] Inline small functions at first pass
+- [ ] Dynamic optimization
+  - [ ] inline captures
+  - [ ] *branch prediction?*
+- [ ] Detect fixed values in loops
+- [ ] JIT compilation
+- [ ] Propagate type information when possible
+  - [x] intrinsic operators
+  - [x] constructors
+  - [ ] functions
+    - [ ] C functions
+    - [ ] closures
+- [ ] Merge sequential unpacks (if applicable)
+- [ ] Smaller instructions
 
 # [Examples](#examples)
 

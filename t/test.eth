@@ -160,8 +160,6 @@ end;
 
 print ("argv:", concat_with ", " command_line);
 
-exit 0;
-
 let option = id (Some 42) in
 print ("variant:", option);
 let Some x = option in
@@ -178,5 +176,42 @@ print (">~:");
 print ("  _0:", _0);
 print ("  foo:", foo);
 print ("  bar:", bar);
+
+let capitalize str =
+  let c = substr str 0 1 in
+  let rest = substr str (1 ...) in
+  to_upper c ++ rest
+in
+
+let dog color =
+  {
+    color = capitalize color,
+    say = fn self ->
+      printf "~d dog says \"Wof!\"\n" self.color
+  }
+in
+
+let cat color =
+  {
+    color = capitalize color,
+    say = fn self ->
+      printf "~d cat says \"Miau\"\n" self.color
+  }
+in
+
+let d = dog "black" in
+d.say d;
+
+
+
+let struct = {foo = 0xF00, ba = {b = 0xB, a = 0xA}, r = R} in
+print ("struct:", struct);
+print ("struct.foo:", struct.foo);
+let { ba } = struct in print ("struct.ba:", ba);
+let { ba } = struct in print ("struct.ba:", ba);
+(*print ("struct.ba.b:", struct.ba.b);*)
+(*print ("struct.ba.a:", struct.ba.a);*)
+(*print ("struct.r:", struct.r);*)
+(*print ("struct.ba (second):", struct.ba);*)
 
 13;

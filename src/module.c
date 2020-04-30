@@ -1,4 +1,5 @@
 #include "ether/ether.h"
+#include "codeine/vec.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -6,6 +7,10 @@
 
 ETH_MODULE("ether:module")
 
+typedef struct {
+  void *data;
+  void (*dtor)(void*);
+} closure;
 
 // TODO: use hash table
 struct eth_module {
@@ -13,6 +18,7 @@ struct eth_module {
   int ndefs, defscap;
   eth_def *defs;
   eth_env *env;
+  cod_vec(closure) clos;
 };
 
 eth_module*
@@ -25,6 +31,7 @@ eth_create_module(const char *name)
   mod->defs = malloc(sizeof(eth_def) * mod->defscap);
   mod->env = eth_create_empty_env();
   eth_add_module_path(mod->env, ".");
+  cod_vec_init(mod->clos);
   return mod;
 }
 
@@ -42,6 +49,8 @@ eth_destroy_module(eth_module *mod)
   }
   free(mod->defs);
   eth_destroy_env(mod->env);
+  cod_vec_iter(mod->clos, i, x, if (x.dtor) x.dtor(x.data));
+  cod_vec_destroy(mod->clos);
   free(mod);
 }
 
@@ -106,3 +115,9 @@ eth_find_def(const eth_module *mod, const char *ident)
   return NULL;
 }
 
+void
+eth_add_destructor(eth_module *mod, void *data, void (*dtor)(void*))
+{
+  closure c = { .data = data, dtor = dtor };
+  cod_vec_push(mod->clos, c);
+}
