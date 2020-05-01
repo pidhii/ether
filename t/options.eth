@@ -1,5 +1,3 @@
-import Options in
-
 let test =
   let do_test name thunk =
     printf "- ~d " name;
@@ -43,12 +41,12 @@ let tests = [
     ["first","--long-arg","arg","second","--long-no-arg","-a","1","-f","third"]
   in
   let (kw, pos) = Options.get options cmd in
-  ("test-1", fn -> all? id [
+  ("test-1", fn -> List.all? id [
       pos eq ["first", "second", "third"],
-      assoc "long-arg" kw eq Some "arg",
-      assoc "long-no-arg" kw eq Some true,
-      assoc "short-arg" kw eq Some "1",
-      assoc "short-no-arg" kw eq Some true,
+      List.assoc "long-arg" kw eq Some "arg",
+      List.assoc "long-no-arg" kw eq Some true,
+      List.assoc "short-arg" kw eq Some "1",
+      List.assoc "short-no-arg" kw eq Some true,
     ]),
 
   (* test-2 *)
@@ -56,18 +54,18 @@ let tests = [
     ["first","--long-arg=arg","second","--long-no-arg","-a1","-f","third"]
   in
   let (kw, pos) = Options.get options cmd in
-  ("test-2", fn -> all? id [
+  ("test-2", fn -> List.all? id [
       pos eq ["first", "second", "third"],
-      assoc "long-arg" kw eq Some "arg",
-      assoc "long-no-arg" kw eq Some true,
-      assoc "short-arg" kw eq Some "1",
-      assoc "short-no-arg" kw eq Some true,
+      List.assoc "long-arg" kw eq Some "arg",
+      List.assoc "long-no-arg" kw eq Some true,
+      List.assoc "short-arg" kw eq Some "1",
+      List.assoc "short-no-arg" kw eq Some true,
     ]),
 
   (* test-3 *)
   let cmd = ["--long-arg="] in
   let (kw, pos) = Options.get options cmd in
-  ("test-3", fn -> assoc "long-arg" kw eq Some ""),
+  ("test-3", fn -> List.assoc "long-arg" kw eq Some ""),
 
   (* test-4 *)
   let cmd = ["--long-arg"] in

@@ -59,7 +59,12 @@ destroy_ir_builder(ir_builder *bldr)
   cod_vec_destroy(bldr->defidents);
   cod_vec_destroy(bldr->defvarids);
   cod_vec_destroy(bldr->defattrs);
-  assert(bldr->mods.len == 0);
+  /*assert(bldr->mods.len == 0);*/
+  while (bldr->mods.len > 0)
+  { // MODULE will leve dangling modules
+    module_entry ent = cod_vec_pop(bldr->mods);
+    free(ent.name);
+  }
   cod_vec_destroy(bldr->mods);
   free(bldr);
 }
@@ -146,7 +151,7 @@ resolve_var_path(const eth_module *mod, const char *path)
     int modnamelen = p - path;
     char modname[modnamelen + 1];
     memcpy(modname, path, modnamelen);
-    modname[modnamelen-1] = '\0';
+    modname[modnamelen] = '\0';
 
     eth_module *submod = eth_require_module(eth_get_env(mod), modname);
     if (submod == NULL)
@@ -167,6 +172,59 @@ resolve_var_path(const eth_module *mod, const char *path)
   return def->val;
 }
 
+const eth_module*
+require_module(ir_builder *bldr, const char *name)
+{
+  assert(bldr->env);
+
+  char *p;
+  char topname[256];
+  bool istop = true;
+  if ((p = strchr(name, '.')))
+  {
+    int len = p - name;
+    memcpy(topname, name, len);
+    topname[len] = '\0';
+    istop = false;
+  }
+  else
+    strcpy(topname, name);
+
+  // 1. try to load as a submodule
+  // 2. else, load with global environment
+  // 3. else, load from imported modules
+  const eth_module *topmod = NULL, *mod = NULL;
+  if (bldr->mod)
+  {
+    topmod = eth_require_module(eth_get_env(bldr->mod), topname);
+    if (not istop)
+      mod = eth_require_module(eth_get_env(bldr->mod), name);
+  }
+  if (not mod)
+  {
+    topmod = eth_require_module(bldr->env, topname);
+    if (not istop)
+      mod = eth_require_module(bldr->env, name);
+  }
+  if (not topmod or not istop and not mod)
+  {
+    topmod = find_module(bldr, name);
+    if (not istop)
+      mod = find_module(bldr, name);
+  }
+  if (not topmod or not istop and not mod)
+  {
+    eth_warning("failed to resolv module %s", name);
+    return NULL;
+  }
+
+  if (istop)
+    mod = topmod;
+
+  add_module(bldr, topname, topmod);
+  return mod;
+}
+
 /*
  * Require variable in the scope. Variable will be captured if not found in
  * current scope.
@@ -185,12 +243,9 @@ require_var(ir_builder *bldr, const char *ident)
     memcpy(modname, ident, modnamelen);
     modname[modnamelen] = '\0';
 
-    const eth_module *mod = find_module(bldr, modname);
+    const eth_module *mod = require_module(bldr, modname);
     if (mod == NULL)
-    {
-      eth_warning("module %s was not imported", modname);
       return NULL;
-    }
 
     eth_t val = resolve_var_path(mod, p + 1);
     static eth_var ret;
@@ -259,6 +314,7 @@ import_default(ir_builder *bldr, const eth_module *mod, const char *alias)
 static void
 import_unqualified(ir_builder *bldr, const eth_module *mod)
 {
+  // import vals
   int ndefs = eth_get_ndefs(mod);
   eth_def defs[ndefs];
   eth_get_defs(mod, defs);
@@ -268,6 +324,14 @@ import_unqualified(ir_builder *bldr, const eth_module *mod)
     varcfg.attr = defs[i].attr;
     eth_prepend_var(bldr->vars, varcfg);
   }
+
+  // import submodules
+  eth_env *modenv = eth_get_env(mod);
+  int nsubmods = eth_get_nmodules(modenv);
+  const eth_module *submods[nsubmods];
+  eth_get_modules(modenv, submods, nsubmods);
+  for (int i = 0; i < nsubmods; ++i)
+    add_module(bldr, eth_get_module_name(submods[i]), submods[i]);
 }
 
 static eth_ir_pattern*
@@ -820,59 +884,25 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
 
     case ETH_AST_IMPORT:
     {
-      assert(bldr->env);
+      int n1 = bldr->vars->len - bldr->capoffs;
+      int nm1 = bldr->mods.len;
+      bool ok = true;
 
-      char *p;
-      char topname[256];
-      bool istop = true;
-      if ((p = strchr(ast->import.module, '.')))
-      {
-        int len = p - ast->import.module;
-        memcpy(topname, ast->import.module, len);
-        topname[len] = '\0';
-        istop = false;
-      }
-      else
-        strcpy(topname, ast->import.module);
-
-      // 1. try to load as a submodule
-      // 2. otherwize, load with global environment
-      const eth_module *topmod = NULL, *mod = NULL;
-      if (bldr->mod)
-      {
-        topmod = eth_require_module(eth_get_env(bldr->mod), topname);
-        if (not istop)
-          mod = eth_require_module(eth_get_env(bldr->mod), ast->import.module);
-      }
+      const eth_module *mod = require_module(bldr, ast->import.module);
       if (not mod)
       {
-        topmod = eth_require_module(bldr->env, topname);
-        if (not istop)
-          mod = eth_require_module(bldr->env, ast->import.module);
-      }
-
-      if (not topmod or not istop and not mod)
-      {
-        eth_warning("failed to import module %s", ast->import.module);
         *e = 1;
+        eth_error("can't import %s", ast->import.module);
         eth_print_location(ast->loc, stderr);
         return eth_ir_error();
       }
 
-      if (istop)
-        mod = topmod;
-
-      int n1 = bldr->vars->len - bldr->capoffs;
-      int nm1 = bldr->mods.len;
-      bool ok = true;
       if (ast->import.nams)
         ok = import_names(bldr, mod, ast->import.nams, ast->import.nnam);
       else if (ast->import.alias and ast->import.alias[0] == 0)
         import_unqualified(bldr, mod);
       else
         import_default(bldr, mod, ast->import.alias);
-
-      add_module(bldr, topname, topmod);
 
       int nmods = bldr->mods.len - nm1;
       int nvars = bldr->vars->len - bldr->capoffs - n1;
@@ -883,6 +913,25 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       eth_pop_var(bldr->vars, nvars);
       while (nmods--) pop_module(bldr);
       return body;
+    }
+
+    case ETH_AST_MODULE:
+    {
+      // create module
+      eth_module *mod = eth_create_module(ast->module.name);
+      eth_env *env = bldr->mod ? eth_get_env(bldr->mod) : bldr->env;
+      eth_t modret;
+      if (not eth_load_module_from_ast(env, mod, ast->module.body, &modret))
+      {
+        eth_destroy_module(mod);
+        *e = 1;
+        eth_error("failed to create module");
+        eth_print_location(ast->loc, stderr);
+        return eth_ir_error();
+      }
+      // import in current environment
+      import_default(bldr, mod, NULL);
+      return eth_ir_cval(modret);
     }
 
     case ETH_AST_AND:

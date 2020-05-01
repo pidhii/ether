@@ -173,7 +173,7 @@ int _eth_start_token = -1;
 %token<integer> END_REGEXP
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %nonassoc LET REC AND IN FN IFLET WHENLET
-%nonassoc IMPORT AS UNQUALIFIED
+%nonassoc OPEN USING AS UNQUALIFIED MODULE
 %nonassoc DOT_OPEN1 DOT_OPEN2
 %nonassoc LARROW
 %nonassoc PUB BUILTIN
@@ -203,7 +203,7 @@ int _eth_start_token = -1;
 // level 5:
 %left '+' '-'
 // level 6:
-%left '*' '/' '%' MOD LAND LOR LXOR
+%left '*' '/' MOD LAND LOR LXOR
 // level 7:
 %right '^' LSHL LSHR ASHL ASHR
 // level 8:
@@ -258,6 +258,24 @@ fn_atom
     LOC($$, @$);
     free($1);
   }
+  | capident DOT_OPEN1 list ',' expr ')' {
+    cod_vec_push($3, $5);
+    int n = $3.len;
+    char fieldsbuf[n][22];
+    char *fields[n];
+    for (int i = 0; i < n; ++i)
+    {
+      fields[i] = fieldsbuf[i];
+      sprintf(fields[i], "_%d", i+1);
+    }
+    eth_ast *tuple = eth_ast_make_record_with_type(eth_tuple_type(n), fields,
+        $3.data, n);
+    cod_vec_destroy($3);
+    // --
+    $$ = eth_ast_import($1, "", NULL, 0, tuple);
+    LOC($$, @$);
+    free($1);
+  }
   | capident DOT_OPEN2 list maybe_coma ']' {
     eth_ast *acc = eth_ast_cval(eth_nil);
     cod_vec_riter($3, i, x, acc = eth_ast_binop(ETH_CONS, x, acc));
@@ -265,7 +283,7 @@ fn_atom
     LOC(acc, $3);
 
     $$ = eth_ast_import($1, "", NULL, 0, acc);
-    LOC($$, @$);
+    LOC($$, @1);
     free($1);
   }
   | atom '.' SYMBOL {
@@ -310,7 +328,7 @@ atom
       eth_ast *body = eth_ast_if($4.pred, $2, elsebr);
       fn = eth_ast_fn_with_patterns(fnargs, 1, body);
       // ---
-      eth_t mapfn = eth_get_builtin("filter_map");
+      eth_t mapfn = eth_get_builtin("__List_filter_map");
       assert(mapfn);
       eth_ast *map = eth_ast_cval(mapfn);
       // ---
@@ -321,7 +339,7 @@ atom
     {
       fn = eth_ast_fn_with_patterns(fnargs, 1, $2);
       // ---
-      eth_t mapfn = eth_get_builtin("map");
+      eth_t mapfn = eth_get_builtin("__List_map");
       assert(mapfn);
       eth_ast *map = eth_ast_cval(mapfn);
       // ---
@@ -349,6 +367,11 @@ atom
     cod_vec_destroy($2.keys);
     cod_vec_destroy($2.vals);
   }
+  | MODULE CAPSYMBOL '=' expr END {
+    $$ = eth_ast_module($2, $4);
+    LOC($$, @1);
+    free($2);
+  }
 ;
 
 form
@@ -369,26 +392,24 @@ form
 
 expr
   : form
-  | IMPORT capident maybe_imports IN expr {
-    $$ = eth_ast_import($2, NULL, $3.data, $3.len, $5);
+  | OPEN capident maybe_imports IN expr {
+    if ($3.data)
+      $$ = eth_ast_import($2, NULL, $3.data, $3.len, $5);
+    else
+      $$ = eth_ast_import($2, "", NULL, 0, $5);
     free($2);
     if ($3.data)
     {
       cod_vec_iter($3, i, x, free(x));
       cod_vec_destroy($3);
     }
-    LOC($$, @$);
+    LOC($$, @1);
   }
-  | IMPORT capident AS CAPSYMBOL IN expr {
+  | USING capident AS CAPSYMBOL IN expr {
     $$ = eth_ast_import($2, $4, NULL, 0, $6);
     free($2);
     free($4);
-    LOC($$, @$);
-  }
-  | IMPORT UNQUALIFIED capident IN expr {
-    $$ = eth_ast_import($3, "", NULL, 0, $5);
-    free($3);
-    LOC($$, @$);
+    LOC($$, @1);
   }
   | TRY expr WITH pattern RARROW expr %prec WITH {
     $$ = eth_ast_try($4, $2, $6, 1);
@@ -481,7 +502,6 @@ expr
   | expr IS    expr { $$ = eth_ast_binop(ETH_IS  , $1, $3); LOC($$, @$); }
   | expr EQUAL expr { $$ = eth_ast_binop(ETH_EQUAL,$1, $3); LOC($$, @$); }
   | expr CONS  expr { $$ = eth_ast_binop(ETH_CONS, $1, $3); LOC($$, @$); }
-  | expr '%'   expr { $$ = eth_ast_binop(ETH_MOD , $1, $3); LOC($$, @$); }
   | expr MOD   expr { $$ = eth_ast_binop(ETH_MOD , $1, $3); LOC($$, @$); }
   | expr '^'   expr { $$ = eth_ast_binop(ETH_POW , $1, $3); LOC($$, @$); }
   | expr LAND  expr { $$ = eth_ast_binop(ETH_LAND, $1, $3); LOC($$, @$); }

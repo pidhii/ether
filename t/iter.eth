@@ -1,0 +1,52 @@
+
+let pub map f {state, next} =
+  {state, next = fn i -> when let (x, i) = next i then (f x, i)}
+in
+
+let pub take n {state, next} = {
+    state = (state, n),
+    next = fn arg ->
+      let (i, n) = arg in
+      when n > 0 then
+        try
+          let (x, i) = next i in
+          (x, (i, n - 1))
+        with Match_error -> raise Range_error
+  }
+in
+
+let pub filter f {state, next} =
+  let rec next' i =
+    when let (x, i) = next i then
+      if f x then (x, i)
+      else next' i
+  in
+  {state, next = next'}
+in
+
+let pub of_list xs =
+  {state = xs, next = fn xs -> when let x::xs = xs then (x, xs)}
+in
+
+let pub to_list {state, next} =
+  let rec loop i acc =
+    if let (x, i) = next i then
+      loop i (x::acc)
+    else rev acc
+  in loop state nil
+in
+
+let pub range from to =
+  {state = from, next = fn i -> when i < to then (i, i + 1)}
+in
+
+let pub fold_left f z {state, next} =
+  let rec loop i acc =
+    if let (x, i) = next i then
+      loop i (f acc x)
+    else acc
+  in loop state z
+in
+
+()
+

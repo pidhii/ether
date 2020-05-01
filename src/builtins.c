@@ -1740,14 +1740,14 @@ _eth_init_builtins(void)
   eth_define(g_mod,       "gsub", eth_create_proc(      _gsub, 3, NULL, NULL));
   eth_define(g_mod,  "rev_split", eth_create_proc( _rev_split, 2, NULL, NULL));
   // ---
-  eth_define(g_mod,     "length", eth_create_proc(    _length, 1, NULL, NULL));
-  eth_define(g_mod, "rev_append", eth_create_proc(_rev_append, 2, NULL, NULL));
+  eth_define(g_mod, "__List_length", eth_create_proc(_length, 1, NULL, NULL));
+  eth_define(g_mod, "__List_rev_append", eth_create_proc(_rev_append, 2, NULL, NULL));
   eth_define(g_mod, "__inclusive_range", eth_create_proc(_inclusive_range, 2, NULL, NULL));
-  eth_define(g_mod,    "rev_map", eth_create_proc(   _rev_map, 2, NULL, NULL));
-  eth_define(g_mod,   "rev_mapi", eth_create_proc(  _rev_mapi, 2, NULL, NULL));
-  eth_define(g_mod,    "rev_zip", eth_create_proc(   _rev_zip, 3, NULL, NULL));
-  eth_define(g_mod,   "rev_zipi", eth_create_proc(  _rev_zipi, 3, NULL, NULL));
-  eth_define(g_mod, "rev_filter_map", eth_create_proc(_rev_filter_map, 2, NULL, NULL));
+  eth_define(g_mod, "__List_rev_map", eth_create_proc(   _rev_map, 2, NULL, NULL));
+  eth_define(g_mod, "__List_rev_mapi", eth_create_proc(  _rev_mapi, 2, NULL, NULL));
+  eth_define(g_mod, "__List_rev_zip", eth_create_proc(   _rev_zip, 3, NULL, NULL));
+  eth_define(g_mod, "__List_rev_zipi", eth_create_proc(  _rev_zipi, 3, NULL, NULL));
+  eth_define(g_mod, "__List_rev_filter_map", eth_create_proc(_rev_filter_map, 2, NULL, NULL));
   // ---
   eth_define(g_mod,      "stdin", eth_stdin);
   eth_define(g_mod,     "stdout", eth_stdout);

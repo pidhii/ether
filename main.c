@@ -16,15 +16,14 @@ help_and_exit(char *argv0)
   printf("usage: %s [OPTIONS] [<script>]\n", argv0);
   puts("");
   puts("OPTIONS:");
-  puts("  --help       -h          Show this message and exit.");
-  puts("  --bytecode               Dump bytecode.");
-  puts("  --log-level     <level>  Set log-level. Available values for <level> are:");
-  puts("                           'debug'   - enable all log-messages;");
-  puts("                           'warning' - show warnings and errors;");
-  puts("                           'error'   - show only error messages.");
-  puts("  --version    -v          Show version and configuration and exit.");
-  puts("  --prefix                 Show installation prefix and exit.");
-  puts("               -L <dir>    Add direcory to the module path.");
+  puts("  --help       -h           Show this message and exit.");
+  puts("  --log-level      <level>  Set log-level. Available values for <level> are:");
+  puts("                            'debug'   - enable all log-messages;");
+  puts("                            'warning' - show warnings and errors;");
+  puts("                            'error'   - show only error messages.");
+  puts("  --version    -v           Show version and configuration and exit.");
+  puts("  --prefix                  Show installation prefix and exit.");
+  puts("               -L  <dir>    Add direcory to the module path.");
   exit(EXIT_SUCCESS);
 }
 
@@ -44,13 +43,11 @@ main(int argc, char **argv)
 
   struct option longopts[] = {
     { "help", false, NULL, 'h' },
-    { "bytecode", false, NULL, 0x1FF },
     { "log-level", true, NULL, 0x2FF },
     { "version", false, NULL, 'v' },
     { "prefix", false, NULL, 0x3FF },
     { 0, 0, 0, 0 }
   };
-  bool showbc = false;
   int opt;
   cod_vec(char*) L;
   cod_vec_init(L);
@@ -72,10 +69,6 @@ main(int argc, char **argv)
 
       case 'L':
         cod_vec_push(L, optarg);
-        break;
-
-      case 0x1FF:
-        showbc = true;
         break;
 
       case 0x2FF:
@@ -152,13 +145,6 @@ main(int argc, char **argv)
       eth_drop_ir(ir);
       if (ssa)
       {
-        if (showbc)
-        {
-          fprintf(stderr, "---------- SSA bytecode ----------\n");
-          eth_dump_ssa(ssa->body, stderr);
-          fprintf(stderr, "----------------------------------\n");
-        }
-
         eth_debug("build bytecode");
         eth_bytecode *bc = eth_build_bytecode(ssa);
         eth_drop_ssa(ssa);

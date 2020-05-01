@@ -1264,7 +1264,15 @@ eth_load_module_from_script(eth_env *env, eth_module *mod, const char *path,
     eth_t *ret);
 
 bool
+eth_load_module_from_ast(eth_env *env, eth_module *mod, eth_ast *ast,
+    eth_t *ret);
+
+bool
 eth_load_module_from_script2(eth_env *env, eth_module *mod, const char *path,
+    eth_t *ret, eth_module *uservars);
+
+bool
+eth_load_module_from_ast2(eth_env *env, eth_module *mod, eth_ast *ast,
     eth_t *ret, eth_module *uservars);
 
 bool
@@ -1388,6 +1396,7 @@ typedef enum {
   ETH_AST_FN,
   ETH_AST_MATCH,
   ETH_AST_IMPORT,
+  ETH_AST_MODULE,
   ETH_AST_AND,
   ETH_AST_OR,
   ETH_AST_ACCESS,
@@ -1434,6 +1443,7 @@ struct eth_ast {
       match;
     struct { char *module; eth_ast *body; char *alias; char **nams; int nnam; }
       import;
+    struct { char *name; eth_ast *body; } module;
     struct { eth_ast *lhs, *rhs; } scand, scor;
     struct { eth_ast *expr; char *field; } access;
     struct { eth_ast_pattern *pat; eth_ast *trybr, *catchbr; int likely;
@@ -1505,6 +1515,9 @@ eth_ast_match(eth_ast_pattern *pat, eth_ast *expr, eth_ast *thenbr,
 eth_ast* __attribute__((malloc))
 eth_ast_import(const char *module, const char *alias, char *const nams[],
     int nnam, eth_ast *body);
+
+eth_ast*
+eth_ast_module(const char *name, eth_ast *body);
 
 eth_ast* __attribute__((malloc))
 eth_ast_and(eth_ast *lhs, eth_ast *rhs);

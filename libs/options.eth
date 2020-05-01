@@ -2,17 +2,17 @@
 let get_options cfg os =
 
   let get_rules opt =
-    if let Some x = find (fn {name} -> name eq opt) cfg then x
+    if let Some x = List.find (fn {name} -> name eq opt) cfg then x
     else raise Undefined_option
   in
 
   let rec loop os kws pos =
     if let o::os = os then
-      if o eq "--" then (kws, rev_append pos os)
+      if o eq "--" then (kws, List.rev_append pos os)
       else if strncmp o "--" 2 == 0 then handle_long_option o os kws pos
       else if strncmp o "-" 1 == 0 then handle_short_option o os kws pos
       else loop os kws (o :: pos)
-    else (kws, rev pos)
+    else (kws, List.rev pos)
 
   and handle_long_option o os kws pos =
     let brk = strstr o "=" in

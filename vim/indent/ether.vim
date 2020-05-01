@@ -44,7 +44,7 @@ let s:beflet = '^\s*\(initializer\|method\|try\)\|\(\<\(begin\|do\|else\|in\|the
 let s:letpat = '^\s*\(let\|type\|module\|class\|open\|exception\|val\|include\|external\)\>'
 let s:letlim = '\(\<\(sig\|struct\)\|;;\)\s*$'
 let s:lim = '^\s*\(exception\|external\|include\|let\|module\|open\|type\|val\)\>'
-let s:module = '\<\%(begin\|sig\|struct\|object\)\>'
+let s:module = '\<\%(begin\|object\|module\)\>'
 let s:obj = '^\s*\(constraint\|inherit\|initializer\|method\|val\)\>\|\<\(object\|object\s*(.*)\)\s*$'
 let s:type = '^\s*\%(class\|let\|type\)\>.*='
 

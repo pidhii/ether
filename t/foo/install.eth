@@ -1,0 +1,13 @@
+
+let pub name = "Foo" in
+let pub main = "foo.eth" in
+
+let pub build! =
+  print "BUILDING FOO";
+in
+
+let pub post_install! =
+  print "CLEANUP FOO";
+in
+
+()

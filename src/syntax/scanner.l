@@ -140,9 +140,9 @@ unless { return UNLESS; }
 fn     { return FN; }
 if[ \t\n]+let   { return IFLET; }
 when[ \t\n]+let { return WHENLET; }
-import { return IMPORT; }
+open   { return OPEN; }
+using  { return USING; }
 as     { return AS; }
-unqualified { return UNQUALIFIED; }
 try    { return TRY; }
 with   { return WITH; }
 or     { return OR; }
@@ -152,6 +152,7 @@ do     { return DO; }
 done   { return DONE; }
 case   { return CASE; }
 of     { return OF; }
+module { return MODULE; }
 
 nil   { yylval->constant = eth_nil;   return CONST; }
 true  { yylval->constant = eth_true;  return CONST; }
@@ -162,7 +163,6 @@ __builtin { return BUILTIN; }
 
 "|"     |
 "_"     |
-"%"     |
 "^"     |
 "."     |
 "$"     |

@@ -414,13 +414,23 @@ eth_vm(eth_bytecode *bc)
           int I = 0;
           size_t id = ip->loadrcrd.ids[I];
           int i;
-          for (i = 0; i < n; ++i)
+          ids[n] = id;
+          for (i = 0; true; ++i)
           {
             if (ids[i] == id)
             {
-              r[ip->loadrcrd.vids[I++]] = eth_tup_get(x, i);
-              if (I == N) break;
-              id = ip->loadrcrd.ids[I];
+              if (eth_unlikely(i == n))
+              { // not found
+                test = 0;
+                break;
+              }
+              else
+              {
+                r[ip->loadrcrd.vids[I++]] = eth_tup_get(x, i);
+                if (I == N) break;
+                id = ip->loadrcrd.ids[I];
+                ids[n] = id;
+              }
             }
           }
           if (eth_unlikely(i == n))

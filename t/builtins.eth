@@ -27,6 +27,15 @@ let test =
   fn tests -> loop tests 0 0
 in
 
+let math_tests = [
+  ("even?", fn -> even? 0 && even? 2 && not even? 3),
+  ("odd?", fn -> not odd? 0 && odd? 1 && not odd? 2 && odd? 3),
+  ("min", fn -> min 1 2 == 1),
+  ("max", fn -> max 1 2 == 2),
+  ("minmax", fn -> minmax 2 1 eq (1, 2)),
+]
+in
+
 let string_tests = [
   ("concat", fn -> concat ["a", "b", "c"] eq "abc"),
   ("concat_with", fn -> concat_with "," ["a", "b", "c"] eq "a,b,c"),
@@ -43,7 +52,7 @@ let string_tests = [
   ("strncasecmp", fn -> strncasecmp "asd2" "ASdF" 3 == 0),
   ("substr", fn ->
     let str = "Hello World!" in
-    all? id [
+    List.all? id [
       substr str 0 4 eq "Hell",
       substr str (6...) eq "World!",
       substr str (...4) eq "Hello",
@@ -60,7 +69,7 @@ let regexp_tests = [
 ]
 in
 
-let list_tests = [
+let list_tests = open List in [
   ("[..]", fn -> [1..10] eq [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
   ("[.|.,.]", fn -> [x | x <- [1..10], even? x] eq [2, 4, 6, 8, 10]),
   ("init", fn -> init 3 id eq [0, 1, 2]),
@@ -118,7 +127,12 @@ let list_tests = [
   ("assq", fn ->
     let t1 = assq B [(A, 1), (B, 2), (C, 3)] eq Some 2 in
     let t2 = not assq B [(A, 1), (C, 3)] in
-    t1 && t2)
+    t1 && t2),
+  ("transpose", fn ->
+    print $transpose [[10,11],[20],[],[30,31,32]];
+    let t1 = transpose [[1,2,3],[4,5,6]] eq [[1,4],[2,5],[3,6]]
+    and t2 = transpose [[10,11],[20],[],[30,31,32]] eq [[10,20,30],[11,31],[32]]
+    in t1 && t2),
 ]
 in
 
@@ -126,6 +140,10 @@ let sumres (nok, nfail) (nok', nfail') =
   (nok + nok', nfail + nfail')
 in
 let res = (0, 0) in
+
+newline!;
+printf "\x1b[1mTest math\x1b[0m\n";
+let res = sumres res $ test math_tests in
 
 newline!;
 printf "\x1b[1mTest string\x1b[0m\n";

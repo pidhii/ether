@@ -59,7 +59,7 @@ syn keyword ethBuiltinFunction unfold_left unfold_right init
 syn keyword ethBuiltinFunction length rev_append append rev
 syn keyword ethBuiltinFunction rev_map map rev_zip zip
 syn keyword ethBuiltinFunction rev_mapi mapi rev_zipi zipi
-syn keyword ethBuiltinFunction for_each for_eachi
+syn keyword ethBuiltinFunction iter iteri
 syn keyword ethBuiltinFunction rev_filter_map filter_map
 syn keyword ethBuiltinFunction rev_flat_map flat_map flatten
 syn keyword ethBuiltinFunction rev_filter filter find partition
@@ -70,10 +70,14 @@ syn keyword ethBuiltinFunction sort merge
 syn keyword ethBuiltinFunction drop rev_take take
 syn keyword ethBuiltinFunction any? all? member? memq?
 syn keyword ethBuiltinFunction assoc assq
+syn keyword ethBuiltinFunction transpose
+"syn keyword ethBuiltinFunction maximum minimum
 
 syn keyword ethBuiltinFunction id flip const
 syn keyword ethBuiltinFunction curry uncurry
+
 syn keyword ethBuiltinFunction even? odd?
+syn keyword ethBuiltinFunction min max minmax
 
 syn keyword ethBuiltinFunction open_in open_out open_append
 syn keyword ethBuiltinFunction open_pipe_in open_pipe_out
@@ -137,12 +141,14 @@ syn keyword Special __builtin
 
 syn match ethDelimiter /[,;()]/
 
-" import [as]:
-syn region ethImport matchgroup=ethKeyword start=/\<import\>/ end=/\<in\>/ contains=ethImportAs,ethDelimiter,ethIdentifier,ethUnqualified
-syn keyword ethImportAs as contained
-hi link ethImportAs ethKeyword
-syn keyword ethUnqualified unqualified contained
-hi link ethUnqualified ethKeyword
+" open:
+syn region ethOpen matchgroup=ethKeyword start=/\<open\>/ end=/\<in\>/ contains=ethDelimiter,ethIdentifier
+syn region ethUsing matchgroup=ethKeyword start=/\<using\>/ end=/\<in\>/ contains=ethUsingAs,ethIdentifier
+syn keyword ethUsingAs as contained
+hi link ethUsingAs ethKeyword
+
+" module
+syn region ethModuleDef matchgroup=Keyword start=/\<module\>/ end=/\<end\>/ contains=TOP skipnl skipwhite
 
 syn match ethKeyword /\<let\>/
 syn match ethConditional /\<if\%(\s\+let\)\?\>/

@@ -1,0 +1,134 @@
+
+let rec revAppend xs acc =
+  if let x::xs = xs then
+    revAppend xs (x :: acc)
+  else acc
+in
+
+let reverse xs = revAppend xs nil in
+
+let revMap f xs =
+  let rec loop xs acc =
+    if let x::xs = xs then
+      loop xs (f x :: acc)
+    else acc
+  in loop xs nil
+in
+
+let map f xs = reverse $ revMap f xs in
+
+let rec map' f xs =
+  if let x::xs = xs then
+    f x :: map' f xs
+  else nil
+in
+
+(*
+let revFilterMap f xs =
+  let rec loop xs acc =
+    if let x::xs = xs then
+      loop xs $ try (f x :: acc) with FilterOut -> acc
+    else acc
+  in loop xs nil
+in
+*)
+
+(*let filterMap f xs = reverse $ revFilterMap f xs in *)
+
+let revFilter f xs =
+  let rec loop xs acc =
+    if let x::xs = xs then
+      loop xs (if f x then x :: acc else acc)
+    else acc
+  in loop xs nil
+in
+
+let filter f xs = reverse $ revFilter f xs in
+
+let rec filter' f xs =
+  if let x::xs = xs then
+    if f x then
+      x :: filter' f xs
+    else filter' f xs
+  else nil
+in
+
+let foldLeft f acc xs = let rec loop xs acc =
+    if let x::xs = xs then
+      loop xs (f acc x)
+    else acc
+  in loop xs acc
+in
+
+let range from to =
+  let rec loop i acc =
+    if i < from then acc
+    else loop (i - 1) (i :: acc)
+  in loop (to - 1) nil
+in
+(*let range from to = [from .. to - 1] in *)
+
+(*
+let rec even x =
+  x == 0 || odd (x - 1)
+and odd x =
+  x /= 0 && even (x - 1)
+in
+*)
+
+let even x = x mod 2 == 0 in
+let odd  x = x mod 2 /= 0 in
+
+let rec doTimes n thunk =
+  if n == 0 then nil
+  else (thunk nil; doTimes (n - 1) thunk)
+in
+
+let n = 10000 in
+
+let job1 _ =
+  foldLeft (+) 0 $ filter odd $ map (fn x -> x + 1) $ range 0 n
+in
+
+let job1' _ =
+  foldLeft (+) 0 $ filter' odd $ map' (fn x -> x + 1) $ range 0 n
+in
+
+let job2 _ =
+  foldLeft (+) 0 $ revFilter odd $ revMap (fn x -> x + 1) $ range 0 n
+in
+
+(*
+let job3 _ =
+  range 0 n
+  |> filterMap (fn x -> if odd x then x + 1 else raise FilterOut)
+  |> foldLeft (+) 0
+in
+*)
+
+(*
+let job4 _ =
+  range 0 n
+  |> revFilterMap (fn x -> if odd x then x + 1 else raise FilterOut)
+  |> foldLeft (+) 0
+in
+*)
+
+let job5 _ =
+  Iter.(fold_left (+) 0 $ filter odd $ map (fn x -> x + 1) $ range 0 n)
+in
+
+let l = [0 .. n-1] in
+let job_native _ =
+  (*fold_left (+) 0 [x + 1 | x <- l, even? x] *)
+  fold_left (+) 0 [x + 1 | x <- [0 .. n-1], even? x]
+in
+
+let job = job1 in
+(*let job = job1' in *)
+(*let job = job2 in *)
+(*let job = job_native in *)
+(*let job = job5 in *)
+print $ job nil;
+doTimes 700 job;
+

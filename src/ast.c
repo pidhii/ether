@@ -276,6 +276,11 @@ destroy_ast_node(eth_ast *ast)
       eth_unref_ast(ast->import.body);
       break;
 
+    case ETH_AST_MODULE:
+      free(ast->module.name);
+      eth_unref_ast(ast->module.body);
+      break;
+
     case ETH_AST_AND:
     case ETH_AST_OR:
       eth_unref_ast(ast->scor.lhs);
@@ -502,6 +507,15 @@ eth_ast_import(const char *module, const char *alias, char *const nams[],
   }
   else
     ast->import.nams = NULL;
+  return ast;
+}
+
+eth_ast*
+eth_ast_module(const char *name, eth_ast *body)
+{
+  eth_ast *ast = create_ast_node(ETH_AST_MODULE);
+  ast->module.name = strdup(name);
+  eth_ref_ast(ast->module.body = body);
   return ast;
 }
 

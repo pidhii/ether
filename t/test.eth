@@ -1,3 +1,4 @@
+open List in
 
 let _MODE =
   if member? "testmode" command_line
@@ -165,7 +166,7 @@ print ("variant:", option);
 let Some x = option in
 print ("variant value:", x);
 
-for_eachi [0x61 .. 0x70] (fn i x ->
+[0x61 .. 0x70] |> iteri (fn i x ->
   print (i, chr x)
 );
 
