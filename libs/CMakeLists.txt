@@ -14,6 +14,30 @@ set_target_properties (ref
     OUTPUT_NAME "ref")
 install (TARGETS ref DESTINATION ${REF_DST_DIR})
 
+# List
+set (LIST_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/list)
+set (LIST_DST_DIR lib/ether/list)
+add_library (list SHARED ${LIST_SRC_DIR}/lib.c)
+set_target_properties (list
+  PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    PREFIX ""
+    OUTPUT_NAME "list")
+install (TARGETS list DESTINATION ${LIST_DST_DIR})
+install (FILES ${LIST_SRC_DIR}/lib.eth DESTINATION ${LIST_DST_DIR})
+
+# String
+set (STRING_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/string)
+set (STRING_DST_DIR lib/ether/string)
+add_library (string SHARED ${STRING_SRC_DIR}/lib.c)
+set_target_properties (string
+  PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    PREFIX ""
+    OUTPUT_NAME "string")
+install (TARGETS string DESTINATION ${STRING_DST_DIR})
+install (FILES ${STRING_SRC_DIR}/lib.eth DESTINATION ${STRING_DST_DIR})
+
 # OS
 set (OS_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/os)
 set (OS_DST_DIR lib/ether/os)

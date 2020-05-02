@@ -1,0 +1,318 @@
+(* ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
+ *                                  List
+ * -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+ * Constructors:
+ * - init
+ * - unfold_left
+ * - unfold_right
+ * - range
+ *
+ * Miscelenious:
+ * - len (C)
+ * - rev_append (C)
+ * - rev
+ * - append
+ * - transpose
+ *
+ * Iterators:
+ * - rev_map (C)
+ * - rev_mapi (C)
+ * - rev_zip (C)
+ * - rev_zipi (C)
+ * - map
+ * - mapi
+ * - zip
+ * - zipi
+ * - iter
+ * - iteri
+ * - rev_flat_map
+ * - flat_map
+ * - flatten
+ * - rev_filter_map (C)
+ * - filter_map
+ * - fold_left
+ * - fold_right
+ * - scan_left
+ * - scan_right
+ *
+ * Slicing:
+ * - rev_take
+ * - take
+ * - drop
+ *
+ * Scanning:
+ * - all?
+ * - any?
+ * - member?
+ * - memq?
+ *
+ * Searching:
+ * - rev_filter
+ * - filter
+ * - remove
+ * - insert
+ * - find
+ * - maximum (no)
+ * - minimum (no)
+ * - partition
+ *
+ * Sorting:
+ * - merge
+ * - sort
+ *
+ * Assosiation lists:
+ * - assoc
+ * - assq
+ *)
+
+let rec pub fold_map f z xs =
+  if let x :: xs' = xs then
+    let (z', x') = f z x in
+    x' :: fold_map f z' xs'
+  else []
+in
+
+let pub init n f =
+  let rec loop i acc =
+    if i >= 0 then
+      loop (i - 1) (f i :: acc)
+    else acc
+  in loop (n - 1) nil
+in
+let pub unfold_left f z =
+  let rec loop z acc =
+    if let (z, x) = f z then
+      loop z (x :: acc)
+    else acc
+  in loop z []
+in
+let rec pub unfold_right f z =
+  if let (x, z) = f z then
+    x :: unfold_right f z
+  else []
+in
+let pub range (from .. to) =
+  let rec loop i acc =
+    if i < from then acc
+    else loop (i - 1) (i :: acc)
+  in loop to nil
+in
+
+let pub rev xs = rev_append xs nil in
+let rec pub append xs ys =
+  if let x::xs = xs then
+    x :: append xs ys
+  else ys
+in
+
+let pub map f xs = rev $ rev_map f xs in
+let pub mapi f xs = rev $ rev_mapi f xs in
+let pub zip f xs ys = rev $ rev_zip f xs ys in
+let pub zipi f xs ys = rev $ rev_zipi f xs ys in
+let rec pub iter f xs =
+  when let x::xs = xs then (
+    f x;
+    iter f xs
+  )
+in
+let rec pub iteri f xs =
+  let rec loop i xs =
+    when let x::xs = xs then (
+      f i x;
+      loop (i + 1) xs f
+    )
+  in loop 0 xs
+in
+let rec pub rev_flat_map f xs =
+  let rec loop ys xs acc =
+    if let y::ys = ys then
+      loop ys xs (y :: acc)
+    else if let x::xs = xs then
+      loop (f x) xs acc
+    else acc
+  in loop nil xs nil
+in
+let rec pub flat_map f xs =
+  if let x::xs = xs then
+    if xs is nil then f x
+    else append (f x) (flat_map f xs)
+  else nil
+in
+let pub flatten = flat_map id in
+let pub filter_map f xs = rev $ rev_filter_map f xs in
+let pub fold_left f z xs =
+  let rec loop xs acc =
+    if let x::xs = xs then
+      loop xs (f acc x)
+    else acc
+  in loop xs z
+in
+let rec pub fold_right f z xs =
+  if let x::xs = xs then
+    f x (fold_right f z xs)
+  else z
+in
+let rec pub scan_left f z xs =
+  if let x::xs = xs then
+    let z = f z x in
+    z :: scan_left f z xs
+  else nil
+in
+let rec pub scan_right f z xs =
+  if let x::xs = xs then
+    if let z::_ as tl = scan_right f z xs then
+      f x z :: tl
+    else [f x z]
+  else nil
+in
+
+let rec pub rev_take =
+  let rec loop n xs acc =
+    if n > 0 then
+      let x::xs = xs in
+      loop (n - 1) xs (x :: acc)
+    else acc
+  in fn n xs -> loop n xs []
+in
+let rec pub take n xs =
+  if n > 0 then
+    let x::xs = xs in
+    x :: take (n - 1) xs
+  else []
+in
+let rec pub drop n xs =
+  if n > 0 then
+    drop (n - 1) (cdr xs)
+  else xs
+in
+
+let rec pub all? p xs =
+  if let x::xs = xs then
+    p x && all? p xs
+  else true
+in
+let rec pub any? p xs =
+  if let x::xs = xs then
+    p x || any? p xs
+  else false
+in
+let rec pub member? a xs =
+  if let x::xs = xs then
+    x eq a || member? a xs
+  else false
+in
+let rec pub memq? a xs =
+  if let x::xs = xs then
+    x is a || memq? a xs
+  else false
+in
+
+let pub rev_filter f xs =
+  let rec loop xs acc =
+    if let x :: xs = xs then
+      loop xs (if f x then x :: acc else acc)
+    else acc
+  in loop xs nil
+in
+let pub filter f xs = rev $ rev_filter f xs in
+let rec pub remove f xs =
+  if let x::xs = xs then
+    if f x then xs
+    else x :: remove f xs
+  else []
+in
+let rec pub insert cmp x ys =
+  if let y::ys' = ys then
+    if cmp x y then x :: ys
+    else y :: insert cmp x ys'
+  else [x]
+in
+let rec pub find p xs =
+  if let x::xs = xs then
+    if p x then Some x
+    else find p xs
+  else false
+in
+(*let rec pub maximum cmp xs =*)
+  (*if let x :: xs = xs then*)
+    (*if xs is nil then x*)
+    (*else*)
+      (*let select x y = if cmp x y then x else y in*)
+      (*fold_left select x xs*)
+  (*else raise Invalid_argument*)
+(*in*)
+(*let rec pub minimum cmp xs =*)
+  (*if let x :: xs = xs then*)
+    (*if xs is nil then x*)
+    (*else*)
+      (*let select x y = if cmp x y then x else y in*)
+      (*fold_left select x xs*)
+  (*else raise Invalid_argument*)
+(*in*)
+let pub partition p xs =
+  let rec loop xs acc1 acc2 =
+    if let x::xs = xs then
+      if p x
+      then loop xs (x :: acc1) acc2
+      else loop xs acc1 (x :: acc2)
+    else (rev acc1, rev acc2)
+  in loop xs [] []
+in
+
+let pub merge cmp xs ys =
+  let rec loop xs ys acc =
+    if let x::xs' = xs then
+      if let y::ys' = ys then
+        if cmp x y
+        then loop xs' ys  (x::acc)
+        else loop xs  ys' (y::acc)
+      else rev_append acc xs
+    else rev_append acc ys
+  in loop xs ys nil
+in
+let split_by_half =
+  let rec loop slow fast acc =
+    if let _::_::fast = fast then
+      let x::slow = slow in
+      loop slow fast (x::acc)
+    else (acc, slow)
+  in fn xs -> loop xs xs nil
+in
+let rec pub sort cmp xs =
+  if let _::_::_ = xs then
+    let (l, r) = split_by_half xs in
+    merge cmp (sort cmp l) (sort cmp r)
+  else xs
+in
+
+let rec pub assoc x l =
+  if let kv::l = l then
+    if let (k, v) = kv then
+      if k eq x then Some v
+      else assoc x l
+    else raise Invalid_argument
+  else false
+in
+let rec pub assq x l =
+  if let kv::l = l then
+    if let (k, v) = kv then
+      if k is x then Some v
+      else assq x l
+    else raise Invalid_argument
+  else false
+in
+
+let rec pub transpose xs =
+  if let xs :: xss = xs then
+    if let x :: xs = xs then
+      let f l = car l if pair? l else raise Filter_out in
+      let head = x :: filter_map f xss in
+      let f l = cdr l if pair? l else raise Filter_out in
+      let tail = transpose (xs :: filter_map f xss) in
+      head :: tail
+    else transpose xss
+  else []
+in
+
+nil;
+

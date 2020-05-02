@@ -60,8 +60,8 @@ print ("d:", d);
 
 when _MODE is Default then
   try
-    let a = to_number $ input "Enter a: " in
-    let b = to_number $ input "Enter b: " in
+    let a = String.to_number $ input "Enter a: " in
+    let b = String.to_number $ input "Enter b: " in
     let name = input "Enter your name: " in
     print (name ++ ", a + b = ", a + b);
   with End_of_file ->
@@ -102,13 +102,13 @@ print "--- test string";
 let str = "abCdefg" in
 print ("  str:", str);
 print ("  list:", list str);
-print ("  concat:", concat $ list str);
-print ("  strlen:", strlen str);
-print ("  to_upper:", to_upper str);
-print ("  to_lower:", to_lower str);
-print ("  str[case]cmp:", strcmp str str, strcmp str (to_upper str),
+print ("  concat:", String.concat $ list str);
+print ("  strlen:", String.len str);
+print ("  to_upper:", String.to_upper str);
+print ("  to_lower:", String.to_lower str);
+print String.("  str[case]cmp:", strcmp str str, strcmp str (to_upper str),
   strcasecmp str (to_upper str));
-print ("  chr 0x61:", chr 0x61);
+print ("  chr 0x61:", String.chr 0x61);
 
 
 print ("eq:",
@@ -159,7 +159,7 @@ begin
   print ("l3:", l3);
 end;
 
-print ("argv:", concat_with ", " command_line);
+print ("argv:", String.join ", " command_line);
 
 let option = id (Some 42) in
 print ("variant:", option);
@@ -167,21 +167,21 @@ let Some x = option in
 print ("variant value:", x);
 
 [0x61 .. 0x70] |> iteri (fn i x ->
-  print (i, chr x)
+  print (i, String.chr x)
 );
 
 print ("=~:", "as foo so do bar" =~ \foo/);
 
-let [_0, foo, bar] = match \as\s+(\w+).*do\s+(\w+)/ "as foo so do bar" in
+let [_0, foo, bar] = String.match \as\s+(\w+).*do\s+(\w+)/ "as foo so do bar" in
 print (">~:");
 print ("  _0:", _0);
 print ("  foo:", foo);
 print ("  bar:", bar);
 
 let capitalize str =
-  let c = substr str 0 1 in
-  let rest = substr str (1 ...) in
-  to_upper c ++ rest
+  let c = String.sub str 0 1 in
+  let rest = String.sub str (1 ...) in
+  String.to_upper c ++ rest
 in
 
 let dog color =

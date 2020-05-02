@@ -879,6 +879,18 @@ eth_length(eth_t l, bool *isproper)
   return len;
 }
 
+static inline eth_t
+eth_reverse(eth_t l)
+{
+  eth_t acc = eth_nil;
+  while (eth_is_pair(l))
+  {
+    acc = eth_cons(eth_car(l), acc);
+    l = eth_cdr(l);
+  }
+  return acc;
+}
+
 static inline bool __attribute__((pure))
 eth_is_proper_list(eth_t l)
 {

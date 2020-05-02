@@ -35,18 +35,18 @@ syn match ethSymbol     /\<[A-Z][a-zA-Z0-9_]*\>/
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""'
 " Builtins:
-syn keyword ethBuiltinFunction pair? symbol? number? string? boolean? function? tuple? record? file?
+syn keyword ethBuiltinFunction pair? symbol? number? string? boolean? function? tuple? record? file? regexp?
 
 syn keyword ethBuiltinFunction to_number to_symbol
 syn keyword ethBuiltinFunction list
 
 syn keyword ethBuiltinFunction dump
 
-syn keyword ethBuiltinFunction strlen
-syn keyword ethBuiltinFunction concat concat_with chr ord
+syn keyword ethBuiltinFunction len
+syn keyword ethBuiltinFunction concat join chr ord
 syn keyword ethBuiltinFunction to_upper to_lower
 syn keyword ethBuiltinFunction strcmp strcasecmp strncmp strncasecmp
-syn keyword ethBuiltinFunction substr strstr strcasestr
+syn keyword ethBuiltinFunction sub find strcasestr
 syn keyword ethBuiltinFunction chomp chop
 
 syn keyword ethBuiltinFunction match gsub rev_split split
@@ -56,7 +56,7 @@ syn keyword ethBuiltinFunction first second third
 
 syn keyword ethBuiltinFunction range
 syn keyword ethBuiltinFunction unfold_left unfold_right init
-syn keyword ethBuiltinFunction length rev_append append rev
+syn keyword ethBuiltinFunction len rev_append append rev
 syn keyword ethBuiltinFunction rev_map map rev_zip zip
 syn keyword ethBuiltinFunction rev_mapi mapi rev_zipi zipi
 syn keyword ethBuiltinFunction iter iteri
