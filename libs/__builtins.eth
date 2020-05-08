@@ -28,6 +28,8 @@ let pub (++) x y = x ++ y in
 
 let pub __builtin (not) x = not x in
 
+let pub (∘) f g x = f (g x) in
+
 (* Application *)
 let pub ($) f x = f x in
 let pub (|>) x f = f x in

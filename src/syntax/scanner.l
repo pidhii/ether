@@ -38,7 +38,7 @@ static int g_comment_cnt = 0;
 %x REGEXP
 %x COMMENT
 
-OPERATOR [-+%^.$:!<>*/=&|]+
+OPERATOR [-+%^.$:!<>*/=&|∘]+
 
 %%
 
@@ -177,6 +177,7 @@ __builtin { return BUILTIN; }
 "="     |
 ","     |
 ";"     { return yytext[0]; }
+"∘"     { return COMPOSE; }
 "::"    { return CONS; }
 "<="    { return LE; }
 ">="    { return GE; }

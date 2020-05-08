@@ -171,7 +171,7 @@ syn keyword ethAssert assert
 
 syn keyword ethLazy lazy
 
-syn match ethOperator /[-+=*/%><&|.!^~]\+/
+syn match ethOperator /[-+=*/%><&|.!^~∘]\+/
 syn match ethOperator /:\|\$/
 syn keyword ethOperator is eq not mod land lor lxor lshl lshr ashl ashr lnot
 

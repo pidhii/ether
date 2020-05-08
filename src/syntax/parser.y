@@ -223,6 +223,7 @@ int _eth_start_token = -1;
 %left<string> USROP
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %left UMINUS UPLUS NOT LNOT
+%right COMPOSE
 %nonassoc '!'
 %left '.'
 
@@ -527,6 +528,12 @@ expr
   | expr LSHR  expr { $$ = eth_ast_binop(ETH_LSHR, $1, $3); LOC($$, @$); }
   | expr ASHL  expr { $$ = eth_ast_binop(ETH_ASHL, $1, $3); LOC($$, @$); }
   | expr ASHR  expr { $$ = eth_ast_binop(ETH_ASHR, $1, $3); LOC($$, @$); }
+  | expr COMPOSE expr {
+    eth_ast *args[] = { $1, $3 };
+    eth_ast *fn = eth_ast_ident("∘");
+    $$ = eth_ast_apply(fn, args, 2);
+    LOC($$, @$);
+  }
   | expr PPLUS expr {
     eth_ast *args[] = { $1, $3 };
     eth_ast *fn = eth_ast_ident("++");

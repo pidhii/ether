@@ -83,9 +83,12 @@ print x;
 
 (* FizzBuzz
  *
- * Note a `()`: this is a synonim for `nil`.
+ * `|>` is a "pipe"-operator from OCaml: `x |> f` is equivalent to `f x`
+ * `()` is a synonim for `nil`.
+ * And you can find here alternative way to write if-statement:
+ *   `<then> if <cond> else <else>`
  *)
-for_each [1 .. 100] (fn i ->
+[1 .. 100] |> List.iter (fn i ->
   print i if i mod 3 /= 0 && i mod 5 /= 0 else
   print "Fizz" if i mod 3 == 0 else
   print "Buzz" if i mod 5 == 0 else ()

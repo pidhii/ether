@@ -37,10 +37,10 @@ let merge xs ys =
         else loop xs  ys' (y :: acc)
       else
         (* No more ys left, append all remaining xs to the result *)
-        rev_append acc xs
+        List.rev_append acc xs
     else
       (* No more xs left, append all remaining ys to the result *)
-      rev_append acc ys
+      List.rev_append acc ys
   in
   loop xs ys nil
 in
@@ -83,7 +83,7 @@ let read_list file =
     if let Some x = read_line_opt file then
       (* Note the `$`: this is an application operator from Haskell. The whole
        * role of `$` is to have the lowest precedence of all operators *)
-      loop $ (to_number $ chomp x) :: acc
+      loop $ String.(to_number $ chomp x) :: acc
     else acc
   in loop nil
 in

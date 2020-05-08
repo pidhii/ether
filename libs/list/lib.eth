@@ -115,17 +115,17 @@ let pub mapi f xs = rev $ rev_mapi f xs in
 let pub zip f xs ys = rev $ rev_zip f xs ys in
 let pub zipi f xs ys = rev $ rev_zipi f xs ys in
 let rec pub iter f xs =
-  when let x::xs = xs then (
+  when let x::xs = xs then begin
     f x;
     iter f xs
-  )
+  end
 in
 let rec pub iteri f xs =
   let rec loop i xs =
-    when let x::xs = xs then (
+    when let x::xs = xs then begin
       f i x;
       loop (i + 1) xs f
-    )
+    end
   in loop 0 xs
 in
 let rec pub rev_flat_map f xs =
