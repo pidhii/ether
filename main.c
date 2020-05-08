@@ -36,6 +36,22 @@ argv_to_list(int argc, char **argv, int offs)
   return acc;
 }
 
+static void
+print_trace(eth_location *const trace[], int start, int n, int hi)
+{
+  char buf[PATH_MAX];
+  for (int i = start; i >= start - n + 1; --i)
+  {
+    eth_get_location_file(trace[i], buf);
+    putc('\n', stderr);
+    eth_trace("trace[%d]: %s", i, buf);
+    if (i == hi)
+      eth_print_location_opt(trace[i], stderr, ETH_LOPT_EXTRALINES);
+    else
+      eth_print_location_opt(trace[i], stderr, 0);
+  }
+}
+
 int
 main(int argc, char **argv)
 {
@@ -51,6 +67,8 @@ main(int argc, char **argv)
   int opt;
   cod_vec(char*) L;
   cod_vec_init(L);
+  int tracelimh = 3;
+  int tracelimt = 1;
   /*opterr = 0;*/
   while ((opt = getopt_long(argc, argv, "+hv:L:", longopts, NULL)) > 0)
   {
@@ -167,15 +185,18 @@ main(int argc, char **argv)
               err = EXIT_FAILURE;
               eth_exception *exn = ETH_EXCEPTION(ret);
               eth_error("unhandled exception: ~w", what);
-              char buf[PATH_MAX];
-              for (int i = exn->tracelen - 1; i >= 0; --i)
+
+              int tracelen = exn->tracelen;
+              if (tracelimh + tracelimt >= tracelen)
               {
-                eth_get_location_file(exn->trace[i], buf);
-                eth_trace("trace[%d]: %s", exn->tracelen - i - 1, buf);
-                if (i == exn->tracelen - 1)
-                  eth_print_location_opt(exn->trace[i], stderr, ETH_LOPT_EXTRALINES);
-                else
-                  eth_print_location_opt(exn->trace[i], stderr, 0);
+                print_trace(exn->trace, tracelen - 1, tracelen, tracelen - 1);
+              }
+              else
+              {
+                print_trace(exn->trace, tracelen - 1, tracelimh, tracelen - 1);
+                putc('\n', stderr);
+                eth_trace(" ... ");
+                print_trace(exn->trace, tracelimt - 1, tracelimt, -1);
               }
             }
           }

@@ -478,7 +478,7 @@ _wredrawln(void)
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 int
-ether_module(eth_module *mod)
+ether_module(eth_module *mod, eth_env *topenv)
 {
   window_type = eth_create_type("WINDOW");
   window_type->destroy = destroy_window;
@@ -626,7 +626,7 @@ ether_module(eth_module *mod)
   eth_define(mod, "key_event", eth_num(KEY_EVENT));
   eth_define(mod, "key_max", eth_num(KEY_MAX));
 
-  if (not eth_load_module_from_script2(NULL, mod, "./lib.eth", NULL, mod))
+  if (not eth_load_module_from_script2(topenv, NULL, mod, "./lib.eth", NULL, mod))
     return -1;
   return 0;
 }

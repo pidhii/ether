@@ -166,7 +166,7 @@ static eth_t
 _regexp_p(void)
 {
   eth_t x = *eth_sp++;
-  eth_t ret = eth_boolean(x->type == eth_file_type);
+  eth_t ret = eth_boolean(x->type == eth_regexp_type);
   eth_drop(x);
   return ret;
 }
@@ -959,7 +959,7 @@ _load(void)
 
   eth_module *mod = eth_create_module(id);
   eth_t ret;
-  if (not eth_load_module_from_script(g_env, mod, eth_str_cstr(path), &ret))
+  if (not eth_load_module_from_script(g_env, g_env, mod, eth_str_cstr(path), &ret))
   {
     eth_drop(path);
     eth_destroy_module(mod);
@@ -978,6 +978,46 @@ _load(void)
   eth_remove_module(g_env, id);
   eth_destroy_module(mod);
   return ret;
+}
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                                  lazy
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+static eth_t
+_lazy_get(void)
+{
+  return eth_this->proc.data;
+}
+
+static eth_t
+_lazy_eval(void)
+{
+  eth_function *this = eth_this;
+  eth_t thunk = this->proc.data;
+  eth_t val = eth_apply(thunk, 0);
+  if (eth_unlikely(eth_is_exn(val)))
+    return val;
+  // replace handle
+  this->proc.handle = _lazy_get;
+  this->proc.data = val;
+  this->proc.dtor = (void*)eth_unref;
+  eth_ref(val);
+  eth_unref(thunk);
+  return val;
+}
+
+static eth_t
+_Lazy_create(void)
+{
+  eth_use_symbol(Type_error)
+  eth_t thunk = *eth_sp++;
+  if (eth_unlikely(not eth_is_fn(thunk)))
+  {
+    eth_drop(thunk);
+    return eth_exn(Type_error);
+  }
+  eth_ref(thunk);
+  return eth_create_proc(_lazy_eval, 0, thunk, (void*)eth_unref);
 }
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -1055,6 +1095,8 @@ _eth_init_builtins(void)
   eth_define(g_mod,       "exit", eth_create_proc(     __exit, 1, NULL, NULL));
   // ---
   eth_define(g_mod,       "load", eth_create_proc(      _load, 1, NULL, NULL));
+  // ---
+  eth_define(g_mod, "__Lazy_create", eth_create_proc(_Lazy_create, 1, NULL, NULL));
 
 
   if (not eth_resolve_path(g_env, "__builtins.eth", buf))
@@ -1063,7 +1105,7 @@ _eth_init_builtins(void)
     abort();
   }
   eth_debug("- loading \"%s\"", buf);
-  if (not eth_load_module_from_script(g_env, g_mod, buf, NULL))
+  if (not eth_load_module_from_script(g_env, g_env, g_mod, buf, NULL))
   {
     eth_error("failed to load builtins");
     abort();

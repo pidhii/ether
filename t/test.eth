@@ -102,12 +102,12 @@ print "--- test string";
 let str = "abCdefg" in
 print ("  str:", str);
 print ("  list:", list str);
-print ("  concat:", String.concat $ list str);
+print ("  cat:", String.cat $ list str);
 print ("  strlen:", String.len str);
 print ("  to_upper:", String.to_upper str);
 print ("  to_lower:", String.to_lower str);
-print String.("  str[case]cmp:", strcmp str str, strcmp str (to_upper str),
-  strcasecmp str (to_upper str));
+print String.("  str[case]cmp:", cmp str str, cmp str (to_upper str),
+  casecmp str (to_upper str));
 print ("  chr 0x61:", String.chr 0x61);
 
 
@@ -214,5 +214,12 @@ let { ba } = struct in print ("struct.ba:", ba);
 (*print ("struct.ba.a:", struct.ba.a);*)
 (*print ("struct.r:", struct.r);*)
 (*print ("struct.ba (second):", struct.ba);*)
+
+print "------------- test lazy ----------------";
+let x = lazy (print "calculation"; 42) in
+print ("x:", x!);
+print ("x:", x!);
+print ("x:", x!);
+print ("x:", x!);
 
 13;

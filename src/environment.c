@@ -91,6 +91,7 @@ eth_add_module_path(eth_env *env, const char *path)
 bool
 eth_resolve_path(eth_env *env, const char *path, char *fullpath)
 {
+  eth_debug("resolving path \"%s\"", path);
   if (path[0] == '/')
     return realpath(path, fullpath);
 
@@ -98,6 +99,7 @@ eth_resolve_path(eth_env *env, const char *path, char *fullpath)
   for (size_t i = 0; i < env->modpath.len; ++i)
   {
     sprintf(buf, "%s/%s", env->modpath.data[i], path);
+    eth_debug("[\"%s\"] check \"%s\"", path, buf);
     if (realpath(buf, fullpath))
       return true;
   }
@@ -166,11 +168,11 @@ eth_get_modules(const eth_env *env, const eth_module *out[], int n)
 }
 
 static bool
-load_from_ast(eth_env *env, eth_module *mod, eth_ast *ast, eth_t *retptr,
-    eth_module *uservars)
+load_from_ast(eth_env *topenv, eth_module *mod, eth_ast *ast,
+    eth_t *retptr, eth_module *uservars)
 {
   eth_ir_defs defs;
-  eth_ir *ir = eth_build_module_ir(ast, env, mod, &defs, uservars);
+  eth_ir *ir = eth_build_module_ir(ast, topenv, mod, &defs, uservars);
   if (ir == NULL)
     goto error;
 
@@ -226,8 +228,8 @@ error:
 }
 
 bool
-eth_load_module_from_ast2(eth_env *env, eth_module *mod, eth_ast *ast,
-    eth_t *ret, eth_module *uservars)
+eth_load_module_from_ast2(eth_env *topenv, eth_env *env, eth_module *mod,
+    eth_ast *ast, eth_t *ret, eth_module *uservars)
 {
   bool status = true;
 
@@ -256,7 +258,7 @@ eth_load_module_from_ast2(eth_env *env, eth_module *mod, eth_ast *ast,
   else
     ent = add_module(env, mod, 0);
 
-  int ok = load_from_ast(env, mod, ast, ret, uservars);
+  int ok = load_from_ast(topenv, mod, ast, ret, uservars);
   ent->flag |= ETH_MFLAG_READY;
   if (not ok)
   {
@@ -275,8 +277,8 @@ error:
 }
 
 bool
-eth_load_module_from_script2(eth_env *env, eth_module *mod, const char *path,
-    eth_t *ret, eth_module *uservars)
+eth_load_module_from_script2(eth_env *topenv, eth_env *env, eth_module *mod,
+    const char *path, eth_t *ret, eth_module *uservars)
 {
   bool status = true;
 
@@ -304,28 +306,28 @@ eth_load_module_from_script2(eth_env *env, eth_module *mod, const char *path,
   char *dir = dirname(dirbuf);
 
   chdir(dir);
-  bool ok = eth_load_module_from_ast2(env, mod, ast, ret, uservars);
+  bool ok = eth_load_module_from_ast2(topenv, env, mod, ast, ret, uservars);
   eth_drop_ast(ast);
   chdir(cwd);
   return true;
 }
 
 bool
-eth_load_module_from_ast(eth_env *env, eth_module *mod, eth_ast *ast,
-    eth_t *ret)
+eth_load_module_from_ast(eth_env *topenv, eth_env *env, eth_module *mod,
+    eth_ast *ast, eth_t *ret)
 {
-  return eth_load_module_from_ast2(env, mod, ast, ret, NULL);
+  return eth_load_module_from_ast2(topenv, env, mod, ast, ret, NULL);
 }
 
 bool
-eth_load_module_from_script(eth_env *env, eth_module *mod, const char *path,
-    eth_t *ret)
+eth_load_module_from_script(eth_env *topenv, eth_env *env, eth_module *mod,
+    const char *path, eth_t *ret)
 {
-  return eth_load_module_from_script2(env, mod, path, ret, NULL);
+  return eth_load_module_from_script2(topenv, env, mod, path, ret, NULL);
 }
 
 void*
-load_from_elf(eth_env *env, eth_module *mod, const char *path)
+load_from_elf(eth_env *topenv, eth_env *env, eth_module *mod, const char *path)
 {
   eth_debug("loading ELF-module %s", eth_get_module_name(mod));
 
@@ -336,7 +338,7 @@ load_from_elf(eth_env *env, eth_module *mod, const char *path)
     return NULL;
   }
 
-  int (*init)(eth_module*) = dlsym(dl, "ether_module");
+  int (*init)(eth_module*, eth_env *topenv) = dlsym(dl, "ether_module");
   if (not init)
   {
     eth_warning("%s", dlerror());
@@ -344,7 +346,7 @@ load_from_elf(eth_env *env, eth_module *mod, const char *path)
     return NULL;
   }
 
-  if (init(mod))
+  if (init(mod, topenv))
   {
     eth_warning("failed to load module %s", eth_get_module_name(mod));
     dlclose(dl);
@@ -357,7 +359,8 @@ load_from_elf(eth_env *env, eth_module *mod, const char *path)
 
 // TODO: code duplication (see eth_load_module_from_script())
 bool
-eth_load_module_from_elf(eth_env *env, eth_module *mod, const char *path)
+eth_load_module_from_elf(eth_env *topenv, eth_env *env, eth_module *mod,
+    const char *path)
 {
   char fullpath[PATH_MAX];
   if (not realpath(path, fullpath))
@@ -381,7 +384,7 @@ eth_load_module_from_elf(eth_env *env, eth_module *mod, const char *path)
 
   chdir(dir);
   module_entry *ent = add_module(env, mod, 0);
-  void *dl = load_from_elf(env, mod, fullpath);
+  void *dl = load_from_elf(topenv, env, mod, fullpath);
   ent->flag |= ETH_MFLAG_READY;
   chdir(cwd);
 
@@ -409,39 +412,51 @@ resolve_path_by_name(eth_env *env, const char *name, char *path)
   eth_debug("searching for '%s'", name);
 
   static char buf[4109]; // to suppress gcc warning
+  eth_debug("[%s] check \"%s\"", name, name);
   if (eth_resolve_path(env, name, path))
   {
     mode_t mode = get_file_mode(path);
     if (S_ISREG(mode))
+    {
+      eth_debug("[%s] found file \"%s\"", name, path);
       return true;
+    }
 
     if (S_ISDIR(mode))
     {
+      eth_debug("[%s] found directory \"%s\"", name, path);
+
       char dir[PATH_MAX];
       strcpy(dir, path);
 
       sprintf(buf, "%s/__main__.eth", dir);
+      eth_debug("[%s] check \"%s\"", name, buf);
       if (realpath(buf, path))
         return true;
 
       sprintf(buf, "%s/%s.eth", dir, name);
+      eth_debug("[%s] check \"%s\"", name, buf);
       if (realpath(buf, path))
         return true;
 
       sprintf(buf, "%s/%s.so", dir, name);
+      eth_debug("[%s] check \"%s\"", name, buf);
       if (realpath(buf, path))
         return true;
     }
   }
 
   sprintf(buf, "%s.eth", name);
+  eth_debug("[%s] check \"%s\"", name, buf);
   if (eth_resolve_path(env, buf, path))
     return true;
 
   sprintf(buf, "%s.so", name);
+  eth_debug("[%s] check \"%s\"", name, buf);
   if (eth_resolve_path(env, buf, path))
     return true;
 
+  eth_debug("[%s] serach failed", name);
   return false;
 }
 
@@ -496,7 +511,7 @@ find_module_in_env(eth_env *env, const char *name, bool *e)
 }
 
 static eth_module*
-load_module(eth_env *env, const char *name)
+load_module(eth_env *topenv, eth_env *env, const char *name)
 {
   char path[PATH_MAX];
   int namelen = strlen(name);
@@ -537,9 +552,9 @@ load_module(eth_env *env, const char *name)
   eth_module *mod = eth_create_module(topname);
   bool ok;
   if (is_elf(path))
-    ok = eth_load_module_from_elf(env, mod, path);
+    ok = eth_load_module_from_elf(topenv, env, mod, path);
   else
-    ok = eth_load_module_from_script(env, mod, path, NULL);
+    ok = eth_load_module_from_script(topenv, env, mod, path, NULL);
 
   if (not ok)
   {
@@ -550,7 +565,7 @@ load_module(eth_env *env, const char *name)
 }
 
 eth_module*
-eth_require_module(eth_env *env, const char *name)
+eth_require_module(eth_env *topenv, eth_env *env, const char *name)
 {
   eth_module *mod;
   char path[PATH_MAX];
@@ -563,6 +578,6 @@ eth_require_module(eth_env *env, const char *name)
   else if (e)
     return NULL;
   else
-    return load_module(env, name);
+    return load_module(topenv, env, name);
 }
 

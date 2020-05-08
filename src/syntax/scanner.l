@@ -62,7 +62,7 @@ OPERATOR [-+%^.$:!<>*/=&|]+
   return SYMBOL;
 }
 
-"^#!".*$ // comments
+^"#!".*$ // comments
 "(*" { BEGIN(COMMENT); }
 <COMMENT>"(*" { g_comment_cnt += 1; }
 <COMMENT>"*)" {
@@ -153,6 +153,7 @@ done   { return DONE; }
 case   { return CASE; }
 of     { return OF; }
 module { return MODULE; }
+lazy   { return LAZY; }
 
 nil   { yylval->constant = eth_nil;   return CONST; }
 true  { yylval->constant = eth_true;  return CONST; }

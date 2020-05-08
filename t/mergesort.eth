@@ -21,10 +21,10 @@ let merge =
         else loop xs  ys' (y::acc)
       else
         (* No more ys left, append all remaining xs to the result *)
-        rev_append acc xs
+        List.rev_append acc xs
     else
       (* No more xs left, append all remaining ys to the result *)
-      rev_append acc ys
+      List.rev_append acc ys
   in fn xs ys -> loop xs ys nil
 in
 
@@ -48,16 +48,14 @@ let read_list file =
   in
   let rec loop acc =
     if let Some x = read_line_opt file then
-      loop $ (to_number $ chomp x) :: acc
+      loop (String.(to_number $ chomp x) :: acc)
     else acc
   in loop nil
 in
 
-let l = rev $ read_list $ open_in "t/list.txt" in
-print ("Given list:", take 10 l);
-for_each [1..10] (fn _ ->
-  print ("Sorted list:", take 10 $ sort l)
+let l = List.rev $ read_list $ open_in "t/list.txt" in
+print ("Given list:", List.take 10 l);
+[1..10] |> List.iter (fn _ ->
+  print ("Sorted list:", List.take 10 $ sort l)
 );
 
-
-()

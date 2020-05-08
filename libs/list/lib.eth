@@ -6,6 +6,7 @@
  * - unfold_left
  * - unfold_right
  * - range
+ * - linspace
  *
  * Miscelenious:
  * - len (C)
@@ -96,6 +97,10 @@ let pub range (from .. to) =
     if i < from then acc
     else loop (i - 1) (i :: acc)
   in loop to nil
+in
+let pub linspace from to n =
+  let dx = (to - from) / (n - 1) in
+  unfold_left (fn i -> (i - 1, Math.fma dx i from) when i >= 0) (n - 1)
 in
 
 let pub rev xs = rev_append xs nil in

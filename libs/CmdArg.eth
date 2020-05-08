@@ -9,24 +9,23 @@ let get_options cfg os =
   let rec loop os kws pos =
     if let o::os = os then
       if o eq "--" then (kws, List.rev_append pos os)
-      else if String.strncmp o "--" 2 == 0 then handle_long_option o os kws pos
-      else if String.strncmp o "-" 1 == 0 then handle_short_option o os kws pos
+      else if String.match \^--/ o then handle_long_option o os kws pos
+      else if String.match \^-/ o then handle_short_option o os kws pos
       else loop os kws (o :: pos)
     else (kws, List.rev pos)
 
   and handle_long_option o os kws pos =
-    let brk = String.find "=" o in
-    if brk then
+    if let Some brk = String.find "=" o then
       (* Long option with '=' *)
       let lopt = String.sub o (2 .. brk-1) in
-      let { has_arg, val } = get_rules lopt in
+      let {has_arg, val} = get_rules lopt in
       if has_arg then
         let arg = String.sub o (brk + 1 ...) in
         loop os ((val, arg) :: kws) pos
       else raise Unexpected_argument
     else
       let lopt = String.sub o (2...) in
-      let { has_arg, val } = get_rules lopt in
+      let {has_arg, val} = get_rules lopt in
       if has_arg then
         if let arg::os = os then
           loop os ((val, arg) :: kws) pos
@@ -35,7 +34,7 @@ let get_options cfg os =
 
   and handle_short_option o os kws pos =
     let shopt = String.sub o 1 1 in
-    let { has_arg, val } = get_rules shopt in
+    let {has_arg, val} = get_rules shopt in
     if String.len o > 2 then
       (* Option and argument are merged *)
       if has_arg then

@@ -16,11 +16,12 @@ eth_vm(eth_bytecode *bc)
   if (eth_unlikely(not eth_reserve_c_stack(nreg * sizeof(eth_t))))
   {
     eth_warning("stack overflow");
-    for (int i = 0; i < eth_nargs; ++i)
+    int nargs = eth_nargs;
+    for (int i = 0; i < nargs; ++i)
       eth_ref(eth_sp[i]);
-    for (int i = 0; i < eth_nargs; ++i)
+    for (int i = 0; i < nargs; ++i)
       eth_unref(eth_sp[i]);
-    eth_pop_stack(eth_nargs);
+    eth_pop_stack(nargs);
     return eth_exn(eth_sym("Stack_overflow"));
   }
 

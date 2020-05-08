@@ -4,7 +4,7 @@
  * -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
  * Constructors:
  * - format
- * - concat (C)
+ * - cat (C)
  * - join
  *
  * Miscelenious:
@@ -24,10 +24,8 @@
  * - sub
  *
  * Comparison:
- * - strcmp (C)
- * - strcasecmp (C)
- * - strncmp (C)
- * - strncasecmp (C, _GNU_SOURCE)
+ * - cmp (C)
+ * - casecmp (C)
  *
  * Searching:
  * - find
@@ -36,7 +34,7 @@ let pub join sep xs =
   if xs is nil then ""
   else if let hd::[] = xs then hd
   else if let hd::tl = xs then
-    List.fold_left (fn x y -> concat [x, sep, y]) hd tl
+    List.fold_left (fn x y -> cat [x, sep, y]) hd tl
   else raise Invalid_argument
 in
 let pub sub s x =
@@ -56,7 +54,7 @@ in
 let pub split re str = List.rev $ rev_split re str in
 
 let pub find pat s =
-  if regexp? pat then raise Unimplemented
+  if regexp? pat then __find_regexp pat s
   else if string? pat then __strstr s pat
   else raise Type_error
 in

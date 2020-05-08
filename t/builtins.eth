@@ -1,45 +1,18 @@
 
-let test =
-  let do_test name thunk =
-    printf "- ~d " name;
-    try
-      if thunk! then (
-        printf "\x1b[38;5;2;1m✓\x1b[0m\n";
-        true;
-      ) else (
-        printf "\x1b[38;5;1;1m✗\x1b[0m\n";
-        false;
-      )
-    with e -> (
-      printf "\x1b[38;5;1;1m✗ (~w)\x1b[0m\n" e;
-      false;
-    )
-  in
-
-  let rec loop xs nok nfail =
-    if let (name,thunk)::xs = xs then
-      if do_test name thunk
-      then loop xs (nok+1) nfail
-      else loop xs nok (nfail+1)
-    else (nok, nfail)
-  in
-
-  fn tests -> loop tests 0 0
-in
-
-let math_tests = [
-  ("even?", fn -> even? 0 && even? 2 && not even? 3),
-  ("odd?", fn -> not odd? 0 && odd? 1 && not odd? 2 && odd? 3),
-  ("min", fn -> min 1 2 == 1),
-  ("max", fn -> max 1 2 == 2),
-  ("minmax", fn -> minmax 2 1 eq (1, 2)),
-]
+let math_tests = open Math in
+  [
+    ("even?", fn -> even? 0 && even? 2 && not even? 3),
+    ("odd?", fn -> not odd? 0 && odd? 1 && not odd? 2 && odd? 3),
+    ("min", fn -> min 1 2 == 1),
+    ("max", fn -> max 1 2 == 2),
+    ("minmax", fn -> minmax 2 1 eq (1, 2)),
+  ]
 in
 
 let string_tests =
   open String in
   [
-    ("concat", fn -> concat ["a", "b", "c"] eq "abc"),
+    ("cat", fn -> cat ["a", "b", "c"] eq "abc"),
     ("join", fn -> join "," ["a", "b", "c"] eq "a,b,c"),
     ("chr", fn -> chr 0x61 eq "a"),
     ("ord", fn -> ord "a" eq 0x61),
@@ -48,10 +21,8 @@ let string_tests =
     ("to_lower", fn -> to_lower "AbcD" eq "abcd"),
     ("chomp", fn -> chomp "asd\n\n" eq "asd" && chomp "asd" eq "asd"),
     ("chop", fn -> chop "asd" eq "as" && chop "" eq ""),
-    ("strcmp", fn -> strcmp "asdf" "asdf" == 0),
-    ("strcasecmp", fn -> strcasecmp "asdf" "ASdF" == 0),
-    ("strncmp", fn -> strncmp "asd2" "asdf" 3 == 0),
-    ("strncasecmp", fn -> strncasecmp "asd2" "ASdF" 3 == 0),
+    ("strcmp", fn -> cmp "asdf" "asdf" == 0),
+    ("strcasecmp", fn -> casecmp "asdf" "ASdF" == 0),
     ("substr", fn ->
       let str = "Hello World!" in
       List.all? id [
@@ -59,10 +30,11 @@ let string_tests =
         sub str (6...) eq "World!",
         sub str (...4) eq "Hello",
         sub str (4..6) eq "o W"]),
-    ("strstr", fn -> find "45" "123456" == 3),
+    ("find", fn ->
+      find "45" "123456" eq Some 3 && find \[3-6]/ "123456" eq Some 2),
     ("match", fn -> match \[^^]\K(\w+)\s+(\w)/ "a bu c" eq ["bu c", "bu", "c"]),
-  ("gsub", fn -> gsub \\s+/ (const "-") "a   s f  f f   " eq "a-s-f-f-f-"),
-  ("split", fn -> split \\s+/ "asd asdf asdf " eq ["asd", "asdf", "asdf", ""]),
+    ("gsub", fn -> gsub \\s+/ (const "-") "a   s f  f f   " eq "a-s-f-f-f-"),
+    ("split", fn -> split \\s+/ "asd asdf asdf " eq ["asd", "asdf", "asdf", ""]),
   ]
 in
 
@@ -80,6 +52,7 @@ let list_tests =
     ("unfold_left", fn -> unfold_left (fn i -> (i+1, i) when i < 3) 1 eq [2, 1]),
     ("unfold_right", fn -> unfold_right (fn i -> (i, i+1) when i < 3) 1 eq [1, 2]),
     ("range", fn -> range (0..9) eq [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
+    ("linspace", fn -> linspace 1 10 10 eq [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
     ("rev_append", fn -> rev_append [A, B, C] D eq C::B::A::D),
     ("rev", fn -> rev [A, B, C] eq [C, B, A]),
     ("append", fn -> append [A, B, C] D eq A::B::C::D),
@@ -144,31 +117,12 @@ let sumres (nok, nfail) (nok', nfail') =
 in
 let res = (0, 0) in
 
-newline!;
-printf "\x1b[1mTest math\x1b[0m\n";
-let res = sumres res $ test math_tests in
-
-newline!;
-printf "\x1b[1mTest string\x1b[0m\n";
-let res = sumres res $ test string_tests in
-
-newline!;
-printf "\x1b[1mTest regexp\x1b[0m\n";
-let res = sumres res $ test regexp_tests in
-
-newline!;
-printf "\x1b[1mTest list\x1b[0m\n";
-let res = sumres res $ test list_tests in
-
-newline!;
-let (nok, nfail) = res in
-printf "\x1b[1mSummary\x1b[0m\n";
-printf "- succeed: \x1b[38;5;2;1m~d\x1b[0m\n" nok;
-printf "- failed: \x1b[38;5;1;1m~d\x1b[0m\n" nfail;
-
-newline!;
-
+let (nok, nfail) = Test.run [
+    ("math", math_tests),
+    ("string", string_tests),
+    ("regexp", regexp_tests),
+    ("list", list_tests),
+  ]
+in
 exit 1 when nfail > 0;
-
-()
 

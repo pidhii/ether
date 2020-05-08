@@ -114,21 +114,26 @@ let job4 _ =
 in
 *)
 
-let job5 _ =
+let job_iter _ =
   Iter.(fold_left (+) 0 $ filter odd $ map (fn x -> x + 1) $ range 0 n)
+in
+
+let job_seq _ =
+  Seq.(fold_left (+) 0 $ filter odd $ map (fn x -> x + 1) $ range 0 n)
 in
 
 let l = [0 .. n-1] in
 let job_native _ =
-  (*fold_left (+) 0 [x + 1 | x <- l, even? x] *)
-  fold_left (+) 0 [x + 1 | x <- [0 .. n-1], even? x]
+  (*List.fold_left (+) 0 [x + 1 | x <- l, even? x] *)
+  List.fold_left (+) 0 [x + 1 | x <- [0 .. n-1], even? x]
 in
 
-let job = job1 in
+(*let job = job1 in*)
 (*let job = job1' in *)
 (*let job = job2 in *)
-(*let job = job_native in *)
-(*let job = job5 in *)
+let job = job_native in 
+(*let job = job_iter in *)
+(*let job = job_seq in *)
 print $ job nil;
 doTimes 700 job;
 

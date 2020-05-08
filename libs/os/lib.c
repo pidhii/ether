@@ -73,7 +73,7 @@ _realpath(void)
 }
 
 int
-ether_module(eth_module *mod)
+ether_module(eth_module *mod, eth_env *topenv)
 {
   int ret = 0;
   eth_define(mod, "chdir", eth_create_proc(_chdir, 1, NULL, NULL));
@@ -86,7 +86,7 @@ ether_module(eth_module *mod)
   eth_define(mod, "getcwd", eth_create_proc(_getcwd, 0, NULL, NULL));
   eth_define(mod, "realpath", eth_create_proc(_realpath, 1, NULL, NULL));
 
-  if (not eth_load_module_from_script2(NULL, mod, "./lib.eth", NULL, mod))
+  if (not eth_load_module_from_script2(topenv, NULL, mod, "./lib.eth", NULL, mod))
     ret = -1;
 
   return ret;

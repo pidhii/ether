@@ -32,7 +32,7 @@ let pub to_list {state, next} =
   let rec loop i acc =
     if let (x, i) = next i then
       loop i (x::acc)
-    else rev acc
+    else List.rev acc
   in loop state nil
 in
 

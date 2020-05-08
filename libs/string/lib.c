@@ -95,34 +95,6 @@ _strcmp(void)
 }
 
 static eth_t
-_strncmp(void)
-{
-  eth_t x = *eth_sp++;
-  eth_ref(x);
-  eth_t y = *eth_sp++;
-  eth_ref(y);
-  eth_t n = *eth_sp++;
-  if (eth_unlikely(not eth_is_str(x) or not eth_is_str(y) or not eth_is_num(n)))
-  {
-    eth_unref(x);
-    eth_unref(y);
-    eth_unref(n);
-    return eth_exn(eth_sym("Type_error"));
-  }
-  if (eth_unlikely(not eth_is_size(n)))
-  {
-    eth_unref(x);
-    eth_unref(y);
-    eth_unref(n);
-    return eth_exn(eth_sym("Invalid_argument"));
-  }
-  int cmp = strncmp(eth_str_cstr(x), eth_str_cstr(y), eth_num_val(n));
-  eth_unref(x);
-  eth_unref(y);
-  return eth_num(cmp);
-}
-
-static eth_t
 _strcasecmp(void)
 {
   eth_t x = *eth_sp++;
@@ -136,34 +108,6 @@ _strcasecmp(void)
     return eth_exn(eth_sym("Type_error"));
   }
   int cmp = strcasecmp(eth_str_cstr(x), eth_str_cstr(y));
-  eth_unref(x);
-  eth_unref(y);
-  return eth_num(cmp);
-}
-
-static eth_t
-_strncasecmp(void)
-{
-  eth_t x = *eth_sp++;
-  eth_ref(x);
-  eth_t y = *eth_sp++;
-  eth_ref(y);
-  eth_t n = *eth_sp++;
-  if (eth_unlikely(not eth_is_str(x) or not eth_is_str(y) or not eth_is_num(n)))
-  {
-    eth_unref(x);
-    eth_unref(y);
-    eth_unref(n);
-    return eth_exn(eth_sym("Type_error"));
-  }
-  if (eth_unlikely(not eth_is_size(n)))
-  {
-    eth_unref(x);
-    eth_unref(y);
-    eth_unref(n);
-    return eth_exn(eth_sym("Invalid_argument"));
-  }
-  int cmp = strncasecmp(eth_str_cstr(x), eth_str_cstr(y), eth_num_val(n));
   eth_unref(x);
   eth_unref(y);
   return eth_num(cmp);
@@ -209,7 +153,7 @@ _substr(void)
 }
 
 static eth_t
-_concat(void)
+_cat(void)
 {
   eth_t x = *eth_sp++;
 
@@ -244,6 +188,8 @@ _concat(void)
 static eth_t
 _strstr(void)
 {
+  eth_use_variant(Some)
+  eth_use_symbol(Type_error)
   eth_t x = *eth_sp++;
   eth_ref(x);
   eth_t y = *eth_sp++;
@@ -252,10 +198,10 @@ _strstr(void)
   {
     eth_unref(x);
     eth_unref(y);
-    return eth_exn(eth_sym("Type_error"));
+    return eth_exn(Type_error);
   }
   char *p = strstr(eth_str_cstr(x), eth_str_cstr(y));
-  eth_t ret = p ? eth_num(p - eth_str_cstr(x)) : eth_false;
+  eth_t ret = p ? Some(eth_num(p - eth_str_cstr(x))) : eth_false;
   eth_unref(x);
   eth_unref(y);
   return ret;
@@ -495,6 +441,24 @@ _rev_split(void)
 }
 
 static eth_t
+_find_regexp(void)
+{
+  eth_use_variant(Some)
+  eth_use_symbol(Regexp_error)
+  eth_args args = eth_start(2);
+  eth_t re = eth_arg2(args, eth_regexp_type);
+  eth_t str = eth_arg2(args, eth_string_type);
+  const char *p = eth_str_cstr(str);
+  int n = eth_exec_regexp(re, p, eth_str_len(p), 0);
+  if (n == 0)
+    eth_throw(args, Regexp_error);
+  else if (n < 0)
+    eth_return(args, eth_false);
+  else
+    eth_return(args, Some(eth_num(eth_ovector()[0])));
+}
+
+static eth_t
 _to_number(void)
 {
   eth_t x = *eth_sp++;
@@ -544,18 +508,16 @@ _to_symbol(void)
 
 
 int
-ether_module(eth_module *mod)
+ether_module(eth_module *mod, eth_env *topenv)
 {
   eth_define(mod, "len", eth_create_proc(_strlen, 1, NULL, NULL));
   eth_define(mod, "to_upper", eth_create_proc(_to_upper, 1, NULL, NULL));
   eth_define(mod, "to_lower", eth_create_proc(_to_lower, 1, NULL, NULL));
-  eth_define(mod, "strcmp", eth_create_proc(_strcmp, 2, NULL, NULL));
-  eth_define(mod, "strcasecmp", eth_create_proc(_strcasecmp, 2, NULL, NULL));
-  eth_define(mod, "strncmp", eth_create_proc(_strncmp, 3, NULL, NULL));
-  eth_define(mod, "strncasecmp", eth_create_proc(_strncasecmp, 3, NULL, NULL));
+  eth_define(mod, "cmp", eth_create_proc(_strcmp, 2, NULL, NULL));
+  eth_define(mod, "casecmp", eth_create_proc(_strcasecmp, 2, NULL, NULL));
   eth_define(mod, "__substr", eth_create_proc(_substr, 3, NULL, NULL));
   eth_define(mod, "__strstr", eth_create_proc(_strstr, 2, NULL, NULL));
-  eth_define(mod, "concat", eth_create_proc(_concat, 1, NULL, NULL));
+  eth_define(mod, "cat", eth_create_proc(_cat, 1, NULL, NULL));
   eth_define(mod, "chomp", eth_create_proc(_chomp, 1, NULL, NULL));
   eth_define(mod, "chop", eth_create_proc(_chop, 1, NULL, NULL));
   eth_define(mod, "chr", eth_create_proc(_chr, 1, NULL, NULL));
@@ -567,13 +529,11 @@ ether_module(eth_module *mod)
   eth_define(mod, "match", eth_create_proc(_match, 2, NULL, NULL));
   eth_define(mod, "gsub", eth_create_proc(_gsub, 3, NULL, NULL));
   eth_define(mod, "rev_split", eth_create_proc(_rev_split, 2, NULL, NULL));
+  eth_define(mod, "__find_regexp", eth_create_proc(_find_regexp, 2, NULL, NULL));
 
   int ret = 0;
-  eth_env *env = eth_create_env();
-  if (not eth_load_module_from_script2(env, mod, "lib.eth", NULL, mod))
+  if (not eth_load_module_from_script2(topenv, NULL, mod, "lib.eth", NULL, mod))
     ret = -1;
-  eth_remove_module(env, eth_get_module_name(mod));
-  eth_destroy_env(env);
   return ret;
 }
 

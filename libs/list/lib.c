@@ -212,7 +212,7 @@ _rev_filter_map(void)
 }
 
 int
-ether_module(eth_module *mod)
+ether_module(eth_module *mod, eth_env *topenv)
 {
   eth_define(mod, "len", eth_create_proc(_length, 1, NULL, NULL));
   eth_define(mod, "rev_append", eth_create_proc(_rev_append, 2, NULL, NULL));
@@ -222,7 +222,7 @@ ether_module(eth_module *mod)
   eth_define(mod, "rev_zipi", eth_create_proc(_rev_zipi, 3, NULL, NULL));
   eth_define(mod, "rev_filter_map", eth_create_proc(_rev_filter_map, 2, NULL, NULL));
 
-  if (not eth_load_module_from_script2(NULL, mod, "lib.eth", NULL, mod))
+  if (not eth_load_module_from_script2(topenv, NULL, mod, "lib.eth", NULL, mod))
     return -1;
   return 0;
 }

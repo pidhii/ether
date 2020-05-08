@@ -604,6 +604,7 @@ _ETH_TEST_SNUM(long_double, LDBL)
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 ETH_EXTERN
 eth_type *eth_function_type;
+#define eth_is_fn(x) ((x)->type == eth_function_type)
 
 typedef struct {
   int rc;
@@ -1269,26 +1270,27 @@ bool
 eth_remove_module(eth_env *env, const char *name);
 
 eth_module*
-eth_require_module(eth_env *env, const char *name);
+eth_require_module(eth_env *topenv, eth_env *env, const char *name);
 
 bool
-eth_load_module_from_script(eth_env *env, eth_module *mod, const char *path,
-    eth_t *ret);
+eth_load_module_from_script(eth_env *topenv, eth_env *env, eth_module *mod,
+    const char *path, eth_t *ret);
 
 bool
-eth_load_module_from_ast(eth_env *env, eth_module *mod, eth_ast *ast,
-    eth_t *ret);
+eth_load_module_from_ast(eth_env *topenv, eth_env *env, eth_module *mod,
+    eth_ast *ast, eth_t *ret);
 
 bool
-eth_load_module_from_script2(eth_env *env, eth_module *mod, const char *path,
-    eth_t *ret, eth_module *uservars);
+eth_load_module_from_script2(eth_env *topenv, eth_env *env, eth_module *mod,
+    const char *path, eth_t *ret, eth_module *uservars);
 
 bool
-eth_load_module_from_ast2(eth_env *env, eth_module *mod, eth_ast *ast,
-    eth_t *ret, eth_module *uservars);
+eth_load_module_from_ast2(eth_env *topenv, eth_env *env, eth_module *mod,
+    eth_ast *ast, eth_t *ret, eth_module *uservars);
 
 bool
-eth_load_module_from_elf(eth_env *env, eth_module *mod, const char *path);
+eth_load_module_from_elf(eth_env *topenv, eth_env *env, eth_module *mod,
+    const char *path);
 
 int
 eth_get_nmodules(const eth_env *env);
@@ -2392,6 +2394,27 @@ _eth_type_error(size_t n, size_t ntot)
   eth_return(args, exn)
 
 
+#define eth_drop_n(xs...)                                 \
+  do {                                                    \
+    eth_t _eth_drops_xs[] = { xs };                       \
+    for (size_t i = 0; i < sizeof xs / sizeof xs[0]; ++i) \
+      eth_ref(_eth_drops_xs[i]);                          \
+    for (size_t i = 0; i < sizeof xs / sizeof xs[0]; ++i) \
+      eth_unref(_eth_drops_xs[i]);                        \
+  } while (0)
+
+#define eth_drop_2(x, y) \
+  eth_ref(x);            \
+  eth_drop(y);           \
+  eth_unref(x);
+
+#define eth_drop_3(x, y, z) \
+  eth_ref(x);               \
+  eth_ref(y);               \
+  eth_drop(z);              \
+  eth_unref(x);             \
+  eth_unref(y);
+
 #define eth_use_symbol_as(ident, sym) \
   static eth_t ident = NULL;          \
   if (eth_unlikely(ident == NULL))    \
@@ -2417,5 +2440,8 @@ _eth_type_error(size_t n, size_t ntot)
 
 eth_t
 eth_system_error(int err);
+
+eth_t
+eth_type_error();
 
 #endif

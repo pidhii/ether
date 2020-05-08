@@ -143,7 +143,7 @@ find_type(ir_builder *bldr, const char *name)
 }
 
 static eth_t
-resolve_var_path(const eth_module *mod, const char *path)
+resolve_var_path(ir_builder *bldr, const eth_module *mod, const char *path)
 {
   char *p;
   if ((p = strchr(path, '.')))
@@ -153,14 +153,14 @@ resolve_var_path(const eth_module *mod, const char *path)
     memcpy(modname, path, modnamelen);
     modname[modnamelen] = '\0';
 
-    eth_module *submod = eth_require_module(eth_get_env(mod), modname);
+    eth_module *submod = eth_require_module(bldr->env, eth_get_env(mod), modname);
     if (submod == NULL)
     {
       eth_warning("no submodule %s in %s", modname, eth_get_module_name(mod));
       return NULL;
     }
 
-    return resolve_var_path(submod, p + 1);
+    return resolve_var_path(bldr, submod, p + 1);
   }
 
   eth_def *def = eth_find_def(mod, path);
@@ -196,15 +196,15 @@ require_module(ir_builder *bldr, const char *name)
   const eth_module *topmod = NULL, *mod = NULL;
   if (bldr->mod)
   {
-    topmod = eth_require_module(eth_get_env(bldr->mod), topname);
+    topmod = eth_require_module(bldr->env, eth_get_env(bldr->mod), topname);
     if (not istop)
-      mod = eth_require_module(eth_get_env(bldr->mod), name);
+      mod = eth_require_module(bldr->env, eth_get_env(bldr->mod), name);
   }
   if (not mod)
   {
-    topmod = eth_require_module(bldr->env, topname);
+    topmod = eth_require_module(bldr->env, bldr->env, topname);
     if (not istop)
-      mod = eth_require_module(bldr->env, name);
+      mod = eth_require_module(bldr->env, bldr->env, name);
   }
   if (not topmod or not istop and not mod)
   {
@@ -247,7 +247,8 @@ require_var(ir_builder *bldr, const char *ident)
     if (mod == NULL)
       return NULL;
 
-    eth_t val = resolve_var_path(mod, p + 1);
+    eth_t val = resolve_var_path(bldr, mod, p + 1);
+    if (val == NULL) return NULL;
     static eth_var ret;
     ret.ident = NULL;
     ret.cval = val;
@@ -921,7 +922,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       eth_module *mod = eth_create_module(ast->module.name);
       eth_env *env = bldr->mod ? eth_get_env(bldr->mod) : bldr->env;
       eth_t modret;
-      if (not eth_load_module_from_ast(env, mod, ast->module.body, &modret))
+      if (not eth_load_module_from_ast(bldr->env, env, mod, ast->module.body, &modret))
       {
         eth_destroy_module(mod);
         *e = 1;

@@ -42,6 +42,5 @@ ether_module(eth_module *mod)
   eth_define(mod, "get", eth_create_proc(_get, 1, NULL, NULL));
   eth_define(mod, "set", eth_create_proc(_set, 2, NULL, NULL));
 
-
   return 0;
 }

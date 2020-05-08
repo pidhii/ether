@@ -1,15 +1,12 @@
 #!/bin/env ether
 
-import Options in
-import Os in
-
 (* Get direcory containing modules *)
 let module_path =
   let pipe = open_pipe_in "ether --prefix" in
   let line = read_line_of pipe in
   if close pipe /= 0 then
     raise Failed_to_resolve_prefix
-  else format "~d/lib/ether" (chomp line)
+  else format "~d/lib/ether" (String.chop line)
 in
 
 (* Checks whether a file exists in the file system *)
@@ -41,14 +38,14 @@ let utc_date! =
   let pipe = open_pipe_in "date -u +'%x %X'" in
   let line = read_line_of pipe in
   if close pipe /= 0 then System_error
-  else chomp line
+  else String.chop line
 in
 
 let realpath path =
   let pipe = open_pipe_in (format "realpath '~d'" path) in
   let line = read_line_of pipe in
   if close pipe /= 0 then System_error
-  else chomp line
+  else String.chop line
 in
 
 let db_path = format "~d/__db.eth" module_path in
@@ -58,7 +55,7 @@ let load_db! = first $ load db_path if exist? db_path else [] in
 
 (* Get module record *)
 let get_module name db =
-  find (fn {name = name'} -> strcasecmp name name' == 0) db;
+  List.find (fn {name = name'} -> String.strcasecmp name name' == 0) db;
 in
 
 let update_db db =
@@ -82,9 +79,9 @@ let install dir =
       raise Failure;
     )
   in
-  let Some name = assoc "name" conf in
-  let Some files = Maybe.(assoc "files" conf || Some []) in
-  let Some main = assoc "main" conf in
+  let Some name = List.assoc "name" conf in
+  let Some files = Maybe.(List.assoc "files" conf || Some []) in
+  let Some main = List.assoc "main" conf in
 
   let db = load_db! in
 
@@ -95,7 +92,7 @@ let install dir =
   );
 
   (* Build *)
-  when let Some build = assoc "build" conf then do_in dir (fn ->
+  when let Some build = List.assoc "build" conf then do_in dir (fn ->
     printf "> building module ~d\n" name;
     build!;
   );
@@ -107,9 +104,9 @@ let install dir =
   mkdir moddir;
 
   (* Copy module sources *)
-  for_each (main :: files) (fn file ->
+  List.iter (fn file ->
     copy_file (dir ++ "/" ++ file) (moddir ++ "/" ++ file)
-  );
+  ) (main :: files);
 
   (* Create symlink to main *)
   let mainpath = moddir ++ "/__main__.eth" in
@@ -124,10 +121,11 @@ let install dir =
   let db = {name, date, source_dir, install_dir} :: db in
   update_db db;
 
-  when let Some post_install = assoc "post_install" conf then do_in dir (fn ->
-    printf "> running post-install hooks\n";
-    post_install!;
-  );
+  when let Some post_install = List.assoc "post_install" conf then
+    do_in dir (fn ->
+      printf "> running post-install hooks\n";
+      post_install!;
+    );
 in
 
 
@@ -140,7 +138,7 @@ let uninstall name =
     unlink install_dir;
     (* Update registry *)
     printf "> updating registry\n";
-    let db = remove (fn {name = name'} -> strcasecmp name' name == 0) db in
+    let db = List.remove (fn {name = name'} -> String.strcasecmp name' name == 0) db in
     update_db db;
 
   ) else (
@@ -158,7 +156,7 @@ let reinstall dir =
       raise Failure;
     )
   in
-  let Some name = assoc "name" conf in
+  let Some name = List.assoc "name" conf in
   uninstall name;
   install dir;
 in
@@ -176,7 +174,7 @@ let list_modules! =
       printf "\e[4minstall_dir\e[0m: ~d\n" install_dir;
       printf "\e[4mdate\e[0m: ~d\n" date;
       false;
-    in fold_left f true db
+    in List.fold_left f true db
 in
 
 
@@ -196,14 +194,14 @@ let options = [
 in
 
 let (opts, _) =
-  try Options.get options (cdr command_line)
+  try CmdArg.get options (cdr command_line)
   with e -> (
     eprintf "> error: i didn't get what do you want\n";
     exit 1;
   )
 in
 
-for_each opts (fn (opt, arg) ->
+List.iter (fn (opt, arg) ->
   try
     install arg   if opt eq "i" else
     uninstall arg if opt eq "u" else
@@ -211,9 +209,9 @@ for_each opts (fn (opt, arg) ->
     list_modules! if opt eq "l" else ()
   with Failure -> (
     eprintf "> failure\n";
-    #exit 1;
+    exit 1;
   )
-);
+) opts;
 
 ()
 

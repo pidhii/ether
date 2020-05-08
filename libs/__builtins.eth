@@ -37,12 +37,13 @@ let pub car (x::_) = x in
 let pub cdr (_::x) = x in
 
 (* Tuples *)
-let pub first  { _1 = x } = x in
-let pub second { _2 = x } = x in
-let pub third  { _3 = x } = x in
+let pub first  {_1 = x} = x in
+let pub second {_2 = x} = x in
+let pub third  {_3 = x} = x in
 
 (* Functions *)
 let pub id x = x in
+
 let pub flip f x y = f y x in
 let pub const x = fn _ -> x in
 let pub curry f = fn x y -> f (x, y) in
@@ -51,9 +52,6 @@ let pub uncurry f = fn (x, y) -> f x y in
 (* Math *)
 let pub even? x = x mod 2 == 0 in
 let pub odd?  x = x mod 2 == 1 in
-let pub min x y = x if x < y else y in
-let pub max x y = x if x > y else y in
-let pub minmax x y = (x, y) if x < y else (y, x) in
 
 (*let ( *<< ) f g = *)
 let compose_va f g =
@@ -86,6 +84,7 @@ in
  *
  * Output:
  * - print (C)
+ * - print_to
  * - newline (C)
  * - write_to (C)
  * - write
@@ -105,8 +104,22 @@ let pub open_pipe_out cmd = __popen cmd "w" in
 let pub read_line! = read_line_of stdin in
 let pub read! = read_of stdin in
 
+let pub print_to file x =
+  if tuple? x then
+    let hd :: tl = list x in
+    write_to file (format "~d" hd);
+    let rec loop xs =
+      if let x :: xs = xs then
+        write_to file (format "\t~d" x);
+        loop xs
+      else write_to file "\n";
+    in loop tl
+  else
+    write_to file (format "~d\n" x)
+in
 let pub write = write_to stdout in
 let pub printf = __printf stdout in
+let pub fprintf file = compose_va (write_to file) format in
 let pub eprintf = __printf stderr in
 
 let pub seek file pos =

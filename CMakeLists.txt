@@ -94,5 +94,5 @@ add_subdirectory (libs)
 enable_testing ()
 add_test (TestFuzzy ether -L${CMAKE_SOURCE_DIR}/t ${CMAKE_SOURCE_DIR}/t/test.eth testmode)
 add_test (TestBuiltins ether -L${CMAKE_SOURCE_DIR}/t ${CMAKE_SOURCE_DIR}/t/builtins.eth)
-add_test (TestOptions ether -L${CMAKE_SOURCE_DIR}/t ${CMAKE_SOURCE_DIR}/t/options.eth)
+add_test (TestCmdArg ether -L${CMAKE_SOURCE_DIR}/t ${CMAKE_SOURCE_DIR}/t/cmdarg.eth)
 

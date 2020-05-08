@@ -46,11 +46,24 @@ int _eth_start_token = -1;
 
 %code requires {
   #include "codeine/vec.h"
+
   #include <assert.h>
+
   typedef struct {
     eth_ast_pattern *pat;
     eth_ast *expr;
   } lc_in;
+
+  typedef struct {
+    cod_vec(eth_ast_pattern*) pats;
+    cod_vec(eth_ast*) vals;
+  } binds_t;
+
+  typedef struct {
+    bool rec;
+    binds_t binds;
+  } module_elt;
+
 }
 
 %union {
@@ -61,10 +74,7 @@ int _eth_start_token = -1;
   char character;
   bool boolean;
   int integer;
-  struct {
-    cod_vec(eth_ast_pattern*) pats;
-    cod_vec(eth_ast*) vals;
-  } binds;
+  binds_t binds;
   struct {
     eth_ast_pattern *pat;
     eth_ast *val;
@@ -82,6 +92,8 @@ int _eth_start_token = -1;
     lc_in in;
     eth_ast *pred;
   } lc_aux;
+
+  /*cod_vec(module_elt) module_defs;*/
 
   cod_vec(eth_ast*) astvec;
   cod_vec(char*) strvec;
@@ -184,6 +196,7 @@ int _eth_start_token = -1;
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %right RARROW
 %right ';'
+%left LAZY
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %right TERNARY
 %nonassoc IF THEN ELSE WHEN UNLESS TRY WITH
@@ -238,6 +251,8 @@ int _eth_start_token = -1;
 %type<record> record
 %type<record_pattern> record_pattern
 %type<lc_aux> lc_aux
+/*%type<module_defs> module_defs*/
+/*%type<ast> module_body*/
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %start entry
 
@@ -368,6 +383,7 @@ atom
     cod_vec_destroy($2.vals);
   }
   | MODULE CAPSYMBOL '=' expr END {
+  /*| MODULE CAPSYMBOL '=' module_body END {*/
     $$ = eth_ast_module($2, $4);
     LOC($$, @1);
     free($2);
@@ -554,6 +570,12 @@ expr
     $$ = eth_ast_apply(fn, args, 2);
     LOC($$, @$);
     free($2);
+  }
+  | LAZY expr {
+    eth_t lazy = eth_get_builtin("__Lazy_create");
+    assert(lazy);
+    eth_ast *thunk = eth_ast_fn(NULL, 0, $2);
+    $$ = eth_ast_apply(eth_ast_cval(lazy), &thunk, 1);
   }
 ;
 
@@ -877,6 +899,39 @@ maybe_coma
   : { $$ = false; }
   | ',' { $$ = true; }
 ;
+
+/*module_body*/
+  /*: module_defs {*/
+    /*int n = $1.len;*/
+    /*eth_ast *acc = eth_ast_cval(eth_nil);*/
+    /*for (int i = n - 1; i >= 0; --i)*/
+    /*{*/
+      /*module_elt *elt = $1.data + i;*/
+      /*binds_t binds = elt->binds;*/
+      /*acc = elt->rec ?*/
+          /*eth_ast_letrec(binds.pats.data, binds.vals.data, binds.pats.len, acc)*/
+        /*: eth_ast_let(binds.pats.data, binds.vals.data, binds.pats.len, acc);*/
+      /*cod_vec_destroy(binds.pats);*/
+      /*cod_vec_destroy(binds.vals);*/
+    /*}*/
+    /*cod_vec_destroy($1);*/
+    /*$$ = acc;*/
+  /*}*/
+/*;*/
+
+/*module_defs*/
+  /*: { cod_vec_init($$); }*/
+  /*| module_defs LET binds {*/
+    /*module_elt ent = { .rec = false, .binds = $3 };*/
+    /*cod_vec_push($1, ent);*/
+    /*$$ = $1;*/
+  /*}*/
+  /*| module_defs LET REC binds {*/
+    /*module_elt ent = { .rec = true, .binds = $4 };*/
+    /*cod_vec_push($1, ent);*/
+    /*$$ = $1;*/
+  /*}*/
+/*;*/
 
 %%
 

@@ -14,6 +14,17 @@ set_target_properties (ref
     OUTPUT_NAME "ref")
 install (TARGETS ref DESTINATION ${REF_DST_DIR})
 
+# Math
+set (MATH_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/math)
+set (MATH_DST_DIR lib/ether/math)
+add_library (math SHARED ${MATH_SRC_DIR}/lib.c)
+set_target_properties (math
+  PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    PREFIX ""
+    OUTPUT_NAME "math")
+install (TARGETS math DESTINATION ${MATH_DST_DIR})
+
 # List
 set (LIST_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/list)
 set (LIST_DST_DIR lib/ether/list)

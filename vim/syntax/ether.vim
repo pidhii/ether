@@ -43,10 +43,10 @@ syn keyword ethBuiltinFunction list
 syn keyword ethBuiltinFunction dump
 
 syn keyword ethBuiltinFunction len
-syn keyword ethBuiltinFunction concat join chr ord
+syn keyword ethBuiltinFunction cat join chr ord
 syn keyword ethBuiltinFunction to_upper to_lower
-syn keyword ethBuiltinFunction strcmp strcasecmp strncmp strncasecmp
-syn keyword ethBuiltinFunction sub find strcasestr
+syn keyword ethBuiltinFunction cmp casecmp
+syn keyword ethBuiltinFunction sub find
 syn keyword ethBuiltinFunction chomp chop
 
 syn keyword ethBuiltinFunction match gsub rev_split split
@@ -54,7 +54,7 @@ syn keyword ethBuiltinFunction match gsub rev_split split
 syn keyword ethBuiltinFunction car cdr
 syn keyword ethBuiltinFunction first second third
 
-syn keyword ethBuiltinFunction range
+syn keyword ethBuiltinFunction range linspace
 syn keyword ethBuiltinFunction unfold_left unfold_right init
 syn keyword ethBuiltinFunction len rev_append append rev
 syn keyword ethBuiltinFunction rev_map map rev_zip zip
@@ -83,14 +83,14 @@ syn keyword ethBuiltinFunction open_in open_out open_append
 syn keyword ethBuiltinFunction open_pipe_in open_pipe_out
 syn keyword ethBuiltinFunction close
 syn keyword ethBuiltinFunction input
-syn keyword ethBuiltinFunction print newline
+syn keyword ethBuiltinFunction print print_to newline
 syn keyword ethBuiltinFunction write_to write
 syn keyword ethBuiltinFunction read_line read_line_of
 syn keyword ethBuiltinFunction read read_of
 syn keyword ethBuiltinFunction read_file
 syn keyword ethBuiltinFunction tell seek
 
-syn keyword ethBuiltinFunction printf eprintf format
+syn keyword ethBuiltinFunction printf eprintf fprintf format
 syn keyword ethBuiltinFunction apply
 syn keyword ethBuiltinFunction die raise exit
 syn keyword ethBuiltinFunction system shell

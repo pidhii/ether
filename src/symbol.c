@@ -26,7 +26,11 @@ static void
 destroy_symbol(void *ptr)
 {
   symbol *sym = ptr;
-  assert(sym->header.rc == 1);
+  /*assert(sym->header.rc == 1);*/
+  if (eth_unlikely(sym->header.rc != 1))
+  {
+    eth_warning("RC for symbol '%s' /= 1", sym->str);
+  }
   free(sym);
 }
 

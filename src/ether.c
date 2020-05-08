@@ -320,3 +320,10 @@ eth_system_error(int err)
   return System_error(eth_sym(eth_errno_to_str(err)));
 }
 
+eth_t
+eth_type_error(void)
+{
+  eth_use_symbol(Type_error)
+  return Type_error;
+}
+
