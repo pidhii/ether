@@ -55,7 +55,7 @@ let load_db! = first $ load db_path if exist? db_path else [] in
 
 (* Get module record *)
 let get_module name db =
-  List.find (fn {name = name'} -> String.strcasecmp name name' == 0) db;
+  List.find (fn {name = name'} -> String.casecmp name name' == 0) db;
 in
 
 let update_db db =
@@ -138,7 +138,7 @@ let uninstall name =
     unlink install_dir;
     (* Update registry *)
     printf "> updating registry\n";
-    let db = List.remove (fn {name = name'} -> String.strcasecmp name' name == 0) db in
+    let db = List.remove (fn {name = name'} -> String.casecmp name' name == 0) db in
     update_db db;
 
   ) else (

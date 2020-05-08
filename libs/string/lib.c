@@ -449,7 +449,7 @@ _find_regexp(void)
   eth_t re = eth_arg2(args, eth_regexp_type);
   eth_t str = eth_arg2(args, eth_string_type);
   const char *p = eth_str_cstr(str);
-  int n = eth_exec_regexp(re, p, eth_str_len(p), 0);
+  int n = eth_exec_regexp(re, p, eth_str_len(str), 0);
   if (n == 0)
     eth_throw(args, Regexp_error);
   else if (n < 0)

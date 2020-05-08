@@ -483,7 +483,7 @@ eth_require_magic(eth_t x);
 //                            RECURSIVE SCOPE
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 struct eth_scp {
-  eth_function **clos; /* Scope closures. Note: clos ⊆ wrefs. */
+  eth_function **clos; /* Scope closures. Note: clos ⊆ wrefs (XXX NO!). */
   eth_t *wrefs; /* Recursive variables and closures created inside scope. */
   size_t nclos; /* Length of clos-array. */
   size_t nwref; /* Length of wrefs-array. */
