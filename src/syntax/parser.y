@@ -210,7 +210,7 @@ int _eth_start_token = -1;
 // level 2:
 %right OPAND
 // level 3:
-%nonassoc '<' LE '>' GE EQ NE IS EQUAL DDOT DDDOT EQ_TILD
+%nonassoc '<' LE '>' GE EQ NE IS ISNOT EQUAL NOTEQUAL DDOT DDDOT EQ_TILD
 // level 4:
 %right CONS PPLUS
 // level 5:
@@ -528,6 +528,14 @@ expr
   | expr LSHR  expr { $$ = eth_ast_binop(ETH_LSHR, $1, $3); LOC($$, @$); }
   | expr ASHL  expr { $$ = eth_ast_binop(ETH_ASHL, $1, $3); LOC($$, @$); }
   | expr ASHR  expr { $$ = eth_ast_binop(ETH_ASHR, $1, $3); LOC($$, @$); }
+  | expr ISNOT expr {
+    $$ = eth_ast_unop(ETH_NOT, eth_ast_binop(ETH_IS, $1, $3));
+    LOC($$, @$);
+  }
+  | expr NOTEQUAL expr {
+    $$ = eth_ast_unop(ETH_NOT, eth_ast_binop(ETH_EQUAL, $1, $3));
+    LOC($$, @$);
+  }
   | expr COMPOSE expr {
     eth_ast *args[] = { $1, $3 };
     eth_ast *fn = eth_ast_ident("∘");

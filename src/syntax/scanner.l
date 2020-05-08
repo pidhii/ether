@@ -185,7 +185,9 @@ __builtin { return BUILTIN; }
 "/="    { return NE; }
 "=~"    { return EQ_TILD; }
 is      { return IS; }
+is[ \v\t\n]+not { return ISNOT; }
 eq      { return EQUAL; }
+not[ \v\t\n]+eq { return NOTEQUAL; }
 "->"    { return RARROW; }
 "<-"    { return LARROW; }
 "&&"    { return OPAND; }
