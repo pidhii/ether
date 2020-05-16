@@ -37,14 +37,14 @@ in
 let utc_date! =
   let pipe = open_pipe_in "date -u +'%x %X'" in
   let line = read_line_of pipe in
-  if close pipe /= 0 then System_error
+  if close pipe /= 0 then raise System_error
   else String.chop line
 in
 
 let realpath path =
   let pipe = open_pipe_in (format "realpath '~d'" path) in
   let line = read_line_of pipe in
-  if close pipe /= 0 then System_error
+  if close pipe /= 0 then raise System_error
   else String.chop line
 in
 
@@ -74,10 +74,10 @@ in
 let install dir =
   let (_, conf) =
     try load (format "~d/install.eth" dir)
-    with _ -> (
+    with _ -> begin
       eprintf "> error: failed to load install-script\n";
       raise Failure;
-    )
+    end
   in
   let Some name = List.assoc "name" conf in
   let Some files = Maybe.(List.assoc "files" conf || Some []) in
@@ -86,10 +86,10 @@ let install dir =
   let db = load_db! in
 
   (* Check if module name is unique *)
-  when get_module name db then (
+  when get_module name db then begin
     eprintf "> error: module already present\n";
     raise Failure;
-  );
+  end;
 
   (* Build *)
   when let Some build = List.assoc "build" conf then do_in dir (fn ->
@@ -132,7 +132,7 @@ in
 let uninstall name =
   let db = load_db! in
 
-  if let Some {install_dir} = get_module name db then (
+  if let Some {install_dir} = get_module name db then begin
     (* Remove module directory *)
     printf "> uninstalling module '~d'\n" name;
     unlink install_dir;
@@ -140,21 +140,19 @@ let uninstall name =
     printf "> updating registry\n";
     let db = List.remove (fn {name = name'} -> String.casecmp name' name == 0) db in
     update_db db;
-
-  ) else (
+  end else begin
     eprintf "> error: no such module\n";
     raise Failure;
-  )
+  end
 in
 
 
 let reinstall dir =
   let (_, conf) =
     try load (format "~d/install.eth" dir)
-    with Failure -> (
+    with Failure ->
       eprintf "> error: failed to load install-script\n";
       raise Failure;
-    )
   in
   let Some name = List.assoc "name" conf in
   uninstall name;
@@ -178,39 +176,65 @@ let list_modules! =
 in
 
 
+let basename path =
+  let [_, tail] = String.match \\/?([^\/]+)$/ path in
+  tail
+in
+
+let help! =
+  printf "usage: ~d [OPTIONS]\n" (basename $ car command_line);
+  print "";
+  print "OPTIONS:";
+  print "  --help       -h          Show this message.";
+  print "  --install    -i  <dir>   Install package.";
+  print "  --uninstall  -u  <name>  Uninstall package.";
+  print "  --reinstall  -r  <dir>   Reinstall package.";
+  print "  --list       -l          List installed packages.";
+in
+
+
 (******************************** Main ****************************************)
-let options = [
-  (* Long options *)
-  {name = "install"  , val = "i", has_arg = true},
-  {name = "uninstall", val = "u", has_arg = true},
-  {name = "reinstall", val = "r", has_arg = true},
-  {name = "list"     , val = "l", has_arg = false},
-  (* Short options *)
-  {name = "i", val = "i", has_arg = true},
-  {name = "u", val = "u", has_arg = true},
-  {name = "r", val = "r", has_arg = true},
-  {name = "l", val = "l", has_arg = false}
-]
+let options =
+  [
+    (* Long options *)
+    {name = "help"     , val = "h", has_arg = false},
+    {name = "install"  , val = "i", has_arg = true },
+    {name = "uninstall", val = "u", has_arg = true },
+    {name = "reinstall", val = "r", has_arg = true },
+    {name = "list"     , val = "l", has_arg = false},
+    (* Short options *)
+    {name = "h", val = "h", has_arg = false},
+    {name = "i", val = "i", has_arg = true },
+    {name = "u", val = "u", has_arg = true },
+    {name = "r", val = "r", has_arg = true },
+    {name = "l", val = "l", has_arg = false},
+  ]
 in
 
 let (opts, _) =
   try CmdArg.get options (cdr command_line)
-  with e -> (
-    eprintf "> error: i didn't get what do you want\n";
+  with e ->
+    if e is Undefined_option then
+      eprintf "> error: undefined command-line option\n";
+    else if e is Unexpected_argument then
+      eprintf "> error: unexpected command-line option argument\n";
+    else if e is Missing_argument then
+      eprintf "> error: missing argument for command-line option\n";
+    else
+      eprintf "> error while parsing command-line options\n";
     exit 1;
-  )
 in
 
 List.iter (fn (opt, arg) ->
   try
+    help!         if opt eq "h" else
     install arg   if opt eq "i" else
     uninstall arg if opt eq "u" else
     reinstall arg if opt eq "r" else
     list_modules! if opt eq "l" else ()
-  with Failure -> (
+  with e ->
     eprintf "> failure\n";
     exit 1;
-  )
 ) opts;
 
 ()

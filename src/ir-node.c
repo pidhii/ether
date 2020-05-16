@@ -202,6 +202,14 @@ destroy_ir_node(eth_ir_node *node)
       free(node->multimatch.exprs);
       eth_destroy_ir_match_table(node->multimatch.table);
       break;
+
+    case ETH_IR_UPDATE:
+      eth_unref_ir_node(node->update.src);
+      for (int i = 0; i < node->update.n; ++i)
+        eth_unref_ir_node(node->update.fields[i]);
+      free(node->update.fields);
+      free(node->update.ids);
+      break;
   }
 
   if (node->loc)
@@ -397,6 +405,23 @@ eth_ir_mkrcrd(eth_type *type, eth_ir_node *const fields[])
   node->mkrcrd.fields = malloc(sizeof(eth_ir_node*) * type->nfields);
   for (int i = 0; i < type->nfields; ++i)
     eth_ref_ir_node(node->mkrcrd.fields[i] = fields[i]);
+  return node;
+}
+
+eth_ir_node*
+eth_ir_update(eth_ir_node *src, eth_ir_node *const fields[], size_t const ids[],
+    int n)
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_UPDATE);
+  eth_ref_ir_node(node->update.src = src);
+  node->update.n = n;
+  node->update.fields = malloc(sizeof(eth_ir_node*) * n);
+  node->update.ids = malloc(sizeof(size_t) * n);
+  for (int i = 0; i < n; ++i)
+  {
+    eth_ref_ir_node(node->update.fields[i] = fields[i]);
+    node->update.ids[i] = ids[i];
+  }
   return node;
 }
 

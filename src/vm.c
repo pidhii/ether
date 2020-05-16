@@ -86,6 +86,7 @@ eth_vm(eth_bytecode *bc)
     [ETH_OPC_SETEXN   ] = &&INSN_SETEXN,
     [ETH_OPC_GETEXN   ] = &&INSN_GETEXN,
     [ETH_OPC_MKRCRD   ] = &&INSN_MKRCRD,
+    [ETH_OPC_UPDTRCRD ] = &&INSN_UPDTRCRD,
   };
 #define FAST_DISPATCH_NEXT() goto *insn[(++ip)->opc]
 #define FAST_DISPATCH() goto *insn[ip->opc]
@@ -434,8 +435,8 @@ eth_vm(eth_bytecode *bc)
               }
             }
           }
-          if (eth_unlikely(i == n))
-            test = 0;
+          /*if (eth_unlikely(i == n))*/
+            /*test = 0;*/
         }
         FAST_DISPATCH_NEXT();
       }
@@ -480,8 +481,8 @@ eth_vm(eth_bytecode *bc)
 
       OP(MKRCRD)
       {
-        eth_type *type = ip->mkrcrd.data->type;
-        uint64_t *vids = ip->mkrcrd.data->vids;
+        eth_type *type = ip->mkrcrd.type;
+        uint64_t *vids = ip->mkrcrd.vids;
         int n = type->nfields;
         assert(n > 0);
         eth_tuple *rec;
@@ -499,6 +500,76 @@ eth_vm(eth_bytecode *bc)
         for (int i = 0; i < n; ++i)
           rec->data[i] = r[vids[i]];
         r[ip->mkrcrd.out] = ETH(rec);
+        FAST_DISPATCH_NEXT();
+      }
+
+      OP(UPDTRCRD)
+      {
+        eth_t const x = r[ip->updtrcrd.src];
+        eth_type *restrict const type = x->type;
+        test = type->flag == ETH_TFLAG_RECORD;
+        if (eth_likely(test))
+        {
+          size_t *restrict const ids = type->fieldids;
+          const int n = type->nfields;
+          assert(n > 0);
+          const int N = ip->updtrcrd.n;
+          eth_tuple *rec;
+          switch (n)
+          {
+            case 1:  rec = eth_alloc_h1(); break;
+            case 2:  rec = eth_alloc_h2(); break;
+            case 3:  rec = eth_alloc_h3(); break;
+            case 4:  rec = eth_alloc_h4(); break;
+            case 5:  rec = eth_alloc_h5(); break;
+            case 6:  rec = eth_alloc_h6(); break;
+            default: rec = malloc(sizeof(eth_tuple) + sizeof(eth_t) * n);
+          }
+          int I = 0;
+          size_t id = ip->updtrcrd.ids[I];
+          int i;
+          ids[n] = id;
+          for (i = 0; true; ++i)
+          {
+            if (ids[i] == id)
+            {
+              if (eth_unlikely(i == n))
+              { // not found
+                test = 0;
+                for (i = n - 1; i >= 0; --i)
+                  eth_dec(rec->data[i]);
+                switch (n)
+                {
+                  case 1:  eth_free_h1(rec); break;
+                  case 2:  eth_free_h2(rec); break;
+                  case 3:  eth_free_h3(rec); break;
+                  case 4:  eth_free_h4(rec); break;
+                  case 5:  eth_free_h5(rec); break;
+                  case 6:  eth_free_h6(rec); break;
+                  default: free(rec);
+                }
+                break;
+              }
+              else
+              {
+                eth_ref(rec->data[i] = r[ip->updtrcrd.vids[I++]]);
+                if (I == N)
+                {
+                  for (i += 1; i < n; ++i)
+                    eth_ref(rec->data[i] = eth_tup_get(x, i));
+                  eth_init_header(rec, type);
+                  eth_ref(ETH(rec)); // due to PHI-semantics
+                  r[ip->updtrcrd.out] = ETH(rec);
+                  break;
+                }
+                id = ip->updtrcrd.ids[I];
+                ids[n] = id;
+              }
+            }
+            else
+              eth_ref(rec->data[i] = eth_tup_get(x, i));
+          }
+        }
         FAST_DISPATCH_NEXT();
       }
     }

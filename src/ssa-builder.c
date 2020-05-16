@@ -1203,6 +1203,29 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
       return out;
     }
 
+    case ETH_IR_UPDATE:
+    {
+      int n = ir->update.n;
+      int vids[n];
+      int src = build(bldr, tape, ir->update.src, false, e);
+      for (int i = 0; i < n; ++i)
+        vids[i] = build(bldr, tape, ir->update.fields[i], false, e);
+      int out = new_val(bldr, RC_RULES_PHI);
+      eth_ssa_tape *errtape = eth_create_ssa_tape();
+      int exnvid = new_val(bldr, RC_RULES_DISABLE);
+      eth_t exn = eth_exn(eth_sym("Type_error"));
+      eth_write_insn(errtape, eth_insn_cval(exnvid, exn));
+      write_throw(bldr, errtape, exnvid, ir->loc);
+      eth_insn *insn = eth_insn_if_update(out, src, vids, ir->update.ids, n,
+          eth_insn_nop(), errtape->head);
+      insn->iff.likely = 1;
+      eth_destroy_ssa_tape(errtape);
+      bldr->vinfo[out]->creatloc = insn;
+      bldr->vinfo[out]->type = bldr->vinfo[src]->type;
+      eth_write_insn(tape, insn);
+      return out;
+    }
+
     case ETH_IR_THROW:
     {
       int vid = build(bldr, tape, ir->throw.exn, false, e);
@@ -1258,6 +1281,14 @@ is_using(eth_insn *insn, int vid)
       return false;
 
     case ETH_INSN_IF:
+      if (insn->iff.test == ETH_TEST_UPDATE)
+      {
+        for (int i = 0; i < insn->iff.update.n; ++i)
+        {
+          if (insn->iff.update.vids[i] == vid)
+            return true;
+        }
+      }
       return insn->iff.cond == vid;
 
     case ETH_INSN_TRY:
@@ -1798,7 +1829,7 @@ handle_movs(ssa_builder *bldr, kill_info *kinfo)
     eth_insn *mov = bldr->movs.data[imov];
     int n;
     const int *vids = get_moved_vids(mov, &n);
-    
+
     for (int i = 0; i < n; ++i)
     {
       int vid = vids[i];

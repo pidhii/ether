@@ -383,6 +383,12 @@ atom
     cod_vec_destroy($2.keys);
     cod_vec_destroy($2.vals);
   }
+  | '{' expr WITH record maybe_coma '}' {
+    $$ = eth_ast_update($2, $4.vals.data, $4.keys.data, $4.vals.len);
+    cod_vec_destroy($4.vals);
+    cod_vec_iter($4.keys, i, x, free(x));
+    cod_vec_destroy($4.keys);
+  }
   | MODULE CAPSYMBOL '=' expr END {
   /*| MODULE CAPSYMBOL '=' module_body END {*/
     $$ = eth_ast_module($2, $4);
@@ -428,7 +434,7 @@ expr
     free($4);
     LOC($$, @1);
   }
-  | TRY expr WITH pattern RARROW expr %prec WITH {
+  | TRY expr WITH pattern RARROW expr {
     $$ = eth_ast_try($4, $2, $6, 1);
     LOC($$, @$);
   }

@@ -137,7 +137,14 @@ eth_destroy_insn(eth_insn *insn)
       eth_destroy_insn_list(insn->iff.thenbr);
       eth_destroy_insn_list(insn->iff.elsebr);
       if (insn->iff.test == ETH_TEST_MATCH)
+      {
         eth_destroy_ssa_pattern(insn->iff.pat);
+      }
+      else if (insn->iff.test == ETH_TEST_UPDATE)
+      {
+        free(insn->iff.update.vids);
+        free(insn->iff.update.ids);
+      }
       break;
 
     case ETH_INSN_FN:
@@ -277,6 +284,20 @@ eth_insn_if_match(int out, int cond, eth_ssa_pattern *pat, eth_insn *thenbr,
   eth_insn *insn = eth_insn_if(out, cond, thenbr, elsebr);
   insn->iff.test = ETH_TEST_MATCH;
   insn->iff.pat = pat;
+  return insn;
+}
+
+eth_insn*
+eth_insn_if_update(int out, int src, int *vids, size_t *ids, int n,
+    eth_insn *thenbr, eth_insn *elsebr)
+{
+  eth_insn *insn = eth_insn_if(out, src, thenbr, elsebr);
+  insn->iff.test = ETH_TEST_UPDATE;
+  insn->iff.update.vids = malloc(sizeof(int) * n);
+  memcpy(insn->iff.update.vids, vids, sizeof(int) * n);
+  insn->iff.update.ids = malloc(sizeof(size_t) * n);
+  memcpy(insn->iff.update.ids, ids, sizeof(size_t) * n);
+  insn->iff.update.n = n;
   return insn;
 }
 
@@ -538,6 +559,9 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
           break;
         case ETH_TEST_MATCH:
           fprintf(stream, "<match ...> ");
+          break;
+        case ETH_TEST_UPDATE:
+          fprintf(stream, "<update ...> ");
           break;
       }
       fprintf(stream, "%%%d then\n", insn->iff.cond);

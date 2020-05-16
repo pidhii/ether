@@ -234,7 +234,7 @@ eth_record_type(char *const fields[], size_t n)
 
   char *sortedfields[n];
   ptrdiff_t offsets[n];
-  char totstr[totlen + 1];
+  char totstr[totlen + 2];
   totstr[0] = 0;
   char *p = totstr;
   // ---

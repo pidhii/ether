@@ -1416,6 +1416,7 @@ typedef enum {
   ETH_AST_ACCESS,
   ETH_AST_TRY,
   ETH_AST_MKRCRD,
+  ETH_AST_UPDATE,
   ETH_AST_MULTIMATCH,
 } eth_ast_tag;
 
@@ -1466,6 +1467,7 @@ struct eth_ast {
     struct { bool isctype; union { eth_type *ctype; char *str; } type;
              char **fields; eth_ast **vals; int n; }
       mkrcrd;
+    struct { eth_ast *src, **vals; char **fields; int n; } update;
     struct { eth_match_table *table; eth_ast **exprs; } multimatch;
     struct { eth_ast *expr; } doo;
   };
@@ -1552,6 +1554,10 @@ eth_ast_make_record(const char *type, char *const fields[],
 eth_ast*
 eth_ast_make_record_with_type(eth_type *type, char *const fields[],
    eth_ast *const vals[], int n);
+
+eth_ast*
+eth_ast_update(eth_ast *src, eth_ast *const vals[], char *const fields[], int n);
+
 /*
 eth_ast*
 eth_ast_do(eth_ast *expr);
@@ -1625,6 +1631,7 @@ enum eth_ir_tag {
   ETH_IR_STARTFIX,
   ETH_IR_ENDFIX,
   ETH_IR_MKRCRD,
+  ETH_IR_UPDATE,
   ETH_IR_THROW,
 };
 
@@ -1660,6 +1667,7 @@ struct eth_ir_node {
     struct { int *vars, n; eth_ir_node *body; } startfix;
     struct { int *vars, n; eth_ir_node *body; } endfix;
     struct { eth_type *type; eth_ir_node **fields; } mkrcrd;
+    struct { eth_ir_node *src, **fields; size_t *ids; int n; } update;
     struct { eth_ir_node *exn; } throw;
     struct { eth_ir_match_table *table; eth_ir_node **exprs; } multimatch;
   };
@@ -1728,6 +1736,10 @@ eth_ir_bind(int const varids[], eth_ir_node *const vals[], int n,
 
 eth_ir_node*
 eth_ir_mkrcrd(eth_type *type, eth_ir_node *const fields[]);
+
+eth_ir_node*
+eth_ir_update(eth_ir_node *src, eth_ir_node *const fields[], size_t const ids[],
+    int n);
 
 eth_ir_node*
 eth_ir_throw(eth_ir_node *exn);
@@ -1984,6 +1996,7 @@ typedef enum {
   ETH_TEST_NOTFALSE,
   ETH_TEST_TYPE,
   ETH_TEST_MATCH,
+  ETH_TEST_UPDATE,
 } eth_test_tag;
 
 struct eth_insn {
@@ -1995,10 +2008,17 @@ struct eth_insn {
     struct { int vid; } var;
     struct { int fn, *args; int nargs; } apply;
     struct { int *args; int nargs; } loop;
-    struct { int cond, likely; eth_insn *thenbr, *elsebr; eth_test_tag test;
-             union { eth_type *type; eth_ssa_pattern *pat; };
-             eth_toplvl_flag toplvl; }
-      iff;
+    struct {
+      int cond, likely;
+      eth_insn *thenbr, *elsebr;
+      eth_test_tag test;
+      union {
+        eth_type *type;
+        eth_ssa_pattern *pat;
+        struct { size_t *ids; int *vids; int n; } update;
+      };
+      eth_toplvl_flag toplvl;
+    } iff;
     struct { eth_binop op; int lhs, rhs; } binop;
     struct { eth_unop op; int vid; } unop;
     struct { int arity, *caps, ncap; eth_ast *ast; eth_ir *ir; eth_ssa *ssa; }
@@ -2014,6 +2034,7 @@ struct eth_insn {
     struct { int id, likely; eth_insn *trybr, *catchbr; } try;
     struct { } getexn;
     struct { int *vids; eth_type *type; } mkrcrd;
+    struct { int src, *vids; size_t *ids; } updtrcrd;
   };
   eth_insn *prev;
   eth_insn *next;
@@ -2050,6 +2071,10 @@ eth_insn_if_test_type(int out, int cond, eth_type *type, eth_insn *thenbr,
 eth_insn* __attribute__((malloc))
 eth_insn_if_match(int out, int cond, eth_ssa_pattern *pat, eth_insn *thenbr,
     eth_insn *elsebr);
+
+eth_insn*
+eth_insn_if_update(int out, int src, int *vids, size_t *ids, int n,
+    eth_insn *thenbr, eth_insn *elsebr);
 
 eth_insn* __attribute__((malloc))
 eth_insn_mov(int out, int vid);
@@ -2233,6 +2258,7 @@ typedef enum {
   ETH_OPC_GETEXN,
 
   ETH_OPC_MKRCRD,
+  ETH_OPC_UPDTRCRD,
 } eth_opc;
 
 struct eth_bc_insn {
@@ -2293,9 +2319,9 @@ struct eth_bc_insn {
     struct { uint64_t vid; } setexn;
     struct { uint64_t out; } getexn;
 
-    struct { uint64_t out;
-             struct { eth_type *type; uint64_t vids[]; } *restrict data; }
-      mkrcrd;
+    struct { uint64_t out; eth_type *type; uint64_t *vids; } mkrcrd;
+    struct { uint32_t out; uint16_t src, n; uint64_t *vids; size_t *ids; }
+      updtrcrd;
   };
 };
 

@@ -40,7 +40,7 @@ destroy_insn(eth_bc_insn *insn)
       break;
 
     case ETH_OPC_MKRCRD:
-      free(insn->mkrcrd.data);
+      free(insn->mkrcrd.vids);
       break;
 
     case ETH_OPC_LOADRCRD:
@@ -50,6 +50,11 @@ destroy_insn(eth_bc_insn *insn)
 
     case ETH_OPC_LOOP:
       free(insn->loop.vids);
+      break;
+
+    case ETH_OPC_UPDTRCRD:
+      free(insn->updtrcrd.vids);
+      free(insn->updtrcrd.ids);
       break;
 
     default:
@@ -453,10 +458,29 @@ write_mkrcrd(bc_builder *bldr, int out, int const vids[], eth_type *type)
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_MKRCRD;
   insn->mkrcrd.out = out;
-  insn->mkrcrd.data = malloc(sizeof(*insn->mkrcrd.data) + sizeof(uint64_t) * n);
-  insn->mkrcrd.data->type = type;
+  insn->mkrcrd.type = type;
+  insn->mkrcrd.vids = malloc(sizeof(uint64_t) * n);
   for (int i = 0; i < n; ++i)
-    insn->mkrcrd.data->vids[i] = vids[i];
+    insn->mkrcrd.vids[i] = vids[i];
+  return bldr->len - 1;
+}
+
+static int
+write_updtrcrd(bc_builder *bldr, int out, int src, int const vids[],
+    size_t const ids[], int n)
+{
+  eth_bc_insn *insn = append_insn(bldr);
+  insn->opc = ETH_OPC_UPDTRCRD;
+  insn->updtrcrd.out = out;
+  insn->updtrcrd.src = src;
+  insn->updtrcrd.n = n;
+  insn->updtrcrd.vids = malloc(sizeof(uint64_t) * n);
+  insn->updtrcrd.ids = malloc(sizeof(size_t) * n);
+  for (int i = 0; i < n; ++i)
+  {
+    insn->updtrcrd.vids[i] = vids[i];
+    insn->updtrcrd.ids[i] = ids[i];
+  }
   return bldr->len - 1;
 }
 
@@ -653,8 +677,9 @@ build(bc_builder *bldr, eth_insn *ssa)
         cod_vec_init(jmps);
 
         // create PHI
+        int phi = -1;
         if (ip->out >= 0)
-          new_reg(bldr, ip->out);
+          phi = new_reg(bldr, ip->out);
 
         // test:
         int cond = get_reg(bldr, ip->iff.cond);
@@ -671,10 +696,20 @@ build(bc_builder *bldr, eth_insn *ssa)
           case ETH_TEST_MATCH:
             build_pattern(bldr, ip->iff.pat, cond, &jmps);
             goto if_match;
+
+          case ETH_TEST_UPDATE:
+            assert(phi >= 0);
+            int n = ip->iff.update.n;
+            int vids[n];
+            for (int i = 0; i < n; ++i)
+              vids[i] = get_reg(bldr, ip->iff.update.vids[i]);
+            write_updtrcrd(bldr, phi, cond, vids, ip->iff.update.ids, n);
+            goto if_update;
         }
 
 if_notfalse:
 if_type:
+if_update:
         // branches:
         if (ip->iff.likely > 0)
         {

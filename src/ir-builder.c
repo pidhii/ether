@@ -1114,6 +1114,41 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         irvals[i] = build(bldr, vals[i].val, e);
       return eth_ir_mkrcrd(type, irvals);
     }
+
+    case ETH_AST_UPDATE:
+    {
+      eth_ir_node *src = build(bldr, ast->update.src, e);
+
+      int n = ast->update.n;
+      char *fields[n];
+      memcpy(fields, ast->update.fields, sizeof(char*) * n);
+      typedef struct { eth_ast *val; char *field; size_t id; } value;
+      value vals[n];
+
+      for (int i = 0; i < n; ++i)
+      {
+        vals[i].val = ast->update.vals[i];
+        vals[i].field = ast->update.fields[i];
+        vals[i].id = eth_get_symbol_id(eth_sym(ast->update.fields[i]));
+      }
+
+      int cmp(const void *p1, const void *p2)
+      {
+        const value *v1 = p1;
+        const value *v2 = p2;
+        return v1->id - v2->id;
+      }
+      qsort(vals, n, sizeof(value), cmp);
+
+      eth_ir_node *irvals[n];
+      size_t ids[n];
+      for (int i = 0; i < n; ++i)
+      {
+        irvals[i] = build(bldr, vals[i].val, e);
+        ids[i] = vals[i].id;
+      }
+      return eth_ir_update(src,  irvals, ids, n);
+    }
   }
 
   eth_error("undefined AST-node");

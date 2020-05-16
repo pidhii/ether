@@ -2,7 +2,7 @@ prefix=@ETHER_PREFIX@
 includedir=${prefix}/include
 libdir=${prefix}/lib
 
-Name: opium
+Name: ether
 Description: Interpreter
 Version: @PROJECT_VERSION@
 Cflags: -I${includedir}

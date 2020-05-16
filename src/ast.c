@@ -310,6 +310,17 @@ destroy_ast_node(eth_ast *ast)
       free(ast->mkrcrd.vals);
       break;
 
+    case ETH_AST_UPDATE:
+      eth_unref_ast(ast->update.src);
+      for (int i = 0; i < ast->update.n; ++i)
+      {
+        free(ast->update.fields[i]);
+        eth_unref_ast(ast->update.vals[i]);
+      }
+      free(ast->update.fields);
+      free(ast->update.vals);
+      break;
+
     case ETH_AST_MULTIMATCH:
       for (int i = 0; i < ast->multimatch.table->h; ++i)
         eth_unref_ast(ast->multimatch.exprs[i]);
@@ -610,6 +621,23 @@ eth_ast_make_record_with_type(eth_type *type, char *const fields[],
   }
   return ast;
 }
+
+eth_ast*
+eth_ast_update(eth_ast *src, eth_ast *const vals[], char *const fields[], int n)
+{
+  eth_ast *ast = create_ast_node(ETH_AST_UPDATE);
+  eth_ref_ast(ast->update.src = src);
+  ast->update.n = n;
+  ast->update.fields = malloc(sizeof(char*) * n);
+  ast->update.vals = malloc(sizeof(eth_ast*) * n);
+  for (int i = 0; i < n; ++i)
+  {
+    ast->update.fields[i] = strdup(fields[i]);
+    eth_ref_ast(ast->update.vals[i] = vals[i]);
+  }
+  return ast;
+}
+
 /*
 static eth_ast*
 build_do(eth_ast *ast)

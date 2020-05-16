@@ -155,7 +155,9 @@ syn match ethConditional /\<if\%(\s\+let\)\?\>/
 syn region ethTryWith matchgroup=ethException start=/\<try\>/ end=/\<with\>/ contains=TOP skipwhite skipnl
 syn region ethMatch matchgroup=ethConditional start=/\<case\>/ end=/\<of\>/ contains=TOP skipwhite skipnl
 syn match ethConditional /\<then\>/
+syn match ethConditional /\<else\>/
 syn region ethBegin matchgroup=ethConditional start=/\<then\s\+begin\>/ end=/\<end\>/ contains=TOP skipwhite skipnl
+syn region ethBegin matchgroup=ethConditional start=/\<else\s\+begin\>/ end=/\<end\>/ contains=TOP skipwhite skipnl
 syn region ethBegin matchgroup=ethKeyword start=/\<begin\>/ end=/\<end\>/ contains=TOP skipwhite skipnl
 syn region ethObject matchgroup=ethKeyword start=/\<object\>/ end=/\<end\>/ contains=TOP skipnl skipwhite
 syn keyword ethMethod method contained containedin=ethObject
@@ -166,7 +168,7 @@ syn keyword ethVal val contained containedin=ethObject
 hi link ethVal Keyword
 syn region ethDo matchgroup=ethKeyword start=/\<do\>/ end=/\<done\>/ contains=TOP skipwhite skipnl
 syn keyword ethKeyword let rec and or in as with
-syn keyword ethConditional unless when else otherwize
+syn keyword ethConditional unless when otherwize
 syn keyword ethAssert assert
 
 syn keyword ethLazy lazy
