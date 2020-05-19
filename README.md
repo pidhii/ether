@@ -79,7 +79,7 @@
 # [Examples](#examples)
 
 ## Basics
-```ocaml
+```
 -- Simple function
 let square x = x * x in
 print (square 2);
@@ -176,7 +176,7 @@ print x;
 ```
 
 ## Merge sort
-```ocaml
+```
 -- Split a list on two halves using slow/fast iterators approach.
 --
 -- Note that the left part is returned in reversed order, however it does not
@@ -341,7 +341,7 @@ test exactly on being *"not false"*, rather than *"not false or non-null"*.
 
 These are singleton objects, thus you can use comparison on physical equality
 for these. Also you can use `true` and `false` in patterns.
-```ocaml
+```
 not true is false;
 not false is true;
 
@@ -402,8 +402,8 @@ Strings are implemented similar to `std::string` in C++:
 
 #### `<str> ++ <str>`
 Concatenate two strings.  
-```ocaml
-"foo" ++ "bar" (* => "foobar" *)
+```
+"foo" ++ "bar" -- => "foobar"
 ```
 Exceptions: `Type_error`
 
@@ -411,64 +411,64 @@ Exceptions: `Type_error`
 Format string.  Available formats currently are:
 - ~w - "native" representation of the object
 - ~d - "beautiful" representation of the object
-```ocaml
-format "this gives ~w" "str" (* => "this gives \"str\"" *)
-format "this gives ~d" "str" (* => "this gives str" *)
+```
+format "this gives ~w" "str" -- => "this gives \"str\""
+format "this gives ~d" "str" -- => "this gives str"
 ```
 Use ~~ to escape '~'-character.  
 Exceptions: `Type_error`, `Format_error`
 
 #### `concat <list>`
 Concatenate *list* of strings.
-```ocaml
-concat ["a", "b", "c"] (* => "abc" *)
-concat ["str"] (* => "str" *)
-concat [] (* => "" *)
+```
+concat ["a", "b", "c"] -- => "abc" 
+concat ["str"] -- => "str" 
+concat [] -- => "" 
 ```
 Exceptions: `Type_error`, `Invalid_argument`
 
 #### `concat_with <sep> <list>`
 Concatenate *list* of strings iserting *sep* inbetween.
-```ocaml
-concat_with " " ["Hello", "World"] (* => "Hello World" *)
-concat_with "_" ["str"] (* => "str" *)
-concat_with "_" [] (* => "" *)
+```
+concat_with " " ["Hello", "World"] -- => "Hello World" 
+concat_with "_" ["str"] -- => "str" 
+concat_with "_" [] -- => "" 
 ```
 Exceptions: `Type_error`, `Invalid_argument`
 
 #### `strlen <str>`
 Return string length.
-```ocaml
-strlen "abc" (* => 3 *)
-strlen "abc\x00abc" (* => 7 *)
+```
+strlen "abc" -- => 3 
+strlen "abc\x00abc" -- => 7 
 ```
 Exceptions: `Type_error`
 
 #### `to_upper <str>`
 Return string with all chracters taken from *str* but set in upper case.
-```ocaml
-to_upper "foo_Bar-bazZZ" (* => FOO_BAR-BAZZZ *)
+```
+to_upper "foo_Bar-bazZZ" -- => FOO_BAR-BAZZZ 
 ```
 Exceptions: `Type_error`
 
 #### `to_lower <str>`
 Return string with all chracters taken from *str* but set in lower case.
-```ocaml
-to_lower "foo_Bar-bazZZ" (* => foo_bar-bazzz *)
+```
+to_lower "foo_Bar-bazZZ" -- => foo_bar-bazzz 
 ```
 Exceptions: `Type_error`
 
 #### `chr <num>`
 Return character dfined by the code of *num*.
-```ocaml
-chr 0x61 (* => "a" *)
+```
+chr 0x61 -- => "a" 
 ```
 Exceptions: `Type_error`, `Invalid_argument`
 
 #### `ord <char>`
 Return character code.
-```ocaml
-ord "a" (* => 97 (0x61) *)
+```
+ord "a" -- => 97 (0x61) 
 ```
 Exceptions: `Type_error`, `Invalid_argument`
 
