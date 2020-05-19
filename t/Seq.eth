@@ -1,0 +1,45 @@
+
+let rec pub range from to =
+  if from < to then
+    from :: fn -> range (from + 1) to
+  else []
+in
+
+let rec pub map f s =
+  if let x :: xs = s then
+    f x :: fn -> map f xs!
+  else []
+in
+
+let rec pub filter f s =
+  if let x :: xs = s then
+    if f x then x :: fn -> filter f xs!
+    else filter f xs!
+  else []
+in
+
+let rec pub fold_left f z s =
+  if let x :: xs = s then
+    fold_left f (f z x) xs!
+  else z
+in
+
+let rec pub of_list l =
+  if let x :: xs = l then
+    x :: fn -> of_list xs
+  else []
+in
+
+let pub cons x s = x :: fn -> s in
+
+let rec pub to_rev_list s =
+  let rec loop s l =
+    if let x :: xs = s then
+      loop xs! (x :: l)
+    else l
+  in loop s []
+in
+
+let pub to_list s = List.rev (to_rev_list s) in
+
+nil

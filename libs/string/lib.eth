@@ -1,35 +1,33 @@
 
-(* ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
- *                                Strings
- * -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
- * Constructors:
- * - format
- * - cat (C)
- * - join
- *
- * Miscelenious:
- * - len (C)
- * - to_upper (C)
- * - to_lower (C)
- * - chr (C)
- * - ord (C)
- * - to_number (C)
- * - to_symobl (C)
- *
- * Stripping:
- * - chomp (C)
- * - chop (C)
- *
- * Slicing (C):
- * - sub
- *
- * Comparison:
- * - cmp (C)
- * - casecmp (C)
- *
- * Searching:
- * - find
- *)
+--------------------------------------------------------------------------------
+--                                Strings
+-- Constructors:
+-- * format
+-- * cat (C)
+-- * join
+--
+-- Miscelenious:
+-- * len (C)
+-- * to_upper (C)
+-- * to_lower (C)
+-- * chr (C)
+-- * ord (C)
+-- * to_number (C)
+-- * to_symobl (C)
+--
+-- Stripping:
+-- * chomp (C)
+-- * chop (C)
+--
+-- Slicing (C):
+-- * sub
+--
+-- Comparison:
+-- * cmp (C)
+-- * casecmp (C)
+--
+-- Searching:
+-- * find
 let pub join sep xs =
   if xs is nil then ""
   else if let hd::[] = xs then hd
@@ -44,13 +42,11 @@ let pub sub s x =
   else fn y -> __substr s x y;
 in
 
-(* ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
- *                                Regexp
- * -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
- * - match (C)
- * - rev_split (C)
- * - split
- *)
+--------------------------------------------------------------------------------
+--                                Regexp
+-- * match (C)
+-- * rev_split (C)
+-- * split
 let pub split re str = List.rev $ rev_split re str in
 
 let pub find pat s =

@@ -29,35 +29,13 @@ eth_ast_ident_pattern(const char *ident)
 }
 
 eth_ast_pattern*
-eth_ast_unpack_pattern(const char *type, char *const fields[],
-    eth_ast_pattern *pats[], int n)
+eth_ast_unpack_pattern(eth_type *type, char *const fields[],
+    eth_ast_pattern *const pats[], int n)
 {
   eth_ast_pattern *pat = malloc(sizeof(eth_ast_pattern));
   pat->rc = 0;
   pat->tag = ETH_PATTERN_UNPACK;
-  pat->unpack.isctype = false;
-  pat->unpack.type.str = strdup(type);
-  pat->unpack.fields = malloc(sizeof(char*) * n);
-  pat->unpack.subpats = malloc(sizeof(eth_ast_pattern*) * n);
-  pat->unpack.n = n;
-  pat->unpack.alias = NULL;
-  for (int i = 0; i < n; ++i)
-  {
-    pat->unpack.fields[i] = strdup(fields[i]);
-    eth_ref_ast_pattern(pat->unpack.subpats[i] = pats[i]);
-  }
-  return pat;
-}
-
-eth_ast_pattern*
-eth_ast_unpack_pattern_with_type(eth_type *type, char *const fields[],
-    eth_ast_pattern *pats[], int n)
-{
-  eth_ast_pattern *pat = malloc(sizeof(eth_ast_pattern));
-  pat->rc = 0;
-  pat->tag = ETH_PATTERN_UNPACK;
-  pat->unpack.isctype = true;
-  pat->unpack.type.ctype = type;
+  pat->unpack.type = type;
   pat->unpack.fields = malloc(sizeof(char*) * n);
   pat->unpack.subpats = malloc(sizeof(eth_ast_pattern*) * n);
   pat->unpack.n = n;
@@ -104,12 +82,14 @@ eth_set_pattern_alias(eth_ast_pattern *pat, const char *alias)
   switch (pat->tag)
   {
     case ETH_PATTERN_UNPACK:
-      assert(pat->unpack.alias == NULL);
+      if (pat->unpack.alias)
+        free(pat->unpack.alias);
       pat->unpack.alias = strdup(alias);
       break;
 
     case ETH_PATTERN_RECORD:
-      assert(pat->record.alias == NULL);
+      if (pat->record.alias)
+        free(pat->record.alias);
       pat->record.alias = strdup(alias);
       break;
 
@@ -137,8 +117,6 @@ destroy_ast_pattern(eth_ast_pattern *pat)
         free(pat->unpack.fields[i]);
         eth_unref_ast_pattern(pat->unpack.subpats[i]);
       }
-      if (not pat->unpack.isctype)
-        free(pat->unpack.type.str);
       free(pat->unpack.fields);
       free(pat->unpack.subpats);
       if (pat->unpack.alias)
@@ -299,8 +277,6 @@ destroy_ast_node(eth_ast *ast)
       break;
 
     case ETH_AST_MKRCRD:
-      if (not ast->mkrcrd.isctype)
-        free(ast->mkrcrd.type.str);
       for (int i = 0; i < ast->mkrcrd.n; ++i)
       {
         free(ast->mkrcrd.fields[i]);
@@ -557,7 +533,6 @@ eth_ast_access(eth_ast *expr, const char *field)
   return ast;
 }
 
-
 eth_ast*
 eth_ast_try(eth_ast_pattern *pat, eth_ast *try, eth_ast *catch, int likely)
 {
@@ -574,7 +549,7 @@ eth_ast_try(eth_ast_pattern *pat, eth_ast *try, eth_ast *catch, int likely)
 
   // use exception-pattern so that user is actually matching with `what'
   char *what = "what";
-  pat = eth_ast_unpack_pattern_with_type(eth_exception_type, &what, &pat, 1);
+  pat = eth_ast_unpack_pattern(eth_exception_type, &what, &pat, 1);
 
   eth_ast *ast = create_ast_node(ETH_AST_TRY);
   ast->try.pat = pat;
@@ -587,30 +562,11 @@ eth_ast_try(eth_ast_pattern *pat, eth_ast *try, eth_ast *catch, int likely)
 }
 
 eth_ast*
-eth_ast_make_record(const char *type, char *const fields[],
-    eth_ast *const vals[], int n)
+eth_ast_make_record(eth_type *type, char *const fields[], eth_ast *const vals[],
+    int n)
 {
   eth_ast *ast = create_ast_node(ETH_AST_MKRCRD);
-  ast->mkrcrd.isctype = false;
-  ast->mkrcrd.type.str = strdup(type);
-  ast->mkrcrd.fields = malloc(sizeof(char*) * n);
-  ast->mkrcrd.vals = malloc(sizeof(eth_ast*) * n);
-  ast->mkrcrd.n = n;
-  for (int i = 0; i < n; ++i)
-  {
-    eth_ref_ast(ast->mkrcrd.vals[i] = vals[i]);
-    ast->mkrcrd.fields[i] = strdup(fields[i]);
-  }
-  return ast;
-}
-
-eth_ast*
-eth_ast_make_record_with_type(eth_type *type, char *const fields[],
-   eth_ast *const vals[], int n)
-{
-  eth_ast *ast = create_ast_node(ETH_AST_MKRCRD);
-  ast->mkrcrd.isctype = true;
-  ast->mkrcrd.type.ctype = type;
+  ast->mkrcrd.type = type;
   ast->mkrcrd.fields = malloc(sizeof(char*) * n);
   ast->mkrcrd.vals = malloc(sizeof(eth_ast*) * n);
   ast->mkrcrd.n = n;
@@ -638,71 +594,6 @@ eth_ast_update(eth_ast *src, eth_ast *const vals[], char *const fields[], int n)
   return ast;
 }
 
-/*
-static eth_ast*
-build_do(eth_ast *ast)
-{
-  switch (ast->tag)
-  {
-    case ETH_AST_APPLY:
-    {
-      int n = ast->apply.nargs;
-      eth_ast *args[n];
-      for (int i = 0; i < n; ++i)
-        args[i] = build_do(ast->apply.args[i]);
-      eth_ast *fn = build_do(ast->apply.fn);
-      return eth_ast_apply(fn, args, n);
-    }
-
-    case ETH_AST_IF:
-    {
-      eth_ast *cond = build_do(ast->iff.cond);
-      eth_ast *then = build_do(ast->iff.then);
-      eth_ast *els = build_do(ast->iff.els);
-      eth_ast *iff = eth_ast_if(cond, then, els);
-      iff->iff.toplvl = ast->iff.toplvl;
-      return iff;
-    }
-
-    case ETH_AST_SEQ:
-    {
-    }
-
-    case ETH_AST_LET:
-
-    case ETH_AST_LETREC:
-
-    case ETH_AST_BINOP:
-
-    case ETH_AST_MATCH:
-
-    case ETH_AST_IMPORT:
-
-    case ETH_AST_AND:
-
-    case ETH_AST_OR:
-
-    case ETH_AST_ACCESS:
-
-    case ETH_AST_TRY:
-
-    case ETH_AST_MKRCRD:
-
-    case ETH_AST_MULTIMATCH:
-      eth_error("unimplemented");
-      abort();
-
-    default:
-      return ast;
-  }
-}
-
-eth_ast*
-eth_ast_do(eth_ast *expr)
-{
-  return build_do(expr);
-}
-*/
 eth_match_table*
 eth_create_match_table(eth_ast_pattern **const tab[], eth_ast *const exprs[],
     int h, int w)

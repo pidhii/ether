@@ -216,10 +216,10 @@ print ("struct:", struct);
 print ("struct.foo:", struct.foo);
 let { ba } = struct in print ("struct.ba:", ba);
 let { ba } = struct in print ("struct.ba:", ba);
-(*print ("struct.ba.b:", struct.ba.b);*)
-(*print ("struct.ba.a:", struct.ba.a);*)
-(*print ("struct.r:", struct.r);*)
-(*print ("struct.ba (second):", struct.ba);*)
+--print ("struct.ba.b:", struct.ba.b);
+--print ("struct.ba.a:", struct.ba.a);
+--print ("struct.r:", struct.r);
+--print ("struct.ba (second):", struct.ba);
 
 print "------------- test lazy ----------------";
 let x = lazy (print "calculation"; 42) in

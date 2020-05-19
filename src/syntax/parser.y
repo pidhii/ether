@@ -284,7 +284,7 @@ fn_atom
       fields[i] = fieldsbuf[i];
       sprintf(fields[i], "_%d", i+1);
     }
-    eth_ast *tuple = eth_ast_make_record_with_type(eth_tuple_type(n), fields,
+    eth_ast *tuple = eth_ast_make_record(eth_tuple_type(n), fields,
         $3.data, n);
     cod_vec_destroy($3);
     // --
@@ -373,12 +373,12 @@ atom
       fields[i] = fieldsbuf[i];
       sprintf(fields[i], "_%d", i+1);
     }
-    $$ = eth_ast_make_record_with_type(eth_tuple_type(n), fields, $2.data, n);
+    $$ = eth_ast_make_record(eth_tuple_type(n), fields, $2.data, n);
     cod_vec_destroy($2);
   }
   | '{' record maybe_coma '}' {
     eth_type *type = eth_record_type($2.keys.data, $2.keys.len);
-    $$ = eth_ast_make_record_with_type(type, $2.keys.data, $2.vals.data, $2.keys.len);
+    $$ = eth_ast_make_record(type, $2.keys.data, $2.vals.data, $2.keys.len);
     cod_vec_iter($2.keys, i, x, free(x));
     cod_vec_destroy($2.keys);
     cod_vec_destroy($2.vals);
@@ -407,7 +407,7 @@ form
   | CAPSYMBOL atom {
     eth_type *type = eth_variant_type($1);
     char *_0 = "_0";
-    $$ = eth_ast_make_record_with_type(type, &_0, &$2, 1);
+    $$ = eth_ast_make_record(type, &_0, &$2, 1);
     free($1);
     LOC($$, @$);
   }
@@ -563,17 +563,17 @@ expr
   | expr DDOT expr {
     char *fields[] = { "l", "r" };
     eth_ast *vals[] = { $1, $3 };
-    $$ = eth_ast_make_record_with_type(eth_rangelr_type, fields, vals, 2);
+    $$ = eth_ast_make_record(eth_rangelr_type, fields, vals, 2);
   }
   | expr DDDOT {
     char *fields[] = { "l" };
     eth_ast *vals[] = { $1 };
-    $$ = eth_ast_make_record_with_type(eth_rangel_type, fields, vals, 1);
+    $$ = eth_ast_make_record(eth_rangel_type, fields, vals, 1);
   }
   | DDDOT expr {
     char *fields[] = { "r" };
     eth_ast *vals[] = { $2 };
-    $$ = eth_ast_make_record_with_type(eth_ranger_type, fields, vals, 1);
+    $$ = eth_ast_make_record(eth_ranger_type, fields, vals, 1);
   }
   | '-' expr %prec UMINUS {
     $$ = eth_ast_binop(ETH_SUB, eth_ast_cval(eth_num(0)), $2);
@@ -742,7 +742,7 @@ atomic_pattern
     }
     // ---
     eth_type *type = eth_tuple_type(n);
-    $$ = eth_ast_unpack_pattern_with_type(type, fields, $2.data, n);
+    $$ = eth_ast_unpack_pattern(type, fields, $2.data, n);
     // ---
     cod_vec_destroy($2);
   }
@@ -762,7 +762,7 @@ atomic_pattern
     {
       char *fields[2] = { "car", "cdr" };
       eth_ast_pattern *pats[2] = { $2.data[i], $$ };
-      $$ = eth_ast_unpack_pattern_with_type(eth_pair_type, fields, pats, 2);
+      $$ = eth_ast_unpack_pattern(eth_pair_type, fields, pats, 2);
     }
     // ---
     cod_vec_destroy($2);
@@ -779,7 +779,7 @@ form_pattern
   | CAPSYMBOL atomic_pattern {
     eth_type *type = eth_variant_type($1);
     char *_0 = "_0";
-    $$ = eth_ast_unpack_pattern_with_type(type, &_0, &$2, 1);
+    $$ = eth_ast_unpack_pattern(type, &_0, &$2, 1);
     free($1);
   }
 ;
@@ -789,22 +789,22 @@ pattern
   | pattern CONS pattern {
     char *fields[2] = { "car", "cdr" };
     eth_ast_pattern *pats[2] = { $1, $3 };
-    $$ = eth_ast_unpack_pattern_with_type(eth_pair_type, fields, pats, 2);
+    $$ = eth_ast_unpack_pattern(eth_pair_type, fields, pats, 2);
   }
   | pattern DDOT pattern {
     char *fields[2] = { "l", "r" };
     eth_ast_pattern *pats[2] = { $1, $3 };
-    $$ = eth_ast_unpack_pattern_with_type(eth_rangelr_type, fields, pats, 2);
+    $$ = eth_ast_unpack_pattern(eth_rangelr_type, fields, pats, 2);
   }
   | pattern DDDOT {
     char *fields[1] = { "l" };
     eth_ast_pattern *pats[1] = { $1 };
-    $$ = eth_ast_unpack_pattern_with_type(eth_rangel_type, fields, pats, 1);
+    $$ = eth_ast_unpack_pattern(eth_rangel_type, fields, pats, 1);
   }
   | DDDOT pattern {
     char *fields[1] = { "r" };
     eth_ast_pattern *pats[1] = { $2 };
-    $$ = eth_ast_unpack_pattern_with_type(eth_ranger_type, fields, pats, 1);
+    $$ = eth_ast_unpack_pattern(eth_ranger_type, fields, pats, 1);
   }
   | pattern AS SYMBOL {
     $$ = $1;

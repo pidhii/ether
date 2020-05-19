@@ -80,12 +80,12 @@
 
 ## Basics
 ```ocaml
-(* Simple function *)
+-- Simple function
 let square x = x * x in
 print (square 2);
 
 
-(* Recursive function *)
+-- Recursive function
 let rec factorial x =
   if x <= 1 then 1
   else x * factorial (x - 1)
@@ -93,7 +93,7 @@ in
 print (factorial 3);
 
 
-(* Multiple cross-referencing functions *)
+-- Multiple cross-referencing functions
 let rec even? x =
   x == 0 || odd? (x - 1)
 and odd? x =
@@ -102,7 +102,7 @@ in
 print (even? 42);
 
 
-(* Better way to write factorial: tail-recursion *)
+-- Better way to write factorial: tail-recursion
 let rec factorial2 x acc =
   if x <= 1 then acc
   else factorial2 (x - 1) (acc * x)
@@ -110,31 +110,31 @@ in
 print (factorial2 1000000 1);
 
 
-(* Symbols *)
+-- Symbols
 print Symbols_begin_with_UpperCase_character;
 
 
-(* Exception handling *)
+-- Exception handling
 try factorial 1000000
 with Stack_overflow -> print "Stack overflow";
 
 
-(* Currying *)
+-- Currying
 let add x y = x + y in
 let increment = add 1 in
 print (increment 3);
 
 
-(* Lists *)
+-- Lists
 print ([1, 2, 3] eq 1 :: 2 :: 3 :: []);
 
 
-(* Pattern matching *)
+-- Pattern matching
 let x :: xs = [1, 2, 3] in
 print (x, xs);
 
 
-(* Higher order functions *)
+-- Higher order functions
 let rec map f xs =
   if let x :: xs' = xs then
     f x :: map f xs'
@@ -143,137 +143,129 @@ in
 print (map increment [1, 2, 3]);
 
 
-(* Closures *)
+-- Closures
 print (map (fn x -> x^2) [1, 2, 3]);
 
 
-(* Tuples *)
+-- Tuples
 let (a, b) = (A, B) in
 print (a, b);
 
 
-(* Records *)
+-- Records
 let { login } = { name = "Jill", login = "Mikle Jackson" } in
 print login;
 
 
-(* Variants (tagged wrapper-types) *)
+-- Variants (tagged wrapper-types)
 let safe_div x y = Some (x / y) if y /= 0 else false in
 let Some x = safe_div 1 2 in
 print x;
 
-
-(* FizzBuzz
- *
- * Note a `()`: this is a synonim for `nil`.
- *)
-for_each [1 .. 100] (fn i ->
+-- FizzBuzz
+--
+-- `|>` is a "pipe"-operator from OCaml: `x |> f` is equivalent to `f x`
+-- `()` is a synonim for `nil`.
+-- And you can find here alternative way to write if-statement:
+--   `<then> if <cond> else <else>`
+[1 .. 100] |> List.iter (fn i ->
   print i if i mod 3 /= 0 && i mod 5 /= 0 else
   print "Fizz" if i mod 3 == 0 else
   print "Buzz" if i mod 5 == 0 else ()
-);
+)
 ```
 
 ## Merge sort
 ```ocaml
-(*
- * Split a list on two halves using slow/fast iterators approach.
- *
- * Note that the left part is returned in reversed order, however it does not
- * realy matter for the algorithm.
- *
- * Also note that the `loop` is calling itself from a propper tail position.
- * Thus this function is evaluated withing fixed/finite stack frame, and it
- * will never generate a `Stack_overflow` exception.
- *)
+-- Split a list on two halves using slow/fast iterators approach.
+--
+-- Note that the left part is returned in reversed order, however it does not
+-- realy matter for the algorithm.
+--
+-- Also note that the `loop` is calling itself from a propper tail position.
+-- Thus this function is evaluated withing fixed/finite stack frame, and it
+-- will never generate a `Stack_overflow` exception.
 let split xs =
-  (* This is the way you write loops: just create an auxilary function *)
+  --This is the way you write loops: just create an auxilary function
   let rec loop slow fast acc =
-    (* Try to move fast iterator on two positions further; otherwize, we are
-     * done  *)
+    -- Try to move fast iterator on two positions further; otherwize, we are
+    -- done
     if let _::_::fast = fast then
-      (* Now move slow iterator by one position and continue the loop *)
+      --Now move slow iterator by one position and continue the loop
       let x :: slow = slow in
       loop slow fast (x :: acc)
     else (acc, slow)
   in loop xs xs nil
 in
 
-(*
- * Merge two sorted lists preserving order.
- *)
+-- Merge two sorted lists preserving order.
 let merge xs ys =
   let rec loop xs ys acc =
-    (* This dispatch would look much better with MATCH expression like in OCaml,
-     * however I haven't yet implemented it. *)
+    -- This dispatch would look much better with MATCH expression like in OCaml,
+    -- however I haven't yet implemented it.
     if let x :: xs' = xs then
       if let y :: ys' = ys then
-        (* Take the smallest of x and y and prepend it to the result *)
+        -- Take the smallest of x and y and prepend it to the result
         if x < y
         then loop xs' ys  (x :: acc)
         else loop xs  ys' (y :: acc)
       else
-        (* No more ys left, append all remaining xs to the result *)
-        rev_append acc xs
+        -- No more ys left, append all remaining xs to the result
+        List.rev_append acc xs
     else
-      (* No more xs left, append all remaining ys to the result *)
-      rev_append acc ys
+      -- No more xs left, append all remaining ys to the result
+      List.rev_append acc ys
   in
   loop xs ys nil
 in
 
-(*
- * Sort a list of numbers in increasing order.
- *)
+-- Sort a list of numbers in increasing order.
 let rec sort xs =
-  (* Check if length of the list is greater than 1; otherwize, there is nothing
-   * to sort *)
+  -- Check if length of the list is greater than 1; otherwize, there is nothing
+  -- to sort
   if let _::_::_ = xs then
     let (l, r) = split xs in
     merge (sort l) (sort r)
   else xs
 in
 
-(*
- * Read a list of numbers.
- *)
+-- Read a list of numbers.
 let read_list file =
-  (* Builtin `read_line_of` will throw `End_of_file` exception upon reaching
-   * end of file, so we could use TRY/WITH expression to do the job.
-   *
-   * However, we want to be tail-recursive, but it is impossible to achieve
-   * if we perform recursive call withing TRY-block. Instead, we will wrap
-   * the `read_line_of` into a new function and use "Maybe"-monad (sort of).
-   *
-   * In case of succesfull reading, it will return a variant `Some <line>`;
-   * otherwize, it returns nil. Note that in fact it does not matter what do
-   * we return in case of End_of_file exception. We only need it to be NOT the
-   * `Some _`-variant.
-   *)
+  -- Builtin `read_line_of` will throw `End_of_file` exception upon reaching
+  -- end of file, so we could use TRY/WITH expression to do the job.
+  --
+  -- However, we want to be tail-recursive, but it is impossible to achieve
+  -- if we perform recursive call withing TRY-block. Instead, we will wrap
+  -- the `read_line_of` into a new function and use "Maybe"-monad (sort of).
+  --
+  -- In case of succesfull reading, it will return a variant `Some <line>`;
+  -- otherwize, it returns nil. Note that in fact it does not matter what do
+  -- we return in case of End_of_file exception. We only need it to be NOT the
+  -- `Some _`-variant.
   let read_line_opt file =
     try Some (read_line_of file)
     with End_of_file -> ()
   in
 
-  (* And here is the actual loop to read the list *)
+  -- And here is the actual loop to read the list
   let rec loop acc =
     if let Some x = read_line_opt file then
-      (* Note the `$`: this is an application operator from Haskell. The whole
-       * role of `$` is to have the lowest precedence of all operators *)
-      loop $ (to_number $ chomp x) :: acc
+      -- Note the `$`: this is an application operator from Haskell. The whole
+      -- role of `$` is to have the lowest precedence of all operators
+      loop $ String.(to_number $ chomp x) :: acc
     else acc
   in loop nil
 in
 
-(* Read a list from standard input.
- *
- * Press <ENTER> after each entered number. ...we could have done it better,
- * however I think this is out of the scope of this tutorial.
- * Use <C-d> (close input) to finish entering the list. *)
+-- Read a list from standard input.
+--
+-- Press <ENTER> after each entered number. ...we could have done it better,
+-- however I think this is out of the scope of this tutorial.
+-- Use <C-d> (close input) to finish entering the list.
 let l = read_list stdin in
 print ("Given list:", l);
 
-(* Sort it *)
+-- Sort it
 print ("Sorted list:", sort l);
 ```
 
@@ -332,7 +324,7 @@ If you use [NERDCommenter](https://www.vim.org/scripts/script.php?script_id=1218
 you can also add:
 ```vim
 let g:NERDCustomDelimiters = {
-  \ 'ether': { 'left': '(*', 'right': '*)', 'nested': 1 }
+  \ 'ether': { 'left': '--', 'leftAlt': '--[[', 'rightAlt': ']]', 'nested': 1 }
   \ }
 ```
 

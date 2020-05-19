@@ -52,9 +52,11 @@ let s:type = '^\s*\%(class\|let\|type\)\>.*='
 function! s:GetLineWithoutFullComment(lnum)
  let lnum = prevnonblank(a:lnum - 1)
  let lline = substitute(getline(lnum), '(\*.*\*)\s*$', '', '')
+ let lline = substitute(lline, '--.*$', '', '')
  while lline =~ '^\s*$' && lnum > 0
    let lnum = prevnonblank(lnum - 1)
    let lline = substitute(getline(lnum), '(\*.*\*)\s*$', '', '')
+   let lline = substitute(lline, '--.*$', '', '')
  endwhile
  return lnum
 endfunction

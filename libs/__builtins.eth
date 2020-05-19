@@ -30,20 +30,20 @@ let pub __builtin (not) x = not x in
 
 let pub (∘) f g x = f (g x) in
 
-(* Application *)
+-- Application
 let pub ($) f x = f x in
 let pub (|>) x f = f x in
 
-(* Pairs *)
+-- Pairs
 let pub car (x::_) = x in
 let pub cdr (_::x) = x in
 
-(* Tuples *)
+-- Tuples
 let pub first  {_1 = x} = x in
 let pub second {_2 = x} = x in
 let pub third  {_3 = x} = x in
 
-(* Functions *)
+-- Functions
 let pub id x = x in
 
 let pub flip f x y = f y x in
@@ -51,52 +51,51 @@ let pub const x = fn _ -> x in
 let pub curry f = fn x y -> f (x, y) in
 let pub uncurry f = fn (x, y) -> f x y in
 
-(* Math *)
+-- Math
 let pub even? x = x mod 2 == 0 in
 let pub odd?  x = x mod 2 == 1 in
 
-(*let ( *<< ) f g = *)
+--let ( *<< ) f g =
 let compose_va f g =
   let rec aux x =
     if function? x then
       fn y -> aux (x y)
-      (*x >> aux *)
+      --x >> aux
     else f x
   in aux g
 in
-(*let ( >>* ) = flip ( <<* ) in *)
+--let ( >>* ) = flip ( <<* ) in
 
-(* ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
- *                                   IO
- * -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
- * - open_in
- * - open_out
- * - open_append
- * - open_pipe_in
- * - open_pipe_out
- * - close (C)
- *
- * Input:
- * - input (C)
- * - read_of (C)
- * - read
- * - read_line_of (C)
- * - read_line
- * - read_file (C)
- *
- * Output:
- * - print (C)
- * - print_to
- * - newline (C)
- * - write_to (C)
- * - write
- * - printf
- * - eprintf
- *
- * Miscelenious:
- * - tell (C)
- * - seek (C)
- *)
+--------------------------------------------------------------------------------
+--                                   IO
+--
+-- * open_in
+-- * open_out
+-- * open_append
+-- * open_pipe_in
+-- * open_pipe_out
+-- * close (C)
+--
+-- Input:
+-- * input (C)
+-- * read_of (C)
+-- * read
+-- * read_line_of (C)
+-- * read_line
+-- * read_file (C)
+--
+-- Output:
+-- * print (C)
+-- * print_to
+-- * newline (C)
+-- * write_to (C)
+-- * write
+-- * printf
+-- * eprintf
+--
+-- Miscelenious:
+-- * tell (C)
+-- * seek (C)
 let pub open_in path = __open path "r" in
 let pub open_out path = __open path "w" in
 let pub open_append path = __open path "a" in
@@ -133,12 +132,10 @@ let pub seek file pos =
   in __seek file offs whence
 in
 
-(* ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
- *                                System
- * -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
- *)
+--------------------------------------------------------------------------------
+--                                System
 let pub system = compose_va __system format in
-(*let pub system = __system <<* format in *)
+--let pub system = __system <<* format in
 
 
 ()

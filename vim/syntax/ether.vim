@@ -6,7 +6,7 @@ if exists("b:current_syntax")
   finish
 endif
 
-set comments=sr:(*,mb:*,ex:*)
+set comments=:--,sr:(*,mb:*,ex:*)
 
 set iskeyword+=?,'
 
@@ -121,7 +121,7 @@ syn keyword ethBuiltinFunction load
 " Miscelenious:
 syn keyword Special command_line
 
-syn region ethOf matchgroup=StorageClass start=/\<of\>/ matchgroup=ethType end=/\[\?\<[a-z]\k\+\>]\?/ skipwhite skipnl contains=ethSymbol,ethIdentifier
+syn region ethOf matchgroup=StorageClass start=/\<of\>/ matchgroup=ethType end=/\k\+\>/ skipwhite skipnl contains=ethSymbol,ethIdentifier
 
 syn match ethModule /\<[A-Z][a-zA-Z0-9_]*\s*\./he=e-1 nextgroup=ethModule,ethMember
 syn match ethMember /\<[a-z_][a-zA-Z0-9_]*['?]?\>/
@@ -190,9 +190,14 @@ syn match ethLambda /->/
 "syn match ethTableRef /::/ nextgroup=ethKey
 "syn match ethKey /\k\+/ contained
 
-syn region Comment start=/^#!/ end=/$/ contains=ethCommentLabel
-syn region Comment start=/(\*\%([^)]\|$\)/ end=/\*)/ contains=Comment skipwhite skipnl
+syn region ethShebangComment start=/^#!/ end=/$/ contains=ethCommentLabel
+syn region ethComment start=/--/ end=/$/ contains=ethCommentLabel
+syn region ethMultiComment start=/--\[\[/ end=/\]\]/ contains=ethMultiComment skipwhite skipnl
+"syn region luaInnerComment   contained transparent start="\[\[" end="\]\]"
 syn match ethCommentLabel /[A-Z]\w*:/ contained
+hi link ethShebangComment Comment
+hi link ethComment Comment
+hi link ethMultiComment Comment
 
 " Integer
 syn match Number '\<\d\+'

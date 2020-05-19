@@ -8,34 +8,30 @@ let split =
   in fn xs -> loop xs xs nil
 in
 
-(*
- * Merge two sorted lists preserving order.
- *)
+-- Merge two sorted lists preserving order.
 let merge =
   let rec loop xs ys acc =
     if let x::xs' = xs then
       if let y::ys' = ys then
-        (* Take the smallest of x and y *)
+        -- Take the smallest of x and y
         if x < y
         then loop xs' ys  (x::acc)
         else loop xs  ys' (y::acc)
       else
-        (* No more ys left, append all remaining xs to the result *)
+        -- No more ys left, append all remaining xs to the result
         List.rev_append acc xs
     else
-      (* No more xs left, append all remaining ys to the result *)
+      -- No more xs left, append all remaining ys to the result
       List.rev_append acc ys
   in fn xs ys -> loop xs ys nil
 in
 
-(*
- * Sort a list of numbers in increasing order.
- *)
+-- Sort a list of numbers in increasing order.
 let rec sort xs =
   if let _::_::_ = xs then
-    (* Split xs by halves *)
+    -- Split xs by halves
     let (l, r) = split xs in
-    (* Sort each of the halves and merge them back *)
+    -- Sort each of the halves and merge them back
     merge (sort l) (sort r)
   else xs
 in

@@ -23,7 +23,6 @@ typedef struct ir_builder {
   eth_var_list *vars;
   int capoffs;
   int nvars;
-  cod_vec(eth_type*) types;
   cod_vec(char*) defidents;
   cod_vec(int  ) defvarids;
   cod_vec(eth_attr*) defattrs;
@@ -41,7 +40,6 @@ create_ir_builder(ir_builder *parent)
   bldr->vars = eth_create_var_list();
   bldr->capoffs = 0;
   bldr->nvars = 0;
-  cod_vec_init(bldr->types);
   cod_vec_init(bldr->defidents);
   cod_vec_init(bldr->defvarids);
   cod_vec_init(bldr->defattrs);
@@ -54,7 +52,6 @@ static void
 destroy_ir_builder(ir_builder *bldr)
 {
   eth_destroy_var_list(bldr->vars);
-  cod_vec_destroy(bldr->types);
   cod_vec_iter(bldr->defidents, i, x, free(x));
   cod_vec_destroy(bldr->defidents);
   cod_vec_destroy(bldr->defvarids);
@@ -124,22 +121,6 @@ trace_pub_var(ir_builder *bldr, const char *ident, int varid, eth_attr *attr,
     *e = 1;
     eth_print_location(loc, stderr);
   }
-}
-
-static eth_type*
-find_type(ir_builder *bldr, const char *name)
-{
-  for (size_t i = 0; i < bldr->types.len; ++i)
-  {
-    eth_type *ty = bldr->types.data[i];
-    if (strcmp(ty->name, name) == 0)
-      return ty;
-  }
-
-  if (bldr->parent)
-    return find_type(bldr->parent, name);
-  else
-    return NULL;
 }
 
 static eth_t
@@ -363,20 +344,7 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
 
     case ETH_PATTERN_UNPACK:
     {
-      eth_type *type = NULL;
-      if (pat->unpack.isctype)
-        type = pat->unpack.type.ctype;
-      else
-      {
-        type = find_type(bldr, pat->unpack.type.str);
-        if (type == NULL)
-        {
-          eth_error("no such type '%s'", pat->unpack.type.str);
-          *e = 1;
-          eth_print_location(loc, stderr);
-          return eth_ir_ident_pattern(-1); // just some dummy
-        }
-      }
+      eth_type *type = pat->unpack.type;
 
       // aliasing:
       int alias = new_vid(bldr);
@@ -1044,20 +1012,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
 
     case ETH_AST_MKRCRD:
     {
-      eth_type *type;
-      if (not ast->mkrcrd.isctype)
-      {
-        type = find_type(bldr, ast->mkrcrd.type.str);
-        if (type == NULL)
-        {
-          eth_error("no such type '%s'", ast->mkrcrd.type.str);
-          *e = 1;
-          eth_print_location(ast->loc, stderr);
-          return eth_ir_error();
-        }
-      }
-      else
-        type = ast->mkrcrd.type.ctype;
+      eth_type *type = ast->mkrcrd.type;
 
       if (not eth_is_plain(type))
       {
@@ -1067,36 +1022,18 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         return eth_ir_error();
       }
 
-      int nsup = ast->mkrcrd.n;
-      int ntot = type->nfields;
-      char *fields[ntot];
-      memcpy(fields, ast->mkrcrd.fields, sizeof(char*) * nsup);
+      assert(ast->mkrcrd.n == type->nfields);
+      int n = type->nfields;
       typedef struct { eth_ast *val; char *field; ptrdiff_t offs; } value;
-      value vals[ntot];
+      value vals[n];
 
-      // validate supplied fields
-      for (int i = 0; i < nsup; ++i)
+      for (int i = 0; i < n; ++i)
       {
-        eth_field *fldinfo = eth_get_field(type, fields[i]);
-        if (not fldinfo)
-        {
-          eth_error("no field '%s' in record %s", fields[i],
-              ast->mkrcrd.type.str);
-          *e = 1;
-          eth_print_location(ast->loc, stderr);
-          return eth_ir_error();
-        }
+        eth_field *fldinfo = eth_get_field(type, ast->mkrcrd.fields[i]);
+        assert(fldinfo);
         vals[i].val = ast->mkrcrd.vals[i];
         vals[i].field = ast->mkrcrd.fields[i];
         vals[i].offs = fldinfo->offs;
-      }
-      // add missing fields
-      if (nsup != ntot)
-      {
-        eth_error("default values for fields are not implemented");
-        *e = 1;
-        eth_print_location(ast->loc, stderr);
-        return eth_ir_error();
       }
 
       // sort fields
@@ -1107,10 +1044,10 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         const value *v2 = p2;
         return v1->offs - v2->offs;
       }
-      qsort(vals, ntot, sizeof(value), cmp);
+      qsort(vals, n, sizeof(value), cmp);
 
-      eth_ir_node *irvals[ntot];
-      for (int i = 0; i < ntot; ++i)
+      eth_ir_node *irvals[n];
+      for (int i = 0; i < n; ++i)
         irvals[i] = build(bldr, vals[i].val, e);
       return eth_ir_mkrcrd(type, irvals);
     }
@@ -1120,8 +1057,6 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       eth_ir_node *src = build(bldr, ast->update.src, e);
 
       int n = ast->update.n;
-      char *fields[n];
-      memcpy(fields, ast->update.fields, sizeof(char*) * n);
       typedef struct { eth_ast *val; char *field; size_t id; } value;
       value vals[n];
 

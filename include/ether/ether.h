@@ -1172,8 +1172,10 @@ eth_create_ref(eth_t init);
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                             ATTRIBUTES
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-#define ETH_ATTR_BUILTIN (1 << 0)
-#define ETH_ATTR_PUB     (1 << 1)
+typedef enum {
+  ETH_ATTR_BUILTIN = (1 << 0),
+  ETH_ATTR_PUB     = (1 << 1),
+} eth_attr_t;
 
 typedef struct {
   int rc;
@@ -1335,67 +1337,198 @@ eth_print_location_opt(eth_location *loc, FILE *stream, int opt);
 
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
-//                         ABSTRACT SYNTAX TREE
+//                                PATTERNS
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+/** @defgroup Patterns Patterns
+ * @{ */
+
 typedef enum {
+  /**
+   * @brief Dummy placeholder (i.e. `_`)
+   */
   ETH_PATTERN_DUMMY,
+
+  /**
+   * @brief Wildcard pattern for variable binding
+   */
   ETH_PATTERN_IDENT,
+
+  /**
+   * @brief Destructure a value (of known type)
+   */
   ETH_PATTERN_UNPACK,
+
+  /**
+   * @brief Match with a constant
+   *
+   * @note Currently only works for values which can equal physical equality.
+   */
   ETH_PATTERN_CONSTANT,
+
+  /**
+   * @brief Destructure (arbitrary) record
+   *
+   * @note Currently can be used to access **a** field of **any** plain type.
+   * (simultanious access to multiple fields only works for records)
+   */
   ETH_PATTERN_RECORD,
 } eth_pattern_tag;
 
+/**
+ * @brief Check whether a pattern is a wildcard
+ *
+ * Wildcard patterns match any given value.<br>
+ * Patterns recognized as *wildcard* are
+ * - ETH_PATTERN_DUMMY
+ * - ETH_PATTERN_IDENT
+ */
 static inline bool
 eth_is_wildcard(eth_pattern_tag tag)
 {
   return tag == ETH_PATTERN_DUMMY or tag == ETH_PATTERN_IDENT;
 }
 
+/** @} Patterns */
+
+
+// ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
+//                         ABSTRACT SYNTAX TREE
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+/** @defgroup AST Abstract Syntax Tree
+ * @{ */
+
+/***************************************************************************//**
+ * @defgroup AstPatterns AST Patterns
+ *
+ * Here you can find information for how to create and work with patterns on the
+ * level of Abstract Syntax Tree.
+ *
+ * Constructors for all pattern types listed in section \ref Patterns are given:
+ * | Pattern              | Constructor                |
+ * |----------------------|----------------------------|
+ * | ETH_PATTERN_DUMMY    | eth_ast_dummy_pattern()    |
+ * | ETH_PATTERN_IDENT    | eth_ast_ident_pattern()    |
+ * | ETH_PATTERN_CONSTANT | eth_ast_constant_pattern() |
+ * | ETH_PATTERN_UNPACK   | eth_ast_unpack_pattern()   |
+ * | ETH_PATTERN_RECORD   | eth_ast_record_pattern()   |
+ * Unpack and record patterns can be also supplied with an alias.
+ *
+ * Pattern objects are supplied with reference counters. Interface implementing
+ * RC-protocol for shared objects is given by
+ * - eth_ref_ast_pattern()
+ * - eth_unref_ast_pattern()
+ * - eth_drop_ast_pattern()
+ *
+ * However, one usually creates pattern just before feeding it to some AST node,
+ * which will increment reference count, and so, will take the ownership. Thus
+ * manual management of reference count is (in most cases) not required from
+ * the user.
+ *
+ * @{ */
+
 typedef struct eth_ast_pattern eth_ast_pattern;
 struct eth_ast_pattern {
-  eth_pattern_tag tag;
-  int rc;
+  eth_pattern_tag tag; /**< @brief Pattern type */
+  int rc; /**< @brief Reference counter */
+
   union {
-    struct { char *str; int attr; } ident;
-    struct { bool isctype; union { char *str; eth_type *ctype; } type; char **fields;
-             eth_ast_pattern **subpats; int n; char *alias; }
-      unpack;
-    struct { eth_t val; } constant;
-    struct { char **fields; eth_ast_pattern **subpats; int n; char *alias; } record;
+    struct {
+      char *str; /**< Identifier string */
+      int attr; /**< Identifier attribute (see eth_attr_t) */
+    } ident; /**< @brief Identifier pattern */
+
+    struct {
+      eth_type *type; /**< Target type */
+      char **fields; /**< Field names */
+      eth_ast_pattern **subpats; /**< Nested patterns for fields */
+      int n; /**< N fields */
+      char *alias; /**< Alias */
+    } unpack; /**< @brief Known-type destructuring pattern */
+
+    struct { eth_t val; } constant; /**< @brief Constant pattern */
+
+    struct {
+      char **fields; /**< Field names */
+      eth_ast_pattern **subpats; /**< Nested patterns for fields */
+      int n; /**< N fields */
+      char *alias; /**< Alias */
+    } record; /**< @brief Record destructuring pattern */
   };
 };
 
+/**
+ * Corresponding native syntax for this pattern is `_`.
+ * @see \ref ETH_PATTERN_DUMMY
+ */
 eth_ast_pattern*
 eth_ast_dummy_pattern(void);
 
+/**
+ * @see \ref ETH_PATTERN_IDENT
+ */
 eth_ast_pattern*
 eth_ast_ident_pattern(const char *ident);
 
+/**
+ * In native syntax this pattern is used for matching with builtin compund types
+ * like tupes, variants and pairs.
+ *
+ * @see \ref ETH_PATTERN_UNPACK
+ */
 eth_ast_pattern*
-eth_ast_unpack_pattern(const char *type, char *const fields[],
-    eth_ast_pattern *pats[], int n);
+eth_ast_unpack_pattern(eth_type *type, char *const fields[],
+    eth_ast_pattern *const pats[], int n);
 
+/**
+ * @see \ref ETH_PATTERN_CONSTANT
+ */
 eth_ast_pattern*
-eth_ast_unpack_pattern_with_type(eth_type *type, char *const fields[],
-    eth_ast_pattern *pats[], int n);
+eth_ast_constant_pattern(eth_t cval);
 
-eth_ast_pattern*
-eth_ast_constant_pattern(eth_t sym);
-
+/**
+ * Corresponding native syntax for this pattern is `{ ... }`.
+ *
+ * @see \ref ETH_PATTERN_RECORD
+ */
 eth_ast_pattern*
 eth_ast_record_pattern(char *const fields[], eth_ast_pattern *pats[], int n);
 
+/**
+ * Aliases are used to bind matched expression with an identifier.
+ *
+ * Corresponding native syntax for this utility is `<pattern> as <identifier>`.
+ *
+ * @note Only allowed for \ref eth_ast_unpack_pattern() "unpack"- and
+ * \ref eth_ast_record_pattern() "record"-patterns. Repeated application of this
+ * function to the same eth_ast_pattern object will overwrite previous alias
+ * (if present) with the new one.
+ */
 void
 eth_set_pattern_alias(eth_ast_pattern *pat, const char *alias);
 
+/**
+ * @brief Increment reference count
+ */
 void
 eth_ref_ast_pattern(eth_ast_pattern *pat);
 
+/**
+ * @brief Decrement reference count
+ */
 void
 eth_unref_ast_pattern(eth_ast_pattern *pat);
 
+/**
+ * @brief Release pattern
+ */
 void
 eth_drop_ast_pattern(eth_ast_pattern *pat);
+
+/** @} AstPatterns */
+
+/***************************************************************************//**
+ * @defgroup AstNodes AST Nodes
+ * @{ */
 
 typedef enum {
   ETH_AST_CVAL,
@@ -1464,9 +1597,7 @@ struct eth_ast {
     struct { eth_ast_pattern *pat; eth_ast *trybr, *catchbr; int likely;
              bool _check_exit; }
       try;
-    struct { bool isctype; union { eth_type *ctype; char *str; } type;
-             char **fields; eth_ast **vals; int n; }
-      mkrcrd;
+    struct { eth_type *type; char **fields; eth_ast **vals; int n; } mkrcrd;
     struct { eth_ast *src, **vals; char **fields; int n; } update;
     struct { eth_match_table *table; eth_ast **exprs; } multimatch;
     struct { eth_ast *expr; } doo;
@@ -1548,22 +1679,16 @@ eth_ast* __attribute__((malloc))
 eth_ast_try(eth_ast_pattern *pat, eth_ast *try, eth_ast *catch, int likely);
 
 eth_ast*
-eth_ast_make_record(const char *type, char *const fields[],
-    eth_ast *const vals[], int n);
-
-eth_ast*
-eth_ast_make_record_with_type(eth_type *type, char *const fields[],
-   eth_ast *const vals[], int n);
+eth_ast_make_record(eth_type *type, char *const fields[], eth_ast *const vals[],
+    int n);
 
 eth_ast*
 eth_ast_update(eth_ast *src, eth_ast *const vals[], char *const fields[], int n);
 
-/*
-eth_ast*
-eth_ast_do(eth_ast *expr);
-*/
 eth_ast*
 eth_ast_multimatch(eth_match_table *table, eth_ast *const exprs[]);
+
+/** @} AstNodes */
 
 typedef struct eth_scanner eth_scanner;
 
@@ -1578,6 +1703,8 @@ eth_get_scanner_input(eth_scanner *scan);
 
 eth_ast* __attribute__((malloc))
 eth_parse(FILE *stream);
+
+/** @} AST */
 
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><

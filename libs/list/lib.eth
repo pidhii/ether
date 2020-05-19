@@ -1,70 +1,68 @@
-(* ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
- *                                  List
- * -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
- * Constructors:
- * - init
- * - unfold_left
- * - unfold_right
- * - range
- * - linspace
- *
- * Miscelenious:
- * - len (C)
- * - rev_append (C)
- * - rev
- * - append
- * - transpose
- *
- * Iterators:
- * - rev_map (C)
- * - rev_mapi (C)
- * - rev_zip (C)
- * - rev_zipi (C)
- * - map
- * - mapi
- * - zip
- * - zipi
- * - iter
- * - iteri
- * - rev_flat_map
- * - flat_map
- * - flatten
- * - rev_filter_map (C)
- * - filter_map
- * - fold_left
- * - fold_right
- * - scan_left
- * - scan_right
- *
- * Slicing:
- * - rev_take
- * - take
- * - drop
- *
- * Scanning:
- * - all?
- * - any?
- * - member?
- * - memq?
- *
- * Searching:
- * - rev_filter
- * - filter
- * - remove
- * - insert
- * - find
- * - maximum (no)
- * - minimum (no)
- * - partition
- *
- * Sorting:
- * - merge
- * - sort
- *
- * Assosiation lists:
- * - assoc
- * - assq
- *)
+--------------------------------------------------------------------------------
+--                                  List
+-- Constructors:
+-- * init
+-- * unfold_left
+-- * unfold_right
+-- * range
+-- * linspace
+--
+-- Miscelenious:
+-- * len (C)
+-- * rev_append (C)
+-- * rev
+-- * append
+-- * transpose
+--
+-- Iterators:
+-- * rev_map (C)
+-- * rev_mapi (C)
+-- * rev_zip (C)
+-- * rev_zipi (C)
+-- * map
+-- * mapi
+-- * zip
+-- * zipi
+-- * iter
+-- * iteri
+-- * rev_flat_map
+-- * flat_map
+-- * flatten
+-- * rev_filter_map (C)
+-- * filter_map
+-- * fold_left
+-- * fold_right
+-- * scan_left
+-- * scan_right
+--
+-- Slicing:
+-- * rev_take
+-- * take
+-- * drop
+--
+-- Scanning:
+-- * all?
+-- * any?
+-- * member?
+-- * memq?
+--
+-- Searching:
+-- * rev_filter
+-- * filter
+-- * remove
+-- * insert
+-- * find
+-- * maximum (no)
+-- * minimum (no)
+-- * partition
+--
+-- Sorting:
+-- * merge
+-- * sort
+--
+-- Assosiation lists:
+-- * assoc
+-- * assq
 
 let rec pub fold_map f z xs =
   if let x :: xs' = xs then
@@ -238,22 +236,22 @@ let rec pub find p xs =
     else find p xs
   else false
 in
-(*let rec pub maximum cmp xs =*)
-  (*if let x :: xs = xs then*)
-    (*if xs is nil then x*)
-    (*else*)
-      (*let select x y = if cmp x y then x else y in*)
-      (*fold_left select x xs*)
-  (*else raise Invalid_argument*)
-(*in*)
-(*let rec pub minimum cmp xs =*)
-  (*if let x :: xs = xs then*)
-    (*if xs is nil then x*)
-    (*else*)
-      (*let select x y = if cmp x y then x else y in*)
-      (*fold_left select x xs*)
-  (*else raise Invalid_argument*)
-(*in*)
+--let rec pub maximum cmp xs =
+  --if let x :: xs = xs then
+    --if xs is nil then x
+    --else
+      --let select x y = if cmp x y then x else y in
+      --fold_left select x xs
+  --else raise Invalid_argument
+--in
+--let rec pub minimum cmp xs =
+  --if let x :: xs = xs then
+    --if xs is nil then x
+    --else
+      --let select x y = if cmp x y then x else y in
+      --fold_left select x xs
+  --else raise Invalid_argument
+--in
 let pub partition p xs =
   let rec loop xs acc1 acc2 =
     if let x::xs = xs then

@@ -53,19 +53,17 @@ OPERATOR [-+%^.$:!<>*/=&|∘]+
 
 [ \t\n] // white spaces
 
-"(*)"     {
-  yylval->string = strdup("*");
-  return SYMBOL;
-}
 "(/)"     {
   yylval->string = strdup("/");
   return SYMBOL;
 }
 
-^"#!".*$ // comments
-"(*" { BEGIN(COMMENT); }
-<COMMENT>"(*" { g_comment_cnt += 1; }
-<COMMENT>"*)" {
+^"#!".*$
+"--".*$
+
+"--[[" { BEGIN(COMMENT); }
+<COMMENT>"--[[" { g_comment_cnt += 1; }
+<COMMENT>"--]]" {
   if (g_comment_cnt > 0)
     g_comment_cnt -= 1;
   else
