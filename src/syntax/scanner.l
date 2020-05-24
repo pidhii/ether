@@ -59,11 +59,11 @@ OPERATOR [-+%^.$:!<>*/=&|∘]+
 }
 
 ^"#!".*$
-"--".*$
+"--".*$ { if (strncmp(yytext, "--[[", 4) == 0) REJECT; }
 
 "--[[" { BEGIN(COMMENT); }
 <COMMENT>"--[[" { g_comment_cnt += 1; }
-<COMMENT>"--]]" {
+<COMMENT>"]]" {
   if (g_comment_cnt > 0)
     g_comment_cnt -= 1;
   else
@@ -164,6 +164,7 @@ __builtin { return BUILTIN; }
 "_"     |
 "^"     |
 "."     |
+":"     |
 "$"     |
 "!"     |
 ">"|"<" |

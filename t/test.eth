@@ -191,17 +191,15 @@ let capitalize str =
 in
 
 let dog color =
-  {
-    color = capitalize color,
-    say = fn self ->
+  { color = capitalize color
+  , say = fn self ->
       printf "~d dog says \"Wof!\"\n" self.color
   }
 in
 
 let cat color =
-  {
-    color = capitalize color,
-    say = fn self ->
+  { color = capitalize color
+  , say = fn self ->
       printf "~d cat says \"Miau\"\n" self.color
   }
 in

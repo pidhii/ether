@@ -292,9 +292,10 @@ typedef struct {
 } eth_field;
 
 #define ETH_TFLAG_PLAIN   0x01
-#define ETH_TFLAG_TUPLE   0x03
-#define ETH_TFLAG_RECORD  0x05
-#define ETH_TFLAG_VARIANT 0x09
+#define ETH_TFLAG_TUPLE   (ETH_TFLAG_PLAIN | 1 << 1)
+#define ETH_TFLAG_RECORD  (ETH_TFLAG_PLAIN | 1 << 2)
+#define ETH_TFLAG_VARIANT (ETH_TFLAG_PLAIN | 1 << 3)
+#define ETH_TFLAG_OBJECT  (ETH_TFLAG_RECORD | 1 << 4)
 
 struct eth_type {
   char *name;
@@ -1082,7 +1083,11 @@ eth_destroy_record_hn(eth_type *type, eth_t x);
 ETH_EXTERN
 eth_type *eth_object_type;
 
-typedef struct eth_object eth_object;
+typedef struct {
+  eth_header header;
+  eth_t fields[];
+} eth_object;
+
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                 file
@@ -1600,7 +1605,6 @@ struct eth_ast {
     struct { eth_type *type; char **fields; eth_ast **vals; int n; } mkrcrd;
     struct { eth_ast *src, **vals; char **fields; int n; } update;
     struct { eth_match_table *table; eth_ast **exprs; } multimatch;
-    struct { eth_ast *expr; } doo;
   };
   eth_location *loc;
 };
