@@ -1,3 +1,5 @@
+FIND_PACKAGE(PkgConfig REQUIRED)
+
 
 # single-file-modules
 file (GLOB STD_LIBS ${CMAKE_SOURCE_DIR}/libs/*.eth)
@@ -73,3 +75,21 @@ set_target_properties (curses
 target_link_libraries (curses -lcurses)
 install (TARGETS curses DESTINATION ${CURSES_DST_DIR})
 install (FILES ${CURSES_SRC_DIR}/lib.eth DESTINATION ${CURSES_DST_DIR})
+
+# Gtk
+set (GTK_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/gtk)
+set (GTK_DST_DIR lib/ether/gtk)
+add_library (gtk SHARED ${GTK_SRC_DIR}/lib.c)
+set_target_properties (gtk
+  PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    PREFIX ""
+    OUTPUT_NAME "gtk")
+pkg_check_modules (GTK3 REQUIRED gtk+-3.0)
+#pkg_check_modules (GOBJECT2 REQUIRED gobject-2.0)
+target_include_directories (gtk PRIVATE ${GTK3_INCLUDE_DIRS})
+target_link_directories (gtk PRIVATE ${GTK3_LIBRARY_DIRS})
+target_link_libraries (gtk PRIVATE ${GTK3_LIBRARIES})
+install (TARGETS gtk DESTINATION ${GTK_DST_DIR})
+install (FILES ${GTK_SRC_DIR}/lib.eth DESTINATION ${GTK_DST_DIR})
+

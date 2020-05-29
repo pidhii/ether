@@ -1,6 +1,12 @@
 %define parse.error verbose
+/* Just for the sake of safety. */
+%define parse.lac full
+/* LAR(1) has issues after adding module-syntax. */
+%define lr.type ielr
+/* Reentrant parser: */
 %define api.pure true
 %param {eth_scanner *yyscanner}
+/* Enable access to code locations. */
 %locations
 
 %{
@@ -91,9 +97,6 @@ int _eth_start_token = -1;
     lc_in in;
     eth_ast *pred;
   } lc_aux;
-
-  cod_vec(module_elt) moduledefs;
-  module_elt moduleelt;
 
   cod_vec(eth_ast*) astvec;
   cod_vec(char*) strvec;
@@ -252,9 +255,7 @@ int _eth_start_token = -1;
 %type<record> Record
 %type<record_pattern> ReocrdPattern
 %type<lc_aux> LcAux
-%type<moduledefs> ModuleDefs
 %type<ast> ModuleBody
-%type<moduleelt> ModuleElt
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %start entry
 
@@ -395,12 +396,12 @@ Atom
     cod_vec_iter($4.keys, i, x, free(x));
     cod_vec_destroy($4.keys);
   }
-  | MODULE CAPSYMBOL '=' Expr END {
-  /*| MODULE CAPSYMBOL '=' ModuleBody END {*/
+  | MODULE CAPSYMBOL '=' ModuleBody END {
     $$ = eth_ast_module($2, $4);
     LOC($$, @1);
     free($2);
   }
+  | MODULE '=' ModuleBody END { $$ = $3; }
 ;
 
 Form
@@ -933,38 +934,38 @@ MaybeComa
 ;
 
 ModuleBody
-  : ModuleDefs {
-    int n = $1.len;
-    eth_ast *acc = eth_ast_cval(eth_nil);
-    for (int i = n - 1; i >= 0; --i)
+  : { $$ = eth_ast_cval(eth_nil); }
+  | LET Binds ModuleBody {
+    $$ = eth_ast_let($2.pats.data, $2.vals.data, $2.pats.len, $3);
+    cod_vec_destroy($2.pats);
+    cod_vec_destroy($2.vals);
+    LOC($$, @$);
+  }
+  | LET REC Binds ModuleBody {
+    $$ = eth_ast_letrec($3.pats.data, $3.vals.data, $3.pats.len, $4);
+    cod_vec_destroy($3.pats);
+    cod_vec_destroy($3.vals);
+    LOC($$, @$);
+  }
+  | OPEN CapIdent MaybeImports ModuleBody {
+    if ($3.data)
+      $$ = eth_ast_import($2, NULL, $3.data, $3.len, $4);
+    else
+      $$ = eth_ast_import($2, "", NULL, 0, $4);
+    free($2);
+    if ($3.data)
     {
-      module_elt *elt = $1.data + i;
-      binds_t binds = elt->binds;
-      acc = elt->rec ?
-          eth_ast_letrec(binds.pats.data, binds.vals.data, binds.pats.len, acc)
-        : eth_ast_let(binds.pats.data, binds.vals.data, binds.pats.len, acc);
-      cod_vec_destroy(binds.pats);
-      cod_vec_destroy(binds.vals);
+      cod_vec_iter($3, i, x, free(x));
+      cod_vec_destroy($3);
     }
-    cod_vec_destroy($1);
-    $$ = acc;
+    LOC($$, @1);
   }
-;
-
-ModuleDefs
-  : ModuleElt {
-    cod_vec_init($$);
-    cod_vec_push($$, $1);
+  | MODULE CAPSYMBOL '=' ModuleBody END {
+    $$ = eth_ast_module($2, $4);
+    LOC($$, @1);
+    free($2);
   }
-  | ModuleDefs ModuleElt {
-    cod_vec_push($1, $2);
-    $$ = $1;
-  }
-;
-
-ModuleElt
-  : LET Binds { $$.rec = false; $$.binds = $2; }
-  | LET REC Binds { $$.rec = true; $$.binds = $3; }
+  | MODULE '=' ModuleBody END { $$ = $3; }
 ;
 
 %%

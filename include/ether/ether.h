@@ -1584,7 +1584,7 @@ struct eth_ast {
     struct { eth_t val; } cval;
     struct { char *str; } ident;
     struct { eth_ast *fn, **args; int nargs; } apply;
-    struct { eth_ast *cond, *then, *els; eth_toplvl_flag toplvl; } iff;
+    struct { eth_ast *cond, *then, *els; } iff;
     struct { eth_ast *e1, *e2; } seq;
     struct { eth_ast_pattern **pats; eth_ast **vals; eth_ast *body; int n; }
       let, letrec;

@@ -383,7 +383,6 @@ eth_ast_if(eth_ast *cond, eth_ast *then, eth_ast *els)
   eth_ref_ast(ast->iff.cond = cond);
   eth_ref_ast(ast->iff.then = then);
   eth_ref_ast(ast->iff.els  = els );
-  ast->iff.toplvl = ETH_TOPLVL_NONE;
   return ast;
 }
 

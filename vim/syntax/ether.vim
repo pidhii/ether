@@ -142,7 +142,8 @@ syn keyword Special __builtin
 syn match ethDelimiter /[,;()]/
 
 " open:
-syn region ethOpen matchgroup=ethKeyword start=/\<open\>/ end=/\<in\>/ contains=ethDelimiter,ethIdentifier
+"syn region ethOpen matchgroup=ethKeyword start=/\<open\>/ end=/\<in\>/ contains=ethDelimiter,ethIdentifier
+syn region ethOpen matchgroup=ethKeyword start=/\<open\>/ matchgroup=ethModuleImport end=/[A-Z]\k*/ skipnl skipwhite contains=ethIdentifier
 syn region ethUsing matchgroup=ethKeyword start=/\<using\>/ end=/\<in\>/ contains=ethUsingAs,ethIdentifier
 syn keyword ethUsingAs as contained
 hi link ethUsingAs ethKeyword
@@ -167,7 +168,7 @@ hi link ethInherit Keyword
 syn keyword ethVal val contained containedin=ethObject
 hi link ethVal Keyword
 syn region ethDo matchgroup=ethKeyword start=/\<do\>/ end=/\<done\>/ contains=TOP skipwhite skipnl
-syn keyword ethKeyword let rec and or in as with
+syn keyword ethKeyword rec and or in as with
 syn keyword ethConditional unless when otherwize
 syn keyword ethAssert assert
 

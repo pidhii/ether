@@ -1,6 +1,6 @@
 #!/bin/env ether
 
--- Get direcory containing modules 
+-- Get direcory containing modules
 let module_path =
   let pipe = open_pipe_in "ether --prefix" in
   let line = read_line_of pipe in
@@ -9,7 +9,7 @@ let module_path =
   else format "~d/lib/ether" (String.chop line)
 in
 
--- Checks whether a file exists in the file system 
+-- Checks whether a file exists in the file system
 let exist? path =
   try Os.(access path f_ok)
   with System_error ENOENT -> false
@@ -50,10 +50,10 @@ in
 
 let db_path = format "~d/__db.eth" module_path in
 
--- Get registry of installed modules 
+-- Get registry of installed modules
 let load_db! = first $ load db_path if exist? db_path else [] in
 
--- Get module record 
+-- Get module record
 let get_module name db =
   List.find (fn {name = name'} -> String.casecmp name name' == 0) db;
 in
@@ -72,6 +72,7 @@ in
 
 
 let install dir =
+  -- Read install configuration
   let (_, conf) =
     try load (format "~d/install.eth" dir)
     with _ -> begin
@@ -83,37 +84,35 @@ let install dir =
   let Some files = Maybe.(List.assoc "files" conf || Some []) in
   let Some main = List.assoc "main" conf in
 
+  -- Open DB with all installed modules
   let db = load_db! in
-
-  -- Check if module name is unique 
+  -- Check if module name is unique
   when get_module name db then begin
     eprintf "> error: module already present\n";
     raise Failure;
   end;
 
-  -- Build 
+  -- Build (if build-hook is speciefied)
   when let Some build = List.assoc "build" conf then do_in dir (fn ->
     printf "> building module ~d\n" name;
     build!;
   );
 
+  -- Start installation
   printf "> installing module ~d\n" name;
-
-  -- Create separate direcory for new module 
+  -- Create separate direcory for new module
   let moddir = module_path ++ "/" ++ name in
   mkdir moddir;
-
-  -- Copy module sources 
+  -- Copy module sources
   List.iter (fn file ->
     copy_file (dir ++ "/" ++ file) (moddir ++ "/" ++ file)
   ) (main :: files);
-
-  -- Create symlink to main 
+  -- Create symlink to main
   let mainpath = moddir ++ "/__main__.eth" in
   unless exist? mainpath then
     create_symlink (moddir ++ "/" ++ main) mainpath;
 
-  -- Update registry 
+  -- Update registry
   printf "> updating registry\n";
   let date = utc_date! or "<undefined>" in
   let source_dir = realpath dir or "<undefined>" in
@@ -133,10 +132,10 @@ let uninstall name =
   let db = load_db! in
 
   if let Some {install_dir} = get_module name db then begin
-    -- Remove module directory 
+    -- Remove module directory
     printf "> uninstalling module '~d'\n" name;
     unlink install_dir;
-    -- Update registry 
+    -- Update registry
     printf "> updating registry\n";
     let db = List.remove (fn {name = name'} -> String.casecmp name' name == 0) db in
     update_db db;
@@ -196,13 +195,13 @@ in
 --------------------------------- Main -----------------------------------------
 let options =
   [
-    -- Long options 
+    -- Long options
     {name = "help"     , val = "h", has_arg = false},
     {name = "install"  , val = "i", has_arg = true },
     {name = "uninstall", val = "u", has_arg = true },
     {name = "reinstall", val = "r", has_arg = true },
     {name = "list"     , val = "l", has_arg = false},
-    -- Short options 
+    -- Short options
     {name = "h", val = "h", has_arg = false},
     {name = "i", val = "i", has_arg = true },
     {name = "u", val = "u", has_arg = true },

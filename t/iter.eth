@@ -1,11 +1,13 @@
 
 let pub map f {state, next} =
-  {state, next = fn i -> when let (x, i) = next i then (f x, i)}
+  { state
+  , next = fn i -> when let (x, i) = next i then (f x, i)
+  }
 in
 
-let pub take n {state, next} = {
-    state = (state, n),
-    next = fn arg ->
+let pub take n {state, next} =
+  { state = (state, n)
+  , next = fn arg ->
       let (i, n) = arg in
       when n > 0 then
         try
@@ -25,7 +27,9 @@ let pub filter f {state, next} =
 in
 
 let pub of_list xs =
-  {state = xs, next = fn xs -> when let x::xs = xs then (x, xs)}
+  { state = xs
+  , next = fn xs -> when let x::xs = xs then (x, xs)
+  }
 in
 
 let pub to_list {state, next} =
@@ -37,7 +41,9 @@ let pub to_list {state, next} =
 in
 
 let pub range from to =
-  {state = from, next = fn i -> when i < to then (i, i + 1)}
+  { state = from
+  , next = fn i -> when i < to then (i, i + 1)
+  }
 in
 
 let pub fold_left f z {state, next} =

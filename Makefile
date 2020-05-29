@@ -45,4 +45,3 @@ _test_%:
 fuzzy: t/test.eth
 	@valgrind --leak-check=full ./Debug/install/bin/ether --log debug t/builtins.eth
 	@valgrind --leak-check=full ./Debug/install/bin/ether --log debug t/test.eth <<< $$(echo -e "1\n2\n")
-

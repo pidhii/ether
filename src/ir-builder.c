@@ -635,17 +635,10 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
 
     case ETH_AST_IF:
     {
-      bool tlvl = bldr->istoplvl;
       eth_ir_node *cond = build(bldr, ast->iff.cond, e);
-
-      eth_ir_node *thenbr = build_with_toplvl(bldr, ast->iff.then, e,
-          ast->iff.toplvl == ETH_TOPLVL_THEN);
-
-      eth_ir_node *elsebr = build_with_toplvl(bldr, ast->iff.els, e,
-          ast->iff.toplvl == ETH_TOPLVL_ELSE);
-
+      eth_ir_node *thenbr = build(bldr, ast->iff.then, e);
+      eth_ir_node *elsebr = build(bldr, ast->iff.els, e);
       eth_ir_node *ret = eth_ir_if(cond, thenbr, elsebr);
-      ret->iff.toplvl = ast->iff.toplvl;
       return ret;
     }
 
