@@ -120,9 +120,17 @@ OPERATOR [-+%^.$:!<>*/=&|∘]+
 
 nan                                 |
 inf                                 |
-0[xX][0-9a-fA-F]+                   |
-[0-9]+(\.[0-9]+)?([eE][-+]?[0-9]+)? {
-  yylval->number = strtold(yytext, NULL);
+0[xX][0-9a-fA-F][0-9a-fA-F_]*       |
+[0-9][0-9_]*(\.[0-9][0-9_]*)?([eE][-+]?[0-9][0-9_]*)? {
+  char buf[yyleng];
+  int buflen = 0;
+  for (char *p = yytext; *p; ++p)
+  {
+    if (*p != '_')
+      buf[buflen++] = *p;
+  }
+  buf[buflen] = '\0';
+  yylval->number = strtold(buf, NULL);
   return NUMBER;
 }
 

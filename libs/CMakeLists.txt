@@ -27,6 +27,18 @@ set_target_properties (math
     OUTPUT_NAME "math")
 install (TARGETS math DESTINATION ${MATH_DST_DIR})
 
+# Arb
+set (ARB_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/arb)
+set (ARB_DST_DIR lib/ether/arb)
+add_library (arb SHARED ${ARB_SRC_DIR}/lib.c)
+target_link_libraries (arb -larb)
+set_target_properties (arb
+  PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    PREFIX ""
+    OUTPUT_NAME "arb")
+install (TARGETS arb DESTINATION ${ARB_DST_DIR})
+
 # List
 set (LIST_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/list)
 set (LIST_DST_DIR lib/ether/list)

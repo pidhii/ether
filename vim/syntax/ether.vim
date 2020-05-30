@@ -174,10 +174,6 @@ syn keyword ethAssert assert
 
 syn keyword ethLazy lazy
 
-syn match ethOperator /[-+=*/%><&|.!^~∘]\+/
-syn match ethOperator /:\|\$/
-syn keyword ethOperator is eq not mod land lor lxor lshl lshr ashl ashr lnot
-
 syn match Keyword /!/
 syn match ethUnit /(\s*)/
 
@@ -201,19 +197,15 @@ hi link ethComment Comment
 hi link ethMultiComment Comment
 
 " Integer
-syn match Number '\<\d\+'
-syn match Number '0[xX][0-9a-fA-F]\+'
+"syn match Number '\<\d\+'
+"syn match Number '0[xX][0-9a-fA-F]\+'
+syn keyword Number inf nan
+syn match Number /0[xX][0-9a-fA-F][0-9a-fA-F_]*/
+syn match Number /[0-9][0-9_]*\%(\.[0-9][0-9_]*\)\?\%([eE][-+]\?[0-9][0-9_]*\)\?/
 
-" Floating point number with decimal no E or e
-syn match Number '\<\d\+\.\d\+'
-
-" Floating point like number with E and no decimal point (+,-)
-syn match Number '\<\d[[:digit:]]*[eE][\-+]\=\d\+'
-
-" Floating point like number with E and decimal point (+,-)
-syn match Number '\<\d[[:digit:]]*\.\d*[eE][\-+]\=\d\+'
-
-syn keyword Number nan inf
+syn match ethOperator /[-+=*/%><&|.!^~∘]\+/
+syn match ethOperator /:\|\$/
+syn keyword ethOperator is eq not mod land lor lxor lshl lshr ashl ashr lnot
 
 " String
 syn region String start=/"/ skip=/\\"/ end=/"/ skipnl skipwhite contains=ethFormat
