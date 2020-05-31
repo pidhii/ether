@@ -2,7 +2,7 @@
 - [Examples](#examples)
   - [basics](#basics)
   - [merge sort](#merge-sort)
-- [Build and installation](#build-and-installations)
+- [Build and installation](#build-and-installation)
 - [Syntax higlighting](#syntax-higlighting)
   - [Vim](#vim)
 - [Builtin types and functions](#builtin-types-and-functions)
@@ -399,7 +399,7 @@ Strings are implemented similar to `std::string` in C++:
 - however, length is stored excplicitly, thus
 - string can contain null-bytes
 
-Most utilities to work with strings are contained in the [String-module](./doc/string.html).
+Most utilities to work with strings are contained in the [String-module](https://github.com/pidhii/ether/wiki/String).
 
 ### Builtin functions for strings
 #### `<str> ++ <str>`
