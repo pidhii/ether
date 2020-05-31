@@ -30,6 +30,16 @@ help_and_exit(char *argv0)
   exit(EXIT_SUCCESS);
 }
 
+static void
+print_version(FILE *out)
+{
+  fprintf(out, "version: %s\n", eth_get_version());
+  fprintf(out, "build: %s\n", eth_get_build());
+  fprintf(out, "build flags: %s\n", eth_get_build_flags());
+  if (eth_get_prefix())
+    fprintf(out, "prefix: %s\n", eth_get_prefix());
+}
+
 static eth_t
 argv_to_list(int argc, char **argv, int offs)
 {
@@ -80,7 +90,7 @@ completion_generator(const char *text, int state)
       cod_vec_init(matches);
 
     // resolve module
-    eth_module *mod = repl_defs;
+    const eth_module *mod = repl_defs;
     char *p;
     if ((p = strrchr(text, '.')))
     {
@@ -102,18 +112,40 @@ completion_generator(const char *text, int state)
     else
       strcpy(prefix, "");
 
+    bool checkpriv = strncmp(text, "__", 2) == 0;
+
     // get matches
+    int textlen = strlen(text);
+    // check selected module
     int ndefs = eth_get_ndefs(mod);
     eth_def defs[ndefs];
     eth_get_defs(mod, defs);
-    int textlen = strlen(text);
     for (int i = 0; i < ndefs; ++i)
     {
       if (strncmp(defs[i].ident, text, textlen) == 0)
       {
+        if (strncmp(defs[i].ident, "__", 2) == 0 and not checkpriv)
+          continue;
         char *ident = malloc(strlen(prefix) + strlen(defs[i].ident) + 2);
         sprintf(ident, "%s.%s", prefix, defs[i].ident);
         cod_vec_push(matches, ident);
+      }
+    }
+    // also check builtins (if no module prefix specified)
+    if (strcmp(prefix, "") == 0)
+    {
+      mod = eth_builtins();
+      int ndefs = eth_get_ndefs(mod);
+      eth_def defs[ndefs];
+      eth_get_defs(mod, defs);
+      for (int i = 0; i < ndefs; ++i)
+      {
+        if (strncmp(defs[i].ident, text, textlen) == 0)
+        {
+          if (strncmp(defs[i].ident, "__", 2) == 0 and not checkpriv)
+            continue;
+          cod_vec_push(matches, strdup(defs[i].ident));
+        }
       }
     }
 
@@ -160,11 +192,7 @@ main(int argc, char **argv)
         help_and_exit(argv[0]);
 
       case 'v':
-        printf("version: %s\n", eth_get_version());
-        printf("build: %s\n", eth_get_build());
-        printf("build flags: %s\n", eth_get_build_flags());
-        if (eth_get_prefix())
-          printf("prefix: %s\n", eth_get_prefix());
+        print_version(stdout);
         exit(EXIT_SUCCESS);
 
       case 'L':
@@ -225,9 +253,10 @@ main(int argc, char **argv)
   eth_module *extravars = eth_create_module("");
   eth_define(extravars, "command_line", argv_to_list(argc, argv, optind));
 
-  eth_debug("parse input");
   if (input == stdin)
   {
+    eth_debug("REPL");
+
     eth_module *mod = extravars;
     const char *prompt = "> ";
     char histpath[PATH_MAX];
@@ -248,6 +277,12 @@ main(int argc, char **argv)
       read_history(histpath);
     else
       system("touch ~/.ether_history");
+
+    printf("Ether REPL\n");
+    print_version(stdout);
+    printf("\n");
+    printf("Enter <C-d> (EOF) to exit\n");
+    printf("\n");
 
     while (true)
     {
@@ -309,6 +344,7 @@ main(int argc, char **argv)
   }
   else
   {
+    eth_debug("parse input");
     eth_ast *ast;
     ast = eth_parse(input);
     fclose(input);
