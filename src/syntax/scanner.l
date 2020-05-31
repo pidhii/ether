@@ -32,7 +32,7 @@ static int g_comment_cnt = 0;
 
 %option noyywrap
 %option reentrant
-/*%option interactive*/
+%option interactive
 
 %x STRING
 %x REGEXP
@@ -46,6 +46,12 @@ OPERATOR [-+%^.$:!<>*/=&|∘]+
   if (_eth_start_token >= 0)
   {
     int token = _eth_start_token;
+    if (token == START_REPL)
+    {
+      eth_debug("enable interactive mode");
+      yy_set_interactive(1);
+    }
+
     _eth_start_token = -1;
     return token;
   }

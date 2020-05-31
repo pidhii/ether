@@ -335,7 +335,8 @@ eth_set_ast_location(eth_ast *ast, eth_location *loc)
 {
   if (ast->loc)
     eth_unref_location(ast->loc);
-  eth_ref_location(ast->loc = loc);
+  if ((ast->loc = loc))
+    eth_ref_location(loc);
 }
 
 eth_ast*

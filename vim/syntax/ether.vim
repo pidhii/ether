@@ -187,6 +187,10 @@ syn match ethLambda /->/
 "syn match ethTableRef /::/ nextgroup=ethKey
 "syn match ethKey /\k\+/ contained
 
+syn match ethOperator /[-+=*/%><&|.!^~∘]\+/
+syn match ethOperator /:\|\$/
+syn keyword ethOperator is eq not mod land lor lxor lshl lshr ashl ashr lnot
+
 syn region ethShebangComment start=/^#!/ end=/$/ contains=ethCommentLabel
 syn region ethComment start=/--/ end=/$/ contains=ethCommentLabel
 syn region ethMultiComment start=/--\[\[/ end=/\]\]/ contains=ethMultiComment skipwhite skipnl
@@ -202,10 +206,6 @@ hi link ethMultiComment Comment
 syn keyword Number inf nan
 syn match Number /0[xX][0-9a-fA-F][0-9a-fA-F_]*/
 syn match Number /[0-9][0-9_]*\%(\.[0-9][0-9_]*\)\?\%([eE][-+]\?[0-9][0-9_]*\)\?/
-
-syn match ethOperator /[-+=*/%><&|.!^~∘]\+/
-syn match ethOperator /:\|\$/
-syn keyword ethOperator is eq not mod land lor lxor lshl lshr ashl ashr lnot
 
 " String
 syn region String start=/"/ skip=/\\"/ end=/"/ skipnl skipwhite contains=ethFormat

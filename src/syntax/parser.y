@@ -178,7 +178,7 @@ int _eth_start_token = -1;
 } <lc_aux>
 
 // =============================================================================
-%token UNDEFINED
+%token START_REPL UNDEFINED
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %token<number> NUMBER
 %token<string> SYMBOL CAPSYMBOL
@@ -257,13 +257,26 @@ int _eth_start_token = -1;
 %type<lc_aux> LcAux
 %type<ast> ModuleBody
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-%start entry
+%start Entry
 
 
 %%
 
-entry
+Entry
   : Expr { g_result = $1; }
+  | START_REPL LET Binds {
+    g_result = eth_ast_let($3.pats.data, $3.vals.data, $3.pats.len, eth_ast_cval(eth_nil));
+    cod_vec_destroy($3.pats);
+    cod_vec_destroy($3.vals);
+  }
+  | START_REPL LET REC Binds {
+    g_result = eth_ast_letrec($4.pats.data, $4.vals.data, $4.pats.len, eth_ast_cval(eth_nil));
+    cod_vec_destroy($4.pats);
+    cod_vec_destroy($4.vals);
+  }
+  | START_REPL Expr {
+    g_result = $2;
+  }
 ;
 
 FnAtom
@@ -1005,6 +1018,13 @@ eth_parse(FILE *stream)
     g_result = NULL;
   }
   return g_result;
+}
+
+eth_ast*
+eth_parse_repl(FILE *stream)
+{
+  _eth_start_token = START_REPL;
+  return eth_parse(stream);
 }
 
 void

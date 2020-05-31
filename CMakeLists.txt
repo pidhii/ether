@@ -73,7 +73,7 @@ endif (BUILD_STATIC_LIBRARY)
 
 # executable:
 add_executable (ether ${CMAKE_SOURCE_DIR}/main.c $<TARGET_OBJECTS:ether_obj>)
-target_link_libraries (ether -lm -ldl -lpcre)
+target_link_libraries (ether -lm -ldl -lpcre -lreadline)
 install (TARGETS ether DESTINATION bin)
 
 # directory for modules

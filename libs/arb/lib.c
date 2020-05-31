@@ -24,8 +24,7 @@ destroy_arb(eth_type *type, eth_t x)
 static void
 write_arb(eth_type *type, eth_t x, FILE *out)
 {
-  const char *str = arb_get_str(ARB(x), 5, 0);
-  fputs(str, out);
+  arb_fprintn(out, ARB(x), 5, 0);
 }
 
 static bool
@@ -127,7 +126,7 @@ ether_module(eth_module *mod, eth_env *topenv)
   eth_define(mod, "-", eth_create_proc(_sub, 2, NULL, NULL));
   eth_define(mod, "*", eth_create_proc(_mul, 2, NULL, NULL));
   eth_define(mod, "/", eth_create_proc(_div, 2, NULL, NULL));
-  eth_define(mod, "**", eth_create_proc(_pow, 2, NULL, NULL));
+  eth_define(mod, "^", eth_create_proc(_pow, 2, NULL, NULL));
 
   return 0;
 }
