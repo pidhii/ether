@@ -150,6 +150,7 @@ main(int argc, char **argv)
     print_version(stdout);
     printf("\n");
     printf("Enter <C-d> (EOF) to exit\n");
+    printf("      '.' to reset input buffer (cancel current expression)\n");
     printf("\n");
 
     while (true)
@@ -169,10 +170,19 @@ main(int argc, char **argv)
         continue;
       }
 
+      if (strcmp(line, ".") == 0)
+      {
+        buf.len = 0;
+        free(line);
+        prompt = "> ";
+        continue;
+      }
+
       // append line to input-buffer
       for (int i = 0; line[i]; ++i)
         cod_vec_push(buf, line[i]);
       free(line);
+
 
       // parse input-buffer
       FILE *bufstream = fmemopen(buf.data, buf.len, "r");
