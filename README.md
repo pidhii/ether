@@ -28,15 +28,15 @@
 - [I/O](#io)
 
 # [Check-list](#check-list)
-- [ ] REPL
+- [x] REPL
 - [x] Pattern matching
 - [x] Closures
 - [x] Variant-types
 - [x] Lightweight record-types
-- [ ] Objects
+- [ ] *Objects?*
   - [ ] *fields?*
-  - [ ] methods
-  - [ ] inheritance
+  - [ ] *methods*
+  - [ ] *inheritance*
 - [x] Tuples
 - [ ] Persistent tables
 - [ ] Persistent vectors
@@ -45,12 +45,11 @@
 - [ ] Macros
 - [ ] User-defined operators
   - [x] redefinition of builtin operators
-  - [ ] definition of new operators
+  - [x] definition of new operators
+  - [ ] precedence for user-defined operators
 - [ ] Named arguments
 - [x] Exceptions
 - [x] Modules
-- [x] Memory management with naїve reference counting ONLY
-- [x] No memory leaks
 - [ ] `match` like in Caml
 - [ ] `do`*-natation for monads?*
 - [ ] Coroutines
@@ -397,13 +396,16 @@ Operator | Description | Exceptions
 ## [Strings](#strings)
 Strings are implemented similar to `std::string` in C++:
 - compatible with C strings (terminating null-byte)
-- however, length is stored staticly, and, as result
+- however, length is stored excplicitly, thus
 - string can contain null-bytes
 
+Most utilities to work with strings are contained in the [String-module](./doc/string.html).
+
+### Builtin functions for strings
 #### `<str> ++ <str>`
 Concatenate two strings.  
 ```
-"foo" ++ "bar" -- => "foobar"
+"foo" ++ "bar" --> "foobar"
 ```
 Exceptions: `Type_error`
 
@@ -412,79 +414,15 @@ Format string.  Available formats currently are:
 - ~w - "native" representation of the object
 - ~d - "beautiful" representation of the object
 ```
-format "this gives ~w" "str" -- => "this gives \"str\""
-format "this gives ~d" "str" -- => "this gives str"
+format "this gives ~w" "str" --> "this gives \"str\""
+format "this gives ~d" "str" --> "this gives str"
 ```
 Use ~~ to escape '~'-character.  
 Exceptions: `Type_error`, `Format_error`
 
-#### `concat <list>`
-Concatenate *list* of strings.
-```
-concat ["a", "b", "c"] -- => "abc" 
-concat ["str"] -- => "str" 
-concat [] -- => "" 
-```
-Exceptions: `Type_error`, `Invalid_argument`
+## String module
+[](./doc/index.html)
 
-#### `concat_with <sep> <list>`
-Concatenate *list* of strings iserting *sep* inbetween.
-```
-concat_with " " ["Hello", "World"] -- => "Hello World" 
-concat_with "_" ["str"] -- => "str" 
-concat_with "_" [] -- => "" 
-```
-Exceptions: `Type_error`, `Invalid_argument`
-
-#### `strlen <str>`
-Return string length.
-```
-strlen "abc" -- => 3 
-strlen "abc\x00abc" -- => 7 
-```
-Exceptions: `Type_error`
-
-#### `to_upper <str>`
-Return string with all chracters taken from *str* but set in upper case.
-```
-to_upper "foo_Bar-bazZZ" -- => FOO_BAR-BAZZZ 
-```
-Exceptions: `Type_error`
-
-#### `to_lower <str>`
-Return string with all chracters taken from *str* but set in lower case.
-```
-to_lower "foo_Bar-bazZZ" -- => foo_bar-bazzz 
-```
-Exceptions: `Type_error`
-
-#### `chr <num>`
-Return character dfined by the code of *num*.
-```
-chr 0x61 -- => "a" 
-```
-Exceptions: `Type_error`, `Invalid_argument`
-
-#### `ord <char>`
-Return character code.
-```
-ord "a" -- => 97 (0x61) 
-```
-Exceptions: `Type_error`, `Invalid_argument`
-
-#### `chomp <str>`
-#### `chop <str>`
-
-#### `substr <str> <range>`
-#### `substr <str> <offs> <len>`
-
-#### `strcmp <str> <str>`
-#### `strcasecmp <str> <str>`
-#### `strncmp <str> <str>`
-#### `strncasecmp <str> <str>`
-
-#### `to_number <string>`
-#### `to_symbol <string>`
 
 ## Symbols
 
@@ -512,13 +450,6 @@ where
 Operator | Description | Exceptions
 ---------|-------------|-----------
 `<string> =~ <regexp>` | Check if string matches regexp. | `Regexp_error`
-
-### Functions
-Function | Description | Exceptions
----------|-------------|-----------
-`split <regexp> <string>`| Split string at positions where regexp matches. Matched pattern is excluded from the string. Return a list of substrings. | `Regexp_error`
-`rev_split <regexp> <string>` | Same as `split` but order of substring is reversed. | `Regexp_error`
-`match <regexp> <string>` | Get list of matches. Return [false](#booleans) if match failed. | `Regexp_error`
 
 ## Ranges
 

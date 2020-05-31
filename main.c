@@ -13,57 +13,17 @@
 
 ETH_MODULE("ether:main")
 
-void __attribute__((noreturn))
-help_and_exit(char *argv0)
-{
-  printf("usage: %s [OPTIONS] [<script>]\n", argv0);
-  puts("");
-  puts("OPTIONS:");
-  puts("  --help       -h           Show this message and exit.");
-  puts("  --log-level      <level>  Set log-level. Available values for <level> are:");
-  puts("                            'debug'   - enable all log-messages;");
-  puts("                            'warning' - show warnings and errors;");
-  puts("                            'error'   - show only error messages.");
-  puts("  --version    -v           Show version and configuration and exit.");
-  puts("  --prefix                  Show installation prefix and exit.");
-  puts("               -L  <dir>    Add direcory to the module path.");
-  exit(EXIT_SUCCESS);
-}
+static void __attribute__((noreturn))
+help_and_exit(char *argv0);
 
 static void
-print_version(FILE *out)
-{
-  fprintf(out, "version: %s\n", eth_get_version());
-  fprintf(out, "build: %s\n", eth_get_build());
-  fprintf(out, "build flags: %s\n", eth_get_build_flags());
-  if (eth_get_prefix())
-    fprintf(out, "prefix: %s\n", eth_get_prefix());
-}
+print_version(FILE *out);
 
 static eth_t
-argv_to_list(int argc, char **argv, int offs)
-{
-  eth_t acc = eth_nil;
-  for (int i = argc - 1; i >= offs; --i)
-    acc = eth_cons(eth_str(argv[i]), acc);
-  return acc;
-}
+argv_to_list(int argc, char **argv, int offs);
 
 static void
-print_trace(eth_location *const trace[], int start, int n, int hi)
-{
-  char buf[PATH_MAX];
-  for (int i = start; i >= start - n + 1; --i)
-  {
-    eth_get_location_file(trace[i], buf);
-    putc('\n', stderr);
-    eth_trace("trace[%d]: %s", i, buf);
-    if (i == hi)
-      eth_print_location_opt(trace[i], stderr, ETH_LOPT_EXTRALINES);
-    else
-      eth_print_location_opt(trace[i], stderr, 0);
-  }
-}
+print_trace(eth_location *const trace[], int start, int n, int hi);
 
 static
 eth_module *repl_defs;
@@ -71,100 +31,8 @@ eth_module *repl_defs;
 static
 eth_env *repl_env;
 
-static char*
-completion_generator(const char *text, int state)
-{
-  static cod_vec(char*) matches;
-  static size_t idx;
-  static char prefix[PATH_MAX];
-
-  if (state == 0)
-  {
-    // init vector
-    if (matches.data)
-    {
-      cod_vec_iter(matches, i, x, free(x));
-      matches.len = 0;
-    }
-    else
-      cod_vec_init(matches);
-
-    // resolve module
-    const eth_module *mod = repl_defs;
-    char *p;
-    if ((p = strrchr(text, '.')))
-    {
-      int modnamelen = p - text;
-      char modname[modnamelen + 1];
-      memcpy(modname, text, modnamelen);
-      modname[modnamelen] = '\0';
-      mod = eth_require_module(repl_env, repl_env, modname);
-      if (mod == NULL)
-      {
-        eth_warning("no module %s", modname);
-        return NULL;
-      }
-
-      strncpy(prefix, text, p - text);
-      prefix[p-text] = '\0';
-      text = p + 1;
-    }
-    else
-      strcpy(prefix, "");
-
-    bool checkpriv = strncmp(text, "__", 2) == 0;
-
-    // get matches
-    int textlen = strlen(text);
-    // check selected module
-    int ndefs = eth_get_ndefs(mod);
-    eth_def defs[ndefs];
-    eth_get_defs(mod, defs);
-    for (int i = 0; i < ndefs; ++i)
-    {
-      if (strncmp(defs[i].ident, text, textlen) == 0)
-      {
-        if (strncmp(defs[i].ident, "__", 2) == 0 and not checkpriv)
-          continue;
-        char *ident = malloc(strlen(prefix) + strlen(defs[i].ident) + 2);
-        sprintf(ident, "%s.%s", prefix, defs[i].ident);
-        cod_vec_push(matches, ident);
-      }
-    }
-    // also check builtins (if no module prefix specified)
-    if (strcmp(prefix, "") == 0)
-    {
-      mod = eth_builtins();
-      int ndefs = eth_get_ndefs(mod);
-      eth_def defs[ndefs];
-      eth_get_defs(mod, defs);
-      for (int i = 0; i < ndefs; ++i)
-      {
-        if (strncmp(defs[i].ident, text, textlen) == 0)
-        {
-          if (strncmp(defs[i].ident, "__", 2) == 0 and not checkpriv)
-            continue;
-          cod_vec_push(matches, strdup(defs[i].ident));
-        }
-      }
-    }
-
-    // reset index
-    idx = 0;
-  }
-
-  if (idx >= matches.len)
-    return NULL;
-  else
-    return strdup(matches.data[idx++]);
-}
-
 static char**
-completer(const char *text, int start, int end)
-{
-  rl_attempted_completion_over = 1;
-  return rl_completion_matches(text, completion_generator);
-}
+completer(const char *text, int start, int end);
 
 int
 main(int argc, char **argv)
@@ -442,3 +310,156 @@ main(int argc, char **argv)
 
   exit(err);
 }
+
+
+static void __attribute__((noreturn))
+help_and_exit(char *argv0)
+{
+  printf("usage: %s [OPTIONS]\n", argv0);
+  puts("  Run interpreter in interactive mode (REPL).");
+  puts("");
+  printf("usage: %s [OPTIONS] <script> [argv ...]\n", argv0);
+  puts("  Evaluate a script.");
+  puts("");
+  puts("OPTIONS:");
+  puts("  --help       -h           Show this message and exit.");
+  puts("  --log-level      <level>  Set log-level. Available values for <level> are:");
+  puts("                            'debug'   - enable all log-messages;");
+  puts("                            'warning' - show warnings and errors;");
+  puts("                            'error'   - show only error messages.");
+  puts("  --version    -v           Show version and configuration and exit.");
+  puts("  --prefix                  Show installation prefix and exit.");
+  puts("               -L  <dir>    Add direcory to the module path.");
+  exit(EXIT_SUCCESS);
+}
+
+static void
+print_version(FILE *out)
+{
+  fprintf(out, "version: %s\n", eth_get_version());
+  fprintf(out, "build: %s\n", eth_get_build());
+  fprintf(out, "build flags: %s\n", eth_get_build_flags());
+  if (eth_get_prefix())
+    fprintf(out, "prefix: %s\n", eth_get_prefix());
+}
+
+static eth_t
+argv_to_list(int argc, char **argv, int offs)
+{
+  eth_t acc = eth_nil;
+  for (int i = argc - 1; i >= offs; --i)
+    acc = eth_cons(eth_str(argv[i]), acc);
+  return acc;
+}
+
+static void
+print_trace(eth_location *const trace[], int start, int n, int hi)
+{
+  char buf[PATH_MAX];
+  for (int i = start; i >= start - n + 1; --i)
+  {
+    eth_get_location_file(trace[i], buf);
+    putc('\n', stderr);
+    eth_trace("trace[%d]: %s", i, buf);
+    if (i == hi)
+      eth_print_location_opt(trace[i], stderr, ETH_LOPT_EXTRALINES);
+    else
+      eth_print_location_opt(trace[i], stderr, 0);
+  }
+}
+
+static char*
+completion_generator(const char *text, int state)
+{
+  static cod_vec(char*) matches;
+  static size_t idx;
+  static char prefix[PATH_MAX];
+
+  if (state == 0)
+  {
+    // init vector
+    if (matches.data)
+    {
+      cod_vec_iter(matches, i, x, free(x));
+      matches.len = 0;
+    }
+    else
+      cod_vec_init(matches);
+
+    // resolve module
+    const eth_module *mod = repl_defs;
+    char *p;
+    if ((p = strrchr(text, '.')))
+    {
+      int modnamelen = p - text;
+      char modname[modnamelen + 1];
+      memcpy(modname, text, modnamelen);
+      modname[modnamelen] = '\0';
+      mod = eth_require_module(repl_env, repl_env, modname);
+      if (mod == NULL)
+      {
+        eth_warning("no module %s", modname);
+        return NULL;
+      }
+
+      strncpy(prefix, text, p - text);
+      prefix[p-text] = '\0';
+      text = p + 1;
+    }
+    else
+      strcpy(prefix, "");
+
+    bool checkpriv = strncmp(text, "__", 2) == 0;
+
+    // get matches
+    int textlen = strlen(text);
+    // check selected module
+    int ndefs = eth_get_ndefs(mod);
+    eth_def defs[ndefs];
+    eth_get_defs(mod, defs);
+    for (int i = 0; i < ndefs; ++i)
+    {
+      if (strncmp(defs[i].ident, text, textlen) == 0)
+      {
+        if (strncmp(defs[i].ident, "__", 2) == 0 and not checkpriv)
+          continue;
+        char *ident = malloc(strlen(prefix) + strlen(defs[i].ident) + 2);
+        sprintf(ident, "%s.%s", prefix, defs[i].ident);
+        cod_vec_push(matches, ident);
+      }
+    }
+    // also check builtins (if no module prefix specified)
+    if (strcmp(prefix, "") == 0)
+    {
+      mod = eth_builtins();
+      int ndefs = eth_get_ndefs(mod);
+      eth_def defs[ndefs];
+      eth_get_defs(mod, defs);
+      for (int i = 0; i < ndefs; ++i)
+      {
+        if (strncmp(defs[i].ident, text, textlen) == 0)
+        {
+          if (strncmp(defs[i].ident, "__", 2) == 0 and not checkpriv)
+            continue;
+          cod_vec_push(matches, strdup(defs[i].ident));
+        }
+      }
+    }
+
+    // reset index
+    idx = 0;
+  }
+
+  if (idx >= matches.len)
+    return NULL;
+  else
+    return strdup(matches.data[idx++]);
+}
+
+static char**
+completer(const char *text, int start, int end)
+{
+  rl_attempted_completion_over = 1;
+  return rl_completion_matches(text, completion_generator);
+}
+
