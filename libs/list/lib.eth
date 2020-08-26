@@ -32,6 +32,8 @@
 -- * filter_map
 -- * fold_left
 -- * fold_right
+-- * reduce_left
+-- * reduce_righ
 -- * scan_left
 -- * scan_right
 --
@@ -63,10 +65,14 @@
 -- Assosiation lists:
 -- * assoc
 -- * assq
+--
+-- Element access:
+-- * get
+--
 
 let rec pub fold_map f z xs =
   if let x :: xs' = xs then
-    let (z', x') = f z x in
+    let (x', z') = f z x in
     x' :: fold_map f z' xs'
   else []
 in
@@ -143,17 +149,54 @@ let rec pub flat_map f xs =
 in
 let pub flatten = flat_map id in
 let pub filter_map f xs = rev $ rev_filter_map f xs in
+
 let pub fold_left f z xs =
+{.help|
+\e[1mTYPE\e[0m
+  fold_left (z -> x -> z) z [x] -> z
+
+\e[1mDESCRIPTION\e[0m
+  It takes the second argument and the first item of the list and applies the
+  function to them, then feeds the function with this result and the second
+  argument and so on:
+
+            fold_left f z xs = f (... (f (f z x1) x2)) xn
+
+  See \e[4mscan_left\e[0m for intermediate results.
+|.help}
   let rec loop xs acc =
     if let x::xs = xs then
       loop xs (f acc x)
     else acc
   in loop xs z
 in
+
 let rec pub fold_right f z xs =
   if let x::xs = xs then
     f x (fold_right f z xs)
   else z
+in
+let pub reduce_left f xs =
+  if let x::xs = xs then fold_left f x xs
+  else invalid_argument ()
+in
+let rec pub reduce_right f xs =
+  let rec aux xs =
+    if let x::(_::_ as xs) = xs then
+      f x (aux xs)
+    else car xs
+  in
+  if let x::(_::_ as xs) = xs then f x (aux xs)
+  else invalid_argument ()
+in
+let pub rev_scan_left f z xs =
+  let rec loop z xs acc =
+    if let x :: xs = xs then
+      let z = f z x in
+      loop z xs (z :: acc)
+    else acc
+  in
+  loop z xs []
 in
 let rec pub scan_left f z xs =
   if let x::xs = xs then
@@ -169,7 +212,7 @@ let rec pub scan_right f z xs =
   else nil
 in
 
-let rec pub rev_take =
+let pub rev_take =
   let rec loop n xs acc =
     if n > 0 then
       let x::xs = xs in
@@ -242,7 +285,7 @@ in
     --else
       --let select x y = if cmp x y then x else y in
       --fold_left select x xs
-  --else raise Invalid_argument
+  --else invalid_argument ()
 --in
 --let rec pub minimum cmp xs =
   --if let x :: xs = xs then
@@ -250,7 +293,7 @@ in
     --else
       --let select x y = if cmp x y then x else y in
       --fold_left select x xs
-  --else raise Invalid_argument
+  --else invalid_argument ()
 --in
 let pub partition p xs =
   let rec loop xs acc1 acc2 =
@@ -293,7 +336,7 @@ let rec pub assoc x l =
     if let (k, v) = kv then
       if k eq x then Some v
       else assoc x l
-    else raise Invalid_argument
+    else invalid_argument ()
   else false
 in
 let rec pub assq x l =
@@ -301,7 +344,7 @@ let rec pub assq x l =
     if let (k, v) = kv then
       if k is x then Some v
       else assq x l
-    else raise Invalid_argument
+    else invalid_argument ()
   else false
 in
 
@@ -316,6 +359,8 @@ let rec pub transpose xs =
     else transpose xss
   else []
 in
+
+let pub get l k = car $ drop k l in
 
 nil;
 

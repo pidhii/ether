@@ -46,8 +46,8 @@ _eth_init_regexp_type(void)
 eth_t
 eth_create_regexp(const char *pat, int opts, const char **eptr, int *eoffs)
 {
-  const char *_eptr;
-  int _eoffs;
+  const char *_eptr = NULL;
+  int _eoffs = 0;
   if (eptr == NULL) eptr = &_eptr;
   if (eoffs == NULL) eoffs = &_eoffs;
 

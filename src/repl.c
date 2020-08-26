@@ -12,7 +12,7 @@ set_pub(eth_ast_pattern *pat)
       break;
 
     case ETH_PATTERN_IDENT:
-      pat->ident.attr |= ETH_ATTR_PUB;
+      pat->ident.attr->flag |= ETH_ATTR_PUB;
       break;
 
     case ETH_PATTERN_UNPACK:

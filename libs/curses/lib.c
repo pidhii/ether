@@ -174,7 +174,6 @@ _wclrtoeol(void)
 static eth_t
 _mvwgetnstr(void)
 {
-  eth_use_symbol(Type_error);
   eth_use_tuple_as(tup2_type, 2)
 
   eth_args args = eth_start(3);
@@ -185,7 +184,7 @@ _mvwgetnstr(void)
   eth_t x = eth_tup_get(pos, 0);
   eth_t y = eth_tup_get(pos, 1);
   if (not eth_is_num(x) or not eth_is_num(y))
-    eth_throw(args, Type_error);
+    eth_throw(args, eth_type_error());
 
   int n = eth_num_val(len);
   char *buf = malloc(n + 1);
@@ -218,7 +217,6 @@ _wgetnstr(void)
 static eth_t
 _mvwaddstr(void)
 {
-  eth_use_symbol(Type_error);
   eth_use_tuple_as(tup2_type, 2)
   eth_args args = eth_start(3);
   eth_t win = eth_arg2(args, window_type);
@@ -227,7 +225,7 @@ _mvwaddstr(void)
   eth_t x = eth_tup_get(pos, 0);
   eth_t y = eth_tup_get(pos, 1);
   if (not eth_is_num(x) or not eth_is_num(y))
-    eth_throw(args, Type_error);
+    eth_throw(args, eth_type_error());
   if (mvwaddstr(get_cwin(win), eth_num_val(y), eth_num_val(x),
         eth_str_cstr(str)) == ERR)
   {
@@ -239,7 +237,6 @@ _mvwaddstr(void)
 static eth_t
 _waddstr(void)
 {
-  eth_use_symbol(Type_error);
   eth_use_tuple_as(tup2_type, 2)
   eth_args args = eth_start(3);
   eth_t win = eth_arg2(args, window_type);
@@ -253,7 +250,6 @@ _waddstr(void)
 static eth_t
 _newwin(void)
 {
-  eth_use_symbol(Type_error);
   eth_use_tuple_as(tup4_type, 4)
   eth_args args = eth_start(1);
   eth_t xywh = eth_arg2(args, tup4_type);
@@ -264,7 +260,7 @@ _newwin(void)
   if (not eth_is_num(x) or not eth_is_num(y) or
       not eth_is_num(w) or not eth_is_num(h))
   {
-    eth_throw(args, Type_error);
+    eth_throw(args, eth_type_error());
   }
   WINDOW *win = newwin(eth_num_val(h), eth_num_val(w), eth_num_val(y),
       eth_num_val(x));
@@ -276,7 +272,6 @@ _newwin(void)
 static eth_t
 _mvwin(void)
 {
-  eth_use_symbol(Type_error);
   eth_use_tuple_as(tup2_type, 2)
   eth_args args = eth_start(2);
   eth_t win = eth_arg2(args, window_type);
@@ -284,7 +279,7 @@ _mvwin(void)
   eth_t x = eth_tup_get(pos, 0);
   eth_t y = eth_tup_get(pos, 1);
   if (not eth_is_num(x) or not eth_is_num(y))
-    eth_throw(args, Type_error);
+    eth_throw(args, eth_type_error());
   if (mvwin(get_cwin(win), eth_num_val(y), eth_num_val(x)) == ERR)
     eth_return(args, curses_exn());
   eth_return(args, eth_nil);
@@ -293,7 +288,6 @@ _mvwin(void)
 static eth_t
 _subwin(void)
 {
-  eth_use_symbol(Type_error);
   eth_use_tuple_as(tup4_type, 4)
   eth_args args = eth_start(2);
   eth_t win = eth_arg2(args, window_type);
@@ -305,7 +299,7 @@ _subwin(void)
   if (not eth_is_num(x) or not eth_is_num(y) or
       not eth_is_num(w) or not eth_is_num(h))
   {
-    eth_throw(args, Type_error);
+    eth_throw(args, eth_type_error());
   }
   WINDOW *swin = subwin(get_cwin(win), eth_num_val(h), eth_num_val(w),
       eth_num_val(y), eth_num_val(x));
@@ -317,7 +311,6 @@ _subwin(void)
 static eth_t
 _derwin(void)
 {
-  eth_use_symbol(Type_error);
   eth_use_tuple_as(tup4_type, 4)
   eth_args args = eth_start(2);
   eth_t win = eth_arg2(args, window_type);
@@ -329,7 +322,7 @@ _derwin(void)
   if (not eth_is_num(x) or not eth_is_num(y) or
       not eth_is_num(w) or not eth_is_num(h))
   {
-    eth_throw(args, Type_error);
+    eth_throw(args, eth_type_error());
   }
   WINDOW *swin = derwin(get_cwin(win), eth_num_val(h), eth_num_val(w),
       eth_num_val(y), eth_num_val(x));
@@ -341,7 +334,6 @@ _derwin(void)
 static eth_t
 _mvderwin(void)
 {
-  eth_use_symbol(Type_error);
   eth_use_tuple_as(tup2_type, 2)
   eth_args args = eth_start(2);
   eth_t win = eth_arg2(args, window_type);
@@ -349,7 +341,7 @@ _mvderwin(void)
   eth_t x = eth_tup_get(pos, 0);
   eth_t y = eth_tup_get(pos, 1);
   if (not eth_is_num(x) or not eth_is_num(y))
-    eth_throw(args, Type_error);
+    eth_throw(args, eth_type_error());
   if (mvderwin(get_cwin(win), eth_num_val(y), eth_num_val(x)) == ERR)
     eth_return(args, curses_exn());
   eth_return(args, eth_nil);
@@ -362,7 +354,6 @@ _mvderwin(void)
 static eth_t
 _wborder(void)
 {
-  eth_use_symbol(Type_error);
   eth_use_tuple_as(tup4_type, 4)
   eth_args args = eth_start(3);
   eth_t win = eth_arg2(args, window_type);
@@ -381,7 +372,7 @@ _wborder(void)
       not eth_is_num(lt) or not eth_is_num(tr) or
       not eth_is_num(bl) or not eth_is_num(br))
   {
-    eth_throw(args, Type_error);
+    eth_throw(args, eth_type_error());
   }
   int err = wborder(get_cwin(win),
       eth_num_val(ls), eth_num_val(rs), eth_num_val(ts), eth_num_val(bs),
@@ -397,7 +388,6 @@ _wborder(void)
 static eth_t
 _mvwgetch(void)
 {
-  eth_use_symbol(Type_error);
   eth_use_tuple_as(tup2_type, 2)
   eth_args args = eth_start(2);
   eth_t win = eth_arg2(args, window_type);
@@ -405,7 +395,7 @@ _mvwgetch(void)
   eth_t x = eth_tup_get(pos, 0);
   eth_t y = eth_tup_get(pos, 1);
   if (not eth_is_num(x) or not eth_is_num(y))
-    eth_throw(args, Type_error);
+    eth_throw(args, eth_type_error());
   int ch = mvwgetch(get_cwin(win), eth_num_val(y), eth_num_val(x));
   if (ch == ERR)
     eth_return(args, curses_exn());

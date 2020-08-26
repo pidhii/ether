@@ -13,7 +13,7 @@ _length(void)
   if (isproper)
     return eth_num(len);
   else
-    return eth_exn(eth_sym("Invalid_argument"));
+    return eth_exn(eth_invalid_argument());
 }
 
 static eth_t
@@ -32,7 +32,7 @@ _rev_append(void)
   {
     eth_drop(acc);
     eth_unref(l);
-    return eth_exn(eth_sym("Invalid_argument"));
+    return eth_exn(eth_invalid_argument());
   }
   eth_ref(acc);
   eth_unref(l);

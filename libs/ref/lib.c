@@ -1,22 +1,34 @@
 #include "ether/ether.h"
 
 static eth_t
-_create(void)
+_strong(void)
 {
   eth_t x = *eth_sp++;
-  eth_t ref = eth_create_ref(x);
+  eth_t ref = eth_create_strong_ref(x);
+  return ref;
+}
+
+static eth_t
+_weak(void)
+{
+  eth_t x = *eth_sp++;
+  if (eth_unlikely(x->rc == 0))
+  {
+    eth_drop(x);
+    x = eth_nil;
+  }
+  eth_t ref = eth_create_weak_ref(x);
   return ref;
 }
 
 static eth_t
 _get(void)
 {
-  eth_use_symbol(Type_error)
   eth_t x = *eth_sp++;
-  if (eth_unlikely(x->type != eth_ref_type))
+  if (eth_unlikely(x->type != eth_strong_ref_type))
   {
     eth_drop(x);
-    return eth_exn(Type_error);
+    return eth_exn(eth_type_error());
   }
   eth_t ret = eth_ref_get(x);
   eth_ref(ret);
@@ -29,16 +41,22 @@ static eth_t
 _set(void)
 {
   eth_args args = eth_start(2);
-  eth_t ref = eth_arg2(args, eth_ref_type);
+  eth_t ref = eth_arg(args);
   eth_t x = eth_arg(args);
-  eth_set_ref(ref, x);
+  if (ref->type == eth_strong_ref_type)
+    eth_set_strong_ref(ref, x);
+  else if (ref->type == eth_weak_ref_type)
+    eth_set_weak_ref(ref, x);
+  else
+    eth_throw(args, eth_exn(eth_type_error()));
   eth_return(args, eth_nil);
 }
 
 int
 ether_module(eth_module *mod)
 {
-  eth_define(mod, "create", eth_create_proc(_create, 1, NULL, NULL));
+  eth_define(mod, "strong", eth_create_proc(_strong, 1, NULL, NULL));
+  eth_define(mod, "weak", eth_create_proc(_weak, 1, NULL, NULL));
   eth_define(mod, "get", eth_create_proc(_get, 1, NULL, NULL));
   eth_define(mod, "set", eth_create_proc(_set, 2, NULL, NULL));
 

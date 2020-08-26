@@ -14,7 +14,7 @@ _strlen(void)
   if (eth_unlikely(x->type != eth_string_type))
   {
     eth_drop(x);
-    return eth_exn(eth_sym("Type_error"));
+    return eth_exn(eth_type_error());
   }
   eth_t ret = eth_num(eth_str_len(x));
   eth_drop(x);
@@ -28,7 +28,7 @@ _to_upper(void)
   if (eth_unlikely(x->type != eth_string_type))
   {
     eth_drop(x);
-    return eth_exn(eth_sym("Type_error"));
+    return eth_exn(eth_type_error());
   }
   char *s = eth_str_cstr(x);
   int len = eth_str_len(x);
@@ -55,7 +55,7 @@ _to_lower(void)
   if (eth_unlikely(x->type != eth_string_type))
   {
     eth_drop(x);
-    return eth_exn(eth_sym("Type_error"));
+    return eth_exn(eth_type_error());
   }
   char *s = eth_str_cstr(x);
   int len = eth_str_len(x);
@@ -86,7 +86,7 @@ _strcmp(void)
   {
     eth_unref(x);
     eth_unref(y);
-    return eth_exn(eth_sym("Type_error"));
+    return eth_exn(eth_type_error());
   }
   int cmp = strcmp(eth_str_cstr(x), eth_str_cstr(y));
   eth_unref(x);
@@ -105,7 +105,7 @@ _strcasecmp(void)
   {
     eth_unref(x);
     eth_unref(y);
-    return eth_exn(eth_sym("Type_error"));
+    return eth_exn(eth_type_error());
   }
   int cmp = strcasecmp(eth_str_cstr(x), eth_str_cstr(y));
   eth_unref(x);
@@ -121,7 +121,7 @@ _substr(void)
   eth_t start = eth_arg2(args, eth_number_type);
   eth_t len = eth_arg2(args, eth_number_type);
   if (eth_unlikely(not eth_is_size(start) || not eth_is_size(len)))
-    eth_throw(args, eth_sym("Invalid_argument"));
+    eth_throw(args, eth_invalid_argument());
   // --
   char *s = eth_str_cstr(str);
   size_t slen = eth_str_len(str);
@@ -168,7 +168,7 @@ _cat(void)
     {
       eth_drop(x);
       cod_vec_destroy(buf);
-      return eth_exn(eth_sym("Type_error"));
+      return eth_exn(eth_type_error());
     }
     int len = eth_str_len(s);
     char *cstr = eth_str_cstr(s);
@@ -179,7 +179,7 @@ _cat(void)
   if (eth_unlikely(it != eth_nil))
   {
     cod_vec_destroy(buf);
-    return eth_exn(eth_sym("Invalid_argument"));
+    return eth_exn(eth_invalid_argument());
   }
   cod_vec_push(buf, '\0');
   return eth_create_string_from_ptr2(buf.data, buf.len - 1);
@@ -189,7 +189,6 @@ static eth_t
 _strstr(void)
 {
   eth_use_variant(Some)
-  eth_use_symbol(Type_error)
   eth_t x = *eth_sp++;
   eth_ref(x);
   eth_t y = *eth_sp++;
@@ -198,7 +197,7 @@ _strstr(void)
   {
     eth_unref(x);
     eth_unref(y);
-    return eth_exn(Type_error);
+    return eth_exn(eth_type_error());
   }
   char *p = strstr(eth_str_cstr(x), eth_str_cstr(y));
   eth_t ret = p ? Some(eth_num(p - eth_str_cstr(x))) : eth_false;
@@ -214,7 +213,7 @@ _chomp(void)
   if (eth_unlikely(not eth_is_str(x)))
   {
     eth_drop(x);
-    return eth_exn(eth_sym("Type_error"));
+    return eth_exn(eth_type_error());
   }
   int len = eth_str_len(x);
   if (len == 0) return x;
@@ -240,7 +239,7 @@ _chop(void)
   if (eth_unlikely(not eth_is_str(x)))
   {
     eth_drop(x);
-    return eth_exn(eth_sym("Type_error"));
+    return eth_exn(eth_type_error());
   }
   if (eth_str_len(x) == 0)
     return x;
@@ -264,12 +263,12 @@ _chr(void)
   if (eth_unlikely(not eth_is_num(x)))
   {
     eth_drop(x);
-    return eth_exn(eth_sym("Type_error"));
+    return eth_exn(eth_type_error());
   }
   eth_number_t num = eth_num_val(x);
   eth_drop(x);
   if (num < CHAR_MIN or num > UINT8_MAX)
-    return eth_exn(eth_sym("Invalid_argument"));
+    return eth_exn(eth_invalid_argument());
   else
     return eth_create_string_from_char((char)num);
 }
@@ -281,12 +280,12 @@ _ord(void)
   if (eth_unlikely(not eth_is_str(x)))
   {
     eth_drop(x);
-    return eth_exn(eth_sym("Type_error"));
+    return eth_exn(eth_type_error());
   }
   if (eth_unlikely(eth_str_len(x) != 1))
   {
     eth_drop(x);
-    return eth_exn(eth_sym("Invalid_argument"));
+    return eth_exn(eth_invalid_argument());
   }
   eth_t ret = eth_num(eth_str_cstr(x)[0]);
   eth_drop(x);
@@ -326,8 +325,6 @@ static eth_t
 _gsub(void)
 {
   eth_use_symbol(Regexp_error)
-  eth_use_symbol(Invalid_argument)
-  eth_use_symbol(Type_error)
 
   eth_args args = eth_start(3);
   eth_t reg = eth_arg2(args, eth_regexp_type);
@@ -361,7 +358,7 @@ _gsub(void)
       {
         fclose(buf);
         free(ptr);
-        eth_throw(args, Invalid_argument);
+        eth_throw(args, eth_invalid_argument());
       }
       else
       {
@@ -383,7 +380,7 @@ _gsub(void)
           fclose(buf);
           free(ptr);
           eth_drop(r);
-          eth_throw(args, Type_error);
+          eth_throw(args, eth_type_error());
         }
         fwrite(eth_str_cstr(r), 1, eth_str_len(r), buf);
         eth_drop(r);
@@ -401,7 +398,6 @@ static eth_t
 _rev_split(void)
 {
   eth_use_symbol(Regexp_error)
-  eth_use_symbol(Invalid_argument)
 
   eth_args args = eth_start(2);
   eth_t reg = eth_arg2(args, eth_regexp_type);
@@ -429,7 +425,7 @@ _rev_split(void)
       if (ovec[0] == 0 && ovec[1] == 0)
       {
         eth_drop(acc);
-        eth_throw(args, Invalid_argument);
+        eth_throw(args, eth_invalid_argument());
       }
       else
       {
@@ -465,7 +461,7 @@ _to_number(void)
   if (eth_unlikely(x->type != eth_string_type))
   {
     eth_drop(x);
-    return eth_exn(eth_sym("Type_error"));
+    return eth_exn(eth_type_error());
   }
 
   char *nptr = eth_str_cstr(x);
@@ -475,7 +471,7 @@ _to_number(void)
   if (endptr == nptr)
   {
     eth_drop(x);
-    return eth_exn(eth_sym("Failure"));
+    return eth_exn(eth_failure());
   }
 
   while (*endptr++)
@@ -483,7 +479,7 @@ _to_number(void)
     if (not isspace(*endptr))
     {
       eth_drop(x);
-      return eth_exn(eth_sym("Failure"));
+      return eth_exn(eth_failure());
     }
   }
 
@@ -498,7 +494,7 @@ _to_symbol(void)
   if (eth_unlikely(x->type != eth_string_type))
   {
     eth_drop(x);
-    return eth_exn(eth_sym("Type_error"));
+    return eth_exn(eth_type_error());
   }
 
   eth_t ret = eth_sym(eth_str_cstr(x));

@@ -213,7 +213,7 @@ _list(void)
   else
   {
     eth_drop(x);
-    return eth_exn(eth_sym("Failure"));
+    return eth_exn(eth_failure());
   }
 }
 
@@ -351,7 +351,7 @@ _open(void)
     eth_t exn;
     switch (errno)
     {
-      case EINVAL: exn = eth_exn(eth_sym("Invalid_argument")); break;
+      case EINVAL: exn = eth_exn(eth_invalid_argument()); break;
       default: exn = eth_system_error(errno); break;
     }
     eth_return(args, exn);
@@ -371,7 +371,7 @@ _popen(void)
     eth_t exn;
     switch (errno)
     {
-      case EINVAL: exn = eth_exn(eth_sym("Invalid_argument")); break;
+      case EINVAL: exn = eth_exn(eth_invalid_argument()); break;
       default: exn = eth_system_error(errno); break;
     }
     eth_return(args, exn);
@@ -386,7 +386,7 @@ _close(void)
   if (file->type != eth_file_type)
   {
     eth_drop(file);
-    return eth_exn(eth_sym("Type_error"));
+    return eth_exn(eth_type_error());
   }
   if (eth_is_open(file))
   {
@@ -411,7 +411,7 @@ _close(void)
       {
         switch (err)
         {
-          case EBADF: return eth_exn(eth_sym("Invalid_argument"));
+          case EBADF: return eth_exn(eth_invalid_argument());
           default: return eth_system_error(err);
         }
       }
@@ -442,7 +442,7 @@ _write_to(void)
     {
       case EINVAL:
       case EBADF:
-        eth_throw(args, eth_sym("Invalid_argument"));
+        eth_throw(args, eth_invalid_argument());
     }
     eth_throw(args, eth_sym("System_error"));
   }
@@ -512,7 +512,7 @@ _input(void)
     {
       switch (err)
       {
-        case EINVAL: return eth_exn(eth_sym("Invalid_argument"));
+        case EINVAL: return eth_exn(eth_invalid_argument());
         default: return eth_system_error(err);
       }
     }
@@ -540,7 +540,7 @@ _read_line_of(void)
   if (file->type != eth_file_type)
   {
     eth_drop(file);
-    return eth_exn(eth_sym("Type_error"));
+    return eth_exn(eth_type_error());
   }
 
   char *line = NULL;
@@ -562,7 +562,7 @@ _read_line_of(void)
       switch (err)
       {
         case EBADF:
-        case EINVAL: return eth_exn(eth_sym("Invalid_argument"));
+        case EINVAL: return eth_exn(eth_invalid_argument());
         default: return eth_system_error(err);
       }
     }
@@ -583,13 +583,13 @@ _read_of(void)
   {
     eth_unref(file);
     eth_unref(n);
-    return eth_exn(eth_sym("Type_error"));
+    return eth_exn(eth_type_error());
   }
   if (eth_num_val(n) < 0)
   {
     eth_unref(file);
     eth_unref(n);
-    return eth_exn(eth_sym("Invalid_argument"));
+    return eth_exn(eth_invalid_argument());
   }
 
   FILE *stream = eth_get_file_stream(file);
@@ -624,7 +624,7 @@ _read_file(void)
   if (file->type != eth_file_type)
   {
     eth_drop(file);
-    return eth_exn(eth_sym("Type_error"));
+    return eth_exn(eth_type_error());
   }
 
   FILE *stream = eth_get_file_stream(file);
@@ -666,7 +666,7 @@ error:;
     case EINVAL:
     case ESPIPE:
     case EBADF:
-      return eth_exn(eth_sym("Invalid_argument"));
+      return eth_exn(eth_invalid_argument());
     default:
       return eth_system_error(err);
   }
@@ -686,7 +686,7 @@ _tell(void)
       case EINVAL:
       case ESPIPE:
       case EBADF:
-        eth_return(args, eth_exn(eth_sym("Invalid_argument")));
+        eth_return(args, eth_exn(eth_invalid_argument()));
       default:
         eth_return(args, eth_exn(eth_sym("System_error")));
     }
@@ -710,7 +710,7 @@ _seek(void)
       case EINVAL:
       case ESPIPE:
       case EBADF:
-        eth_return(args, eth_exn(eth_sym("Invalid_argument")));
+        eth_return(args, eth_exn(eth_invalid_argument()));
       default:
         eth_return(args, eth_exn(eth_sym("System_error")));
     }
@@ -893,7 +893,7 @@ _format(void)
   if (fmt->type != eth_string_type)
   {
     eth_drop(fmt);
-    return eth_exn(eth_sym("Type_error"));
+    return eth_exn(eth_type_error());
   }
 
   int n = _test_fmt(eth_str_cstr(fmt));
@@ -929,12 +929,10 @@ _raise(void)
 static eth_t
 __exit(void)
 {
-  eth_use_symbol(Invalid_argument)
-
   eth_args args = eth_start(1);
   eth_t status = eth_arg2(args, eth_number_type);
   if (not eth_is_int(status))
-    eth_throw(args, Invalid_argument);
+    eth_throw(args, eth_invalid_argument());
   eth_t exitobj = eth_create_exit_object(eth_num_val(status));
   eth_throw(args, exitobj);
 }
@@ -951,7 +949,7 @@ _load(void)
   if (eth_unlikely(not eth_is_str(path)))
   {
     eth_drop(path);
-    return eth_exn(eth_sym("Type_error"));
+    return eth_exn(eth_type_error());
   }
 
   char id[42];
@@ -963,7 +961,7 @@ _load(void)
   {
     eth_drop(path);
     eth_destroy_module(mod);
-    return eth_exn(eth_sym("Failure"));
+    return eth_exn(eth_failure());
   }
 
   eth_t acc = eth_nil;
@@ -1009,12 +1007,11 @@ _lazy_eval(void)
 static eth_t
 _Lazy_create(void)
 {
-  eth_use_symbol(Type_error)
   eth_t thunk = *eth_sp++;
   if (eth_unlikely(not eth_is_fn(thunk)))
   {
     eth_drop(thunk);
-    return eth_exn(Type_error);
+    return eth_exn(eth_type_error());
   }
   eth_ref(thunk);
   return eth_create_proc(_lazy_eval, 0, thunk, (void*)eth_unref);
@@ -1040,6 +1037,7 @@ _eth_init_builtins(void)
 
   g_mod = eth_create_module("Builtins");
 
+#if not defined(ETHER_DISABLE_BUILTINS)
   eth_debug("loading builtins");
 
   eth_attr *attr = eth_create_attr(ETH_ATTR_BUILTIN);
@@ -1111,6 +1109,9 @@ _eth_init_builtins(void)
     abort();
   }
   eth_debug("builtins were succesfully loaded");
+#else
+  eth_add_module(g_env, g_mod); // to prevent memory leak
+#endif
 }
 
 void

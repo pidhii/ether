@@ -184,10 +184,12 @@ int _eth_start_token = -1;
 %token<string> SYMBOL CAPSYMBOL
 %token<constant> CONST
 %token<character> CHAR
+%token<string> STRING
+%token HELP
 %token START_REGEXP
 %token<integer> END_REGEXP
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-%nonassoc LET REC AND IN FN IFLET WHENLET
+%nonassoc IN FN IFLET WHENLET
 %nonassoc OPEN USING AS UNQUALIFIED MODULE
 %nonassoc DOT_OPEN1 DOT_OPEN2
 %nonassoc LARROW
@@ -199,6 +201,7 @@ int _eth_start_token = -1;
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %right RARROW
 %right ';'
+%nonassoc LET REC AND
 %left LAZY
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %right TERNARY
@@ -243,6 +246,7 @@ int _eth_start_token = -1;
 %type<integer> Attribute
 %type<astvec> Args
 %type<patvec> FnArgs
+%type<string> Help MaybeHelp
 %type<charvec> String
 %type<ast> RegExp
 %type<charvec> StringAux
@@ -479,6 +483,10 @@ Expr
     $$ = eth_ast_match($2, $4, $6, eth_ast_cval(eth_nil));
     LOC($$, @$);
   }
+  | Expr IS OF Pattern {
+    $$ = eth_ast_match($4, $1, eth_ast_cval(eth_true), eth_ast_cval(eth_false));
+    LOC($$, @$);
+  }
   | IF Expr THEN Expr ELSE Expr {
     $$ = eth_ast_if($2, $4, $6);
     LOC($$, @$);
@@ -693,18 +701,34 @@ Bind
     $$.pat = $1;
     $$.val = $3;
   }
-  | Attribute SYMBOL FnArgs AtomicPattern '=' Expr {
+  | Attribute SYMBOL FnArgs AtomicPattern '=' MaybeHelp Expr {
     $$.pat = eth_ast_ident_pattern($2);
-    $$.pat->ident.attr = $1;
+    eth_attr *attr = eth_create_attr($1);
+    if (g_filename)
+      eth_set_location(attr, location(&@$));
+    if ($6)
+    {
+      eth_set_help(attr, $6);
+      free($6);
+    }
+    eth_ref_attr($$.pat->ident.attr = attr);
     cod_vec_push($3, $4);
-    $$.val = eth_ast_fn_with_patterns($3.data, $3.len, $6);
+    $$.val = eth_ast_fn_with_patterns($3.data, $3.len, $7);
     free($2);
     cod_vec_destroy($3);
   }
-  | Attribute SYMBOL '!' '=' Expr {
+  | Attribute SYMBOL '!' '=' MaybeHelp Expr {
     $$.pat = eth_ast_ident_pattern($2);
-    $$.pat->ident.attr = $1;
-    $$.val = eth_ast_fn(NULL, 0, $5);
+    eth_attr *attr = eth_create_attr($1);
+    if (g_filename)
+      eth_set_location(attr, location(&@$));
+    if ($5)
+    {
+      eth_set_help(attr, $5);
+      free($5);
+    }
+    eth_ref_attr($$.pat->ident.attr = attr);
+    $$.val = eth_ast_fn(NULL, 0, $6);
     free($2);
   }
 ;
@@ -719,6 +743,18 @@ String
   : '"' StringAux '"' { $$ = $2; }
 ;
 
+MaybeHelp
+  : { $$ = NULL; }
+  | Help
+
+Help
+  : HELP StringAux HELP {
+    cod_vec_push($2, 0);
+    $$ = $2.data;
+    $2.data = NULL;
+  }
+;
+
 RegExp
   : START_REGEXP StringAux END_REGEXP {
     cod_vec_push($2, 0);
@@ -726,6 +762,9 @@ RegExp
     if (regexp == NULL)
     {
       eth_error("invalid regular expression");
+      eth_location *loc = location(&@$);
+      eth_print_location(loc, stderr);
+      eth_drop_location(loc);
       abort();
     }
     $$ = eth_ast_cval(regexp);
@@ -740,17 +779,32 @@ StringAux
     $$ = $1;
     cod_vec_push($$, $2);
   }
+  | StringAux STRING {
+    $$ = $1;
+    for (const char *p = $2; *p; ++p)
+      cod_vec_push($$, *p);
+    free($2);
+  }
 ;
 
 AtomicPattern
   : '_' { $$ = eth_ast_dummy_pattern(); }
   | Attribute SYMBOL {
     $$ = eth_ast_ident_pattern($2);
-    $$->ident.attr = $1;
+    eth_attr *attr = eth_create_attr($1);
+    if (g_filename)
+      eth_set_location(attr, location(&@$));
+    eth_ref_attr($$->ident.attr = attr);
     free($2);
   }
   | CAPSYMBOL { $$ = eth_ast_constant_pattern(eth_sym($1)); free($1); }
   | CONST { $$ = eth_ast_constant_pattern($1); }
+  | String {
+    cod_vec_push($1, 0);
+    eth_t str = eth_create_string_from_ptr2($1.data, $1.len - 1);
+    $$ = eth_ast_constant_pattern(str);
+  }
+  | NUMBER { $$ = eth_ast_constant_pattern(eth_create_number($1)); }
   | '('')' { $$ = eth_ast_constant_pattern(eth_nil); }
   | '['']' { $$ = eth_ast_constant_pattern(eth_nil); }
   | '(' Pattern ')' { $$ = $2; }
@@ -856,23 +910,21 @@ ReocrdPattern
     cod_vec_push($$.keys, $1);
     cod_vec_push($$.vals, eth_ast_ident_pattern($1));
   }
-  | SYMBOL '=' SYMBOL {
+  | SYMBOL '=' Pattern {
     cod_vec_init($$.keys);
     cod_vec_init($$.vals);
     cod_vec_push($$.keys, $1);
-    cod_vec_push($$.vals, eth_ast_ident_pattern($3));
-    free($3);
+    cod_vec_push($$.vals, $3);
   }
   | ReocrdPattern ',' SYMBOL {
     $$ = $1;
     cod_vec_push($$.keys, $3);
     cod_vec_push($$.vals, eth_ast_ident_pattern($3));
   }
-  | ReocrdPattern ',' SYMBOL '=' SYMBOL {
+  | ReocrdPattern ',' SYMBOL '=' Pattern {
     $$ = $1;
     cod_vec_push($$.keys, $3);
-    cod_vec_push($$.vals, eth_ast_ident_pattern($5));
-    free($5);
+    cod_vec_push($$.vals, $5);
   }
 ;
 
@@ -973,12 +1025,12 @@ ModuleBody
     }
     LOC($$, @1);
   }
-  | MODULE CAPSYMBOL '=' ModuleBody END {
-    $$ = eth_ast_module($2, $4);
-    LOC($$, @1);
+  | MODULE CAPSYMBOL '=' ModuleBody END ModuleBody {
+    eth_ast *mod = eth_ast_module($2, $4);
+    LOC(mod, @1);
     free($2);
+    $$ = eth_ast_seq(mod, $6);
   }
-  | MODULE '=' ModuleBody END { $$ = $3; }
 ;
 
 %%

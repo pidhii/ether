@@ -132,6 +132,9 @@ eth_init(const int *argc)
   extern void _eth_init_alloc(void);
   _eth_init_alloc();
 
+  extern void _eth_init_scanner(void);
+  _eth_init_scanner();
+
   extern void _eth_init_magic(void);
   _eth_init_magic();
 
@@ -180,6 +183,9 @@ eth_init(const int *argc)
   extern void _eth_init_ref_type(void);
   _eth_init_ref_type();
 
+  extern void _eth_init_vector_type(void);
+  _eth_init_vector_type();
+
   extern void _eth_init_builtins(void);
   _eth_init_builtins();
 }
@@ -187,6 +193,9 @@ eth_init(const int *argc)
 void
 eth_cleanup(void)
 {
+  extern void _eth_cleanup_scanner(void);
+  _eth_cleanup_scanner();
+
   extern void _eth_cleanup_builtins(void);
   _eth_cleanup_builtins();
 
@@ -202,7 +211,9 @@ eth_cleanup(void)
   eth_destroy_type(eth_rangel_type);
   eth_destroy_type(eth_ranger_type);
   eth_destroy_type(eth_regexp_type);
-  eth_destroy_type(eth_ref_type);
+  eth_destroy_type(eth_strong_ref_type);
+  eth_destroy_type(eth_weak_ref_type);
+  eth_destroy_type(eth_vector_type);
 
   extern void _eth_cleanup_strings(void);
   _eth_cleanup_strings();
@@ -325,5 +336,19 @@ eth_type_error(void)
 {
   eth_use_symbol(Type_error)
   return Type_error;
+}
+
+eth_t
+eth_invalid_argument(void)
+{
+  eth_use_symbol(Invalid_argument)
+  return Invalid_argument;
+}
+
+eth_t
+eth_failure(void)
+{
+  eth_use_symbol(Failure)
+  return Failure;
 }
 

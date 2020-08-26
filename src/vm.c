@@ -40,6 +40,7 @@ eth_vm(eth_bytecode *bc)
     [ETH_OPC_TEST     ] = &&INSN_TEST,
     [ETH_OPC_TESTTY   ] = &&INSN_TESTTY,
     [ETH_OPC_TESTIS   ] = &&INSN_TESTIS,
+    [ETH_OPC_TESTEQUAL] = &&INSN_TESTEQUAL,
     [ETH_OPC_GETTEST  ] = &&INSN_GETTEST,
     [ETH_OPC_DUP      ] = &&INSN_DUP,
     [ETH_OPC_JNZ      ] = &&INSN_JNZ,
@@ -206,6 +207,12 @@ eth_vm(eth_bytecode *bc)
       OP(TESTIS)
       {
         test = r[ip->testty.vid] == ip->testis.cval;
+        FAST_DISPATCH_NEXT();
+      }
+
+      OP(TESTEQUAL)
+      {
+        test = eth_equal(r[ip->testequal.vid], ip->testequal.cval);
         FAST_DISPATCH_NEXT();
       }
 

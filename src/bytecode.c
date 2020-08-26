@@ -231,6 +231,17 @@ write_testis(bc_builder *bldr, int vid, eth_t cval)
 }
 
 static int
+write_testequal(bc_builder *bldr, int vid, eth_t cval)
+{
+  eth_bc_insn *insn = append_insn(bldr);
+  insn->opc = ETH_OPC_TESTEQUAL;
+  insn->testequal.vid = vid;
+  insn->testequal.cval = cval;
+  eth_ref(cval);
+  return bldr->len - 1;
+}
+
+static int
 write_gettest(bc_builder *bldr, int out)
 {
   eth_bc_insn *insn = append_insn(bldr);
@@ -550,7 +561,16 @@ build_pattern(bc_builder *bldr, eth_ssa_pattern *pat, int expr, int_vec *jmps)
     case ETH_PATTERN_CONSTANT:
       if (pat->constant.dotest)
       {
-        write_testis(bldr, expr, pat->constant.val);
+        switch (pat->constant.testop)
+        {
+          case ETH_TEST_IS:
+            write_testis(bldr, expr, pat->constant.val);
+            break;
+
+          case ETH_TEST_EQUAL:
+            write_testequal(bldr, expr, pat->constant.val);
+            break;
+        }
         int jmp = write_jze(bldr, -1);
         cod_vec_push(*jmps, jmp);
       }

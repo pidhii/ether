@@ -27,6 +27,17 @@ set_target_properties (math
     OUTPUT_NAME "math")
 install (TARGETS math DESTINATION ${MATH_DST_DIR})
 
+# Vector
+set (VECTOR_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/vector)
+set (VECTOR_DST_DIR lib/ether/vector)
+add_library (vector SHARED ${VECTOR_SRC_DIR}/lib.c)
+set_target_properties (vector
+  PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    PREFIX ""
+    OUTPUT_NAME "vector")
+install (TARGETS vector DESTINATION ${VECTOR_DST_DIR})
+
 # Arb
 set (ARB_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/arb)
 set (ARB_DST_DIR lib/ether/arb)

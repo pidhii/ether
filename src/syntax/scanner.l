@@ -28,6 +28,44 @@ ETH_MODULE("ether:scanner");
 extern int _eth_start_token;
 static int g_comment_cnt = 0;
 
+enum { QUOTES_DEFAULT, QUOTES_STRING };
+typedef struct { int tag; char *str; } quote;
+
+static inline void
+destroy_quote(quote q)
+  {
+    if (q.tag == QUOTES_STRING)
+      free(q.str);
+  }
+
+static cod_vec(quote) g_quotes;
+
+static inline void
+push_quote(int tag, const char *maybestr)
+  {
+    quote q = { .tag = tag, .str = maybestr ? strdup(maybestr) : NULL };
+    cod_vec_push(g_quotes, q);
+  }
+
+static inline void
+pop_quote()
+  {
+    destroy_quote(cod_vec_pop(g_quotes));
+  }
+
+void
+_eth_init_scanner(void)
+  {
+    cod_vec_init(g_quotes);
+  }
+
+void
+_eth_cleanup_scanner(void)
+  {
+    assert(g_quotes.len == 0);
+    cod_vec_destroy(g_quotes);
+  }
+
 %}
 
 %option noyywrap
@@ -78,7 +116,24 @@ OPERATOR [-+%^.$:!<>*/=&|∘]+
 <COMMENT>.
 <COMMENT>\n
 
-\" { BEGIN(STRING); return '"'; }
+\" {
+  push_quote(QUOTES_DEFAULT, NULL);
+  BEGIN(STRING);
+  return '"';
+}
+"{.help|" {
+  push_quote(QUOTES_STRING, ".help");
+  BEGIN(STRING);
+  return HELP;
+}
+"{"\S+"|" {
+  char buf[yyleng-1];
+  memcpy(buf, yytext+1, yyleng-2);
+  buf[yyleng-1] = '\0';
+  push_quote(QUOTES_STRING, buf);
+  BEGIN(STRING);
+  return '"';
+}
 "\\" {
   BEGIN(REGEXP);
   yylval->character = yytext[yyleng-1];
@@ -103,7 +158,48 @@ OPERATOR [-+%^.$:!<>*/=&|∘]+
 }
 <STRING>"\\\"" { yylval->character = '"'; return CHAR; }
 <REGEXP>"\\/"  { yylval->character = '/'; return CHAR; }
-<STRING>\"     { BEGIN(INITIAL); return '"'; }
+<STRING>\" {
+  if (cod_vec_last(g_quotes).tag == QUOTES_DEFAULT)
+  {
+    pop_quote();
+    BEGIN(INITIAL);
+    return '"';
+  }
+  else
+  {
+    yylval->character = '"';
+    return CHAR;
+  }
+}
+<STRING>"|.help}" {
+  if (strcmp(".help", cod_vec_last(g_quotes).str) == 0)
+  {
+    pop_quote();
+    BEGIN(INITIAL);
+    return HELP;
+  }
+  else
+  {
+    yylval->string = strdup(".help");
+    return STRING;
+  }
+}
+<STRING>"|"\S+"}" {
+  char buf[yyleng-1];
+  memcpy(buf, yytext+1, yyleng-2);
+  buf[yyleng-1] = '\0';
+  if (strcmp(buf, cod_vec_last(g_quotes).str) == 0)
+  {
+    pop_quote();
+    BEGIN(INITIAL);
+    return '"';
+  }
+  else
+  {
+    yylval->string = strdup(buf);
+    return STRING;
+  }
+}
 <REGEXP>"/"[a-zA-Z]* {
   int flag = 0;
   for (char *p = yytext + 1; *p; ++p)

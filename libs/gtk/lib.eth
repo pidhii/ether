@@ -64,7 +64,14 @@ let pub gtk_button_new_with_label(label) = _gtk_button_new_with_label label in
 --------------------------------------------------------------------------------
 --                            GtkEntry
 --------------------------------------------------------------------------------
+let pub gtk_entry_new! = _gtk_entry_new! in
 let pub gtk_entry_get_text(entry) = _gtk_entry_get_text entry in
+let pub gtk_entry_set_text(entry, text) = _gtk_entry_set_text entry text in
+
+--------------------------------------------------------------------------------
+--                            GtkStack
+--------------------------------------------------------------------------------
+let pub gtk_stack_set_visible_child(stack, child) = _gtk_stack_set_visible_child stack child in
 
 --------------------------------------------------------------------------------
 --                            GtkBuilder

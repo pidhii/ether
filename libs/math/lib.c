@@ -20,7 +20,7 @@
     if (eth_unlikely(not eth_is_num(x)))       \
     {                                          \
       eth_drop(x);                             \
-      return eth_exn(eth_sym("Type_error"));   \
+      return eth_exn(eth_type_error());   \
     }                                          \
     eth_t ret = eth_num(func(eth_num_val(x))); \
     eth_drop(x);                               \

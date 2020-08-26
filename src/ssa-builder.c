@@ -573,7 +573,7 @@ assert_number(ssa_builder *bldr, eth_ssa_tape *tape, int vid, eth_location *loc,
           bldr->vinfo[vid]->type->name);
       *e = 1;
       int exn = new_val(bldr, RC_RULES_DISABLE);
-      eth_write_insn(tape, eth_insn_cval(exn, eth_exn(eth_sym("Type_error"))));
+      eth_write_insn(tape, eth_insn_cval(exn, eth_exn(eth_type_error())));
       write_throw(bldr, tape, exn, loc);
     }
   }
@@ -582,7 +582,7 @@ assert_number(ssa_builder *bldr, eth_ssa_tape *tape, int vid, eth_location *loc,
     // test type:
     eth_ssa_tape *errtape = eth_create_ssa_tape();
     int exn = new_val(bldr, RC_RULES_DISABLE);
-    eth_write_insn(errtape, eth_insn_cval(exn, eth_exn(eth_sym("Type_error"))));
+    eth_write_insn(errtape, eth_insn_cval(exn, eth_exn(eth_type_error())));
     write_throw(bldr, errtape, exn, loc);
     // --
     eth_insn *test = eth_insn_if_test_type(-1, vid, eth_number_type,
@@ -656,21 +656,52 @@ build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
     {
       value_info *vinfo = bldr->vinfo[expr];
 
-      if (vinfo->cval and vinfo->cval == pat->constant.val)
-        return eth_ssa_constant_pattern(pat->constant.val, false);
-
-      if (vinfo->type and vinfo->type != pat->constant.val->type)
+      // # NIL & BOOLEANs & SYMBOLs
+      if (pat->constant.val->type == eth_nil_type
+          or pat->constant.val->type == eth_boolean_type
+          or pat->constant.val->type == eth_symbol_type)
       {
-        eth_warning("pattern won't match: expect %s, but value is of type %s",
-            pat->constant.val->type->name, vinfo->type->name);
-        *e = 1;
+        if (vinfo->cval and vinfo->cval == pat->constant.val)
+          return eth_ssa_constant_pattern(pat->constant.val, ETH_TEST_IS, false);
+
+        if (vinfo->type and vinfo->type != pat->constant.val->type)
+        {
+          eth_warning("pattern won't match: expect %s, but value is of type %s",
+              pat->constant.val->type->name, vinfo->type->name);
+          *e = 1;
+        }
+
+        // fix type and value for inner branch
+        set_cval(bldr, expr, pat->constant.val);
+        set_type(bldr, expr, pat->constant.val->type);
+
+        return eth_ssa_constant_pattern(pat->constant.val, ETH_TEST_IS, true);
       }
+      // # STRINGs and NUMBERs
+      else if (pat->constant.val->type == eth_string_type
+          or pat->constant.val->type == eth_number_type)
+      {
+        if (vinfo->cval and eth_equal(vinfo->cval, pat->constant.val))
+          return eth_ssa_constant_pattern(pat->constant.val, ETH_TEST_EQUAL, false);
 
-      // fix type and value for inner branch
-      set_cval(bldr, expr, pat->constant.val);
-      set_type(bldr, expr, pat->constant.val->type);
+        if (vinfo->type and vinfo->type != pat->constant.val->type)
+        {
+          eth_warning("pattern won't match: expect %s, but value is of type %s",
+              pat->constant.val->type->name, vinfo->type->name);
+          *e = 1;
+        }
 
-      return eth_ssa_constant_pattern(pat->constant.val, true);
+        // fix type and value for inner branch
+        set_cval(bldr, expr, pat->constant.val);
+        set_type(bldr, expr, pat->constant.val->type);
+
+        return eth_ssa_constant_pattern(pat->constant.val, ETH_TEST_EQUAL, true);
+      }
+      else
+      {
+        eth_error("unsupported constant for match");
+        abort();
+      }
     }
 
     case ETH_PATTERN_RECORD:
@@ -831,7 +862,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
   {
     case ETH_IR_ERROR:
     {
-      eth_error("ERROR-node passed to ssa-builder");
+      eth_error("ERROR-node passed to SSA-builder");
       *e = 1;
       return 0;
     }
@@ -1213,7 +1244,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
       int out = new_val(bldr, RC_RULES_PHI);
       eth_ssa_tape *errtape = eth_create_ssa_tape();
       int exnvid = new_val(bldr, RC_RULES_DISABLE);
-      eth_t exn = eth_exn(eth_sym("Type_error"));
+      eth_t exn = eth_exn(eth_type_error());
       eth_write_insn(errtape, eth_insn_cval(exnvid, exn));
       write_throw(bldr, errtape, exnvid, ir->loc);
       eth_insn *insn = eth_insn_if_update(out, src, vids, ir->update.ids, n,
@@ -1985,9 +2016,18 @@ eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
   eth_ssa *ssa = NULL;
   bool e = false;
 
+  /*eth_ir_node *specir = eth_specialize(ir);*/
+  /*if (not specir)*/
+    /*abort();*/
+  /*eth_ref_ir_node(specir);*/
+
   ssa_builder *bldr = create_ssa_builder(ir->nvars);
   eth_ssa_tape *tape = eth_create_ssa_tape();
+
+  /*int ret = build_logical_block(bldr, tape, specir, false, &e);*/
   int ret = build_logical_block(bldr, tape, ir->body, false, &e);
+  /*eth_unref_ir_node(specir);*/
+
   if (e)
   {
     eth_destroy_insn_list(tape->head);

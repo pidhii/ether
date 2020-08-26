@@ -22,11 +22,12 @@ eth_ssa_ident_pattern(int vid)
 }
 
 eth_ssa_pattern*
-eth_ssa_constant_pattern(eth_t val, bool dotest)
+eth_ssa_constant_pattern(eth_t val, eth_test_op testop, bool dotest)
 {
   eth_ssa_pattern *pat = malloc(sizeof(eth_ssa_pattern));
   pat->tag = ETH_PATTERN_CONSTANT;
   eth_ref(pat->constant.val = val);
+  pat->constant.testop = testop;
   pat->constant.dotest = dotest;
   return pat;
 }

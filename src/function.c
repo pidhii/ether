@@ -50,7 +50,7 @@ eth_drop_source(eth_source *src)
 }
 
 
-
+// TODO: may cause stack overflow during UNREF of captures
 static void
 function_destroy(eth_type *type, eth_t x)
 {

@@ -57,7 +57,20 @@ callback_none(eth_t f)
 {
   eth_t ret = eth_apply(f, 0);
   if (eth_is_exn(ret))
+  {
     eth_warning("unhandled exception in GtkCallback handle (~w)", ret);
+    char buf[PATH_MAX];
+    for (int i = ETH_EXCEPTION(ret)->tracelen - 1; i >= 0; --i)
+    {
+      eth_get_location_file(ETH_EXCEPTION(ret)->trace[i], buf);
+      putc('\n', stderr);
+      eth_trace("trace[%d]: %s", i, buf);
+      if (i == ETH_EXCEPTION(ret)->tracelen - 1)
+        eth_print_location_opt(ETH_EXCEPTION(ret)->trace[i], stderr, ETH_LOPT_EXTRALINES);
+      else
+        eth_print_location_opt(ETH_EXCEPTION(ret)->trace[i], stderr, 0);
+    }
+  }
   eth_drop(ret);
 }
 
@@ -83,7 +96,6 @@ static eth_t
 _g_signal_connect_closure(void)
 {
   eth_use_symbol(Ivalid_callback)
-  eth_use_symbol(Failure);
 
   eth_args args = eth_start(4);
   eth_t wgt = eth_arg2(args, gobject_type);
@@ -99,7 +111,7 @@ _g_signal_connect_closure(void)
   if (id <= 0)
   {
     g_closure_sink(clos);
-    eth_throw(args, Failure);
+    eth_throw(args, eth_failure());
   }
 
   eth_return(args, eth_num(id));
@@ -312,17 +324,46 @@ _gtk_button_new_with_label(void)
 //                             GtkEntry API
 ////////////////////////////////////////////////////////////////////////////////
 static eth_t
+_gtk_entry_new(void)
+{
+  GtkWidget *ent = gtk_entry_new();
+  g_object_ref_sink(ent);
+  return create_gobject(ent);
+}
+
+static eth_t
 _gtk_entry_get_text(void)
 {
-  eth_use_symbol(Failure)
-
   eth_args arg = eth_start(1);
   eth_t ent = eth_arg2(arg, gobject_type);
   const char *text = gtk_entry_get_text(GTK_ENTRY(get_gobj(ent)));
   if (text == NULL)
-    eth_throw(arg, Failure);
+    eth_throw(arg, eth_failure());
   guint16 len = gtk_entry_get_text_length(GTK_ENTRY(get_gobj(ent)));
   eth_return(arg, eth_create_string2(text, len));
+}
+
+static eth_t
+_gtk_entry_set_text(void)
+{
+  eth_args arg = eth_start(2);
+  eth_t ent = eth_arg2(arg, gobject_type);
+  eth_t text = eth_arg2(arg, eth_string_type);
+  gtk_entry_set_text(GTK_ENTRY(get_gobj(ent)), eth_str_cstr(text));
+  eth_return(arg, eth_nil);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//                             GtkStack API
+////////////////////////////////////////////////////////////////////////////////
+static eth_t
+_gtk_stack_set_visible_child(void)
+{
+  eth_args arg = eth_start(2);
+  eth_t stack = eth_arg2(arg, gobject_type);
+  eth_t child = eth_arg2(arg, gobject_type);
+  gtk_stack_set_visible_child(GTK_STACK(get_gobj(stack)), GTK_WIDGET(get_gobj(child)));
+  eth_return(arg, eth_nil);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -359,8 +400,6 @@ _gtk_builder_add_from_file(void)
 static eth_t
 _gtk_builder_get_object(void)
 {
-  eth_use_symbol(Failure)
-
   eth_args arg = eth_start(2);
   eth_t bldr_ = eth_arg2(arg, gobject_type);
   eth_t name_ = eth_arg2(arg, eth_string_type);
@@ -368,7 +407,7 @@ _gtk_builder_get_object(void)
   const char *name = eth_str_cstr(name_);
   GObject *wgt = gtk_builder_get_object(bldr, name);
   if (wgt == NULL)
-    eth_throw(arg, Failure);
+    eth_throw(arg, eth_failure());
   g_object_ref(wgt);
   eth_return(arg, create_gobject(wgt));
 }
@@ -518,7 +557,14 @@ ether_module(eth_module *mod, eth_env *topenv)
  /*----------*
   | GtkEntry |
   *----------*/
+  DEFFUN(_gtk_entry_new, 0);
   DEFFUN(_gtk_entry_get_text, 1);
+  DEFFUN(_gtk_entry_set_text, 2);
+
+ /*----------*
+  | GtkStack |
+  *----------*/
+  DEFFUN(_gtk_stack_set_visible_child, 2);
 
  /*------------*
   | GtkBuilder |

@@ -55,6 +55,7 @@ destroy_ir_builder(ir_builder *bldr)
   cod_vec_iter(bldr->defidents, i, x, free(x));
   cod_vec_destroy(bldr->defidents);
   cod_vec_destroy(bldr->defvarids);
+  cod_vec_iter(bldr->defattrs, i, x, eth_unref_attr(x));
   cod_vec_destroy(bldr->defattrs);
   /*assert(bldr->mods.len == 0);*/
   while (bldr->mods.len > 0)
@@ -332,10 +333,12 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
       eth_attr *attr = NULL;
       if (pat->ident.attr)
       {
-        attr = eth_create_attr(pat->ident.attr);
         // handle PUB
-        if (pat->ident.attr & ETH_ATTR_PUB)
+        attr = pat->ident.attr;
+        if (pat->ident.attr->flag & ETH_ATTR_PUB)
           trace_pub_var(bldr, pat->ident.str, varid, attr, loc, e);
+        /*else*/
+          /*eth_drop_attr(attr);*/
       }
 
       eth_prepend_var(bldr->vars, eth_dyn_var(pat->ident.str, varid, attr));
@@ -436,7 +439,7 @@ build_let(ir_builder *bldr, int idx, eth_ast *ast, eth_ir_node *const vals[],
 
     eth_ir_node *thenbr = build_let(bldr, idx + 1, ast, vals, nvars0, e);
 
-    eth_t exn = eth_exn(eth_sym("Type_error"));
+    eth_t exn = eth_exn(eth_type_error());
     eth_ir_node *elsebr = eth_ir_throw(eth_ir_cval(exn));
     eth_set_ir_location(elsebr, ast->let.vals[idx]->loc);
 
@@ -466,7 +469,7 @@ build_letrec(ir_builder *bldr, int idx, eth_ast *ast, int nvars0, int nvars,
 
     eth_ir_node *thenbr = build_letrec(bldr, idx + 1, ast, nvars0, nvars, pats, e);
 
-    eth_t exn = eth_exn(eth_sym("Type_error"));
+    eth_t exn = eth_exn(eth_type_error());
     eth_ir_node *elsebr = eth_ir_throw(eth_ir_cval(exn));
     eth_set_ir_location(elsebr, ast->letrec.vals[idx]->loc);
 
@@ -661,6 +664,22 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
     {
       eth_ir_pattern *pats[ast->letrec.n];
 
+      /* TODO:
+       *  Figure out a way to have recursive structures (not only closures) s.t.
+       *  record-updates won't yeild dangling resources.
+       */
+      // validate expressions: only closures allowed
+      for (int i = 0; i < ast->letrec.n; ++i)
+      {
+        if (ast->letrec.vals[i]->tag != ETH_AST_FN)
+        {
+          eth_warning("Only closures allowed in recursive scope");
+          eth_print_location(ast->loc, stderr);
+          *e = true;
+          return eth_ir_error();
+        }
+      }
+
       int n1 = bldr->vars->len - bldr->capoffs;
       for (int i = 0; i < ast->letrec.n; ++i)
         pats[i] = build_pattern(bldr, ast->letrec.pats[i], ast->loc, e);
@@ -765,7 +784,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       {
         if (throw == NULL)
         {
-          eth_t exn = eth_exn(eth_sym("Type_error"));
+          eth_t exn = eth_exn(eth_type_error());
           throw = eth_ir_throw(eth_ir_cval(exn));
         }
         // TODO: mark as likely
@@ -958,8 +977,6 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
      */
     case ETH_AST_ACCESS:
     {
-      eth_use_symbol(Type_error)
-
       eth_ir_node *expr = build(bldr, ast->access.expr, e);
       // --
       size_t fid = eth_get_symbol_id(eth_sym(ast->access.field));
@@ -967,7 +984,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       eth_ir_pattern *tmp = eth_ir_ident_pattern(tmpvar);
       eth_ir_pattern *pat = eth_ir_record_pattern(new_vid(bldr), &fid, &tmp, 1);
       // --
-      eth_ir_node *exn = eth_ir_cval(eth_exn(Type_error));
+      eth_ir_node *exn = eth_ir_cval(eth_exn(eth_type_error()));
       // --
       return eth_ir_match(pat, expr, eth_ir_var(tmpvar), eth_ir_throw(exn));
     }

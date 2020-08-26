@@ -20,6 +20,8 @@
 #endif
 
 
+typedef int16_t eth_sshort_t;
+typedef uint16_t eth_short_t;
 typedef uint32_t eth_word_t;
 typedef int32_t eth_sword_t;
 typedef uint64_t eth_dword_t;
@@ -103,6 +105,16 @@ eth_log_aux(bool enable, const char *module, const char *file, const char *func,
       true,                                          \
       eth_this_module, __FILE__, __func__, __LINE__, \
       "\e[48;5;16;38;5;9;1m", stderr, fmt, ##__VA_ARGS__)
+
+#define eth_unimplemented()                             \
+  do {                                                  \
+    eth_log_aux(                                        \
+      true,                                             \
+      eth_this_module, __FILE__, __func__, __LINE__,    \
+      "\e[38;5;16;48;5;9;1m", stderr,                   \
+      "unimplemented: %s, `%s()`", __FILE__, __func__); \
+    abort();                                            \
+  } while (0)
 
 
 const char*
@@ -416,7 +428,7 @@ eth_remove_scope(eth_magic *magic, eth_scp *scp);
 //                             OBJECT HEADER
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 #define ETH_MAGIC_NONE (-1)
-
+#define ETH_RC_MAX UINT32_MAX
 struct eth_header {
   eth_type *type;
   eth_word_t rc;
@@ -453,6 +465,10 @@ eth_delete(eth_t x)
 static inline void
 eth_ref(eth_t x)
 {
+#if defined(ETH_DEBUG_MODE)
+  if (x->rc >= UINT32_MAX)
+    fprintf(stderr, "FATAL ERROR: overflow of reference count\n");
+#endif
   x->rc += 1;
 }
 
@@ -1078,18 +1094,6 @@ void
 eth_destroy_record_hn(eth_type *type, eth_t x);
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-//                                object
-// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-ETH_EXTERN
-eth_type *eth_object_type;
-
-typedef struct {
-  eth_header header;
-  eth_t fields[];
-} eth_object;
-
-
-// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                 file
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 ETH_EXTERN
@@ -1153,7 +1157,8 @@ eth_is_range(eth_t x)
 //                                 ref
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 ETH_EXTERN
-eth_type *eth_ref_type;
+eth_type *eth_strong_ref_type,
+         *eth_weak_ref_type;
 
 struct eth_mut_ref {
   eth_header header;
@@ -1163,16 +1168,53 @@ struct eth_mut_ref {
 #define eth_ref_get(x) (ETH_REF(x)->val)
 
 static inline void
-eth_set_ref(eth_t ref, eth_t x)
+eth_set_strong_ref(eth_t ref, eth_t x)
 {
   eth_ref(x);
   eth_unref(eth_ref_get(ref));
   ETH_REF(ref)->val = x;
 }
 
-eth_t
-eth_create_ref(eth_t init);
+static inline void
+eth_set_weak_ref(eth_t ref, eth_t x)
+{
+  ETH_REF(ref)->val = x;
+}
 
+eth_t
+eth_create_strong_ref(eth_t init);
+
+eth_t
+eth_create_weak_ref(eth_t init);
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                               vector
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+ETH_EXTERN
+eth_type *eth_vector_type;
+
+#define eth_is_vec(x) ((x)->type == eth_vector_type)
+
+eth_t
+eth_create_vector(void);
+
+int
+eth_vec_len(eth_t v);
+
+eth_t
+eth_vec_get(eth_t v, int k);
+
+void
+eth_push_mut(eth_t vec, eth_t x);
+
+eth_t __attribute__((flatten))
+eth_push_pers(eth_t v, eth_t x);
+
+eth_t
+eth_front(eth_t v);
+
+eth_t
+eth_back(eth_t v);
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                             ATTRIBUTES
@@ -1185,10 +1227,18 @@ typedef enum {
 typedef struct {
   int rc;
   int flag;
+  char *help;
+  eth_location *loc;
 } eth_attr;
 
 eth_attr*
 eth_create_attr(int flag);
+
+void
+eth_set_help(eth_attr *attr, const char *help);
+
+void
+eth_set_location(eth_attr *attr, eth_location *loc);
 
 void
 eth_ref_attr(eth_attr *attr);
@@ -1336,6 +1386,8 @@ eth_print_location(eth_location *loc, FILE *stream);
 #define ETH_LOPT_FILE       (1 << 0)
 #define ETH_LOPT_NEWLINES   (1 << 1)
 #define ETH_LOPT_EXTRALINES (1 << 2)
+#define ETH_LOPT_NOCOLOR    (1 << 3)
+#define ETH_LOPT_NOLINENO   (1 << 4)
 
 int
 eth_print_location_opt(eth_location *loc, FILE *stream, int opt);
@@ -1439,7 +1491,7 @@ struct eth_ast_pattern {
   union {
     struct {
       char *str; /**< Identifier string */
-      int attr; /**< Identifier attribute (see eth_attr_t) */
+      eth_attr *attr; /**< Identifier attribute (see eth_attr_t) */
     } ident; /**< @brief Identifier pattern */
 
     struct {
@@ -1993,11 +2045,87 @@ eth_build_module_ir(eth_ast *ast, eth_env *env, eth_module *mod,
 
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
+//                             TYPE ANALYSIS
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+typedef enum {
+  ETH_ATYPE_ERROR,
+  ETH_ATYPE_UNION,
+  ETH_ATYPE_RECORD,
+  ETH_ATYPE_TUPLE,
+  ETH_ATYPE_LIST,
+  ETH_ATYPE_FN,
+  ETH_ATYPE_ATOM,
+} eth_atype_tag;
+
+typedef struct eth_atype eth_atype;
+
+struct eth_atype {
+  eth_atype_tag tag;
+  int rc;
+  union {
+    struct { eth_atype **types; int n; } un;
+    struct { eth_atype **types; int *ids, n; } record;
+    struct { eth_atype **types; int n; } tuple;
+    struct { eth_atype *elttype; } list;
+    struct { int arity; eth_ir *body; } fn;
+    struct { eth_type *type; } atom;
+    struct { eth_t val; } cval;
+  };
+  eth_type *type;
+};
+
+void
+eth_ref_atype(eth_atype *aty);
+
+void
+eth_unref_atype(eth_atype *aty);
+
+void
+eth_drop_atype(eth_atype *aty);
+
+eth_atype*
+eth_create_atype_error(void);
+
+eth_atype*
+eth_create_atype_atom(eth_type *type);
+
+eth_atype*
+eth_create_atype_list(eth_atype *elttype);
+
+eth_atype*
+eth_create_atype_record(int const ids[], eth_atype *const types[], int n);
+
+eth_atype*
+eth_create_atype_tuple(eth_atype *const types[], int n);
+
+eth_atype*
+eth_create_atype_fn(int arity, eth_ir *body);
+
+eth_atype*
+eth_create_atype_union(eth_atype *const types[], int n);
+
+static inline eth_atype*
+eth_create_atype_any(void)
+{ return eth_create_atype_union(NULL, 0); }
+
+static inline bool
+eth_atype_is_atom(eth_atype *atype, eth_type *type)
+{ return atype->tag == ETH_ATYPE_ATOM && atype->atom.type == type; }
+
+eth_ir_node*
+eth_specialize(const eth_ir *ir);
+
+// ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                STATIC SINGLE ASSIGNEMENT REPRESENTATION
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 /*
  * Note: unpack.type is NULL if no type check required.
  */
+typedef enum {
+  ETH_TEST_IS,
+  ETH_TEST_EQUAL,
+} eth_test_op;
+
 typedef struct eth_ssa_pattern eth_ssa_pattern;
 struct eth_ssa_pattern {
   eth_pattern_tag tag;
@@ -2006,7 +2134,7 @@ struct eth_ssa_pattern {
     struct { eth_type *type; int *offs, *vids, n; eth_ssa_pattern **subpat;
              bool dotest; }
       unpack;
-    struct { eth_t val; bool dotest; } constant;
+    struct { eth_t val; eth_test_op testop; bool dotest; } constant;
     struct { size_t *ids; int *vids, n; eth_ssa_pattern **subpat; bool dotest; }
       record;
   };
@@ -2023,7 +2151,7 @@ eth_ssa_unpack_pattern(eth_type *type, int const offs[], int const vids[],
     eth_ssa_pattern *const pats[], int n, bool dotest);
 
 eth_ssa_pattern*
-eth_ssa_constant_pattern(eth_t val, bool dotest);
+eth_ssa_constant_pattern(eth_t val, eth_test_op testop, bool dotest);
 
 eth_ssa_pattern*
 eth_ssa_record_pattern(size_t const ids[], int const vids[],
@@ -2314,6 +2442,7 @@ eth_drop_ssa(eth_ssa *ssa);
 void
 eth_dump_ssa(const eth_insn *insn, FILE *stream);
 
+
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                               BYTECODE
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -2329,6 +2458,7 @@ typedef enum {
   ETH_OPC_TEST,
   ETH_OPC_TESTTY,
   ETH_OPC_TESTIS,
+  ETH_OPC_TESTEQUAL,
   ETH_OPC_GETTEST,
 
   ETH_OPC_DUP,
@@ -2410,6 +2540,7 @@ struct eth_bc_insn {
     struct { uint64_t vid; } test;
     struct { uint64_t vid; eth_type *type; } testty;
     struct { uint64_t vid; eth_t cval; } testis;
+    struct { uint64_t vid; eth_t cval; } testequal;
     struct { uint64_t out; } gettest;
 
     struct { uint64_t out, vid; } dup;
@@ -2610,5 +2741,11 @@ eth_system_error(int err);
 
 eth_t
 eth_type_error();
+
+eth_t
+eth_invalid_argument();
+
+eth_t
+eth_failure();
 
 #endif

@@ -24,7 +24,7 @@ eth_ast_ident_pattern(const char *ident)
   pat->rc = 0;
   pat->tag = ETH_PATTERN_IDENT;
   pat->ident.str = strdup(ident);
-  pat->ident.attr = 0;
+  pat->ident.attr = NULL;
   return pat;
 }
 
@@ -108,6 +108,8 @@ destroy_ast_pattern(eth_ast_pattern *pat)
       break;
 
     case ETH_PATTERN_IDENT:
+      if (pat->ident.attr)
+        eth_unref_attr(pat->ident.attr);
       free(pat->ident.str);
       break;
 

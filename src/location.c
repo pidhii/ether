@@ -116,27 +116,38 @@ eth_print_location_opt(eth_location *loc, FILE *stream, int opt)
 
     if (line >= start && line <= end)
     {
-      if (line == loc->fl && col == loc->fc)
+      if (not (opt & ETH_LOPT_NOCOLOR))
       {
-        hl = true;
-        fputs("\e[38;5;9;1m", stream);
+        if (line == loc->fl && col == loc->fc)
+        {
+          hl = true;
+          fputs("\e[38;5;9;1m", stream);
+        }
       }
 
       if (col == 1)
       {
         if (hl)
           fputs("\e[0m", stream);
-        fprintf(stream, " %6d | ", line);
+
+        if (not (opt & ETH_LOPT_NOLINENO))
+          fprintf(stream, " %6d | ", line);
+        else
+          fprintf(stream, "| ");
+
         if (hl)
           fputs("\e[38;5;9;1m", stream);
       }
 
       putc(c, stream);
 
-      if (line == loc->ll && col == loc->lc - 1)
+      if (not (opt & ETH_LOPT_NOCOLOR))
       {
-        fputs("\e[0m", stream);
-        hl = false;
+        if (line == loc->ll && col == loc->lc - 1)
+        {
+          fputs("\e[0m", stream);
+          hl = false;
+        }
       }
     }
 
