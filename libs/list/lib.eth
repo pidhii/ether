@@ -54,6 +54,7 @@
 -- * remove
 -- * insert
 -- * find
+-- * find_opt
 -- * maximum (no)
 -- * minimum (no)
 -- * partition
@@ -273,11 +274,15 @@ let rec pub insert cmp x ys =
     else y :: insert cmp x ys'
   else [x]
 in
-let rec pub find p xs =
+let rec pub find_opt p xs =
   if let x::xs = xs then
     if p x then Some x
-    else find p xs
+    else find_opt p xs
   else false
+in
+let pub find p xs =
+  if let Some x = find_opt p xs then x
+  else failure ()
 in
 --let rec pub maximum cmp xs =
   --if let x :: xs = xs then
@@ -331,21 +336,30 @@ let rec pub sort cmp xs =
   else xs
 in
 
-let rec pub assoc x l =
+let rec pub assoc_opt x l =
   if let kv::l = l then
     if let (k, v) = kv then
       if k eq x then Some v
-      else assoc x l
+      else assoc_opt x l
     else invalid_argument ()
   else false
 in
-let rec pub assq x l =
+let pub assoc k l =
+  if let Some v = assoc_opt k l then v
+  else failure ()
+in
+
+let rec pub assq_opt x l =
   if let kv::l = l then
     if let (k, v) = kv then
       if k is x then Some v
-      else assq x l
+      else assq_opt x l
     else invalid_argument ()
   else false
+in
+let pub assq k l =
+  if let Some v = assq_opt k l then v
+  else failure ()
 in
 
 let rec pub transpose xs =

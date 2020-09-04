@@ -1,10 +1,22 @@
 
 module =
   let pub some x = Some x
+  let pub none = false
+
+  let pub option? x =
+    if let Some _ = x then true
+    else x is false
+
   let pub unwrap x =
     if let Some x = x then x
     else raise Unwrap_error
-  let pub unwrap_or xopt y = if let Some x = xopt then x else y
-  let pub (&&) x y = if let Some _ = x then y else false
-  let pub (||) x y = if let Some _ = x then x else y
+
+  let pub unwrap_or xopt y =
+    if let Some x = xopt then x else y
+
+  let pub (&&) x y =
+    if let Some _ = x then y else false
+
+  let pub (||) x y =
+    if let Some _ = x then x else y
 end

@@ -944,12 +944,34 @@ static eth_t
 _load(void)
 {
   static int cnt = 1;
+  eth_use_tuple_as(tup2, 2);
 
   eth_t path = *eth_sp++;
+  eth_t env = *eth_sp++;
   if (eth_unlikely(not eth_is_str(path)))
   {
-    eth_drop(path);
+    eth_drop_2(path, env);
     return eth_exn(eth_type_error());
+  }
+
+  eth_module *envmod = eth_create_module("");
+  for (eth_t it = env; eth_is_pair(it); it = eth_cdr(it))
+  {
+    eth_t def = eth_car(it);
+    if (def->type != tup2)
+    {
+      eth_drop_2(path, env);
+      return eth_exn(eth_type_error());
+    }
+    eth_t key = eth_tup_get(def, 0);
+    eth_t val = eth_tup_get(def, 1);
+    if (not eth_is_str(key))
+    {
+      eth_drop_2(path, env);
+      eth_destroy_module(envmod);
+      return eth_exn(eth_type_error());
+    }
+    eth_define(envmod, eth_str_cstr(key), val);
   }
 
   char id[42];
@@ -957,9 +979,12 @@ _load(void)
 
   eth_module *mod = eth_create_module(id);
   eth_t ret;
-  if (not eth_load_module_from_script(g_env, g_env, mod, eth_str_cstr(path), &ret))
+  int ok = eth_load_module_from_script2(g_env, g_env, mod, eth_str_cstr(path),
+      &ret, envmod);
+  eth_destroy_module(envmod);
+  if (not ok)
   {
-    eth_drop(path);
+    eth_drop_2(path, env);
     eth_destroy_module(mod);
     return eth_exn(eth_failure());
   }
@@ -972,7 +997,7 @@ _load(void)
     acc = eth_cons(eth_tup2(eth_str(defs[i].ident), defs[i].val), acc);
 
   ret = eth_tup2(ret, acc);
-  eth_drop(path);
+  eth_drop_2(path, env);
   eth_remove_module(g_env, id);
   eth_destroy_module(mod);
   return ret;
@@ -1092,7 +1117,7 @@ _eth_init_builtins(void)
   eth_define(g_mod,      "raise", eth_create_proc(     _raise, 1, NULL, NULL));
   eth_define(g_mod,       "exit", eth_create_proc(     __exit, 1, NULL, NULL));
   // ---
-  eth_define(g_mod,       "load", eth_create_proc(      _load, 1, NULL, NULL));
+  eth_define(g_mod, "__builtin_load", eth_create_proc(_load, 2, NULL, NULL));
   // ---
   eth_define(g_mod, "__Lazy_create", eth_create_proc(_Lazy_create, 1, NULL, NULL));
 

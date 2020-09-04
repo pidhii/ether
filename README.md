@@ -74,6 +74,7 @@
     - [ ] closures
 - [ ] Merge sequential unpacks (if applicable)
 - [ ] Smaller instructions
+- [ ] Delay lambda constructors (when used conditionaly)
 
 # [Examples](#examples)
 
@@ -235,7 +236,7 @@ let read_list file =
   --
   -- However, we want to be tail-recursive, but it is impossible to achieve
   -- if we perform recursive call withing TRY-block. Instead, we will wrap
-  -- the `read_line_of` into a new function and use "Maybe"-monad (sort of).
+  -- the `read_line_of` into a new function and use "Option"-monad (sort of).
   --
   -- In case of succesfull reading, it will return a variant `Some <line>`;
   -- otherwize, it returns nil. Note that in fact it does not matter what do

@@ -124,8 +124,9 @@ trace_pub_var(ir_builder *bldr, const char *ident, int varid, eth_attr *attr,
   }
 }
 
-static eth_t
-resolve_var_path(ir_builder *bldr, const eth_module *mod, const char *path)
+static bool
+resolve_var_path(ir_builder *bldr, const eth_module *mod, const char *path,
+    eth_def *ret)
 {
   char *p;
   if ((p = strchr(path, '.')))
@@ -139,19 +140,20 @@ resolve_var_path(ir_builder *bldr, const eth_module *mod, const char *path)
     if (submod == NULL)
     {
       eth_warning("no submodule %s in %s", modname, eth_get_module_name(mod));
-      return NULL;
+      return false;
     }
 
-    return resolve_var_path(bldr, submod, p + 1);
+    return resolve_var_path(bldr, submod, p + 1, ret);
   }
 
   eth_def *def = eth_find_def(mod, path);
   if (def == NULL)
   {
     eth_warning("no '%s' in module %s", path, eth_get_module_name(mod));
-    return NULL;
+    return false;
   }
-  return def->val;
+  *ret = *def;
+  return true;
 }
 
 const eth_module*
@@ -214,8 +216,8 @@ require_module(ir_builder *bldr, const char *name)
  * Note: Constants wont be captured. If constant variable is returned, it's
  * constant values must be used instead.
  */
-static eth_var*
-require_var(ir_builder *bldr, const char *ident)
+static bool
+require_var(ir_builder *bldr, const char *ident, eth_var *ret)
 {
   char *p;
   if ((p = strchr(ident, '.')))
@@ -227,36 +229,40 @@ require_var(ir_builder *bldr, const char *ident)
 
     const eth_module *mod = require_module(bldr, modname);
     if (mod == NULL)
-      return NULL;
+      return false;
 
-    eth_t val = resolve_var_path(bldr, mod, p + 1);
-    if (val == NULL) return NULL;
-    static eth_var ret;
-    ret.ident = NULL;
-    ret.cval = val;
-    ret.vid = -1;
-    ret.next = NULL;
-    return &ret;
+    eth_def def;
+    if (not resolve_var_path(bldr, mod, p + 1, &def))
+      return false;
+    ret->ident = def.ident;
+    ret->cval = def.val;
+    ret->attr = def.attr;
+    ret->vid = -1;
+    ret->next = NULL;
+    return true;
   }
   else
   {
-    eth_var *var = eth_find_var(bldr->vars->head, ident, NULL);
-    if (var)
+    eth_var *localvar = eth_find_var(bldr->vars->head, ident, NULL);
+    if (localvar)
     {
-      return var;
+      *ret = *localvar;
+      return true;
     }
     else if (bldr->parent)
     {
-      if ((var = require_var(bldr->parent, ident)))
+      if (require_var(bldr->parent, ident, ret))
       {
         // immediately return constants (don't perform capture)
-        if (var->cval) return var;
+        if (ret->cval)
+          return true;
         int vid = new_vid(bldr);
         bldr->capoffs += 1;
-        return  eth_append_var(bldr->vars, eth_copy_var_cfg(var, vid));
+        *ret = *eth_append_var(bldr->vars, eth_copy_var(ret, vid));
+        return true;
       }
     }
-    return NULL;
+    return false;
   }
 }
 
@@ -611,18 +617,23 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
 
     case ETH_AST_IDENT:
     {
-      eth_var *var = require_var(bldr, ast->ident.str);
-      if (var == NULL)
+      eth_var var;
+      if (not require_var(bldr, ast->ident.str, &var))
       {
         eth_warning("undefined variable, '%s'", ast->ident.str);
         *e = 1;
         eth_print_location(ast->loc, stderr);
         return eth_ir_error();
       }
-      else if (var->cval)
-        return eth_ir_cval(var->cval);
+      if (var.attr && var.attr->flag & ETH_ATTR_DEPRECATED)
+      {
+        eth_warning("use of deprecated variable, '%s'", ast->ident.str);
+        eth_print_location_opt(ast->loc, stderr, ETH_LOPT_FILE);
+      }
+      if (var.cval)
+        return eth_ir_cval(var.cval);
       else
-        return eth_ir_var(var->vid);
+        return eth_ir_var(var.vid);
     }
 
     case ETH_AST_APPLY:
@@ -1093,6 +1104,15 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         ids[i] = vals[i].id;
       }
       return eth_ir_update(src,  irvals, ids, n);
+    }
+
+    case ETH_AST_ASSERT:
+    {
+      eth_use_symbol(Assertion_failed);
+      eth_ir_node *expr = build(bldr, ast->assert.expr, e);
+      eth_ir_node *okbr = build(bldr, ast->assert.body, e);
+      eth_ir_node *errbr = eth_ir_throw(eth_ir_cval(eth_exn(Assertion_failed)));
+      return eth_ir_if(expr, okbr, errbr);
     }
   }
 

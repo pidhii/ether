@@ -46,7 +46,7 @@ syn keyword ethBuiltinFunction len
 syn keyword ethBuiltinFunction cat join chr ord
 syn keyword ethBuiltinFunction to_upper to_lower
 syn keyword ethBuiltinFunction cmp casecmp
-syn keyword ethBuiltinFunction sub find
+syn keyword ethBuiltinFunction sub
 syn keyword ethBuiltinFunction chomp chop
 
 syn keyword ethBuiltinFunction match gsub rev_split split
@@ -55,21 +55,22 @@ syn keyword ethBuiltinFunction car cdr
 syn keyword ethBuiltinFunction first second third
 
 syn keyword ethBuiltinFunction range linspace
-syn keyword ethBuiltinFunction unfold_left unfold_right init
-syn keyword ethBuiltinFunction len rev_append append rev
+syn keyword ethBuiltinFunction unfold_left unfold_right init fold_map
+syn keyword ethBuiltinFunction len rev_append append rev get
 syn keyword ethBuiltinFunction rev_map map rev_zip zip
 syn keyword ethBuiltinFunction rev_mapi mapi rev_zipi zipi
 syn keyword ethBuiltinFunction iter iteri
 syn keyword ethBuiltinFunction rev_filter_map filter_map
 syn keyword ethBuiltinFunction rev_flat_map flat_map flatten
-syn keyword ethBuiltinFunction rev_filter filter find partition
+syn keyword ethBuiltinFunction rev_filter filter find find_opt partition
 syn keyword ethBuiltinFunction remove insert
 syn keyword ethBuiltinFunction fold_left fold_right
-syn keyword ethBuiltinFunction scan_left scan_right
+syn keyword ethBuiltinFunction reduce_left reduce_right
+syn keyword ethBuiltinFunction rev_scan_left scan_left scan_right
 syn keyword ethBuiltinFunction sort merge
 syn keyword ethBuiltinFunction drop rev_take take
 syn keyword ethBuiltinFunction any? all? member? memq?
-syn keyword ethBuiltinFunction assoc assq
+syn keyword ethBuiltinFunction assoc assoc_opt assq assq_opt
 syn keyword ethBuiltinFunction transpose
 "syn keyword ethBuiltinFunction maximum minimum
 
@@ -85,8 +86,8 @@ syn keyword ethBuiltinFunction close
 syn keyword ethBuiltinFunction input
 syn keyword ethBuiltinFunction print print_to newline
 syn keyword ethBuiltinFunction write_to write
-syn keyword ethBuiltinFunction read_line read_line_of
-syn keyword ethBuiltinFunction read read_of
+syn keyword ethBuiltinFunction read_line read_line_opt
+syn keyword ethBuiltinFunction read read_of read_line_of_opt
 syn keyword ethBuiltinFunction read_file
 syn keyword ethBuiltinFunction tell seek
 
@@ -94,7 +95,9 @@ syn keyword ethBuiltinFunction printf eprintf fprintf format
 syn keyword ethBuiltinFunction apply
 syn keyword ethBuiltinFunction die raise exit
 syn keyword ethBuiltinFunction system shell
-syn keyword ethBuiltinFunction load
+syn keyword ethBuiltinFunction load create_env
+
+syn keyword ethBuiltinFunction failure invalid_argument type_error
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Base:
@@ -121,7 +124,7 @@ syn keyword ethBuiltinFunction load
 " Miscelenious:
 syn keyword Special command_line
 
-syn region ethOf matchgroup=StorageClass start=/\<of\>/ matchgroup=ethType end=/\k\+\>/ skipwhite skipnl contains=ethSymbol,ethIdentifier
+"syn region ethOf matchgroup=StorageClass start=/\<of\>/ matchgroup=ethType end=/\k\+\>/ skipwhite skipnl contains=ethSymbol,ethIdentifier
 
 syn match ethModule /\<[A-Z][a-zA-Z0-9_]*\s*\./he=e-1 nextgroup=ethModule,ethMember
 syn match ethMember /\<[a-z_][a-zA-Z0-9_]*['?]?\>/
@@ -137,7 +140,7 @@ syn region ethList matchgroup=Type start=/\[/ end=/\]/ skipwhite skipnl contains
 syn region ethArray matchgroup=Type start=/\[\s*|/ end=/|\s*\]/ skipwhite skipnl contains=TOP
 
 syn keyword StorageClass pub
-syn keyword Special __builtin
+syn keyword Special __builtin __deprecated
 
 syn match ethDelimiter /[,;()]/
 
@@ -153,8 +156,9 @@ syn region ethModuleDef matchgroup=Keyword start=/\<module\>/ end=/\<end\>/ cont
 
 syn match ethKeyword /\<let\>/
 syn match ethConditional /\<if\%(\s\+let\)\?\>/
+syn match ethConditional /\<when\%(\s\+let\)\?\>/
 syn region ethTryWith matchgroup=ethException start=/\<try\>/ end=/\<with\>/ contains=TOP skipwhite skipnl
-syn region ethMatch matchgroup=ethConditional start=/\<case\>/ end=/\<of\>/ contains=TOP skipwhite skipnl
+"syn region ethMatch matchgroup=ethConditional start=/\<case\>/ end=/\<of\>/ contains=TOP skipwhite skipnl
 syn match ethConditional /\<then\>/
 syn match ethConditional /\<else\>/
 syn region ethBegin matchgroup=ethConditional start=/\<then\s\+begin\>/ end=/\<end\>/ contains=TOP skipwhite skipnl
@@ -169,7 +173,7 @@ syn keyword ethVal val contained containedin=ethObject
 hi link ethVal Keyword
 syn region ethDo matchgroup=ethKeyword start=/\<do\>/ end=/\<done\>/ contains=TOP skipwhite skipnl
 syn keyword ethKeyword rec and or in as with
-syn keyword ethConditional unless when otherwize
+syn keyword ethConditional unless otherwize
 syn keyword ethAssert assert
 
 syn keyword ethLazy lazy
@@ -189,7 +193,9 @@ syn match ethLambda /->/
 
 syn match ethOperator /[-+=*/%><&|.!^~∘]\+/
 syn match ethOperator /:\|\$/
-syn keyword ethOperator is eq not mod land lor lxor lshl lshr ashl ashr lnot
+syn keyword ethOperator eq not mod land lor lxor lshl lshr ashl ashr lnot
+syn match ethOperator /\<is\>/
+syn match ethOperator /\<is\s\+of\>/
 
 syn region ethShebangComment start=/^#!/ end=/$/ contains=ethCommentLabel
 syn region ethComment start=/--/ end=/$/ contains=ethCommentLabel
@@ -209,6 +215,17 @@ syn match Number /[0-9][0-9_]*\%(\.[0-9][0-9_]*\)\?\%([eE][-+]\?[0-9][0-9_]*\)\?
 
 " String
 syn region String start=/"/ skip=/\\"/ end=/"/ skipnl skipwhite contains=ethFormat
+syn region String start=/{\z(\S\{-1,}\)|/ end=/|\z1}/ skipnl skipwhite keepend contains=ethFormat,ethQuote
+syn match ethQuote /{\S\{-1,}|/hs=s+1,he=e-1 contained
+syn match ethQuote /|\S\{-1,}}/hs=s+1,he=e-1 contained
+hi link ethQuote String
+" Help
+syn region ethHelp start=/{\.help|/ end=/|\.help}/ skipnl skipwhite contains=ethHelpAux keepend
+syn match ethHelpAux /{\.help|/hs=s+1,he=e-1 contained
+syn match ethHelpAux /|\.help}/hs=s+1,he=e-1 contained
+"hi link ethHelpDelim SpecialComment
+"hi link ethHelp Comment
+hi link ethHelpAux Underlined
 " Regexp
 syn region String matchgroup=ethRegexp start=+\\+ skip=+\\/+ end=+/[a-zA-Z]*+ skipnl skipwhite
 hi link ethRegexp Type

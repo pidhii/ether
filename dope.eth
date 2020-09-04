@@ -4,9 +4,9 @@
 let module_path =
   let pipe = open_pipe_in "ether --prefix" in
   let line = read_line_of pipe in
-  if close pipe /= 0 then
-    raise Failed_to_resolve_prefix
-  else format "~d/lib/ether" (String.chop line)
+  if close pipe /= 0
+    then raise Failed_to_resolve_prefix
+    else format "~d/lib/ether" (String.chop line)
 in
 
 -- Checks whether a file exists in the file system
@@ -16,8 +16,8 @@ let exist? path =
 in
 
 let mkdir path =
-  unless system "mkdir -vp '~d'" path == 0 then
-    raise System_error;
+  unless system "mkdir -vp '~d'" path == 0
+    then raise System_error;
 in
 
 let copy_file src dst =
@@ -25,27 +25,29 @@ let copy_file src dst =
 in
 
 let create_symlink src dst =
-  unless system "ln -vs '~d' '~d'" src dst == 0 then
-    raise System_error;
+  unless system "ln -vs '~d' '~d'" src dst == 0
+    then raise System_error;
 in
 
 let unlink path =
-  unless system "rm -rfv ~d" path == 0 then
-    raise System_error;
+  unless system "rm -rfv ~d" path == 0
+    then raise System_error;
 in
 
 let utc_date! =
   let pipe = open_pipe_in "date -u +'%x %X'" in
   let line = read_line_of pipe in
-  if close pipe /= 0 then raise System_error
-  else String.chop line
+  if close pipe /= 0
+    then raise System_error
+    else String.chop line
 in
 
 let realpath path =
   let pipe = open_pipe_in (format "realpath '~d'" path) in
   let line = read_line_of pipe in
-  if close pipe /= 0 then raise System_error
-  else String.chop line
+  if close pipe /= 0
+    then raise System_error
+    else String.chop line
 in
 
 let db_path = format "~d/__db.eth" module_path in
@@ -54,8 +56,8 @@ let db_path = format "~d/__db.eth" module_path in
 let load_db! = first $ load db_path if exist? db_path else [] in
 
 -- Get module record
-let get_module name db =
-  List.find (fn {name = name'} -> String.casecmp name name' == 0) db;
+let get_module_opt name db =
+  List.find_opt (fn {name = name'} -> String.casecmp name name' == 0) db;
 in
 
 let update_db db =
@@ -71,29 +73,31 @@ let do_in dir thunk =
 in
 
 
-let install dir =
+let install dir args =
   -- Read install configuration
   let (_, conf) =
-    try load (format "~d/install.eth" dir)
+    try
+      let env = create_env [("command_line", args)] in
+      env:load (format "~d/install.eth" dir)
     with _ -> begin
       eprintf "> error: failed to load install-script\n";
       raise Failure;
     end
   in
-  let Some name = List.assoc "name" conf in
-  let Some files = Maybe.(List.assoc "files" conf || Some []) in
-  let Some main = List.assoc "main" conf in
+  let name = List.assoc "name" conf in
+  let files = List.assoc "files" conf or [] in
+  let main = List.assoc "main" conf in
 
   -- Open DB with all installed modules
   let db = load_db! in
   -- Check if module name is unique
-  when get_module name db then begin
+  when get_module_opt name db then begin
     eprintf "> error: module already present\n";
     raise Failure;
   end;
 
   -- Build (if build-hook is speciefied)
-  when let Some build = List.assoc "build" conf then do_in dir (fn ->
+  when let Some build = List.assoc_opt "build" conf then do_in dir (fn ->
     printf "> building module ~d\n" name;
     build!;
   );
@@ -104,13 +108,13 @@ let install dir =
   let moddir = module_path ++ "/" ++ name in
   mkdir moddir;
   -- Copy module sources
-  List.iter (fn file ->
+  main::files |> List.iter (file ->
     copy_file (dir ++ "/" ++ file) (moddir ++ "/" ++ file)
-  ) (main :: files);
+  );
   -- Create symlink to main
   let mainpath = moddir ++ "/__main__.eth" in
-  unless exist? mainpath then
-    create_symlink (moddir ++ "/" ++ main) mainpath;
+  unless exist? mainpath
+    then create_symlink (moddir ++ "/" ++ main) mainpath;
 
   -- Update registry
   printf "> updating registry\n";
@@ -120,7 +124,7 @@ let install dir =
   let db = {name, date, source_dir, install_dir} :: db in
   update_db db;
 
-  when let Some post_install = List.assoc "post_install" conf then
+  when let Some post_install = List.assoc_opt "post_install" conf then
     do_in dir (fn ->
       printf "> running post-install hooks\n";
       post_install!;
@@ -131,7 +135,7 @@ in
 let uninstall name =
   let db = load_db! in
 
-  if let Some {install_dir} = get_module name db then begin
+  if let Some {install_dir} = get_module_opt name db then begin
     -- Remove module directory
     printf "> uninstalling module '~d'\n" name;
     unlink install_dir;
@@ -146,16 +150,16 @@ let uninstall name =
 in
 
 
-let reinstall dir =
+let reinstall dir args =
   let (_, conf) =
     try load (format "~d/install.eth" dir)
     with Failure ->
       eprintf "> error: failed to load install-script\n";
       raise Failure;
   in
-  let Some name = List.assoc "name" conf in
+  let name = List.assoc "name" conf in
   uninstall name;
-  install dir;
+  install dir args;
 in
 
 
@@ -181,7 +185,7 @@ let basename path =
 in
 
 let help! =
-  printf "usage: ~d [OPTIONS]\n" (basename $ car command_line);
+  printf "usage: ~d OPTIONS [<command_line> ...]\n" (basename $ car command_line);
   print "";
   print "OPTIONS:";
   print "  --help       -h          Show this message.";
@@ -210,7 +214,7 @@ let options =
   ]
 in
 
-let (opts, _) =
+let (opts, args) =
   try CmdArg.get options (cdr command_line)
   with e ->
     if e is Undefined_option then
@@ -224,13 +228,13 @@ let (opts, _) =
     exit 1;
 in
 
-List.iter (fn (opt, arg) ->
+List.iter (fn (opt, val) ->
   try
-    help!         if opt eq "h" else
-    install arg   if opt eq "i" else
-    uninstall arg if opt eq "u" else
-    reinstall arg if opt eq "r" else
-    list_modules! if opt eq "l" else ()
+    help!              if opt eq "h" else
+    install val args   if opt eq "i" else
+    uninstall val      if opt eq "u" else
+    reinstall val args if opt eq "r" else
+    list_modules!      if opt eq "l" else ()
   with e ->
     eprintf "> failure\n";
     exit 1;

@@ -299,6 +299,11 @@ destroy_ast_node(eth_ast *ast)
       free(ast->update.vals);
       break;
 
+    case ETH_AST_ASSERT:
+      eth_unref_ast(ast->assert.expr);
+      eth_unref_ast(ast->assert.body);
+      break;
+
     case ETH_AST_MULTIMATCH:
       for (int i = 0; i < ast->multimatch.table->h; ++i)
         eth_unref_ast(ast->multimatch.exprs[i]);
@@ -593,6 +598,15 @@ eth_ast_update(eth_ast *src, eth_ast *const vals[], char *const fields[], int n)
     ast->update.fields[i] = strdup(fields[i]);
     eth_ref_ast(ast->update.vals[i] = vals[i]);
   }
+  return ast;
+}
+
+eth_ast*
+eth_ast_assert(eth_ast *expr, eth_ast *body)
+{
+  eth_ast *ast = create_ast_node(ETH_AST_ASSERT);
+  eth_ref_ast(ast->assert.expr = expr);
+  eth_ref_ast(ast->assert.body = body);
   return ast;
 }
 

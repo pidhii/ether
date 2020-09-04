@@ -798,6 +798,9 @@ eth_ovector(void);
 eth_t
 eth_create_regexp(const char *pat, int opts, const char **eptr, int *eoffs);
 
+void
+eth_study_regexp(eth_t x);
+
 int
 eth_get_regexp_ncaptures(eth_t x);
 
@@ -1220,8 +1223,9 @@ eth_back(eth_t v);
 //                             ATTRIBUTES
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 typedef enum {
-  ETH_ATTR_BUILTIN = (1 << 0),
-  ETH_ATTR_PUB     = (1 << 1),
+  ETH_ATTR_BUILTIN    = (1 << 0),
+  ETH_ATTR_PUB        = (1 << 1),
+  ETH_ATTR_DEPRECATED = (1 << 2),
 } eth_attr_t;
 
 typedef struct {
@@ -1348,6 +1352,10 @@ eth_load_module_from_ast2(eth_env *topenv, eth_env *env, eth_module *mod,
 bool
 eth_load_module_from_elf(eth_env *topenv, eth_env *env, eth_module *mod,
     const char *path);
+
+static bool
+eth_add_module_script(eth_module *self, const char *path, eth_env *topenv)
+{ return eth_load_module_from_script2(topenv, NULL, self, path, NULL, self); }
 
 int
 eth_get_nmodules(const eth_env *env);
@@ -1607,6 +1615,7 @@ typedef enum {
   ETH_AST_TRY,
   ETH_AST_MKRCRD,
   ETH_AST_UPDATE,
+  ETH_AST_ASSERT,
   ETH_AST_MULTIMATCH,
 } eth_ast_tag;
 
@@ -1656,6 +1665,7 @@ struct eth_ast {
       try;
     struct { eth_type *type; char **fields; eth_ast **vals; int n; } mkrcrd;
     struct { eth_ast *src, **vals; char **fields; int n; } update;
+    struct { eth_ast *expr, *body; } assert;
     struct { eth_match_table *table; eth_ast **exprs; } multimatch;
   };
   eth_location *loc;
@@ -1740,6 +1750,9 @@ eth_ast_make_record(eth_type *type, char *const fields[], eth_ast *const vals[],
 
 eth_ast*
 eth_ast_update(eth_ast *src, eth_ast *const vals[], char *const fields[], int n);
+
+eth_ast*
+eth_ast_assert(eth_ast *expr, eth_ast *body);
 
 eth_ast*
 eth_ast_multimatch(eth_match_table *table, eth_ast *const exprs[]);
@@ -1974,7 +1987,7 @@ struct eth_var {
 };
 
 static inline eth_var_cfg
-eth_copy_var_cfg(eth_var* var, int vid)
+eth_copy_var(eth_var* var, int vid)
 {
   return (eth_var_cfg) {
     .ident = var->ident,

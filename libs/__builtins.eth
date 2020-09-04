@@ -71,6 +71,11 @@ let pub die msg =
   __printf stderr "~d\n" msg;
   exit 1
 
+
+let pub create_env defs =
+  { defs, load = fn {defs} path -> __builtin_load path defs }
+let pub load path = __builtin_load path []
+
 --------------------------------------------------------------------------------
 --                                   IO
 --
@@ -86,7 +91,9 @@ let pub die msg =
 -- * read_of (C)
 -- * read
 -- * read_line_of (C)
+-- * read_line_of_opt
 -- * read_line
+-- * read_line_opt
 -- * read_file (C)
 --
 -- Output:
@@ -108,6 +115,13 @@ let pub open_pipe_in cmd = __popen cmd "r"
 let pub open_pipe_out cmd = __popen cmd "w"
 
 let pub read_line! = read_line_of stdin
+let pub read_line_opt! =
+  try Some read_line!
+  with End_of_file -> false
+let pub read_line_of_opt file =
+  try Some (read_line_of file)
+  with End_of_file -> false
+
 let pub read! = read_of stdin
 
 let pub print_to file x =

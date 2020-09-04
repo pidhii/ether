@@ -25,14 +25,54 @@ argv_to_list(int argc, char **argv, int offs);
 static void
 print_trace(eth_location *const trace[], int start, int n, int hi);
 
+/*
+ * This is where all definitions from within the REPL are going to.
+ */
 static
 eth_module *repl_defs;
 
 static
 eth_env *repl_env;
 
+static const eth_module*
+resolve_ident(const char** ident);
+
 static char**
 completer(const char *text, int start, int end);
+
+static void
+repl_help(FILE *out);
+
+static
+bool repl_complete_empty = false;
+
+static const char*
+triml(const char *str)
+{
+  while (*str and isspace(*str))
+    ++str;
+  return str;
+}
+
+static char*
+trimr(char *str)
+{
+  int i = strlen(str) - 1;
+  for (; i >= 0 and isspace(str[i]); --i);
+  str[i+1] = '\0';
+  return str;
+}
+
+static void
+less(const char *text)
+{
+  int size = strlen("LESS=-FX /bin/less -R <<ETHER_HELP\n")
+           + strlen(text)
+           + strlen("\nETHER_HELP");
+  char buf[size+1];
+  sprintf(buf, "LESS=-FX /bin/less -R <<ETHER_HELP\n%s\nETHER_HELP", text);
+  system(buf);
+}
 
 int
 main(int argc, char **argv)
@@ -44,6 +84,7 @@ main(int argc, char **argv)
     { "log-level", true, NULL, 0x2FF },
     { "version", false, NULL, 'v' },
     { "prefix", false, NULL, 0x3FF },
+    { "trace-limit", true, NULL, 0x4FF },
     { 0, 0, 0, 0 }
   };
   int opt;
@@ -92,6 +133,22 @@ main(int argc, char **argv)
           exit(EXIT_FAILURE);
         break;
 
+      case 0x4FF:
+      {
+        int h, t;
+        if (sscanf(optarg, "%d,%d", &h, &t) == 2)
+        {
+          tracelimh = h;
+          tracelimt = t;
+        }
+        else
+        {
+          tracelimh = atoi(optarg);
+          tracelimt = 1;
+        }
+        break;
+      }
+
       case '?':
         /*eth_error("unrecognized option '%s'", optopt);*/
         eth_error("see `%s --help` for available options", argv[0]);
@@ -118,10 +175,10 @@ main(int argc, char **argv)
   eth_env *env = eth_create_env();
   cod_vec_iter(L, i, path, eth_add_module_path(env, path));
   // --
-  eth_module *extravars = eth_create_module("");
+  eth_module *extravars = eth_create_module("<main>");
   eth_define(extravars, "command_line", argv_to_list(argc, argv, optind));
 
-  if (input == stdin)
+  if (input == stdin) // REPL
   {
     eth_debug("REPL");
 
@@ -149,8 +206,7 @@ main(int argc, char **argv)
     printf("Ether REPL\n");
     print_version(stdout);
     printf("\n");
-    printf("Enter <C-d> (EOF) to exit\n");
-    printf("      '.' to reset input buffer (cancel current expression)\n");
+    repl_help(stdout);
     printf("\n");
 
     while (true)
@@ -169,58 +225,114 @@ main(int argc, char **argv)
         free(line);
         continue;
       }
-
-      if (strcmp(line, ".") == 0)
+      // reset buffer
+      else if (strcmp(line, ".") == 0)
       {
         buf.len = 0;
         free(line);
         prompt = "> ";
         continue;
       }
-
-      // append line to input-buffer
-      for (int i = 0; line[i]; ++i)
-        cod_vec_push(buf, line[i]);
-      free(line);
-
-
-      // parse input-buffer
-      FILE *bufstream = fmemopen(buf.data, buf.len, "r");
-      eth_ast *expr = eth_parse_repl(bufstream);
-      fclose(bufstream);
-
-      if (expr)
+      // show help
+      else if (strcmp(line, ".help") == 0)
       {
-        // append history
-        cod_vec_push(buf, 0);
-        add_history(buf.data);
-
-        if (append_history(1, histpath))
-          eth_warning("failed to append history (%s)", strerror(errno));
-
-        // reset buffer
-        buf.len = 0;
-
-        // evaluate expression
-        eth_t ret = eth_eval(env, mod, expr);
-        if (ret and ret != eth_nil)
-        {
-          eth_printf("~w\n", ret);
-          eth_drop(ret);
-        }
-        eth_drop_ast(expr);
-
-        prompt = "> ";
+        repl_help(stdout);
+        free(line);
+        continue;
       }
+      // show help for function
+      else if (strncmp(line, ".help ", 6) == 0)
+      {
+        char *ident = (char*)triml(line + 5);
+        trimr(ident);
+        const char *orig = ident;
+        const eth_module *mod = resolve_ident((const char**)&ident);
+        bool try_help(const eth_module *mod)
+        {
+          eth_def *def = eth_find_def(mod, ident);
+          if (def)
+          {
+            if (def->attr->help)
+              // XXX: mutating help it here
+              less(def->attr->help);
+            else if (def->attr->loc)
+              eth_print_location_opt(def->attr->loc, stdout,
+                  ETH_LOPT_NOLINENO | ETH_LOPT_NOCOLOR);
+            else
+              eth_warning("no help available");
+            return true;
+          }
+          else
+            return false;
+        }
+        if (mod)
+        {
+          if (not (try_help(mod) or (ident==orig and try_help(eth_builtins()))))
+            eth_warning("no such identifier");
+        }
+        free(line);
+        continue;
+      }
+      // enable empty input completion
+      else if (strcmp(line, ".complete-empty") == 0)
+      {
+        repl_complete_empty = true;
+        free(line);
+        continue;
+      }
+      // disable empty input completion
+      else if (strcmp(line, ".no-complete-empty") == 0)
+      {
+        repl_complete_empty = false;
+        free(line);
+        continue;
+      }
+      // evaluate input
       else
       {
-        // continue reading
-        cod_vec_push(buf, ' ');
-        prompt = "@ ";
+        // append line to input-buffer
+        for (int i = 0; line[i]; ++i)
+          cod_vec_push(buf, line[i]);
+        free(line);
+
+        // parse input-buffer
+        FILE *bufstream = fmemopen(buf.data, buf.len, "r");
+        eth_ast *expr = eth_parse_repl(bufstream);
+        fclose(bufstream);
+
+        if (expr)
+        {
+          // append history
+          cod_vec_push(buf, 0);
+          add_history(buf.data);
+
+          if (append_history(1, histpath))
+            eth_warning("failed to append history (%s)", strerror(errno));
+
+          // reset buffer
+          buf.len = 0;
+
+          // evaluate expression
+          eth_t ret = eth_eval(env, mod, expr);
+          if (ret and ret != eth_nil)
+          {
+            eth_printf("~w\n", ret);
+            eth_drop(ret);
+          }
+          eth_drop_ast(expr);
+
+          prompt = "> ";
+        }
+        else
+        {
+          // continue reading
+          cod_vec_push(buf, ' ');
+          prompt = "@ ";
+        }
       }
     }
   }
-  else
+  else // Evaluate script
   {
     eth_debug("parse input");
     eth_ast *ast;
@@ -313,7 +425,6 @@ main(int argc, char **argv)
   eth_destroy_env(env);
   eth_destroy_module(extravars);
 
-
   cod_vec_destroy(L);
   eth_debug("cleanup");
   eth_cleanup();
@@ -332,14 +443,17 @@ help_and_exit(char *argv0)
   puts("  Evaluate a script.");
   puts("");
   puts("OPTIONS:");
-  puts("  --help       -h           Show this message and exit.");
-  puts("  --log-level      <level>  Set log-level. Available values for <level> are:");
-  puts("                            'debug'   - enable all log-messages;");
-  puts("                            'warning' - show warnings and errors;");
-  puts("                            'error'   - show only error messages.");
-  puts("  --version    -v           Show version and configuration and exit.");
-  puts("  --prefix                  Show installation prefix and exit.");
-  puts("               -L  <dir>    Add direcory to the module path.");
+  puts("  --help         -h           Show this message and exit.");
+  puts("  --log-level        <level>  Set log-level. Available values for <level> are:");
+  puts("                                'debug'   - enable all log-messages;");
+  puts("                                'warning' - show warnings and errors;");
+  puts("                                'error'   - show only error messages.");
+  puts("  --version      -v           Show version and configuration and exit.");
+  puts("  --prefix                    Show installation prefix and exit.");
+  puts("                 -L  <dir>    Add direcory to the module path.");
+  puts("  --trace-limit      <value>  Specify depth of the trace to display. Formats for <value> are:");
+  puts("                                <head>,<tail> - specify both head- and tail-length;");
+  puts("                                <head>        - specify only head-length while tail-length is set to 1.");
   exit(EXIT_SUCCESS);
 }
 
@@ -378,6 +492,28 @@ print_trace(eth_location *const trace[], int start, int n, int hi)
   }
 }
 
+static const eth_module*
+resolve_ident(const char** ident)
+{
+  const eth_module *mod = repl_defs;
+  char *p;
+  if ((p = strrchr(*ident, '.')))
+  {
+    int modnamelen = p - *ident;
+    char modname[modnamelen + 1];
+    memcpy(modname, *ident, modnamelen);
+    modname[modnamelen] = '\0';
+    mod = eth_require_module(repl_env, repl_env, modname);
+    if (mod == NULL)
+    {
+      eth_warning("no module '%s'", modname);
+      return NULL;
+    }
+    *ident = p + 1;
+  }
+  return mod;
+}
+
 static char*
 completion_generator(const char *text, int state)
 {
@@ -385,6 +521,15 @@ completion_generator(const char *text, int state)
   static size_t idx;
   static char prefix[PATH_MAX];
 
+  // - - - - - - - - - -
+  // Ignore empty input
+  // - - - - - - - - - -
+  if (text[0] == '\0' && not repl_complete_empty)
+    return NULL;
+
+  // - - - - - - - - - -
+  // Initialize matches
+  // - - - - - - - - - -
   if (state == 0)
   {
     // init vector
@@ -397,44 +542,30 @@ completion_generator(const char *text, int state)
       cod_vec_init(matches);
 
     // resolve module
-    const eth_module *mod = repl_defs;
-    char *p;
-    if ((p = strrchr(text, '.')))
-    {
-      int modnamelen = p - text;
-      char modname[modnamelen + 1];
-      memcpy(modname, text, modnamelen);
-      modname[modnamelen] = '\0';
-      mod = eth_require_module(repl_env, repl_env, modname);
-      if (mod == NULL)
-      {
-        eth_warning("no module %s", modname);
-        return NULL;
-      }
+    const char *ident = text;
+    const eth_module *mod = resolve_ident(&ident);
+    if (mod == NULL)
+      return NULL;
+    strncpy(prefix, text, ident - text);
 
-      strncpy(prefix, text, p - text);
-      prefix[p-text] = '\0';
-      text = p + 1;
-    }
-    else
-      strcpy(prefix, "");
-
-    bool checkpriv = strncmp(text, "__", 2) == 0;
-
-    // get matches
-    int textlen = strlen(text);
+    // - - - - - - -
+    // Get matches
+    // - - - - - - -
+    int identlen = strlen(ident);
     // check selected module
     int ndefs = eth_get_ndefs(mod);
     eth_def defs[ndefs];
     eth_get_defs(mod, defs);
+    // wether we are matching some builtin value
+    bool checkpriv = strncmp(ident, "__", 2) == 0;
     for (int i = 0; i < ndefs; ++i)
     {
-      if (strncmp(defs[i].ident, text, textlen) == 0)
+      if (strncmp(defs[i].ident, ident, identlen) == 0)
       {
         if (strncmp(defs[i].ident, "__", 2) == 0 and not checkpriv)
           continue;
         char *ident = malloc(strlen(prefix) + strlen(defs[i].ident) + 2);
-        sprintf(ident, "%s.%s", prefix, defs[i].ident);
+        sprintf(ident, "%s%s", prefix, defs[i].ident);
         cod_vec_push(matches, ident);
       }
     }
@@ -447,7 +578,7 @@ completion_generator(const char *text, int state)
       eth_get_defs(mod, defs);
       for (int i = 0; i < ndefs; ++i)
       {
-        if (strncmp(defs[i].ident, text, textlen) == 0)
+        if (strncmp(defs[i].ident, ident, identlen) == 0)
         {
           if (strncmp(defs[i].ident, "__", 2) == 0 and not checkpriv)
             continue;
@@ -473,3 +604,14 @@ completer(const char *text, int start, int end)
   return rl_completion_matches(text, completion_generator);
 }
 
+static void
+repl_help(FILE *out)
+{
+  fprintf(out, "Enter <C-d> (EOF) to exit\n");
+  fprintf(out, "Commands:\n");
+  fprintf(out, "  '.'                   to reset input buffer (cancel current expression)\n");
+  fprintf(out, "  '.help'               show help and available commands\n");
+  fprintf(out, "  '.help <ident>'       show help for given identifier\n");
+  fprintf(out, "  '.complete-empty'     display all available identifiers when completing empty word\n");
+  fprintf(out, "  '.no-complete-empty'  disable effect of the previous command\n");
+}

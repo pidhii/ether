@@ -2,8 +2,8 @@
 let get_options cfg os =
 
   let get_rules opt =
-    if let Some x = List.find (fn {name} -> name eq opt) cfg then x
-    else raise Undefined_option
+    try List.find (fn {name} -> name eq opt) cfg
+    with Failure -> raise Undefined_option
   in
 
   let rec loop os kws pos =
@@ -15,7 +15,7 @@ let get_options cfg os =
     else (kws, List.rev pos)
 
   and handle_long_option o os kws pos =
-    if let Some brk = String.find "=" o then
+    if let Some brk = String.find_opt "=" o then
       -- Long option with '=' 
       let lopt = String.sub o (2 .. brk-1) in
       let {has_arg, val} = get_rules lopt in

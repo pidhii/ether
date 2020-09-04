@@ -26,6 +26,7 @@ eth_ovector(void)
 struct eth_regexp {
   eth_header header;
   pcre *re;
+  pcre_extra *extra;
 };
 
 static void
@@ -51,7 +52,6 @@ eth_create_regexp(const char *pat, int opts, const char **eptr, int *eoffs)
   if (eptr == NULL) eptr = &_eptr;
   if (eoffs == NULL) eoffs = &_eoffs;
 
-  eth_debug("compile regexp of \"%s\"", pat);
   pcre *re = pcre_compile(pat, opts, eptr, eoffs, NULL);
   if (re == NULL)
   {
@@ -61,7 +61,20 @@ eth_create_regexp(const char *pat, int opts, const char **eptr, int *eoffs)
   eth_regexp *regexp = malloc(sizeof(eth_regexp));
   eth_init_header(regexp, eth_regexp_type);
   regexp->re = re;
+  regexp->extra = NULL;
   return ETH(regexp);
+}
+
+void
+eth_study_regexp(eth_t x)
+{
+  eth_regexp *regexp = (void*)x;
+  if (not regexp->extra)
+  {
+    int opt = PCRE_STUDY_JIT_COMPILE | PCRE_STUDY_EXTRA_NEEDED;
+    const char *err;
+    pcre_extra *extra = pcre_study(regexp->re, opt, &err);
+  }
 }
 
 int
@@ -88,7 +101,7 @@ eth_exec_regexp(eth_t x, const char *str, int len, int opts)
   }
 
   eth_regexp *regexp = (void*)x;
-  int n = pcre_exec(regexp->re, NULL, str, len, 0, opts, g_ovector,
+  int n = pcre_exec(regexp->re, regexp->extra, str, len, 0, opts, g_ovector,
       ETH_OVECTOR_SIZE);
 
   return n;

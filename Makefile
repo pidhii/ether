@@ -39,7 +39,7 @@ cleanall:
 	@rm -rfv Release Debug
 
 test: _test_Debug _test_Release
-_test_%:
+_test_%: %
 	@test -d $* && $(MAKE) -C $*/build test CTEST_OUTPUT_ON_FAILURE=1
 
 fuzzy: t/test.eth

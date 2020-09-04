@@ -193,7 +193,7 @@ int _eth_start_token = -1;
 %nonassoc OPEN USING AS UNQUALIFIED MODULE
 %nonassoc DOT_OPEN1 DOT_OPEN2
 %nonassoc LARROW
-%nonassoc PUB BUILTIN
+%nonassoc PUB BUILTIN DEPRECATED
 %nonassoc LIST_DDOT
 %nonassoc BEGINN END
 %nonassoc DO DONE
@@ -201,7 +201,7 @@ int _eth_start_token = -1;
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %right RARROW
 %right ';'
-%nonassoc LET REC AND
+%nonassoc LET REC AND ASSERT
 %left LAZY
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %right TERNARY
@@ -511,6 +511,7 @@ Expr
     $$ = eth_ast_if($3, eth_ast_cval(eth_nil), $1);
     LOC($$, @$);
   }
+  | ASSERT Expr IN Expr { $$ = eth_ast_assert($2, $4); }
   | FN FnArgs RARROW Expr {
     $$ = eth_ast_fn_with_patterns($2.data, $2.len, $4);
     cod_vec_destroy($2);
@@ -697,9 +698,28 @@ Binds
 ;
 
 Bind
-  : Pattern '=' Expr {
+  : Pattern '=' MaybeHelp Expr {
     $$.pat = $1;
-    $$.val = $3;
+    $$.val = $4;
+    if ($3)
+    {
+      if ($1->tag == ETH_PATTERN_IDENT)
+      {
+        eth_set_help($1->ident.attr, $3);
+        free($3);
+      }
+      else
+      {
+        eth_warning(".help will be ignored");
+        if (g_filename)
+        {
+          eth_location *loc = location(&@$);
+          eth_print_location(loc, stderr);
+          eth_drop_location(loc);
+        }
+        free($3);
+      }
+    }
   }
   | Attribute SYMBOL FnArgs AtomicPattern '=' MaybeHelp Expr {
     $$.pat = eth_ast_ident_pattern($2);
@@ -735,8 +755,9 @@ Bind
 
 Attribute
   : { $$ = 0; }
-  | Attribute PUB     { $$ = $1 | ETH_ATTR_PUB;     }
-  | Attribute BUILTIN { $$ = $1 | ETH_ATTR_BUILTIN; }
+  | Attribute PUB        { $$ = $1 | ETH_ATTR_PUB;        }
+  | Attribute BUILTIN    { $$ = $1 | ETH_ATTR_BUILTIN;    }
+  | Attribute DEPRECATED { $$ = $1 | ETH_ATTR_DEPRECATED; }
 ;
 
 String
@@ -767,6 +788,7 @@ RegExp
       eth_drop_location(loc);
       abort();
     }
+    eth_study_regexp(regexp);
     $$ = eth_ast_cval(regexp);
     free($2.data);
     LOC($$, @$);

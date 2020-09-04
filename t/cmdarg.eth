@@ -14,10 +14,10 @@ let tests = [
   let (kw, pos) = CmdArg.get options cmd in
   ("test-1", fn -> List.all? id [
       pos eq ["first", "second", "third"],
-      List.assoc "long-arg" kw eq Some "arg",
-      List.assoc "long-no-arg" kw eq Some true,
-      List.assoc "short-arg" kw eq Some "1",
-      List.assoc "short-no-arg" kw eq Some true,
+      List.assoc "long-arg" kw eq "arg",
+      List.assoc "long-no-arg" kw eq true,
+      List.assoc "short-arg" kw eq "1",
+      List.assoc "short-no-arg" kw eq true,
     ]),
 
   -- test-2
@@ -27,16 +27,16 @@ let tests = [
   let (kw, pos) = CmdArg.get options cmd in
   ("test-2", fn -> List.all? id [
       pos eq ["first", "second", "third"],
-      List.assoc "long-arg" kw eq Some "arg",
-      List.assoc "long-no-arg" kw eq Some true,
-      List.assoc "short-arg" kw eq Some "1",
-      List.assoc "short-no-arg" kw eq Some true,
+      List.assoc "long-arg" kw eq "arg",
+      List.assoc "long-no-arg" kw eq true,
+      List.assoc "short-arg" kw eq "1",
+      List.assoc "short-no-arg" kw eq true,
     ]),
 
   -- test-3
   let cmd = ["--long-arg="] in
   let (kw, pos) = CmdArg.get options cmd in
-  ("test-3", fn -> List.assoc "long-arg" kw eq Some ""),
+  ("test-3", fn -> List.assoc "long-arg" kw eq ""),
 
   -- test-4
   let cmd = ["--long-arg"] in

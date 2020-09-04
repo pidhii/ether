@@ -262,13 +262,15 @@ case   { return CASE; }
 of     { return OF; }
 module { return MODULE; }
 lazy   { return LAZY; }
+assert { return ASSERT; }
 
 nil   { yylval->constant = eth_nil;   return CONST; }
 true  { yylval->constant = eth_true;  return CONST; }
 false { yylval->constant = eth_false; return CONST; }
 
-pub       { return PUB; }
-__builtin { return BUILTIN; }
+pub          { return PUB; }
+__builtin    { return BUILTIN; }
+__deprecated { return DEPRECATED; }
 
 "|"     |
 "_"     |

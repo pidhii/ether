@@ -186,7 +186,7 @@ _cat(void)
 }
 
 static eth_t
-_strstr(void)
+_strstr_opt(void)
 {
   eth_use_variant(Some)
   eth_t x = *eth_sp++;
@@ -512,7 +512,7 @@ ether_module(eth_module *mod, eth_env *topenv)
   eth_define(mod, "cmp", eth_create_proc(_strcmp, 2, NULL, NULL));
   eth_define(mod, "casecmp", eth_create_proc(_strcasecmp, 2, NULL, NULL));
   eth_define(mod, "__substr", eth_create_proc(_substr, 3, NULL, NULL));
-  eth_define(mod, "__strstr", eth_create_proc(_strstr, 2, NULL, NULL));
+  eth_define(mod, "__strstr_opt", eth_create_proc(_strstr_opt, 2, NULL, NULL));
   eth_define(mod, "cat", eth_create_proc(_cat, 1, NULL, NULL));
   eth_define(mod, "chomp", eth_create_proc(_chomp, 1, NULL, NULL));
   eth_define(mod, "chop", eth_create_proc(_chop, 1, NULL, NULL));

@@ -74,6 +74,18 @@ set_target_properties (string
 install (TARGETS string DESTINATION ${STRING_DST_DIR})
 install (FILES ${STRING_SRC_DIR}/lib.eth DESTINATION ${STRING_DST_DIR})
 
+# RegExp
+set (REGEXP_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/regexp)
+set (REGEXP_DST_DIR lib/ether/regexp)
+add_library (regexp SHARED ${REGEXP_SRC_DIR}/lib.c)
+set_target_properties (regexp
+  PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    PREFIX ""
+    OUTPUT_NAME "regexp")
+install (TARGETS regexp DESTINATION ${REGEXP_DST_DIR})
+install (FILES ${REGEXP_SRC_DIR}/lib.eth DESTINATION ${REGEXP_DST_DIR})
+
 # OS
 set (OS_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/os)
 set (OS_DST_DIR lib/ether/os)

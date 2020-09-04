@@ -49,10 +49,14 @@ in
 -- * split
 let pub split re str = List.rev $ rev_split re str in
 
-let pub find pat s =
+let pub find_opt pat s =
   if regexp? pat then __find_regexp pat s
-  else if string? pat then __strstr s pat
+  else if string? pat then __strstr_opt s pat
   else type_error ()
+in
+let pub find pat s =
+  if let Some x = find_opt pat s then x
+  else failure ()
 in
 
 nil

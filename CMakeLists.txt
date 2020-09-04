@@ -9,6 +9,7 @@ find_package (FLEX REQUIRED)
 
 option (BUILD_SHARED_LIBRARY "Build shared library \"ether.so\"" OFF)
 option (BUILD_STATIC_LIBRARY "Build static library \"ether.a\"" OFF)
+option (DISABLE_BUILTINS "Disable all builtins" OFF)
 
 
 set (WARNING_FLAGS "-Wall -Werror -Wextra -Wno-unused -Wno-error=cpp")
@@ -22,6 +23,11 @@ set (CMAKE_C_STANDARD 99)
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${WARNING_FLAGS} -rdynamic")
 set (CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Og -ggdb -DETH_DEBUG_MODE")
 set (CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -Ofast -flto")
+
+if (DISABLE_BUILTINS)
+  set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DETHER_DISABLE_BUILTINS=1")
+endif (DISABLE_BUILTINS)
+
 include_directories (${ETHER_INCLUDE_DIR})
 include_directories (${CMAKE_SOURCE_DIR}/codeine/include)
 
