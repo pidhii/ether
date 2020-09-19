@@ -6,4 +6,4 @@ Name: ether
 Description: Interpreter
 Version: @PROJECT_VERSION@
 Cflags: -I${includedir}
-Libs: -L${libdir} -lether
+Libs: -L${libdir} -lether -lpcre -lm

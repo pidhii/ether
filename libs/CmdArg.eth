@@ -52,6 +52,22 @@ let get_options cfg os =
   loop os [] []
 in
 
-let pub get = get_options in
+let pub get =
+{.help|
+\e[1mDESCRIPTION:\e[0m
+  Parse command line arguments in GNU style. Both short and long formats are
+  available.
+
+\e[1mUSAGE:\e[0m
+  get <list-of-options> <list-of-arguments> -> (opts, non-opt-args)
+
+  where:
+  * <list-of-options> is a list of configurations for expected argumets of the
+    form 
+      \e[4m{name = string?, val = <any-tag>, has_arg = boolean?}\e[0m
+  * <list-of-arguments> is a list of strings to be parsed (to parse command-line
+    arguments passed to your script use \`cdr command_line\`.
+|.help}
+  get_options in
 
 ()

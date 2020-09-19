@@ -5,6 +5,8 @@
 -- * format
 -- * cat (C)
 -- * join
+-- * create
+-- * make (C)
 --
 -- Miscelenious:
 -- * len (C)
@@ -28,6 +30,31 @@
 --
 -- Searching:
 -- * find
+--
+
+let pub create =
+{.help|
+\e[1mUSAGE:\e[0m
+  create number? -> string?
+
+\e[1mDESCRIPTION:\e[0m
+  Create an uninitialized string of given length.
+|.help}
+  __create
+in
+
+let pub make =
+{.help|
+\e[1mUSAGE:\e[0m
+  make number? string? -> string?
+
+\e[1mDESCRIPTION:\e[0m
+  Create  a  string of given length filled with a first  character  of  supplied
+  string. If it is of zero length, then the it is treated as 0-byte.
+|.help}
+  __make
+in
+
 let pub join sep xs =
   if xs is nil then ""
   else if let hd::[] = xs then hd

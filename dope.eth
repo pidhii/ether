@@ -21,6 +21,7 @@ let mkdir path =
 in
 
 let copy_file src dst =
+  printf "> copy ~w -> ~w\n" src dst;
   open_in src |> read_file |> write_to (open_out dst)
 in
 
@@ -50,6 +51,10 @@ let realpath path =
     else String.chop line
 in
 
+let elf? path =
+  read_of (open_in path) 4 eq "\x7fELF"
+in
+
 let db_path = format "~d/__db.eth" module_path in
 
 -- Get registry of installed modules
@@ -77,7 +82,7 @@ let install dir args =
   -- Read install configuration
   let (_, conf) =
     try
-      let env = create_env [("command_line", args)] in
+      let env = create_env [("command_line", args), ("root", dir)] in
       env:load (format "~d/install.eth" dir)
     with _ -> begin
       eprintf "> error: failed to load install-script\n";
@@ -111,8 +116,11 @@ let install dir args =
   main::files |> List.iter (file ->
     copy_file (dir ++ "/" ++ file) (moddir ++ "/" ++ file)
   );
+  printf "> all files copied\n";
+
   -- Create symlink to main
-  let mainpath = moddir ++ "/__main__.eth" in
+  let mainext = ".so" if elf? (dir ++ "/" ++ main) else ".eth" in
+  let mainpath = moddir ++ "/__main__" ++ mainext in
   unless exist? mainpath
     then create_symlink (moddir ++ "/" ++ main) mainpath;
 
@@ -152,7 +160,9 @@ in
 
 let reinstall dir args =
   let (_, conf) =
-    try load (format "~d/install.eth" dir)
+    try
+      let env = create_env [("command_line", args), ("root", dir)] in
+      env:load (format "~d/install.eth" dir)
     with Failure ->
       eprintf "> error: failed to load install-script\n";
       raise Failure;
@@ -187,12 +197,66 @@ in
 let help! =
   printf "usage: ~d OPTIONS [<command_line> ...]\n" (basename $ car command_line);
   print "";
-  print "OPTIONS:";
+  print "\e[1mOPTIONS:\e[0m";
   print "  --help       -h          Show this message.";
+  print$"  --help-dev               Show help for the library developper. It will display\n"
+      ++"                           information about installation procedure and  how  to\n"
+      ++"                           set up your library so that  it  could  be  installed\n"
+      ++"                           with this script.";
   print "  --install    -i  <dir>   Install package.";
   print "  --uninstall  -u  <name>  Uninstall package.";
   print "  --reinstall  -r  <dir>   Reinstall package.";
   print "  --list       -l          List installed packages.";
+in
+
+let help_dev! =
+  let text = {TEXT|
+In order to make library installable by  the Dope it may be supplied with appro-
+priate steering which will contain information on  all files  required  for  the
+library dependencies, entry point,  and routines responsible  for  building  the
+library.
+
+Libraries are installed in the directory:
+
+  |TEXT} ++ module_path ++ {TEXT|/<lib-name>
+
+where  the first part  of  the path  is obtained  as  "<ether-prefix>/lib/ether"
+(check \`$ ether --prefx\`). And template tree of the directory <lib-name> is:
+
+                <lib-name>
+                ├── __main__.[eth|so] -> <entry-point>
+                ├── <entry-point>
+                ├── ... all other files specified in steering
+
+Sterring is to be provided via a script  "<lib-root>/install.eth".  It  provides
+configuration via a public variables. Following is the list of variables  to  be
+provided:
+
+  - \e[4mname\e[0m: String with the name of the library. In order to make the name  flexi-
+    ble wrt. capital letters this value should be written in lower-case.  If  it
+    contains upper-case characters then only exact  match  of  names will work.
+
+  - \e[4mmain\e[0m: Path to the entry point to the library. May be either a script wriiten
+    in Ether, or a shared library.
+
+  - \e[4mfiles\e[0m (optional): Listh with pathes to all the other supplementary files re-
+    quired by the library. All these files will be copied  to  the  installation
+    root (directory previously referenced with <lib-name>).
+
+  - \e[4mbuild\e[0m (optional): Function  of zero  arguments to be called to  build  (i.e.
+    compile) the library.
+
+  - \e[4mpost_install\e[0m (optional): Function of zero arguments to be called to clean up
+    after the installation.  E.g. one may remove all object files  and  compiled
+    library itself.
+
+Installation script will be evaluated within the root directory of  the  library
+(the one passed to the Dope).  Command-line arguments provided by the user  will
+be available via the \`command_line\`-variable; and the root directory --  via the
+\`root\`-variable.
+|TEXT}
+  in
+  system "LESS=-FX /usr/bin/less -R <<TEXT~dTEXT" text;
 in
 
 
@@ -201,6 +265,7 @@ let options =
   [
     -- Long options
     {name = "help"     , val = "h", has_arg = false},
+    {name = "help-dev" , val = "hd",has_arg = false},
     {name = "install"  , val = "i", has_arg = true },
     {name = "uninstall", val = "u", has_arg = true },
     {name = "reinstall", val = "r", has_arg = true },
@@ -231,6 +296,7 @@ in
 List.iter (fn (opt, val) ->
   try
     help!              if opt eq "h" else
+    help_dev!          if opt eq "hd"else
     install val args   if opt eq "i" else
     uninstall val      if opt eq "u" else
     reinstall val args if opt eq "r" else

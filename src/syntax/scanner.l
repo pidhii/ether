@@ -126,10 +126,11 @@ OPERATOR [-+%^.$:!<>*/=&|∘]+
   BEGIN(STRING);
   return HELP;
 }
-"{"\S+"|" {
+"{"[-a-zA-Z0-9_+]+"|" {
+/*eth_warning("open string: %s", yytext);*/
   char buf[yyleng-1];
   memcpy(buf, yytext+1, yyleng-2);
-  buf[yyleng-1] = '\0';
+  buf[yyleng-2] = '\0';
   push_quote(QUOTES_STRING, buf);
   BEGIN(STRING);
   return '"';
@@ -184,10 +185,11 @@ OPERATOR [-+%^.$:!<>*/=&|∘]+
     return STRING;
   }
 }
-<STRING>"|"\S+"}" {
+<STRING>"|"[-a-zA-Z0-9_+]+"}" {
+/*eth_warning("close string: %s", yytext);*/
   char buf[yyleng-1];
   memcpy(buf, yytext+1, yyleng-2);
-  buf[yyleng-1] = '\0';
+  buf[yyleng-2] = '\0';
   if (strcmp(buf, cod_vec_last(g_quotes).str) == 0)
   {
     pop_quote();
@@ -224,7 +226,7 @@ nan                                 |
 inf                                 |
 0[xX][0-9a-fA-F][0-9a-fA-F_]*       |
 [0-9][0-9_]*(\.[0-9][0-9_]*)?([eE][-+]?[0-9][0-9_]*)? {
-  char buf[yyleng];
+  char buf[yyleng+1];
   int buflen = 0;
   for (char *p = yytext; *p; ++p)
   {

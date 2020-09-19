@@ -1,0 +1,20 @@
+#main-window
+{
+  background-image: url("bg.jpg");
+}
+
+#main-label
+{
+  font-weight: bold;
+  color: white;
+}
+
+#exit-button
+{
+  background: cyan;
+}
+
+#echo-button
+{
+  background: LightGreen;
+}

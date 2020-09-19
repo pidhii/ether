@@ -1061,13 +1061,13 @@ eth_create_tuple_n(eth_type *type, eth_t const data[]);
 #define eth_tupn eth_create_tuple_n
 
 static inline int __attribute__((pure))
-eth_tuple_size(eth_type *type)
+eth_tuple_size(const eth_type *type)
 {
   return type->nfields;
 }
 
 static inline int __attribute__((pure))
-eth_record_size(eth_type *type)
+eth_record_size(const eth_type *type)
 {
   return type->nfields;
 }
@@ -1320,6 +1320,9 @@ eth_destroy_env(eth_env *env);
 
 bool
 eth_add_module_path(eth_env *env, const char *path);
+
+void
+eth_add_exit_handle(eth_env *env, void (*cb)(void*), void *data);
 
 bool
 eth_resolve_path(eth_env *env, const char *path, char *fullpath);

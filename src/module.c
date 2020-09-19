@@ -118,6 +118,6 @@ eth_find_def(const eth_module *mod, const char *ident)
 void
 eth_add_destructor(eth_module *mod, void *data, void (*dtor)(void*))
 {
-  closure c = { .data = data, dtor = dtor };
+  closure c = { .data = data, .dtor = dtor };
   cod_vec_push(mod->clos, c);
 }

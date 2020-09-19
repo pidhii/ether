@@ -29,14 +29,21 @@ static void
 destroy_module_entry(void *ptr)
 {
   module_entry *ent = ptr;
+  eth_debug("calling DTOR for module '%s'", eth_get_module_name(ptr));
   eth_destroy_module(ent->mod);
   if (ent->dl)
     dlclose(ent->dl);
   free(ent);
 }
 
+typedef struct {
+  void (*cb)(void*);
+  void *data;
+} exit_handle;
+
 struct eth_env {
   cod_vec(char*) modpath;
+  cod_vec(exit_handle) exithndls;
   cod_hash_map *mods;
 };
 
@@ -45,6 +52,7 @@ eth_create_empty_env(void)
 {
   eth_env *env = malloc(sizeof(eth_env));
   cod_vec_init(env->modpath);
+  cod_vec_init(env->exithndls);
   env->mods = cod_hash_map_new();
   return env;
 }
@@ -66,6 +74,8 @@ eth_create_env(void)
 void
 eth_destroy_env(eth_env *env)
 {
+  cod_vec_iter(env->exithndls, i, x, eth_debug("exit handle: %p(%p)", x.cb, x.data); x.cb(x.data));
+  cod_vec_destroy(env->exithndls);
   cod_vec_iter(env->modpath, i, x, free(x));
   cod_vec_destroy(env->modpath);
   cod_hash_map_delete(env->mods, destroy_module_entry);
@@ -86,6 +96,13 @@ eth_add_module_path(eth_env *env, const char *path)
     eth_warning("invalid module-path, \"%s\"", path);
     return false;
   }
+}
+
+void
+eth_add_exit_handle(eth_env *env, void (*cb)(void*), void *data)
+{
+  exit_handle hndle = { .cb = cb, .data = data };
+  cod_vec_push(env->exithndls, hndle);
 }
 
 bool
@@ -430,6 +447,11 @@ resolve_path_by_name(eth_env *env, const char *name, char *path)
       strcpy(dir, path);
 
       sprintf(buf, "%s/__main__.eth", dir);
+      eth_debug("[%s] check \"%s\"", name, buf);
+      if (realpath(buf, path))
+        return true;
+
+      sprintf(buf, "%s/__main__.so", dir);
       eth_debug("[%s] check \"%s\"", name, buf);
       if (realpath(buf, path))
         return true;

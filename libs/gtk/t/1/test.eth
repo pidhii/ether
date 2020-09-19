@@ -1,0 +1,56 @@
+open Gtk in
+
+let activate app =
+  fn ->
+    -- Load UI from XML-file.
+    let bldr = gtk_builder_new! in
+    gtk_builder_add_from_file(bldr, "./gtk-tests/test.ui");
+
+    -- Set up main window.
+    let window = gtk_builder_get_object(bldr, "main-window") in
+    gtk_application_add_window(app, window);
+
+    try
+      -- Set up exit-button.
+      let button = gtk_builder_get_object(bldr, "exit-button") in
+      g_signal_connect(button, "clicked", fn -> gtk_widget_destroy window);
+
+      -- Set up echo-button.
+      let button = gtk_builder_get_object(bldr, "echo-button") in
+      -- Will echo user's input.
+      let entry = gtk_builder_get_object(bldr, "text-entry") in
+      let cb! =
+        let text = gtk_entry_get_text(entry) in
+        if text eq ""
+          then print "Oh, come on, enter something";
+          else print $ "> " ++ text;
+        gtk_entry_set_text(entry, "");
+      in
+      g_signal_connect(button, "clicked", cb);
+      g_signal_connect(entry, "activate", cb);
+
+      -- Load CSS.
+      let css = gtk_css_provider_new! in
+      gtk_css_provider_load_from_path(css, "./gtk-tests/test.css");
+      -- Apply for each widget.
+      let rec apply_css wgt =
+        let sty = gtk_widget_get_style_context(wgt) in
+        gtk_style_context_add_provider(sty, css, -1);
+        when gtk_is_container(wgt) then
+          gtk_container_forall(wgt, apply_css);
+      in
+      apply_css window;
+
+      -- Display main window.
+      gtk_widget_show_all(window);
+
+    with exn ->
+      print ("unhandled exception:", exn);
+      gtk_widget_destroy window;
+in
+
+
+let app = gtk_application_new("org.gtk.example", 0) in
+g_signal_connect(app, "activate", activate app);
+g_application_run(app);
+

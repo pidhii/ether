@@ -17,6 +17,8 @@ let string_tests =
     ("chr", fn -> chr 0x61 eq "a"),
     ("ord", fn -> ord "a" eq 0x61),
     ("len", fn -> len "1234" == 4),
+    ("create", fn -> len (create 10) == 10),
+    ("make", fn -> make 10 "@" eq "@@@@@@@@@@" && make 2 "" eq "\0\0"),
     ("to_upper", fn -> to_upper "AbcD" eq "ABCD"),
     ("to_lower", fn -> to_lower "AbcD" eq "abcd"),
     ("chomp", fn -> chomp "asd\n\n" eq "asd" && chomp "asd" eq "asd"),
@@ -62,11 +64,8 @@ let list_tests =
   , ("map", fn -> map ((+) 1) [1, 2, 3] eq [2, 3, 4])
   , ("rev_mapi", fn -> rev_mapi (+) [1, 2, 3] eq [5, 3, 1])
   , ("mapi", fn -> mapi (+) [1, 2, 3] eq [1, 3, 5])
-  , ("rev_zip", fn -> rev_zip (-) [1, 2, 3] [2, 1, 0] eq [3, 1, -1])
-  , ("zip", fn -> zip (-) [1, 2, 3] [2, 1, 0] eq [-1, 1, 3])
-  , ("rev_zipi", fn ->
-      rev_zipi (fn i x y -> i + x - y) [1, 2, 3] [2, 1, 0] eq [5, 2, -1])
-  , ("zipi", fn -> zipi (fn i x y -> i + x - y) [1, 2, 3] [2, 1, 0] eq [-1, 2, 5])
+  , ("rev_map2", fn -> rev_map2 (-) [1, 2, 3] [2, 1, 0] eq [3, 1, -1])
+  , ("map2", fn -> map2 (-) [1, 2, 3] [2, 1, 0] eq [-1, 1, 3])
   , ("rev_flat_map", fn -> rev_flat_map (fn x -> [1..x-1]) [1, 2, 3] eq [2, 1, 1])
   , ("flat_map", fn -> flat_map (fn x -> [1..x-1]) [1, 2, 3] eq [1, 1, 2])
   , ("rev_filter_map", fn ->

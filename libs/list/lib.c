@@ -107,7 +107,7 @@ _rev_mapi(void)
 }
 
 static eth_t
-_rev_zip(void)
+_rev_map2(void)
 {
   eth_use_symbol(Improper_list)
 
@@ -143,40 +143,121 @@ _rev_zip(void)
 }
 
 static eth_t
-_rev_zipi(void)
+_rev_zip(void)
 {
-  eth_use_symbol(Improper_list)
+  eth_use_symbol(Improper_list);
 
-  eth_args args = eth_start(3);
+  eth_args args = eth_start(2);
   const eth_t f = eth_arg2(args, eth_function_type);
-  const eth_t xs = eth_arg(args);
-  const eth_t ys = eth_arg(args);
+  const eth_t ltup = eth_arg(args);
+
+  if (eth_unlikely(not eth_is_tuple(ltup->type)))
+    eth_throw(args, eth_type_error());
+
+  const int n = eth_tuple_size(ltup->type);
+  eth_t it[n];
+  for (int i = 0; i < n; ++i)
+  {
+    it[i] = eth_tup_get(ltup, i);
+    if (eth_unlikely(not eth_is_pair(it[i])))
+    {
+      if (it[i] == eth_nil)
+        eth_return(args, eth_nil);
+      else
+        eth_throw(args, eth_invalid_argument());
+    }
+  }
 
   eth_t acc = eth_nil;
-  eth_t it1, it2;
-  eth_number_t i = 0;
-  for (it1 = xs, it2 = ys; eth_is_pair(it1) and eth_is_pair(it2);
-      it1 = eth_cdr(it1), it2 = eth_cdr(it2), ++i)
+  while (true)
   {
-    eth_reserve_stack(3);
-    eth_sp[0] = eth_num(i);
-    eth_sp[1] = eth_car(it1);
-    eth_sp[2] = eth_car(it2);
-    const eth_t v = eth_apply(f, 3);
+    // push arguments
+    eth_reserve_stack(n);
+    for (register int i = 0; i < n; ++i)
+      eth_sp[i] = eth_car(it[i]);
+    // apply
+    const eth_t v = eth_apply(f, n);
     if (eth_unlikely(eth_is_exn(v)))
     {
       eth_drop(acc);
       eth_rethrow(args, v);
     }
+    // prepend to return-value
     acc = eth_cons(v, acc);
+    // incerement iterators
+    for (int i = 0; i < n; ++i)
+    {
+      it[i] = eth_cdr(it[i]);
+      if (eth_unlikely(not eth_is_pair(it[i])))
+      {
+        if (eth_unlikely(it[i] != eth_nil))
+        {
+          eth_drop(acc);
+          eth_throw(args, Improper_list);
+        }
+        goto end_loop;
+      }
+    }
   }
-  if (eth_unlikely(not eth_is_pair(it1) and it1 != eth_nil or
-                   not eth_is_pair(it2) and it2 != eth_nil))
+  end_loop:
+  eth_return(args, acc);
+}
+
+static eth_t
+_fold_zip(void)
+{
+  eth_use_symbol(Improper_list);
+
+  eth_args args = eth_start(3);
+  const eth_t f = eth_arg2(args, eth_function_type);
+  const eth_t z = eth_arg(args);
+  const eth_t ltup = eth_arg(args);
+
+  if (eth_unlikely(not eth_is_tuple(ltup->type)))
+    eth_throw(args, eth_type_error());
+
+  const int n = eth_tuple_size(ltup->type);
+  eth_t it[n];
+  for (int i = 0; i < n; ++i)
   {
-    eth_drop(acc);
-    eth_throw(args, Improper_list);
+    it[i] = eth_tup_get(ltup, i);
+    if (eth_unlikely(not eth_is_pair(it[i])))
+    {
+      if (it[i] == eth_nil)
+        eth_return(args, eth_nil);
+      else
+        eth_throw(args, eth_invalid_argument());
+    }
   }
 
+  eth_t acc = z;
+  while (true)
+  {
+    // push arguments
+    eth_reserve_stack(n + 1);
+    eth_sp[0] = acc;
+    for (register int i = 0; i < n; ++i)
+      eth_sp[i+1] = eth_car(it[i]);
+    // apply
+    acc = eth_apply(f, n + 1);
+    if (eth_unlikely(eth_is_exn(acc)))
+      eth_rethrow(args, acc);
+    // incerement iterators
+    for (int i = 0; i < n; ++i)
+    {
+      it[i] = eth_cdr(it[i]);
+      if (eth_unlikely(not eth_is_pair(it[i])))
+      {
+        if (eth_unlikely(it[i] != eth_nil))
+        {
+          eth_drop(acc);
+          eth_throw(args, Improper_list);
+        }
+        goto end_loop;
+      }
+    }
+  }
+  end_loop:
   eth_return(args, acc);
 }
 
@@ -214,13 +295,14 @@ _rev_filter_map(void)
 int
 ether_module(eth_module *mod, eth_env *topenv)
 {
-  eth_define(mod, "len", eth_create_proc(_length, 1, NULL, NULL));
-  eth_define(mod, "rev_append", eth_create_proc(_rev_append, 2, NULL, NULL));
-  eth_define(mod, "rev_map", eth_create_proc(_rev_map, 2, NULL, NULL));
-  eth_define(mod, "rev_mapi", eth_create_proc(_rev_mapi, 2, NULL, NULL));
-  eth_define(mod, "rev_zip", eth_create_proc(_rev_zip, 3, NULL, NULL));
-  eth_define(mod, "rev_zipi", eth_create_proc(_rev_zipi, 3, NULL, NULL));
-  eth_define(mod, "rev_filter_map", eth_create_proc(_rev_filter_map, 2, NULL, NULL));
+  eth_define(mod, "__len", eth_create_proc(_length, 1, NULL, NULL));
+  eth_define(mod, "__rev_append", eth_create_proc(_rev_append, 2, NULL, NULL));
+  eth_define(mod, "__rev_map", eth_create_proc(_rev_map, 2, NULL, NULL));
+  eth_define(mod, "__rev_mapi", eth_create_proc(_rev_mapi, 2, NULL, NULL));
+  eth_define(mod, "__rev_map2", eth_create_proc(_rev_map2, 3, NULL, NULL));
+  eth_define(mod, "__rev_zip", eth_create_proc(_rev_zip, 2, NULL, NULL));
+  eth_define(mod, "__fold_zip", eth_create_proc(_fold_zip, 3, NULL, NULL));
+  eth_define(mod, "__rev_filter_map", eth_create_proc(_rev_filter_map, 2, NULL, NULL));
 
   if (not eth_load_module_from_script2(topenv, NULL, mod, "lib.eth", NULL, mod))
     return -1;

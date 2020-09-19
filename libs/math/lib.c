@@ -20,7 +20,7 @@
     if (eth_unlikely(not eth_is_num(x)))       \
     {                                          \
       eth_drop(x);                             \
-      return eth_exn(eth_type_error());   \
+      return eth_exn(eth_type_error());        \
     }                                          \
     eth_t ret = eth_num(func(eth_num_val(x))); \
     eth_drop(x);                               \
@@ -36,7 +36,7 @@
     if (eth_unlikely(not eth_is_num(x) or not eth_is_num(y)))  \
     {                                                          \
       eth_drop_2(x, y);                                        \
-      return eth_type_error();                                 \
+      return eth_exn(eth_type_error());                        \
     }                                                          \
     eth_t ret = eth_num(func(eth_num_val(x), eth_num_val(y))); \
     eth_drop_2(x, y);                                          \
@@ -53,7 +53,7 @@
     if (eth_unlikely(not eth_is_num(x) or not eth_is_num(y) or not eth_is_num(z))) \
     {                                                                              \
       eth_drop_3(x, y, z);                                                         \
-      return eth_type_error();                                                     \
+      return eth_exn(eth_type_error());                                            \
     }                                                                              \
     eth_t ret = eth_num(func(eth_num_val(x), eth_num_val(y), eth_num_val(z)));     \
     eth_drop_3(x, y, z);                                                           \
@@ -132,7 +132,7 @@ _minmax(void)
   if (eth_unlikely(not eth_is_num(x) or not eth_is_num(y)))
   {
     eth_drop_2(x, y);
-    return eth_type_error();
+    return eth_exn(eth_type_error());
   }
   if (eth_num_val(x) < eth_num_val(y))
     return eth_create_tuple_2(x, y);
@@ -166,7 +166,7 @@ _frexp(void)
   if (eth_unlikely(not eth_is_num(x)))
   {
     eth_drop(x);
-    return eth_type_error();
+    return eth_exn(eth_type_error());
   }
   int exp;
   eth_t integ = eth_num(GNAME(frexp)(eth_num_val(x), &exp));

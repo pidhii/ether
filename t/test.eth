@@ -153,7 +153,7 @@ begin
 
   let (+) x y =
     if number? x && number? y then x + y
-    else if list? x && list? y then zip (+) x y
+    else if list? x && list? y then map2 (+) x y
     else raise Type_error
   in
 

@@ -33,6 +33,8 @@ static void
 destroy_regexp(eth_type *type, eth_t x)
 {
   eth_regexp *regexp = (void*)x;
+  if (regexp->extra)
+    pcre_free_study(regexp->extra);
   pcre_free(regexp->re);
   free(regexp);
 }
@@ -73,7 +75,7 @@ eth_study_regexp(eth_t x)
   {
     int opt = PCRE_STUDY_JIT_COMPILE | PCRE_STUDY_EXTRA_NEEDED;
     const char *err;
-    pcre_extra *extra = pcre_study(regexp->re, opt, &err);
+    regexp->extra = pcre_study(regexp->re, opt, &err);
   }
 }
 

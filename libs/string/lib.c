@@ -8,6 +8,42 @@
 
 
 static eth_t
+_create(void)
+{
+  eth_t n = *eth_sp++;
+  if (eth_unlikely(not eth_is_num(n)))
+  {
+    eth_drop(n);
+    return eth_exn(eth_type_error());
+  }
+  int len = eth_num_val(n);
+  char *str = malloc(len + 1);
+  str[len] = '\0';
+  eth_drop(n);
+  return eth_create_string_from_ptr2(str, len);
+}
+
+static eth_t
+_make(void)
+{
+  eth_args args = eth_start(2);
+  int len = eth_num_val(eth_arg2(args, eth_number_type));
+  char c = *eth_str_cstr(eth_arg2(args, eth_string_type));
+  char *str;
+  if (c == 0)
+  {
+    str = calloc(len + 1, 1);
+  }
+  else
+  {
+    str = malloc(len + 1);
+    memset(str, c, len);
+    str[len] = '\0';
+  }
+  eth_return(args, eth_create_string_from_ptr2(str, len));
+}
+
+static eth_t
 _strlen(void)
 {
   eth_t x = *eth_sp++;
@@ -506,6 +542,9 @@ _to_symbol(void)
 int
 ether_module(eth_module *mod, eth_env *topenv)
 {
+  eth_define(mod, "__create", eth_create_proc(_create, 1, NULL, NULL));
+  eth_define(mod, "__make", eth_create_proc(_make, 2, NULL, NULL));
+
   eth_define(mod, "len", eth_create_proc(_strlen, 1, NULL, NULL));
   eth_define(mod, "to_upper", eth_create_proc(_to_upper, 1, NULL, NULL));
   eth_define(mod, "to_lower", eth_create_proc(_to_lower, 1, NULL, NULL));

@@ -60,6 +60,10 @@ target_include_directories (ether_obj PRIVATE ${CMAKE_BINARY_DIR})
 
 get_target_property(BUILD_FALGS ether_obj COMPILE_OPTIONS)
 
+# install headers:
+install (DIRECTORY ${ETHER_INCLUDE_DIR} DESTINATION ".")
+install (DIRECTORY "${CMAKE_SOURCE_DIR}/codeine/include/codeine" DESTINATION "include")
+
 # shared library:
 if (BUILD_SHARED_LIBRARY)
   add_library (ether_so SHARED ${ETHER_SRC} ${SYNTAX_SRC})
@@ -83,7 +87,7 @@ target_link_libraries (ether -lm -ldl -lpcre -lreadline)
 install (TARGETS ether DESTINATION bin)
 
 # directory for modules
-install(DIRECTORY DESTINATION "lib/ether")
+install (DIRECTORY DESTINATION "lib/ether")
 
 if (CMAKE_INSTALL_PREFIX)
   set (ETHER_PREFIX "${CMAKE_INSTALL_PREFIX}")

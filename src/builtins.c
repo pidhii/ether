@@ -758,6 +758,7 @@ _fmt(char *fmt, int n, FILE *out)
   for (int i = 0; i < n; ++i)
     eth_ref(eth_sp[i]);
 
+  eth_t ret = eth_nil;
   int ipar = 0;
   for (char *p = fmt; *p; ++p)
   {
@@ -796,7 +797,7 @@ _fmt(char *fmt, int n, FILE *out)
   }
 
   eth_pop_stack(n);
-  return eth_nil;
+  return ret;
 }
 
 static int
