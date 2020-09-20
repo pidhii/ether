@@ -43,14 +43,18 @@ ether_module(eth_module *mod, eth_env *topenv)
   eth_define(mod, "pcre_firstline", eth_num(PCRE_FIRSTLINE));
   eth_define(mod, "pcre_javascript_compat", eth_num(PCRE_JAVASCRIPT_COMPAT));
   eth_define(mod, "pcre_multiline", eth_num(PCRE_MULTILINE));
+#ifdef PCRE_NEVER_UTF
   eth_define(mod, "pcre_never_utf", eth_num(PCRE_NEVER_UTF));
+#endif
   eth_define(mod, "pcre_newline_any", eth_num(PCRE_NEWLINE_ANY));
   eth_define(mod, "pcre_newline_anycrlf", eth_num(PCRE_NEWLINE_ANYCRLF));
   eth_define(mod, "pcre_newline_cr", eth_num(PCRE_NEWLINE_CR));
   eth_define(mod, "pcre_newline_crlf", eth_num(PCRE_NEWLINE_CRLF));
   eth_define(mod, "pcre_newline_lf", eth_num(PCRE_NEWLINE_LF));
   eth_define(mod, "pcre_no_auto_capture", eth_num(PCRE_NO_AUTO_CAPTURE));
+#ifdef PCRE_NO_AUTO_POSSESS
   eth_define(mod, "pcre_no_auto_possess", eth_num(PCRE_NO_AUTO_POSSESS));
+#endif
   eth_define(mod, "pcre_no_start_optimize", eth_num(PCRE_NO_START_OPTIMIZE));
   eth_define(mod, "pcre_no_utf16_check", eth_num(PCRE_NO_UTF16_CHECK));
   eth_define(mod, "pcre_no_utf32_check", eth_num(PCRE_NO_UTF32_CHECK));

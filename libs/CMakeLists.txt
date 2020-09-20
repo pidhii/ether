@@ -1,5 +1,3 @@
-FIND_PACKAGE(PkgConfig REQUIRED)
-
 
 # single-file-modules
 file (GLOB STD_LIBS ${CMAKE_SOURCE_DIR}/libs/*.eth)
@@ -39,16 +37,18 @@ set_target_properties (vector
 install (TARGETS vector DESTINATION ${VECTOR_DST_DIR})
 
 # Arb
-set (ARB_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/arb)
-set (ARB_DST_DIR lib/ether/arb)
-add_library (arb SHARED ${ARB_SRC_DIR}/lib.c)
-target_link_libraries (arb -larb)
-set_target_properties (arb
-  PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
-    PREFIX ""
-    OUTPUT_NAME "arb")
-install (TARGETS arb DESTINATION ${ARB_DST_DIR})
+if (ENABLE_ARB)
+  set (ARB_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/arb)
+  set (ARB_DST_DIR lib/ether/arb)
+  add_library (arb SHARED ${ARB_SRC_DIR}/lib.c)
+  target_link_libraries (arb -larb)
+  set_target_properties (arb
+    PROPERTIES
+      POSITION_INDEPENDENT_CODE ON
+      PREFIX ""
+      OUTPUT_NAME "arb")
+  install (TARGETS arb DESTINATION ${ARB_DST_DIR})
+endif (ENABLE_ARB)
 
 # List
 set (LIST_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/list)
@@ -75,16 +75,18 @@ install (TARGETS string DESTINATION ${STRING_DST_DIR})
 install (FILES ${STRING_SRC_DIR}/lib.eth DESTINATION ${STRING_DST_DIR})
 
 # RegExp
-set (REGEXP_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/regexp)
-set (REGEXP_DST_DIR lib/ether/regexp)
-add_library (regexp SHARED ${REGEXP_SRC_DIR}/lib.c)
-set_target_properties (regexp
-  PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
-    PREFIX ""
-    OUTPUT_NAME "regexp")
-install (TARGETS regexp DESTINATION ${REGEXP_DST_DIR})
-install (FILES ${REGEXP_SRC_DIR}/lib.eth DESTINATION ${REGEXP_DST_DIR})
+if (ENABLE_REGEXP)
+  set (REGEXP_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/regexp)
+  set (REGEXP_DST_DIR lib/ether/regexp)
+  add_library (regexp SHARED ${REGEXP_SRC_DIR}/lib.c)
+  set_target_properties (regexp
+    PROPERTIES
+      POSITION_INDEPENDENT_CODE ON
+      PREFIX ""
+      OUTPUT_NAME "regexp")
+  install (TARGETS regexp DESTINATION ${REGEXP_DST_DIR})
+  install (FILES ${REGEXP_SRC_DIR}/lib.eth DESTINATION ${REGEXP_DST_DIR})
+endif (ENABLE_REGEXP)
 
 # OS
 set (OS_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/os)
@@ -112,19 +114,22 @@ install (TARGETS curses DESTINATION ${CURSES_DST_DIR})
 install (FILES ${CURSES_SRC_DIR}/lib.eth DESTINATION ${CURSES_DST_DIR})
 
 # Gtk
-set (GTK_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/gtk)
-set (GTK_DST_DIR lib/ether/gtk)
-add_library (gtk SHARED ${GTK_SRC_DIR}/lib.c)
-set_target_properties (gtk
-  PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
-    PREFIX ""
-    OUTPUT_NAME "gtk")
-pkg_check_modules (GTK3 REQUIRED gtk+-3.0)
-#pkg_check_modules (GOBJECT2 REQUIRED gobject-2.0)
-target_include_directories (gtk PRIVATE ${GTK3_INCLUDE_DIRS})
-target_link_directories (gtk PRIVATE ${GTK3_LIBRARY_DIRS})
-target_link_libraries (gtk PRIVATE ${GTK3_LIBRARIES})
-install (TARGETS gtk DESTINATION ${GTK_DST_DIR})
-install (FILES ${GTK_SRC_DIR}/lib.eth DESTINATION ${GTK_DST_DIR})
+if (ENABLE_GTK)
+  FIND_PACKAGE(PkgConfig REQUIRED)
+  set (GTK_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/gtk)
+  set (GTK_DST_DIR lib/ether/gtk)
+  add_library (gtk SHARED ${GTK_SRC_DIR}/lib.c)
+  set_target_properties (gtk
+    PROPERTIES
+      POSITION_INDEPENDENT_CODE ON
+      PREFIX ""
+      OUTPUT_NAME "gtk")
+  pkg_check_modules (GTK3 REQUIRED gtk+-3.0)
+  #pkg_check_modules (GOBJECT2 REQUIRED gobject-2.0)
+  target_include_directories (gtk PRIVATE ${GTK3_INCLUDE_DIRS})
+  target_link_directories (gtk PRIVATE ${GTK3_LIBRARY_DIRS})
+  target_link_libraries (gtk PRIVATE ${GTK3_LIBRARIES})
+  install (TARGETS gtk DESTINATION ${GTK_DST_DIR})
+  install (FILES ${GTK_SRC_DIR}/lib.eth DESTINATION ${GTK_DST_DIR})
+endif (ENABLE_GTK)
 

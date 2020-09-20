@@ -7,6 +7,8 @@ all:
 				 -D CMAKE_INSTALL_PREFIX=`pwd`/Debug/install \
 				 -D BUILD_SHARED_LIBRARY=ON \
 				 -D BUILD_STATIC_LIBRARY=ON \
+				 -D ENABLE_GTK=NO \
+				 -D ENABLE_ARB=NO \
 				 -B Debug/build \
 				 -S .
 	@$(MAKE) -C Debug/build install
@@ -16,6 +18,8 @@ all:
 				 -D CMAKE_INSTALL_PREFIX=`pwd`/Release/install \
 				 -D BUILD_SHARED_LIBRARY=ON \
 				 -D BUILD_STATIC_LIBRARY=ON \
+				 -D ENABLE_GTK=NO \
+				 -D ENABLE_ARB=NO \
 				 -B Release/build \
 				 -S .
 	@$(MAKE) -C Release/build install
@@ -26,6 +30,8 @@ Release:
 				 -D CMAKE_INSTALL_PREFIX=`pwd`/Release/install \
 				 -D BUILD_SHARED_LIBRARY=ON \
 				 -D BUILD_STATIC_LIBRARY=ON \
+				 -D ENABLE_GTK=NO \
+				 -D ENABLE_ARB=NO \
 				 -B Release/build \
 				 -S .
 	@$(MAKE) -C Release/build install
@@ -36,6 +42,8 @@ Debug:
 				 -D CMAKE_INSTALL_PREFIX=`pwd`/Debug/install \
 				 -D BUILD_SHARED_LIBRARY=ON \
 				 -D BUILD_STATIC_LIBRARY=ON \
+				 -D ENABLE_GTK=NO \
+				 -D ENABLE_ARB=NO \
 				 -B Debug/build \
 				 -S .
 	@$(MAKE) -C Debug/build install
@@ -47,9 +55,9 @@ cleanall:
 	@rm -rfv Release Debug
 
 test: _test_Debug _test_Release
-_test_%: %
+_test_%:
 	@test -d $* && $(MAKE) -C $*/build test CTEST_OUTPUT_ON_FAILURE=1
 
 fuzzy: t/test.eth
-	@valgrind --leak-check=full ./Debug/install/bin/ether --log debug t/builtins.eth
-	@valgrind --leak-check=full ./Debug/install/bin/ether --log debug t/test.eth <<< $$(echo -e "1\n2\n")
+	valgrind --leak-check=full ./Debug/install/bin/ether --log=debug -Lt t/builtins.eth
+	valgrind --leak-check=full ./Debug/install/bin/ether --log=debug -Lt t/test.eth <<<$(shell echo -e "1\n2\n")

@@ -103,7 +103,10 @@ OPERATOR [-+%^.$:!<>*/=&|∘]+
 }
 
 ^"#!".*$
-"--".*$ { if (strncmp(yytext, "--[[", 4) == 0) REJECT; }
+"--".*$ {
+  if (strncmp(yytext, "--[""[", 4) == 0)
+    REJECT;
+}
 
 "--[[" { BEGIN(COMMENT); }
 <COMMENT>"--[[" { g_comment_cnt += 1; }

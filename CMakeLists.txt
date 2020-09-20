@@ -11,6 +11,10 @@ option (BUILD_SHARED_LIBRARY "Build shared library \"ether.so\"" OFF)
 option (BUILD_STATIC_LIBRARY "Build static library \"ether.a\"" OFF)
 option (DISABLE_BUILTINS "Disable all builtins" OFF)
 
+option (ENABLE_ARB "Build an Arb-module" ON)
+option (ENABLE_GTK "Build a Gtk-module" ON)
+option (ENABLE_REGEXP "Build a Regexp-module" ON)
+
 
 set (WARNING_FLAGS "-Wall -Werror -Wextra -Wno-unused -Wno-error=cpp")
 #set (WARNING_FLAGS "-Wfatal-errors ${WARNING_FLAGS}")
