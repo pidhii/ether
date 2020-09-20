@@ -598,6 +598,7 @@ _read_of(void)
   size_t nrd = fread(buf, 1, size, stream);
   if (nrd == 0)
   {
+    free(buf);
     if (feof(stream))
     {
       eth_unref(file);

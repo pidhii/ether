@@ -1,11 +1,32 @@
 --------------------------------------------------------------------------------
 -- Functions:
--- * chdir (C)
--- * access (C)
--- * getcwd (C)
--- * realpath (C)
+-- * chdir
+-- * access
+-- * getcwd
+-- * realpath
 --
 -- Values:
 -- * f_ok, r_ok, w_ok, x_ok
 
-()
+module =
+  let pub chdir = __chdir
+
+  let pub access =
+{.help|
+\e[1mUSAGE:\e[0m
+  access <path> <amode> -> boolean?
+
+\e[1mDESCRIPTION:\e[0m
+  The function shall chek the file named by  the  pathname  (possibly  relative)
+  \e[4mpath\e[0m for acessibility according to the bit pattern specified in \e[4mamode\e[0m.
+
+  The value of \e[4mamode\e[0m  is either  the bitwise-inclusive  OR  of  \`r_ok\`,  \`w_ok\`,
+  \`x_ok\` or existence test, \`f_ok\`.
+
+  See also man(3) access for complete documentation.
+|.help}
+    __access
+
+  let pub getcwd = __getcwd
+  let pub realpath = __realpath
+end

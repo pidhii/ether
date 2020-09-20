@@ -90,7 +90,9 @@ syn keyword ethBuiltinFunction input
 syn keyword ethBuiltinFunction print print_to newline
 syn keyword ethBuiltinFunction write_to write
 syn keyword ethBuiltinFunction read_line read_line_opt
-syn keyword ethBuiltinFunction read read_of read_line_of read_line_of_opt
+syn keyword ethBuiltinFunction read_line_of read_line_of_opt
+syn keyword ethBuiltinFunction read read_of
+syn keyword ethBuiltinFunction read_opt read_of_opt
 syn keyword ethBuiltinFunction read_file
 syn keyword ethBuiltinFunction tell seek
 

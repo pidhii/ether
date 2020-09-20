@@ -115,14 +115,12 @@ let pub open_pipe_in cmd = __popen cmd "r"
 let pub open_pipe_out cmd = __popen cmd "w"
 
 let pub read_line! = read_line_of stdin
-let pub read_line_opt! =
-  try Some read_line!
-  with End_of_file -> false
-let pub read_line_of_opt file =
-  try Some (read_line_of file)
-  with End_of_file -> false
+let pub read_line_opt! = try Some read_line!  with End_of_file -> false
+let pub read_line_of_opt file = try Some (read_line_of file) with End_of_file -> false
 
-let pub read! = read_of stdin
+let pub read = read_of stdin
+let pub read_opt n = try Some (read n) with End_of_file -> false
+let pub read_of_opt file n = try Some (read_of file n) with End_of_file -> false
 
 let pub print_to file x =
   if tuple? x then
@@ -155,6 +153,17 @@ let pub seek file pos =
 let pub system = compose_va __system format
 --let pub system = __system <<* format in
 
+let pub shell =
+  let aux cmd =
+    let pipe = open_pipe_in cmd in
+    let rec loop acc =
+      if let Some data = read_of_opt pipe 0x100
+        then loop (acc ++ data)
+        else acc
+    in
+    loop ""
+  in
+  compose_va aux format
 
 --------------------------------------------------------------------------------
 --                                Errors

@@ -75,20 +75,19 @@ _realpath(void)
 int
 ether_module(eth_module *mod, eth_env *topenv)
 {
-  int ret = 0;
-  eth_define(mod, "chdir", eth_create_proc(_chdir, 1, NULL, NULL));
-  // --
+  eth_define(mod, "__chdir", eth_create_proc(_chdir, 1, NULL, NULL));
+
   eth_define(mod, "f_ok", eth_num(F_OK));
   eth_define(mod, "r_ok", eth_num(R_OK));
   eth_define(mod, "w_ok", eth_num(W_OK));
   eth_define(mod, "x_ok", eth_num(X_OK));
-  eth_define(mod, "access", eth_create_proc(_access, 2, NULL, NULL));
-  eth_define(mod, "getcwd", eth_create_proc(_getcwd, 0, NULL, NULL));
-  eth_define(mod, "realpath", eth_create_proc(_realpath, 1, NULL, NULL));
+  eth_define(mod, "__access", eth_create_proc(_access, 2, NULL, NULL));
+  eth_define(mod, "__getcwd", eth_create_proc(_getcwd, 0, NULL, NULL));
+  eth_define(mod, "__realpath", eth_create_proc(_realpath, 1, NULL, NULL));
 
+  int ret = 0;
   if (not eth_load_module_from_script2(topenv, NULL, mod, "./lib.eth", NULL, mod))
     ret = -1;
-
   return ret;
 }
 
