@@ -35,6 +35,11 @@ let unlink path =
     then raise System_error;
 in
 
+let unlink_quite path =
+  unless system "rm -rf ~d" path == 0
+    then raise System_error;
+in
+
 let utc_date! =
   let pipe = open_pipe_in "date -u +'%x %X'" in
   let line = read_line_of pipe in
@@ -73,8 +78,22 @@ in
 let do_in dir thunk =
   let cwd = Os.getcwd! in
   Os.chdir dir;
-  thunk!;
+  (try thunk!  with e -> Os.chdir cwd; raise e);
   Os.chdir cwd;
+in
+
+let do_in_tempdir thunk =
+  let cwd = Os.getcwd! in
+
+  let tempdir = Os.mkdtemp "/tmp/dope-tmp.XXXXXX" in
+  Os.chdir tempdir;
+  let cleanup! =
+    unlink_quite tempdir;
+    Os.chdir cwd;
+  in
+
+  (try thunk! with e -> cleanup!; raise e);
+  cleanup!;
 in
 
 
@@ -114,7 +133,7 @@ let install dir args =
   mkdir moddir;
   -- Copy module sources
   main::files |> List.iter (file ->
-    copy_file (dir ++ "/" ++ file) (moddir ++ "/" ++ file)
+    copy_file (dir ++ "/" ++ file) (moddir ++ "/" ++ file);
   );
   printf "> all files copied\n";
 
@@ -195,18 +214,30 @@ let basename path =
 in
 
 let help! =
-  printf "usage: ~d OPTIONS [<command_line> ...]\n" (basename $ car command_line);
+  print "\e[1mUSAGE:\e[0m";
+  printf"  ~d COMMAND [OPTIONS]\n" (basename $ car command_line);
+  print "";
+  print "\e[1mCOMMANDS:\e[0m";
+  print "  help       h          Show this message.";
+  print "  install    i  <dir>   Install package.";
+  print "  uninstall  u  <name>  Uninstall package.";
+  print "  reinstall  r  <dir>   Reinstall package.";
+  print "  list  ls   l          List installed packages.";
+  print "";
+  print "  Furethermore, each command may contain additional options. For  instance  one";
+  print "  can check --help for any command to, probably, find out more.";
+in
+
+let help_help! =
+  print "\e[1mUSAGE:\e[0m";
+  printf"  ~d help [OPTIONS]\n" (basename $ car command_line);
   print "";
   print "\e[1mOPTIONS:\e[0m";
-  print "  --help       -h          Show this message.";
-  print$"  --help-dev               Show help for the library developper. It will display\n"
-      ++"                           information about installation procedure and  how  to\n"
-      ++"                           set up your library so that  it  could  be  installed\n"
-      ++"                           with this script.";
-  print "  --install    -i  <dir>   Install package.";
-  print "  --uninstall  -u  <name>  Uninstall package.";
-  print "  --reinstall  -r  <dir>   Reinstall package.";
-  print "  --list       -l          List installed packages.";
+  print "  --help   -h             Show this message.";
+  print$"  --dev                   Show help for the library developper. It will display\n"
+      ++"                          information about installation procedure and  how  to\n"
+      ++"                          set up your library so that  it  could  be  installed\n"
+      ++"                          with this script.";
 in
 
 let help_dev! =
@@ -259,22 +290,120 @@ be available via the \`command_line\`-variable; and the root directory --  via t
   system "LESS=-FX /usr/bin/less -R <<TEXT~dTEXT" text;
 in
 
+let install_help! =
+  print "\e[1mUSAGE:\e[0m";
+  printf"  ~d install [OPTIONS] [<command_line> ...]\n" (basename $ car command_line);
+  print "";
+  print "\e[1mOPTIONS:\e[0m";
+  print "  --help   -h             Show this message.";
+  print "  --git         <url>     Install linbrary from a remote Git repository.";
+in
+
 
 --------------------------------- Main -----------------------------------------
+let dopepath :: cmd :: command_line = command_line in
+try
+  if cmd eq "help" || cmd eq "h" then
+    let options =
+      [ {name = "dev", val = "dev", has_arg = false}
+      , {name = "help", val = "help", has_arg = false}
+      , {name = "h", val = "help", has_arg = false}
+      ]
+    in
+    let (opts, _) = CmdArg.get options command_line in
+    if List.assoc_opt "help" opts then help_help!
+    else if List.assoc_opt "dev" opts then help_dev!
+    else help!
+
+  else if cmd eq "list" || cmd eq "ls" || cmd eq "l" then
+    list_modules!
+
+  else if cmd eq "install" || cmd eq "i" then
+    let options =
+      [ {name = "help", val = "help", has_arg = false}
+      , {name = "h", val = "help", has_arg = false}
+      , {name = "git", val = "git", has_arg = false}
+      ]
+    in
+    let (opts, args) = CmdArg.get options command_line in
+    if List.assoc_opt "help" opts then install_help!
+    else if List.assoc_opt "git" opts then
+      if let url :: modargs = args then
+        let reponame =
+          if let [_, x] = String.match \\/([^\/]+).git$/ url then x
+          else if let [_, x] = String.match \\/([^\/]+)$/ url then x
+          else "__repository__"
+        in
+        do_in_tempdir (fn ->
+          if system "git clone ~d ~d" url reponame /= 0 then begin
+            eprintf "> error: failed to clone repository\n";
+            exit 1;
+          end else
+            install reponame modargs
+        )
+      else begin
+        eprintf "> error: missing module-directory path\n";
+        eprintf "> see `~d install --help`\n" (basename dopepath);
+        exit 1;
+      end
+    else
+      if let moddir :: modargs = args then install moddir modargs
+      else begin
+        eprintf "> error: missing module-directory path\n";
+        eprintf "> see `~d install --help`\n" (basename dopepath);
+        exit 1;
+      end
+
+  else if cmd eq "uninstall" || cmd eq "u" then
+    let options =
+      [ {name = "help", val = "help", has_arg = false}
+      , {name = "h", val = "help", has_arg = false}
+      ]
+    in
+    let (opts, args) = CmdArg.get options command_line in
+    if List.assoc_opt "help" opts then die "unimplemented"
+    else
+      let [modname] = args in
+      uninstall modname
+
+  else if cmd eq "reinstall" || cmd eq "r" then
+    let options =
+      [ {name = "help", val = "help", has_arg = false}
+      , {name = "h", val = "help", has_arg = false}
+      ]
+    in
+    let (opts, args) = CmdArg.get options command_line in
+    if List.assoc_opt "help" opts then die "unimplemented"
+    else
+      let modname :: modargs = args in
+      reinstall modname modargs
+
+  else begin
+    eprintf "> error: undefined command, ~w\n" cmd;
+    eprintf "> see `~d help` for avaliable commands\n" (basename dopepath);
+    exit 1;
+  end
+
+with e -> begin
+  eprintf "> failure\n";
+  exit 1;
+end;
+
+--[[
 let options =
   [
     -- Long options
-    {name = "help"     , val = "h", has_arg = false},
-    {name = "help-dev" , val = "hd",has_arg = false},
-    {name = "install"  , val = "i", has_arg = true },
-    {name = "uninstall", val = "u", has_arg = true },
-    {name = "reinstall", val = "r", has_arg = true },
-    {name = "list"     , val = "l", has_arg = false},
+    {name = "help", val = "h", has_arg = false},
+    {name = "help-dev", val = "hd",has_arg = false},
+    {name = "install", val = "i", has_arg = true},
+    {name = "uninstall", val = "u", has_arg = true},
+    {name = "reinstall", val = "r", has_arg = true},
+    {name = "list", val = "l", has_arg = false},
     -- Short options
     {name = "h", val = "h", has_arg = false},
-    {name = "i", val = "i", has_arg = true },
-    {name = "u", val = "u", has_arg = true },
-    {name = "r", val = "r", has_arg = true },
+    {name = "i", val = "i", has_arg = true},
+    {name = "u", val = "u", has_arg = true},
+    {name = "r", val = "r", has_arg = true},
     {name = "l", val = "l", has_arg = false},
   ]
 in
@@ -295,9 +424,6 @@ in
 
 List.iter (fn (opt, val) ->
   try
-    help!              if opt eq "h" else
-    help_dev!          if opt eq "hd"else
-    install val args   if opt eq "i" else
     uninstall val      if opt eq "u" else
     reinstall val args if opt eq "r" else
     list_modules!      if opt eq "l" else ()
@@ -307,4 +433,5 @@ List.iter (fn (opt, val) ->
 ) opts;
 
 ()
+--]]
 

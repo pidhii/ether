@@ -29,4 +29,19 @@ module =
 
   let pub getcwd = __getcwd
   let pub realpath = __realpath
+
+  let pub mkdtemp =
+{.help|
+\e[1mUSAGE:\e[0m
+  mkdtemp <template-string> -> string?
+
+\e[1mDESCRIPTION:\e[0m
+  Create temporary directory with name created from \e[4mtemplate-string\e[0m  and  return
+  obtained path.
+
+\e[1mARGUMENTS:\e[0m
+- \e[4mtemplate-string\e[0m: Template path for the  directory  ending  with  six
+  'X' characters.
+|.help}
+    __mkdtemp
 end
