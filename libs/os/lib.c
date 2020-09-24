@@ -51,7 +51,7 @@ _getcwd(void)
   if (not getcwd(buf, PATH_MAX))
   {
     eth_t err = eth_sym(eth_errno_to_str(errno));
-    return System_error(err);
+    return eth_exn(System_error(err));
   }
   return eth_str(buf);
 }
