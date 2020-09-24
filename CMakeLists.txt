@@ -2,55 +2,70 @@ cmake_minimum_required (VERSION 3.15)
 project (ether VERSION 0.1.0)
 enable_language (C)
 
-#include (ExternalProject)
+
 find_package (BISON REQUIRED)
 find_package (FLEX REQUIRED)
 
 
+################################################################################
+#                                  OPTIONS
+#
+# ------------------------------- Libraries ------------------------------------
 option (BUILD_SHARED_LIBRARY "Build shared library \"ether.so\"" OFF)
 option (BUILD_STATIC_LIBRARY "Build static library \"ether.a\"" OFF)
+# -------------------------------- Modules ------------------------------------
+option (ENABLE_ARB "Build an Arb-module" YES)
+option (ENABLE_GTK "Build a Gtk-module" YES)
+option (ENABLE_REGEXP "Build a Regexp-module" YES)
+# ------------------------------ Dev-Options -----------------------------------
 option (DISABLE_BUILTINS "Disable all builtins" OFF)
 
-option (ENABLE_ARB "Build an Arb-module" ON)
-option (ENABLE_GTK "Build a Gtk-module" ON)
-option (ENABLE_REGEXP "Build a Regexp-module" ON)
 
-
+################################################################################
+#                                   FLAGS
+#
 set (WARNING_FLAGS "-Wall -Werror -Wextra -Wno-unused -Wno-error=cpp")
-#set (WARNING_FLAGS "-Wfatal-errors ${WARNING_FLAGS}")
-file (GLOB ETHER_SRC
-  ${CMAKE_SOURCE_DIR}/src/*.c
-  ${CMAKE_SOURCE_DIR}/codeine/src/*.c)
-set (ETHER_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
-
+# ------------------------------ Common Flags ----------------------------------
 set (CMAKE_C_STANDARD 99)
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${WARNING_FLAGS} -rdynamic")
-set (CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Og -ggdb -DETH_DEBUG_MODE")
-set (CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -Ofast -flto")
-
+# --
 if (DISABLE_BUILTINS)
   set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DETHER_DISABLE_BUILTINS=1")
 endif (DISABLE_BUILTINS)
-
-include_directories (${ETHER_INCLUDE_DIR})
-include_directories (${CMAKE_SOURCE_DIR}/codeine/include)
-
-set_source_files_properties(${CMAKE_SOURCE_DIR}/src/vm.c
-  PROPERTIES COMPILE_FLAGS "-fno-gcse -fno-crossjumping")
-
-string(TOUPPER ${CMAKE_BUILD_TYPE} BLDTYPE)
+# --
+string (TOUPPER "${CMAKE_BUILD_TYPE}" BLDTYPE)
 add_definitions (
-  -DETHER_VERSION="${PROJECT_VERSION}"
+  -DETHER_VERSION="${CMAKE_PROJECT_VERSION}"
   -DETHER_BUILD="${CMAKE_BUILD_TYPE}"
   -DETHER_BUILD_FLAGS="${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_${BLDTYPE}}"
 )
-
+# --
 if (CMAKE_INSTALL_PREFIX)
-  add_definitions (
-    -DETHER_PREFIX="${CMAKE_INSTALL_PREFIX}"
-  )
+  add_definitions (-DETHER_PREFIX="${CMAKE_INSTALL_PREFIX}")
 endif (CMAKE_INSTALL_PREFIX)
+# --
+set_source_files_properties(${CMAKE_SOURCE_DIR}/src/vm.c
+  PROPERTIES COMPILE_FLAGS "-fno-gcse -fno-crossjumping")
+# ------------------------------- Debug Flags ----------------------------------
+set (CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Og -ggdb -DETH_DEBUG_MODE")
+# ------------------------------ Release Flags ---------------------------------
+set (CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -Ofast -flto")
 
+
+################################################################################
+#                                  HEADERS
+#
+set (ETHER_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
+include_directories (${ETHER_INCLUDE_DIR})
+include_directories (${CMAKE_SOURCE_DIR}/codeine/include)
+
+
+################################################################################
+#                                SOURCE FILES
+#
+file (GLOB ETHER_SRC
+  ${CMAKE_SOURCE_DIR}/src/*.c
+  ${CMAKE_SOURCE_DIR}/codeine/src/*.c)
 set (SYNTAX_DIR ${CMAKE_SOURCE_DIR}/src/syntax)
 BISON_TARGET (parser ${SYNTAX_DIR}/parser.y ${CMAKE_BINARY_DIR}/parser.c)
 FLEX_TARGET (scanner ${SYNTAX_DIR}/scanner.l ${CMAKE_BINARY_DIR}/scanner.c)
