@@ -161,7 +161,9 @@ let pub shell =
         then loop (acc ++ data)
         else acc
     in
-    loop ""
+    let out = loop "" in
+    if close pipe == 0 then out
+    else raise Failure
   in
   compose_va aux format
 

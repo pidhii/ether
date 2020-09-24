@@ -366,13 +366,13 @@ _popen(void)
   eth_t path = eth_arg2(args, eth_string_type);
   eth_t mode = eth_arg2(args, eth_string_type);
   eth_t file = eth_open_pipe(eth_str_cstr(path), eth_str_cstr(mode));
-  if (file == NULL)
+  if (file == NULL or ferror(eth_get_file_stream(file)))
   {
     eth_t exn;
     switch (errno)
     {
       case EINVAL: exn = eth_exn(eth_invalid_argument()); break;
-      default: exn = eth_system_error(errno); break;
+      default: exn = eth_exn(eth_system_error(errno)); break;
     }
     eth_return(args, exn);
   }
