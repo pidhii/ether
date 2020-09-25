@@ -3,7 +3,8 @@ includedir=${prefix}/include
 libdir=${prefix}/lib
 
 Name: ether
-Description: Interpreter
+Description: Interpreter for Ether language
+URL: https://github.com/pidhii/ether
 Version: @PROJECT_VERSION@
 Cflags: -I${includedir}
-Libs: -L${libdir} -lether -lpcre -lm
+Libs: -L${libdir} -lether -lpcre -lm -ldl
