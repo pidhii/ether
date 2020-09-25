@@ -32,8 +32,9 @@ let string_tests =
         sub str (6...) eq "World!",
         sub str (...4) eq "Hello",
         sub str (4..6) eq "o W"]),
+    ("strstr", fn -> strstr "a;b,c" ";" == 1 && not strstr_opt "" ","),
     ("find", fn ->
-      find "45" "123456" eq 3 && find \[3-6]/ "123456" eq 2),
+      find "45" "123456" eq (3, 3+2) && find \[3-5]+/ "123456" eq (2, 2+3)),
     ("match", fn -> match \[^^]\K(\w+)\s+(\w)/ "a bu c" eq ["bu c", "bu", "c"]),
     ("gsub", fn -> gsub \\s+/ (const "-") "a   s f  f f   " eq "a-s-f-f-f-"),
     ("split", fn -> split \\s+/ "asd asdf asdf " eq ["asd", "asdf", "asdf", ""]),

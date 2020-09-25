@@ -15,7 +15,7 @@ let get_options cfg os =
     else (kws, List.rev pos)
 
   and handle_long_option o os kws pos =
-    if let Some brk = String.find_opt "=" o then
+    if let Some brk = String.strstr_opt o "=" then
       -- Long option with '=' 
       let lopt = String.sub o (2 .. brk-1) in
       let {has_arg, val} = get_rules lopt in

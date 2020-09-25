@@ -487,7 +487,8 @@ _find_regexp(void)
   else if (n < 0)
     eth_return(args, eth_false);
   else
-    eth_return(args, Some(eth_num(eth_ovector()[0])));
+    eth_return(args,
+        eth_tup2(eth_num(eth_ovector()[0]), eth_num(eth_ovector()[1])));
 }
 
 static eth_t
