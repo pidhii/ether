@@ -14,9 +14,24 @@
 #define eth_unlikely(expr) __builtin_expect((expr), 0)
 
 #ifdef __cplusplus
-# define ETH_EXTERN extern "C"
-#else
-# define ETH_EXTERN extern
+
+/* C++ does not have a 'restrict'-keyword by standard, also most compilers do
+ * implement it. */
+# ifdef __GNUC__
+#   define restrict __restrict__
+# else
+#   warning "No support for `restrict'-qualifier"
+# endif
+
+/* Disable mungling during linkage. */
+extern "C" {
+
+/* I used 'try', 'catch' and 'throw' keywords in the header (shame on me), so
+ * here we temporary hide these. */
+# define try   _try
+# define catch _catch
+# define throw _throw
+
 #endif
 
 
@@ -27,9 +42,6 @@ typedef int32_t eth_sword_t;
 typedef uint64_t eth_dword_t;
 typedef int64_t eth_sdword_t;
 typedef uint32_t eth_hash_t;
-
-typedef enum eth_ir_tag eth_ir_tag;
-typedef enum eth_insn_tag eth_insn_tag;
 
 typedef struct eth_type eth_type;
 typedef struct eth_magic eth_magic;
@@ -75,7 +87,7 @@ enum eth_log_level {
   ETH_LOG_ERROR,
 };
 
-ETH_EXTERN
+extern
 enum eth_log_level eth_log_level;
 
 void
@@ -193,22 +205,22 @@ eth_unop_name(eth_unop op);
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                            CALL PROPAGATION
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-ETH_EXTERN
+extern
 eth_t *eth_stack;
 
-ETH_EXTERN
+extern
 eth_t *eth_sp;
 
-ETH_EXTERN
+extern
 int eth_nargs;
 
-ETH_EXTERN
+extern
 eth_function *eth_this;
 
-ETH_EXTERN
+extern
 ssize_t eth_c_stack_size;
 
-ETH_EXTERN
+extern
 char *eth_c_stack_start;
 
 static inline void
@@ -439,7 +451,7 @@ struct eth_header {
 static inline void
 eth_init_header(void *ptr, eth_type *type)
 {
-  eth_header *hdr = ptr;
+  eth_header *hdr = (eth_header*)ptr;
   hdr->type = type;
   hdr->rc = 0;
   hdr->magic = ETH_MAGIC_NONE;
@@ -454,7 +466,7 @@ eth_force_delete(eth_t x)
 static inline void
 eth_delete(eth_t x)
 {
-  ETH_EXTERN void _eth_delete_magic(eth_t x);
+  extern void _eth_delete_magic(eth_t x);
 
   if (eth_likely(x->magic == -1))
     eth_force_delete(x);
@@ -549,7 +561,7 @@ typedef float eth_number_t;
 # error Undefined value of ETH_NUMBER_TYPE.
 #endif
 
-ETH_EXTERN
+extern
 eth_type *eth_number_type;
 #define eth_is_num(x) ((x)->type == eth_number_type)
 
@@ -563,7 +575,7 @@ typedef struct {
 static inline eth_t __attribute__((malloc))
 eth_create_number(eth_number_t val)
 {
-  eth_number *num = eth_alloc_h2();
+  eth_number *num = (eth_number*)eth_alloc_h2();
   eth_init_header(num, eth_number_type);
   num->val = val;
   return ETH(num);
@@ -619,7 +631,7 @@ _ETH_TEST_SNUM(long_double, LDBL)
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                               function
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-ETH_EXTERN
+extern
 eth_type *eth_function_type;
 #define eth_is_fn(x) ((x)->type == eth_function_type)
 
@@ -709,7 +721,7 @@ eth_apply(eth_t fn, int narg)
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                               exception
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-ETH_EXTERN
+extern
 eth_type *eth_exception_type;
 
 static inline bool
@@ -740,7 +752,7 @@ eth_push_trace(eth_t exn, eth_location *loc);
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                              exit-object
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-ETH_EXTERN
+extern
 eth_type *eth_exit_type;
 
 typedef struct {
@@ -755,7 +767,7 @@ eth_create_exit_object(int status);
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                string
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-ETH_EXTERN
+extern
 eth_type *eth_string_type;
 #define eth_is_str(x) ((x)->type == eth_string_type)
 
@@ -787,7 +799,7 @@ eth_create_string_from_char(char c);
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                               regexp
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-ETH_EXTERN
+extern
 eth_type *eth_regexp_type;
 
 typedef struct eth_regexp eth_regexp;
@@ -813,16 +825,16 @@ eth_exec_regexp(eth_t x, const char *str, int len, int opts);
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                               boolean
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-ETH_EXTERN
+extern
 eth_type *eth_boolean_type;
 
-ETH_EXTERN
+extern
 eth_t eth_true;
 
-ETH_EXTERN
+extern
 eth_t eth_false;
 
-ETH_EXTERN
+extern
 eth_t eth_false_true[2];
 
 static inline eth_t
@@ -834,16 +846,16 @@ eth_boolean(bool val)
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                nil
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-ETH_EXTERN
+extern
 eth_type *eth_nil_type;
 
-ETH_EXTERN
+extern
 eth_t eth_nil;
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                               pair
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-ETH_EXTERN
+extern
 eth_type *eth_pair_type;
 #define eth_is_pair(x) ((x)->type == eth_pair_type)
 
@@ -857,7 +869,7 @@ typedef struct {
 static inline eth_t __attribute__((malloc))
 eth_cons_noref(eth_t car, eth_t cdr)
 {
-  eth_pair *pair = eth_alloc_h2();
+  eth_pair *pair = (eth_pair*)eth_alloc_h2();
   eth_init_header(pair, eth_pair_type);
   pair->car = car;
   pair->cdr = cdr;
@@ -867,7 +879,7 @@ eth_cons_noref(eth_t car, eth_t cdr)
 static inline eth_t __attribute__((malloc))
 eth_cons(eth_t car, eth_t cdr)
 {
-  eth_pair *pair = eth_alloc_h2();
+  eth_pair *pair = (eth_pair*)eth_alloc_h2();
   eth_init_header(pair, eth_pair_type);
   eth_ref(pair->car = car);
   eth_ref(pair->cdr = cdr);
@@ -923,7 +935,7 @@ eth_is_proper_list(eth_t l)
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                              symbol
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-ETH_EXTERN
+extern
 eth_type *eth_symbol_type;
 
 eth_t
@@ -982,7 +994,7 @@ eth_create_tuple_2(eth_t _1, eth_t _2)
   static eth_type *type = NULL;
   if (eth_unlikely(type == NULL))
     type = eth_tuple_type(2);
-  eth_tuple *tup = eth_alloc_h2();
+  eth_tuple *tup = (eth_tuple*)eth_alloc_h2();
   eth_init_header(tup, type);
   eth_ref(tup->data[0] = _1);
   eth_ref(tup->data[1] = _2);
@@ -996,7 +1008,7 @@ eth_create_tuple_3(eth_t _1, eth_t _2, eth_t _3)
   static eth_type *type = NULL;
   if (eth_unlikely(type == NULL))
     type = eth_tuple_type(3);
-  eth_tuple *tup = eth_alloc_h3();
+  eth_tuple *tup = (eth_tuple*)eth_alloc_h3();
   eth_init_header(tup, type);
   eth_ref(tup->data[0] = _1);
   eth_ref(tup->data[1] = _2);
@@ -1011,7 +1023,7 @@ eth_create_tuple_4(eth_t _1, eth_t _2, eth_t _3, eth_t _4)
   static eth_type *type = NULL;
   if (eth_unlikely(type == NULL))
     type = eth_tuple_type(4);
-  eth_tuple *tup = eth_alloc_h4();
+  eth_tuple *tup = (eth_tuple*)eth_alloc_h4();
   eth_init_header(tup, type);
   eth_ref(tup->data[0] = _1);
   eth_ref(tup->data[1] = _2);
@@ -1027,7 +1039,7 @@ eth_create_tuple_5(eth_t _1, eth_t _2, eth_t _3, eth_t _4, eth_t _5)
   static eth_type *type = NULL;
   if (eth_unlikely(type == NULL))
     type = eth_tuple_type(5);
-  eth_tuple *tup = eth_alloc_h5();
+  eth_tuple *tup = (eth_tuple*)eth_alloc_h5();
   eth_init_header(tup, type);
   eth_ref(tup->data[0] = _1);
   eth_ref(tup->data[1] = _2);
@@ -1044,7 +1056,7 @@ eth_create_tuple_6(eth_t _1, eth_t _2, eth_t _3, eth_t _4, eth_t _5, eth_t _6)
   static eth_type *type = NULL;
   if (eth_unlikely(type == NULL))
     type = eth_tuple_type(6);
-  eth_tuple *tup = eth_alloc_h6();
+  eth_tuple *tup = (eth_tuple*)eth_alloc_h6();
   eth_init_header(tup, type);
   eth_ref(tup->data[0] = _1);
   eth_ref(tup->data[1] = _2);
@@ -1099,10 +1111,10 @@ eth_destroy_record_hn(eth_type *type, eth_t x);
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                 file
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-ETH_EXTERN
+extern
 eth_type *eth_file_type;
 
-ETH_EXTERN
+extern
 eth_t eth_stdin, eth_stdout, eth_stderr;
 
 eth_t
@@ -1126,7 +1138,7 @@ eth_get_file_stream(eth_t x);
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                ranges
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-ETH_EXTERN
+extern
 eth_type *eth_rangelr_type, *eth_rangel_type, *eth_ranger_type;
 
 typedef struct {
@@ -1159,7 +1171,7 @@ eth_is_range(eth_t x)
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                 ref
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-ETH_EXTERN
+extern
 eth_type *eth_strong_ref_type,
          *eth_weak_ref_type;
 
@@ -1193,7 +1205,7 @@ eth_create_weak_ref(eth_t init);
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                               vector
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-ETH_EXTERN
+extern
 eth_type *eth_vector_type;
 
 #define eth_is_vec(x) ((x)->type == eth_vector_type)
@@ -1814,7 +1826,7 @@ eth_ir_record_pattern(int varid, size_t const ids[],
 void
 eth_destroy_ir_pattern(eth_ir_pattern *pat);
 
-enum eth_ir_tag {
+typedef enum {
   ETH_IR_ERROR,
   ETH_IR_CVAL,
   ETH_IR_VAR,
@@ -1832,7 +1844,7 @@ enum eth_ir_tag {
   ETH_IR_MKRCRD,
   ETH_IR_UPDATE,
   ETH_IR_THROW,
-};
+} eth_ir_tag;
 
 typedef struct {
   int h, w;
@@ -2240,7 +2252,7 @@ eth_create_switch(const eth_mtree_case L[], int n);
 void
 eth_destroy_mtree(eth_mtree *t);
 
-enum eth_insn_tag {
+typedef enum {
   ETH_INSN_NOP,
   ETH_INSN_CVAL,
   ETH_INSN_APPLY,
@@ -2265,7 +2277,7 @@ enum eth_insn_tag {
   ETH_INSN_TRY,
   ETH_INSN_GETEXN,
   ETH_INSN_MKRCRD,
-};
+} eth_insn_tag;
 
 typedef enum {
   ETH_TEST_NOTFALSE,
@@ -2763,5 +2775,14 @@ eth_invalid_argument();
 
 eth_t
 eth_failure();
+
+#ifdef __cplusplus
+} /* extern "C" */
+
+/* Restore 'try', 'catch' and 'throw'. */
+# undef try
+# undef catch
+# undef throw
+#endif
 
 #endif
