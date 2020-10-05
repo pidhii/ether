@@ -107,6 +107,19 @@ eth_open(const char *path, const char *mod)
 }
 
 eth_t
+eth_open_fd(int fd, const char *mod)
+{
+  FILE *stream = fdopen(fd, mod);
+  if (stream == NULL)
+    return NULL;
+  file *f = malloc(sizeof(file));
+  eth_init_header(f, eth_file_type);
+  f->stream = stream;
+  f->flag = OPEN;
+  return ETH(f);
+}
+
+eth_t
 eth_open_pipe(const char *command, const char *mod)
 {
   FILE *stream = popen(command, mod);

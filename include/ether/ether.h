@@ -1121,6 +1121,9 @@ eth_t
 eth_open(const char *path, const char *mod);
 
 eth_t
+eth_open_fd(int fd, const char *mod);
+
+eth_t
 eth_open_pipe(const char *command, const char *mod);
 
 int
