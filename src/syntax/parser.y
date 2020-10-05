@@ -1047,6 +1047,12 @@ ModuleBody
     }
     LOC($$, @1);
   }
+  | USING CapIdent AS CAPSYMBOL ModuleBody {
+    $$ = eth_ast_import($2, $4, NULL, 0, $5);
+    free($2);
+    free($4);
+    LOC($$, @1);
+  }
   | MODULE CAPSYMBOL '=' ModuleBody END ModuleBody {
     eth_ast *mod = eth_ast_module($2, $4);
     LOC(mod, @1);
