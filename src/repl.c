@@ -12,6 +12,8 @@ set_pub(eth_ast_pattern *pat)
       break;
 
     case ETH_PATTERN_IDENT:
+      if (not pat->ident.attr)
+        eth_ref_attr(pat->ident.attr = eth_create_attr(0));
       pat->ident.attr->flag |= ETH_ATTR_PUB;
       break;
 

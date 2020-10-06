@@ -1517,7 +1517,8 @@ struct eth_ast_pattern {
   union {
     struct {
       char *str; /**< Identifier string */
-      eth_attr *attr; /**< Identifier attribute (see eth_attr_t) */
+      eth_attr *attr; /**< Identifier attribute (see eth_attr_t).
+                       * @note May be set to NULL. */
     } ident; /**< @brief Identifier pattern */
 
     struct {
