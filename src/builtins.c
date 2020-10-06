@@ -609,7 +609,7 @@ _read_of(void)
     {
       eth_unref(file);
       eth_unref(n);
-      return eth_system_error(0);
+      return eth_exn(eth_system_error(0));
     }
   }
   eth_unref(file);
@@ -717,6 +717,18 @@ _seek(void)
     }
   }
   eth_return(args, eth_nil);
+}
+
+static eth_t
+_flush(void)
+{
+  eth_use_variant(System_error);
+  eth_args args = eth_start(1);
+  eth_t file = eth_arg2(args, eth_file_type);
+  if (fflush(eth_get_file_stream(file)) == EOF)
+    eth_throw(args, System_error(eth_str(eth_errno_to_str(errno))));
+  else
+    eth_return(args, eth_nil);
 }
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -1110,6 +1122,7 @@ _eth_init_builtins(void)
   eth_define(g_mod,      "input", eth_create_proc(     _input, 1, NULL, NULL));
   eth_define(g_mod,       "tell", eth_create_proc(      _tell, 1, NULL, NULL));
   eth_define(g_mod,     "__seek", eth_create_proc(      _seek, 3, NULL, NULL));
+  eth_define(g_mod,      "flush", eth_create_proc(     _flush, 1, NULL, NULL));
   // ---
   eth_define(g_mod,   "__system", eth_create_proc(    _system, 1, NULL, NULL));
   // ---
