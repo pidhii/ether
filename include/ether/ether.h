@@ -43,6 +43,32 @@ typedef uint64_t eth_dword_t;
 typedef int64_t eth_sdword_t;
 typedef uint32_t eth_hash_t;
 
+#define ETH_NUMBER_LONGDOUBLE 1
+#define ETH_NUMBER_DOUBLE 2
+#define ETH_NUMBER_FLOAT 3
+
+#ifndef ETH_NUMBER_TYPE
+# define ETH_NUMBER_TYPE ETH_NUMBER_LONGDOUBLE
+#endif
+#if ETH_NUMBER_TYPE == ETH_NUMBER_LONGDOUBLE
+typedef long double eth_number_t;
+# define eth_mod fmodl
+# define eth_pow powl
+# define eth_strtonum strtold
+#elif ETH_NUMBER_TYPE == ETH_NUMBER_DOUBLE
+typedef double eth_number_t;
+# define eth_mod fmod
+# define eth_pow pow
+# define eth_strtonum strtod
+#elif ETH_NUMBER_TYPE == ETH_NUMBER_FLOAT
+typedef float eth_number_t;
+# define eth_mod fmodf
+# define eth_pow powf
+# define eth_strtonum strtof
+#else
+# error Undefined value of ETH_NUMBER_TYPE.
+#endif
+
 typedef struct eth_type eth_type;
 typedef struct eth_magic eth_magic;
 typedef struct eth_header eth_header;
@@ -319,7 +345,7 @@ typedef struct {
 #define ETH_TFLAG_TUPLE   (ETH_TFLAG_PLAIN | 1 << 1)
 #define ETH_TFLAG_RECORD  (ETH_TFLAG_PLAIN | 1 << 2)
 #define ETH_TFLAG_VARIANT (ETH_TFLAG_PLAIN | 1 << 3)
-#define ETH_TFLAG_OBJECT  (ETH_TFLAG_RECORD | 1 << 4)
+/*#define ETH_TFLAG_OBJECT  (ETH_TFLAG_RECORD | 1 << 4)*/
 
 struct eth_type {
   char *name;
@@ -328,6 +354,11 @@ struct eth_type {
   void (*write)(eth_type *type, eth_t x, FILE *out);
   void (*display)(eth_type *type, eth_t x, FILE *out);
   bool (*equal)(eth_type *type, eth_t x, eth_t y);
+
+  eth_t (*to_number)(eth_type *type, eth_t x);
+  eth_t (*to_function)(eth_type *type, eth_t x);
+  eth_t (*to_string)(eth_type *type, eth_t x);
+  eth_t (*to_pair)(eth_type *type, eth_t x);
 
   uint8_t flag;
 
@@ -341,6 +372,9 @@ struct eth_type {
 
 void
 eth_default_write(eth_type *type, eth_t x, FILE *out);
+
+eth_t
+eth_cast_id(eth_type *type, eth_t x);
 
 eth_type* __attribute__((malloc))
 eth_create_type(const char *name);
@@ -534,33 +568,6 @@ eth_drop_out(eth_scp *scp);
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                               number
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-#define ETH_NUMBER_LONGDOUBLE 1
-#define ETH_NUMBER_DOUBLE 2
-#define ETH_NUMBER_FLOAT 3
-
-#ifndef ETH_NUMBER_TYPE
-# define ETH_NUMBER_TYPE ETH_NUMBER_LONGDOUBLE
-#endif
-
-#if ETH_NUMBER_TYPE == ETH_NUMBER_LONGDOUBLE
-typedef long double eth_number_t;
-# define eth_mod fmodl
-# define eth_pow powl
-# define eth_strtonum strtold
-#elif ETH_NUMBER_TYPE == ETH_NUMBER_DOUBLE
-typedef double eth_number_t;
-# define eth_mod fmod
-# define eth_pow pow
-# define eth_strtonum strtod
-#elif ETH_NUMBER_TYPE == ETH_NUMBER_FLOAT
-typedef float eth_number_t;
-# define eth_mod fmodf
-# define eth_pow powf
-# define eth_strtonum strtof
-#else
-# error Undefined value of ETH_NUMBER_TYPE.
-#endif
-
 extern
 eth_type *eth_number_type;
 #define eth_is_num(x) ((x)->type == eth_number_type)
@@ -679,8 +686,8 @@ struct eth_function {
 
 
 eth_t __attribute__((malloc))
-eth_create_proc(eth_t (*f)(void), int n, void *data, void (*dtor)(void*));
-#define eth_proc eth_create_proc
+eth_create_proc(eth_t (*f)(void), int n, void *data, void (*dtor)(void*), ...);
+#define eth_proc(...) eth_create_proc(__VA_ARGS__, 0, 0, 0)
 
 eth_t __attribute__((malloc))
 eth_create_clos(eth_source *src, eth_bytecode *bc, eth_t *cap, int ncap, int arity);

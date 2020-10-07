@@ -85,24 +85,33 @@ _mkdtemp(void)
     eth_return(args, eth_str(buf));
 }
 
+static eth_t
+_fork(void)
+{
+  int pid = fork();
+  return pid < 0 ? eth_exn(eth_system_error(errno)) : eth_num(pid);
+}
+
 int
 ether_module(eth_module *mod, eth_env *topenv)
 {
-  eth_define(mod, "__chdir", eth_create_proc(_chdir, 1, NULL, NULL));
+  eth_define(mod, "__chdir", eth_proc(_chdir, 1));
 
   eth_define(mod, "f_ok", eth_num(F_OK));
   eth_define(mod, "r_ok", eth_num(R_OK));
   eth_define(mod, "w_ok", eth_num(W_OK));
   eth_define(mod, "x_ok", eth_num(X_OK));
-  eth_define(mod, "__access", eth_create_proc(_access, 2, NULL, NULL));
-  eth_define(mod, "__getcwd", eth_create_proc(_getcwd, 0, NULL, NULL));
-  eth_define(mod, "__realpath", eth_create_proc(_realpath, 1, NULL, NULL));
+  eth_define(mod, "__access", eth_proc(_access, 2));
+  eth_define(mod, "__getcwd", eth_proc(_getcwd));
+  eth_define(mod, "__realpath", eth_proc(_realpath, 1));
 
-  eth_define(mod, "__mkdtemp", eth_create_proc(_mkdtemp, 1, NULL, NULL));
+  eth_define(mod, "__mkdtemp", eth_proc(_mkdtemp, 1));
 
-  int ret = 0;
-  if (not eth_load_module_from_script2(topenv, NULL, mod, "./lib.eth", NULL, mod))
-    ret = -1;
-  return ret;
+  eth_define(mod, "__fork", eth_proc(_fork));
+
+  if (not eth_add_module_script(mod, "./lib.eth", topenv))
+    return -1;
+
+  return 0;
 }
 

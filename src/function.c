@@ -107,7 +107,7 @@ create_function(void)
 }
 
 eth_t
-eth_create_proc(eth_t (*f)(void), int n, void *data, void (*dtor)(void*))
+eth_create_proc(eth_t (*f)(void), int n, void *data, void (*dtor)(void*), ...)
 {
   eth_function *func = create_function();
   func->islam = false;

@@ -12,7 +12,7 @@ find_package (FLEX REQUIRED)
 #
 # ------------------------------- Libraries ------------------------------------
 option (BUILD_SHARED_LIBRARY "Build shared library \"ether.so\"" OFF)
-option (BUILD_STATIC_LIBRARY "Build static library \"ether.a\"" OFF)
+option (BUILD_STATIC_LIBRARY "Build static library \"ether.a\"" ON)
 # -------------------------------- Modules ------------------------------------
 option (ENABLE_ARB "Build an Arb-module" YES)
 option (ENABLE_GTK "Build a Gtk-module" YES)

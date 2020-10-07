@@ -25,7 +25,7 @@ eth_module*
 eth_create_module(const char *name)
 {
   eth_module *mod = malloc(sizeof(eth_module));
-  mod->name = strdup(name);
+  mod->name = name ? strdup(name) : strdup("<unnamed-module>");
   mod->ndefs = 0;
   mod->defscap = 0x10;
   mod->defs = malloc(sizeof(eth_def) * mod->defscap);

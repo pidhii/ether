@@ -19,6 +19,13 @@ default_display(eth_type *type, eth_t x, FILE *stream)
   type->write(type, x, stream);
 }
 
+static eth_t
+cast_error(eth_type* type, eth_t x)
+{
+  eth_use_symbol(Cast_error);
+  return eth_exn(Cast_error);
+}
+
 static eth_type*
 create_type(const char *name, int nfields)
 {
@@ -27,6 +34,10 @@ create_type(const char *name, int nfields)
   type->destroy = default_destroy;
   type->write = eth_default_write;
   type->display = default_display;
+  type->to_number = cast_error;
+  type->to_function = cast_error;
+  type->to_string = cast_error;
+  type->to_pair = cast_error;
   type->equal = NULL;
   type->nfields = 0;
   type->fields = NULL;
@@ -102,6 +113,12 @@ void
 eth_default_write(eth_type *type, eth_t x, FILE *out)
 {
   fprintf(out, "<%s %p>", type->name, x);
+}
+
+eth_t
+eth_cast_id(eth_type *type, eth_t x)
+{
+  return x;
 }
 
 void

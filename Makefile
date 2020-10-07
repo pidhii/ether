@@ -5,8 +5,6 @@ all:
 	@mkdir -p Debug/build
 	@cmake -D CMAKE_BUILD_TYPE=Debug \
 				 -D CMAKE_INSTALL_PREFIX=`pwd`/Debug/install \
-				 -D BUILD_SHARED_LIBRARY=ON \
-				 -D BUILD_STATIC_LIBRARY=ON \
 				 -D ENABLE_GTK=NO \
 				 -D ENABLE_ARB=NO \
 				 -B Debug/build \
@@ -16,8 +14,6 @@ all:
 	@mkdir -p Release/build
 	@cmake -D CMAKE_BUILD_TYPE=Release \
 				 -D CMAKE_INSTALL_PREFIX=`pwd`/Release/install \
-				 -D BUILD_SHARED_LIBRARY=ON \
-				 -D BUILD_STATIC_LIBRARY=ON \
 				 -D ENABLE_GTK=NO \
 				 -D ENABLE_ARB=NO \
 				 -B Release/build \
@@ -29,7 +25,6 @@ Release:
 	@cmake -D CMAKE_BUILD_TYPE=Release \
 				 -D CMAKE_INSTALL_PREFIX=`pwd`/Release/install \
 				 -D BUILD_SHARED_LIBRARY=ON \
-				 -D BUILD_STATIC_LIBRARY=ON \
 				 -D ENABLE_GTK=NO \
 				 -D ENABLE_ARB=NO \
 				 -B Release/build \
@@ -40,8 +35,6 @@ Debug:
 	@mkdir -p Debug/build
 	@cmake -D CMAKE_BUILD_TYPE=Debug \
 				 -D CMAKE_INSTALL_PREFIX=`pwd`/Debug/install \
-				 -D BUILD_SHARED_LIBRARY=ON \
-				 -D BUILD_STATIC_LIBRARY=ON \
 				 -D ENABLE_GTK=NO \
 				 -D ENABLE_ARB=NO \
 				 -B Debug/build \

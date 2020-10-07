@@ -44,4 +44,6 @@ module =
   'X' characters.
 |.help}
     __mkdtemp
+
+  let pub fork = __fork
 end

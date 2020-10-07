@@ -968,7 +968,7 @@ _load(void)
     return eth_exn(eth_type_error());
   }
 
-  eth_module *envmod = eth_create_module("");
+  eth_module *envmod = eth_create_module(NULL);
   for (eth_t it = env; eth_is_pair(it); it = eth_cdr(it))
   {
     eth_t def = eth_car(it);
