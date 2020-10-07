@@ -79,6 +79,8 @@ let list_tests =
   , ("fold_right", fn -> fold_right (-) 0 [1, 2, 3] == 2)
   , ("reduce_left", fn -> reduce_left (-) [0, 1, 2, 3] == -6)
   , ("reduce_right", fn -> reduce_right (-) [1, 2, 3, 0] == 2)
+  , ("reduce_left'", fn -> reduce_left' raise [0] == 0)
+  , ("reduce_right'", fn -> reduce_right' raise [1] == 1)
   , ("rev_scan_left", fn -> rev_scan_left (-) 0 [1, 2, 3] eq [-6, -3, -1])
   , ("scan_left", fn -> scan_left (-) 0 [1, 2, 3] eq [-1, -3, -6])
   , ("scan_right", fn -> scan_right (-) 0 [1, 2, 3] eq [2, -1, 3])

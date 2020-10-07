@@ -217,14 +217,25 @@ let pub reduce_left f xs =
   if let x::xs = xs then fold_left f x xs
   else invalid_argument ()
 in
-let rec pub reduce_right f xs =
+let pub reduce_left' f xs =
+  if let x::xs = xs then fold_left f x xs
+  else let [x] = xs in x
+in
+let reduce_right_aux f =
   let rec aux xs =
     if let x::(_::_ as xs) = xs then
       f x (aux xs)
     else car xs
   in
-  if let x::(_::_ as xs) = xs then f x (aux xs)
+  aux
+in
+let pub reduce_right f xs =
+  if let x::(_::_ as xs) = xs then f x (reduce_right_aux f xs)
   else invalid_argument ()
+in
+let pub reduce_right' f xs =
+  if let x::(_::_ as xs) = xs then f x (reduce_right_aux f xs)
+  else let [x] = xs in x
 in
 let pub rev_scan_left f z xs =
   let rec loop z xs acc =
