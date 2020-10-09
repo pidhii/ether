@@ -43,6 +43,18 @@ _access(void)
 }
 
 static eth_t
+_getenv(void)
+{
+  eth_args args = eth_start(1);
+  eth_t name = eth_arg2(args, eth_string_type);
+  const char *val = getenv(eth_str_cstr(name));
+  if (val)
+    return eth_str(val);
+  else
+    return eth_failure();
+}
+
+static eth_t
 _getcwd(void)
 {
   eth_use_variant(System_error)
@@ -103,6 +115,9 @@ ether_module(eth_module *mod, eth_env *topenv)
   eth_define(mod, "x_ok", eth_num(X_OK));
   eth_define(mod, "__access", eth_proc(_access, 2));
   eth_define(mod, "__getcwd", eth_proc(_getcwd));
+
+  eth_define(mod, "__getenv", eth_proc(_getenv, 1));
+
   eth_define(mod, "__realpath", eth_proc(_realpath, 1));
 
   eth_define(mod, "__mkdtemp", eth_proc(_mkdtemp, 1));

@@ -28,7 +28,13 @@ module =
     __access
 
   let pub getcwd = __getcwd
-  let pub realpath = __realpath
+
+  let pub getenv = __getenv
+
+  let pub realpath path =
+    if String.sub path (0..1) eq "~/"
+    then __realpath (getenv "HOME" ++ String.sub path (1...))
+    else __realpath path
 
   let pub mkdtemp =
 {.help|
