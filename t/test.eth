@@ -102,7 +102,7 @@ print ("list-comprehension:", [x + x | x <- [1..3], odd? x]);
 
 print ("partition:", partition even? [0..9]);
 
-print ("format:", format "~d + ~d = ~d" 1 2 (1+2));
+print ("format:", format "%d + %d = %d" 1 2 (1+2));
 
 print "";
 print "--- test string";
@@ -139,7 +139,7 @@ in
 
 when _MODE is Default then (
   let path = "Debug/install/bin/ether" in
-  printf "elf? ~w: ~w\n" path (elf? path);
+  printf "elf? %w: %w\n" path (elf? path);
 );
 
 let path = "out.txt" in
@@ -147,7 +147,7 @@ let file = open_out path in
 write_to file "Hello there!";
 close file;
 print ("out.txt:", read_file $ open_in path);
-system "rm -v ~d" path ;
+system "rm -v %d" path ;
 
 begin
   let list? x = x is nil || pair? x in
@@ -194,14 +194,14 @@ in
 let dog color =
   { color = capitalize color
   , say = fn self ->
-      printf "~d dog says \"Wof!\"\n" self.color
+      printf "%d dog says \"Wof!\"\n" self.color
   }
 in
 
 let cat color =
   { color = capitalize color
   , say = fn self ->
-      printf "~d cat says \"Miau\"\n" self.color
+      printf "%d cat says \"Miau\"\n" self.color
   }
 in
 

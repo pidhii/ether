@@ -8,7 +8,7 @@ let module_path =
   let line = read_line_of pipe in
   if close pipe /= 0
     then raise Failed_to_resolve_prefix
-    else format "~d/lib/ether" (String.chop line)
+    else format "%d/lib/ether" (String.chop line)
 in
 
 -- Checks whether a file exists in the file system
@@ -18,27 +18,27 @@ let exist? path =
 in
 
 let mkdir path =
-  unless system "mkdir -vp '~d'" path == 0
+  unless system "mkdir -vp '%d'" path == 0
     then raise System_error;
 in
 
 let copy_file src dst =
-  printf "> copy ~w -> ~w\n" src dst;
+  printf "> copy %w -> %w\n" src dst;
   open_in src |> read_file |> write_to (open_out dst)
 in
 
 let create_symlink src dst =
-  unless system "ln -vs '~d' '~d'" src dst == 0
+  unless system "ln -vs '%d' '%d'" src dst == 0
     then raise System_error;
 in
 
 let unlink path =
-  unless system "rm -rfv ~d" path == 0
+  unless system "rm -rfv %d" path == 0
     then raise System_error;
 in
 
 let unlink_quite path =
-  unless system "rm -rf ~d" path == 0
+  unless system "rm -rf %d" path == 0
     then raise System_error;
 in
 
@@ -51,7 +51,7 @@ let utc_date! =
 in
 
 let realpath path =
-  let pipe = open_pipe_in (format "realpath '~d'" path) in
+  let pipe = open_pipe_in (format "realpath '%d'" path) in
   let line = read_line_of pipe in
   if close pipe /= 0
     then raise System_error
@@ -62,7 +62,7 @@ let elf? path =
   read_of (open_in path) 4 eq "\x7fELF"
 in
 
-let db_path = format "~d/__db.eth" module_path in
+let db_path = format "%d/__db.eth" module_path in
 
 -- Get registry of installed modules
 let load_db! = first $ load db_path if exist? db_path else [] in
@@ -74,7 +74,7 @@ in
 
 let update_db db =
   let dbfile = open_out db_path in
-  write_to dbfile (format "~w\n" db);
+  write_to dbfile (format "%w\n" db);
 in
 
 let do_in dir thunk =
@@ -104,7 +104,7 @@ let install dir args =
   let (_, conf) =
     try
       let env = create_env [("command_line", args), ("root", dir)] in
-      env:load (format "~d/install.eth" dir)
+      env:load (format "%d/install.eth" dir)
     with _ -> begin
       eprintf "> error: failed to load install-script\n";
       raise Failure;
@@ -124,12 +124,12 @@ let install dir args =
 
   -- Build (if build-hook is speciefied)
   when let Some build = List.assoc_opt "build" conf then do_in dir (fn ->
-    printf "> building module ~d\n" name;
+    printf "> building module %d\n" name;
     build!;
   );
 
   -- Start installation
-  printf "> installing module ~d\n" name;
+  printf "> installing module %d\n" name;
   -- Create separate direcory for new module
   let moddir = module_path ++ "/" ++ name in
   mkdir moddir;
@@ -166,7 +166,7 @@ let uninstall name =
 
   if let Some {install_dir} = get_module_opt name db then begin
     -- Remove module directory
-    printf "> uninstalling module '~d'\n" name;
+    printf "> uninstalling module '%d'\n" name;
     unlink install_dir;
     -- Update registry
     printf "> updating registry\n";
@@ -183,7 +183,7 @@ let reinstall dir args =
   let (_, conf) =
     try
       let env = create_env [("command_line", args), ("root", dir)] in
-      env:load (format "~d/install.eth" dir)
+      env:load (format "%d/install.eth" dir)
     with Failure ->
       eprintf "> error: failed to load install-script\n";
       raise Failure;
@@ -201,10 +201,10 @@ let list_modules! =
   else
     let f isfirst {name, date, source_dir, install_dir} =
       unless isfirst then print "";
-      printf "\e[4mname\e[0m: ~d\n" name;
-      printf "\e[4msource_dir\e[0m: ~d\n" source_dir;
-      printf "\e[4minstall_dir\e[0m: ~d\n" install_dir;
-      printf "\e[4mdate\e[0m: ~d\n" date;
+      printf "\e[4mname\e[0m: %d\n" name;
+      printf "\e[4msource_dir\e[0m: %d\n" source_dir;
+      printf "\e[4minstall_dir\e[0m: %d\n" install_dir;
+      printf "\e[4mdate\e[0m: %d\n" date;
       false;
     in List.fold_left f true db
 in
@@ -217,7 +217,7 @@ in
 
 let help! =
   print "\e[1mUSAGE:\e[0m";
-  printf"  ~d COMMAND [OPTIONS]\n" (basename $ car command_line);
+  printf"  %d COMMAND [OPTIONS]\n" (basename $ car command_line);
   print "";
   print "\e[1mCOMMANDS:\e[0m";
   print "  help       h          Show this message.";
@@ -232,7 +232,7 @@ in
 
 let help_help! =
   print "\e[1mUSAGE:\e[0m";
-  printf"  ~d help [OPTIONS]\n" (basename $ car command_line);
+  printf"  %d help [OPTIONS]\n" (basename $ car command_line);
   print "";
   print "\e[1mOPTIONS:\e[0m";
   print "  --help   -h             Show this message.";
@@ -289,12 +289,12 @@ be available via the \`command_line\`-variable; and the root directory --  via t
 \`root\`-variable.
 |TEXT}
   in
-  system "LESS=-FX /usr/bin/less -R <<TEXT~dTEXT" text;
+  system "LESS=-FX /usr/bin/less -R <<TEXT%dTEXT" text;
 in
 
 let install_help! =
   print "\e[1mUSAGE:\e[0m";
-  printf"  ~d install [OPTIONS] [<command_line> ...]\n" (basename $ car command_line);
+  printf"  %d install [OPTIONS] [<command_line> ...]\n" (basename $ car command_line);
   print "";
   print "\e[1mOPTIONS:\e[0m";
   print "  --help   -h             Show this message.";
@@ -342,7 +342,7 @@ try
           else "__repository__"
         in
         do_in_tempdir (fn ->
-          if system "git clone ~d ~d" url reponame /= 0 then begin
+          if system "git clone %d %d" url reponame /= 0 then begin
             eprintf "> error: failed to clone repository\n";
             exit 1;
           end else
@@ -350,14 +350,14 @@ try
         )
       else begin
         eprintf "> error: missing module-directory path\n";
-        eprintf "> see `~d install --help`\n" (basename dopepath);
+        eprintf "> see `%d install --help`\n" (basename dopepath);
         exit 1;
       end
     else
       if let moddir :: modargs = args then install moddir modargs
       else begin
         eprintf "> error: missing module-directory path\n";
-        eprintf "> see `~d install --help`\n" (basename dopepath);
+        eprintf "> see `%d install --help`\n" (basename dopepath);
         exit 1;
       end
 
@@ -386,8 +386,8 @@ try
       reinstall modname modargs
 
   else begin
-    eprintf "> error: undefined command, ~w\n" cmd;
-    eprintf "> see `~d help` for avaliable commands\n" (basename dopepath);
+    eprintf "> error: undefined command, %w\n" cmd;
+    eprintf "> see `%d help` for avaliable commands\n" (basename dopepath);
     exit 1;
   end
 

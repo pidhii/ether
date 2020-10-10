@@ -10,14 +10,14 @@ eth_study_format(const char *fmt)
   const char *p = fmt;
   while (true)
   {
-    if ((p = strchr(p, '~')))
+    if ((p = strchr(p, '%')))
     {
       if (p[1] == 'w' || p[1] == 'd')
       {
         n += 1;
         p += 2;
       }
-      else if (p[1] == '~')
+      else if (p[1] == '%')
       {
         p += 2;
       }
@@ -39,7 +39,7 @@ eth_format(FILE *out, const char *fmt, eth_t args[], int n)
   {
     switch (*p)
     {
-      case '~':
+      case '%':
         switch (p[1])
         {
           case 'w':
@@ -56,8 +56,8 @@ eth_format(FILE *out, const char *fmt, eth_t args[], int n)
             p += 1;
             break;
 
-          case '~':
-            putc('~', out);
+          case '%':
+            putc('%', out);
             p += 1;
             break;
 

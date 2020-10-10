@@ -1,0 +1,11 @@
+Os.chdir (List.get command_line 1);
+
+let fail! =
+  system "dope uninstall foo &>/dev/null";
+  exit 1;
+in
+
+system "dope install ./foo" == 0 || fail!;
+system "dope reinstall ./foo" == 0 || fail!;
+system "dope uninstall foo" == 0 || fail!;
+

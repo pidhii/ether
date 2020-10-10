@@ -5,17 +5,17 @@ let test_mergesort! =
   let origlist = [1,9,4,5,7,6,8,2,3] in
   let ret =
     origlist
-    |> List.map (format "~d")
+    |> List.map (format "%d")
     |> String.join "\\n"
-    |> IO.shell {CMD|ether ./mergesort.eth <<<$(echo -e "~d") | grep "Sorted list"|CMD}
+    |> IO.shell {CMD|ether ./mergesort.eth <<<$(echo -e "%d") | grep "Sorted list"|CMD}
     |> String.match \\[.+\]/
     |> car
   in
   let correct =
     List.sort (<) origlist
-    |> List.map (format "~d")
+    |> List.map (format "%d")
     |> String.join ","
-    |> format "[~d]"
+    |> format "[%d]"
   in
   assert ret eq correct in
   nil
