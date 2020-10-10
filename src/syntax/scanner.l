@@ -161,6 +161,7 @@ OPERATOR [-+%^.$:!<>*/=&|∘]+
   return CHAR;
 }
 <STRING>"\\\"" { yylval->character = '"'; return CHAR; }
+<STRING>"\\\\" { yylval->character = '\\'; return CHAR; }
 <REGEXP>"\\/"  { yylval->character = '/'; return CHAR; }
 <STRING>\" {
   if (cod_vec_last(g_quotes).tag == QUOTES_DEFAULT)
