@@ -2,10 +2,10 @@ cmake_minimum_required (VERSION 3.15)
 project (ether VERSION 0.2.0)
 enable_language (C)
 
-
+include (CheckIncludeFile REQUIRED)
 find_package (BISON REQUIRED)
 find_package (FLEX REQUIRED)
-
+find_package (PkgConfig REQUIRED)
 
 ################################################################################
 #                                  OPTIONS
@@ -16,7 +16,6 @@ option (BUILD_STATIC_LIBRARY "Build static library \"ether.a\"" ON)
 # -------------------------------- Modules ------------------------------------
 option (ENABLE_ARB "Build an Arb-module" YES)
 option (ENABLE_GTK "Build a Gtk-module" YES)
-option (ENABLE_REGEXP "Build a Regexp-module" YES)
 # ------------------------------ Dev-Options -----------------------------------
 option (DISABLE_BUILTINS "Disable all builtins" OFF)
 
