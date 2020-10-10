@@ -1,4 +1,5 @@
 open List in
+open IO in
 
 let _MODE =
   if member? "testmode" command_line
@@ -103,7 +104,7 @@ print ("partition:", partition even? [0..9]);
 
 print ("format:", format "~d + ~d = ~d" 1 2 (1+2));
 
-newline!;
+print "";
 print "--- test string";
 let str = "abCdefg" in
 print ("  str:", str);

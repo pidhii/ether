@@ -427,57 +427,6 @@ _close(void)
 }
 
 static eth_t
-_write_to(void)
-{
-  eth_args args = eth_start(2);
-  eth_t file = eth_arg2(args, eth_file_type);
-  eth_t str = eth_arg2(args, eth_string_type);
-  FILE *stream = eth_get_file_stream(file);
-  clearerr(stream);
-  errno = 0;
-  size_t nwr = fwrite(eth_str_cstr(str), 1, eth_str_len(str), stream);
-  if (ferror(stream))
-  {
-    switch (errno)
-    {
-      case EINVAL:
-      case EBADF:
-        eth_throw(args, eth_invalid_argument());
-    }
-    eth_throw(args, eth_sym("System_error"));
-  }
-  eth_end_unref(args);
-  return eth_nil;
-}
-
-static eth_t
-_newline(void)
-{
-  putchar('\n');
-  return eth_nil;
-}
-
-static eth_t
-_print(void)
-{
-  eth_t x = *eth_sp++;
-
-  if (eth_is_tuple(x->type))
-  {
-    for (int i = 0; i < eth_tuple_size(x->type); ++i)
-    {
-      if (i > 0) putc('\t', stdout);
-      eth_display(eth_tup_get(x, i), stdout);
-    }
-  }
-  else
-    eth_display(x, stdout);
-  putc('\n', stdout);
-  eth_drop(x);
-  return eth_nil;
-}
-
-static eth_t
 _input(void)
 {
   eth_t prompt = *eth_sp++;
@@ -534,202 +483,25 @@ _input(void)
 }
 
 static eth_t
-_read_line_of(void)
+_print(void)
 {
-  eth_t file = *eth_sp++;
-  if (file->type != eth_file_type)
-  {
-    eth_drop(file);
-    return eth_exn(eth_type_error());
-  }
+  eth_t x = *eth_sp++;
 
-  char *line = NULL;
-  size_t n = 0;
-  ssize_t nrd = getline(&line, &n, eth_get_file_stream(file));
-  int err = errno;
-
-  if (nrd < 0)
+  if (eth_is_tuple(x->type))
   {
-    free(line);
-    if (feof(eth_get_file_stream(file)))
+    for (int i = 0; i < eth_tuple_size(x->type); ++i)
     {
-      eth_drop(file);
-      return eth_exn(eth_sym("End_of_file"));
-    }
-    else
-    {
-      eth_drop(file);
-      switch (err)
-      {
-        case EBADF:
-        case EINVAL: return eth_exn(eth_invalid_argument());
-        default: return eth_system_error(err);
-      }
+      if (i > 0) putc('\t', stdout);
+      eth_display(eth_tup_get(x, i), stdout);
     }
   }
-  return eth_create_string_from_ptr2(line, nrd);
-}
-
-static eth_t
-_read_of(void)
-{
-  eth_t file = *eth_sp++;
-  eth_ref(file);
-
-  eth_t n = *eth_sp++;
-  eth_ref(n);
-
-  if (file->type != eth_file_type || not eth_is_num(n))
-  {
-    eth_unref(file);
-    eth_unref(n);
-    return eth_exn(eth_type_error());
-  }
-  if (eth_num_val(n) < 0)
-  {
-    eth_unref(file);
-    eth_unref(n);
-    return eth_exn(eth_invalid_argument());
-  }
-
-  FILE *stream = eth_get_file_stream(file);
-  size_t size = eth_num_val(n);
-  char *buf = malloc(size + 1);
-  size_t nrd = fread(buf, 1, size, stream);
-  if (nrd == 0)
-  {
-    free(buf);
-    if (feof(stream))
-    {
-      eth_unref(file);
-      eth_unref(n);
-      return eth_exn(eth_sym("End_of_file"));
-    }
-    else if (ferror(stream))
-    {
-      eth_unref(file);
-      eth_unref(n);
-      return eth_exn(eth_system_error(0));
-    }
-  }
-  eth_unref(file);
-  eth_unref(n);
-  buf[nrd] = '\0';
-  return eth_create_string_from_ptr2(buf, nrd);
-}
-
-static eth_t
-_read_file(void)
-{
-  eth_t file = *eth_sp++;
-  if (file->type != eth_file_type)
-  {
-    eth_drop(file);
-    return eth_exn(eth_type_error());
-  }
-
-  FILE *stream = eth_get_file_stream(file);
-
-  errno = 0;
-  long start = ftell(stream);
-  if (errno) goto error;
-  fseek(stream, 0, SEEK_END);
-  if (errno) goto error;
-  long end = ftell(stream);
-  if (errno) goto error;
-  fseek(stream, start, SEEK_SET);
-  if (errno) goto error;
-
-  char *buf = malloc(end - start + 1);
-  size_t nrd = fread(buf, 1, end - start, stream);
-  if (nrd == 0)
-  {
-    if (feof(stream))
-    {
-      eth_drop(file);
-      return eth_exn(eth_sym("End_of_file"));
-    }
-    else if (ferror(stream))
-    {
-      eth_drop(file);
-      return eth_system_error(0);
-    }
-  }
-  eth_drop(file);
-  buf[nrd] = '\0';
-  return eth_create_string_from_ptr2(buf, nrd);
-
-error:;
-  int err = errno;
-  eth_drop(file);
-  switch (err)
-  {
-    case EINVAL:
-    case ESPIPE:
-    case EBADF:
-      return eth_exn(eth_invalid_argument());
-    default:
-      return eth_system_error(err);
-  }
-}
-
-static eth_t
-_tell(void)
-{
-  eth_args args = eth_start(1);
-  eth_t file = eth_arg2(args, eth_file_type);
-  int pos = ftell(eth_get_file_stream(file));
-  int err = errno;
-  if (pos < 0)
-  {
-    switch (err)
-    {
-      case EINVAL:
-      case ESPIPE:
-      case EBADF:
-        eth_return(args, eth_exn(eth_invalid_argument()));
-      default:
-        eth_return(args, eth_exn(eth_sym("System_error")));
-    }
-  }
-  eth_return(args, eth_num(pos));
-}
-
-static eth_t
-_seek(void)
-{
-  eth_args args = eth_start(3);
-  eth_t file = eth_arg2(args, eth_file_type);
-  eth_t whence = eth_arg2(args, eth_number_type);
-  eth_t offs = eth_arg2(args, eth_number_type);
-  int ret = fseek(eth_get_file_stream(file), eth_num_val(whence), eth_num_val(offs));
-  int err = errno;
-  if (ret)
-  {
-    switch (err)
-    {
-      case EINVAL:
-      case ESPIPE:
-      case EBADF:
-        eth_return(args, eth_exn(eth_invalid_argument()));
-      default:
-        eth_return(args, eth_exn(eth_sym("System_error")));
-    }
-  }
-  eth_return(args, eth_nil);
-}
-
-static eth_t
-_flush(void)
-{
-  eth_use_variant(System_error);
-  eth_args args = eth_start(1);
-  eth_t file = eth_arg2(args, eth_file_type);
-  if (fflush(eth_get_file_stream(file)) == EOF)
-    eth_throw(args, System_error(eth_str(eth_errno_to_str(errno))));
   else
-    eth_return(args, eth_nil);
+    eth_display(x, stdout);
+  putc('\n', stdout);
+  eth_drop(x);
+  return eth_nil;
 }
+
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                  system
@@ -748,7 +520,7 @@ _system(void)
 
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-//                                  printf
+//                                  format
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 typedef struct {
   eth_t file;
@@ -766,121 +538,10 @@ destroy_format_data(format_data *data)
 }
 
 static eth_t
-_fmt(char *fmt, int n, FILE *out)
-{
-  for (int i = 0; i < n; ++i)
-    eth_ref(eth_sp[i]);
-
-  eth_t ret = eth_nil;
-  int ipar = 0;
-  for (char *p = fmt; *p; ++p)
-  {
-    switch (*p)
-    {
-      case '~':
-        switch (p[1])
-        {
-          case 'w':
-            eth_write(eth_sp[ipar], out);
-            eth_unref(eth_sp[ipar]);
-            ipar += 1;
-            p += 1;
-            break;
-
-          case 'd':
-            eth_display(eth_sp[ipar], out);
-            eth_unref(eth_sp[ipar]);
-            ipar += 1;
-            p += 1;
-            break;
-
-          case '~':
-            putc('~', out);
-            p += 1;
-            break;
-
-          default:
-            assert(!"wtf");
-        }
-        break;
-
-      default:
-        putc(*p, out);
-    }
-  }
-
-  eth_pop_stack(n);
-  return ret;
-}
-
-static int
-_test_fmt(const char *fmt)
-{
-  int n = 0;
-  const char *p = fmt;
-  while (true)
-  {
-    if ((p = strchr(p, '~')))
-    {
-      if (p[1] == 'w' || p[1] == 'd')
-      {
-        n += 1;
-        p += 2;
-      }
-      else if (p[1] == '~')
-      {
-        p += 2;
-      }
-      else
-      {
-        return -1;
-      }
-      continue;
-    }
-    return n;
-  }
-}
-
-static eth_t
-_printf_aux(void)
-{
-  format_data *data = eth_this->proc.data;
-  FILE *stream = eth_get_file_stream(data->file);
-  char *fmt = ETH_STRING(data->fmt)->cstr;
-  int n = data->n;
-  return _fmt(fmt, n, stream);
-}
-
-static eth_t
-_printf(void)
-{
-  eth_args args = eth_start(2);
-  eth_t file = eth_arg2(args, eth_file_type);
-  eth_t fmt = eth_arg2(args, eth_string_type);
-
-  int n = _test_fmt(eth_str_cstr(fmt));
-  if (n < 0)
-    eth_throw(args, eth_sym("Format_error"));
-
-  if (n == 0)
-  {
-    fputs(ETH_STRING(fmt)->cstr, eth_get_file_stream(file));
-    eth_return(args, eth_nil);
-  }
-  else
-  {
-    format_data *data = malloc(sizeof(format_data));
-    data->fmt = fmt;
-    data->file = file;
-    data->n = n;
-    eth_pop_stack(2);
-    return eth_create_proc(_printf_aux, n, data, (void*)destroy_format_data);
-  }
-}
-
-static eth_t
 _format_aux(void)
 {
+  eth_use_symbol(Format_error);
+
   format_data *data = eth_this->proc.data;
   char *fmt = ETH_STRING(data->fmt)->cstr;
   int n = data->n;
@@ -888,13 +549,17 @@ _format_aux(void)
   char *ptr = NULL;
   size_t size = 0;
   FILE *out = open_memstream(&ptr, &size);
-  eth_t ret = _fmt(fmt, n, out);
+  /*eth_t ret = _fmt(fmt, n, out);*/
+  for (int i = 0; i < n; eth_ref(eth_sp[i++]));
+  int ok = eth_format(out, fmt, eth_sp, n);
+  for (int i = 0; i < n; eth_unref(eth_sp[i++]));
+  eth_pop_stack(n);
   fclose(out);
 
-  if (ret->type == eth_exception_type)
+  if (not ok)
   {
     free(ptr);
-    return ret;
+    return eth_exn(Format_error);
   }
   else
     return eth_create_string_from_ptr2(ptr, size);
@@ -910,7 +575,7 @@ _format(void)
     return eth_exn(eth_type_error());
   }
 
-  int n = _test_fmt(eth_str_cstr(fmt));
+  int n = eth_study_format(eth_str_cstr(fmt));
   if (n < 0)
   {
     eth_drop(fmt);
@@ -1113,20 +778,11 @@ _eth_init_builtins(void)
   eth_define(g_mod,     "__open", eth_create_proc(      _open, 2, NULL, NULL));
   eth_define(g_mod,    "__popen", eth_create_proc(     _popen, 2, NULL, NULL));
   eth_define(g_mod,      "close", eth_create_proc(     _close, 1, NULL, NULL));
-  eth_define(g_mod,"read_line_of",eth_create_proc(_read_line_of,1,NULL, NULL));
-  eth_define(g_mod,    "read_of", eth_create_proc(   _read_of, 2, NULL, NULL));
-  eth_define(g_mod,  "read_file", eth_create_proc( _read_file, 1, NULL, NULL));
-  eth_define(g_mod,   "write_to", eth_create_proc(  _write_to, 2, NULL, NULL));
-  eth_define(g_mod,    "newline", eth_create_proc(   _newline, 0, NULL, NULL));
-  eth_define(g_mod,      "print", eth_create_proc(     _print, 1, NULL, NULL));
   eth_define(g_mod,      "input", eth_create_proc(     _input, 1, NULL, NULL));
-  eth_define(g_mod,       "tell", eth_create_proc(      _tell, 1, NULL, NULL));
-  eth_define(g_mod,     "__seek", eth_create_proc(      _seek, 3, NULL, NULL));
-  eth_define(g_mod,      "flush", eth_create_proc(     _flush, 1, NULL, NULL));
+  eth_define(g_mod,      "print", eth_create_proc(     _print, 1, NULL, NULL));
   // ---
   eth_define(g_mod,   "__system", eth_create_proc(    _system, 1, NULL, NULL));
   // ---
-  eth_define(g_mod,   "__printf", eth_create_proc(    _printf, 2, NULL, NULL));
   eth_define(g_mod,     "format", eth_create_proc(    _format, 1, NULL, NULL));
   // ---
   eth_define(g_mod,      "raise", eth_create_proc(     _raise, 1, NULL, NULL));

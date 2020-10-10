@@ -104,6 +104,12 @@ eth_fprintf(FILE *out, const char *fmt, ...);
 void
 eth_printf(const char *fmt, ...);
 
+bool
+eth_format(FILE *out, const char *fmt, eth_t arr[], int arrlen);
+
+int
+eth_study_format(const char *fmt);
+
 
 #define ETH_MODULE(name) static const char eth_this_module[] = name;
 

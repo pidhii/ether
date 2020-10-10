@@ -1,5 +1,7 @@
 #!/bin/env ether
 
+open IO in
+
 -- Get direcory containing modules
 let module_path =
   let pipe = open_pipe_in "ether --prefix" in
@@ -198,7 +200,7 @@ let list_modules! =
     printf "> no installed modules\n"
   else
     let f isfirst {name, date, source_dir, install_dir} =
-      unless isfirst then newline!;
+      unless isfirst then print "";
       printf "\e[4mname\e[0m: ~d\n" name;
       printf "\e[4msource_dir\e[0m: ~d\n" source_dir;
       printf "\e[4minstall_dir\e[0m: ~d\n" install_dir;
@@ -301,6 +303,11 @@ in
 
 
 --------------------------------- Main -----------------------------------------
+when List.len command_line < 2 then begin
+  help!;
+  exit 1;
+end;
+
 let dopepath :: cmd :: command_line = command_line in
 try
   if cmd eq "help" || cmd eq "h" then

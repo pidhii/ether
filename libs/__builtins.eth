@@ -68,7 +68,7 @@ let compose_va f g =
 --let ( >>* ) = flip ( <<* ) in
 
 let pub die msg =
-  __printf stderr "~d\n" msg;
+  print msg;
   exit 1
 
 
@@ -88,84 +88,20 @@ let pub load path = __builtin_load path []
 --
 -- Input:
 -- * input (C)
--- * read_of (C)
--- * read
--- * read_line_of (C)
--- * read_line_of_opt
--- * read_line
--- * read_line_opt
--- * read_file (C)
 --
 -- Output:
 -- * print (C)
--- * print_to
--- * newline (C)
--- * write_to (C)
--- * write
--- * printf
--- * eprintf
 --
--- Miscelenious:
--- * tell (C)
--- * seek (C)
 let pub open_in path = __open path "r"
 let pub open_out path = __open path "w"
 let pub open_append path = __open path "a"
 let pub open_pipe_in cmd = __popen cmd "r"
 let pub open_pipe_out cmd = __popen cmd "w"
 
-let pub read_line! = read_line_of stdin
-let pub read_line_opt! = try Some read_line!  with End_of_file -> false
-let pub read_line_of_opt file = try Some (read_line_of file) with End_of_file -> false
-
-let pub read = read_of stdin
-let pub read_opt n = try Some (read n) with End_of_file -> false
-let pub read_of_opt file n = try Some (read_of file n) with End_of_file -> false
-
-let pub print_to file x =
-  if tuple? x then
-    let hd :: tl = list x in
-    write_to file (format "~d" hd);
-    let rec loop xs =
-      if let x :: xs = xs then
-        write_to file (format "\t~d" x);
-        loop xs
-      else write_to file "\n";
-    in loop tl
-  else
-    write_to file (format "~d\n" x)
-
-let pub write = write_to stdout
-let pub printf = __printf stdout
-let pub fprintf file = compose_va (write_to file) format
-let pub eprintf = __printf stderr
-
-let pub seek file pos =
-  let (offs, whence) =
-    if let Set x = pos then (x, 0)
-    else if let Cur x = pos then (x, 1)
-    else if let End x = pos then (x, 2)
-    else raise Invalid_argument
-  in __seek file offs whence
-
 --------------------------------------------------------------------------------
 --                                System
 let pub system = compose_va __system format
 --let pub system = __system <<* format in
-
-let pub shell =
-  let aux cmd =
-    let pipe = open_pipe_in cmd in
-    let rec loop acc =
-      if let Some data = read_of_opt pipe 0x100
-        then loop (acc ++ data)
-        else acc
-    in
-    let out = loop "" in
-    if close pipe == 0 then out
-    else raise Failure
-  in
-  compose_va aux format
 
 --------------------------------------------------------------------------------
 --                                Errors

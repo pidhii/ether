@@ -1,0 +1,70 @@
+module =
+--------------------------------------------------------------------------------
+-- Input:
+-- * read_of (C)
+-- * read
+-- * read_line_of (C)
+-- * read_line_of_opt
+-- * read_line
+-- * read_line_opt
+-- * read_file (C)
+--
+-- Output:
+-- * print (C)
+-- * printf
+-- * fprintf
+-- * eprintf
+-- * write_to (C)
+-- * write
+--
+-- Miscelenious:
+-- * tell (C)
+-- * seek (C)
+-- * shell
+--
+
+let pub read_line! = read_line_of stdin
+let pub read_line_opt! = try Some read_line!  with End_of_file -> false
+let pub read_line_of_opt file = try Some (read_line_of file) with End_of_file -> false
+
+let pub read = read_of stdin
+let pub read_opt n = try Some (read n) with End_of_file -> false
+let pub read_of_opt file n = try Some (read_of file n) with End_of_file -> false
+
+let pub printf = __printf stdout
+let pub fprintf file = __printf file --compose_va (write_to file) format
+let pub eprintf = __printf stderr
+
+let pub write = write_to stdout
+
+let pub seek file pos =
+  let (offs, whence) =
+    if let Set x = pos then (x, 0)
+    else if let Cur x = pos then (x, 1)
+    else if let End x = pos then (x, 2)
+    else raise Invalid_argument
+  in __seek file offs whence
+
+let compose_va f g =
+  let rec aux x =
+    if function? x then
+      fn y -> aux (x y)
+      --x >> aux
+    else f x
+  in aux g
+
+let pub shell =
+  let aux cmd =
+    let pipe = open_pipe_in cmd in
+    let rec loop acc =
+      if let Some data = read_of_opt pipe 0x100
+        then loop (acc ++ data)
+        else acc
+    in
+    let out = loop "" in
+    if close pipe == 0 then out
+    else raise Failure
+  in
+  compose_va aux format
+
+end

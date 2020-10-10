@@ -74,6 +74,18 @@ set_target_properties (string
 install (TARGETS string DESTINATION ${STRING_DST_DIR})
 install (FILES ${STRING_SRC_DIR}/lib.eth DESTINATION ${STRING_DST_DIR})
 
+# I/O
+set (IO_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/io)
+set (IO_DST_DIR lib/ether/io)
+add_library (io SHARED ${IO_SRC_DIR}/lib.c)
+set_target_properties (io
+  PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    PREFIX ""
+    OUTPUT_NAME "io")
+install (TARGETS io DESTINATION ${IO_DST_DIR})
+install (FILES ${IO_SRC_DIR}/lib.eth DESTINATION ${IO_DST_DIR})
+
 # RegExp
 if (ENABLE_REGEXP)
   set (REGEXP_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/regexp)
