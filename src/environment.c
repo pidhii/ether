@@ -61,7 +61,7 @@ eth_env*
 eth_create_env(void)
 {
   eth_env *env = eth_create_empty_env();
-  eth_add_module_path(env, ".");
+  /*eth_add_module_path(env, ".");*/
   if (eth_get_prefix())
   {
     char path[PATH_MAX];
