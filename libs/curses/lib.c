@@ -528,7 +528,7 @@ ether_module(eth_module *mod, eth_env *topenv)
   eth_define(mod, "key_f0", eth_num(KEY_F0));
   for (int i = 1; i <= 12; ++i)
   {
-    char buf[10];
+    char buf[42];
     sprintf(buf, "key_f%d", i);
     eth_define(mod, buf, eth_num(KEY_F(i)));
   }
