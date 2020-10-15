@@ -380,6 +380,18 @@ _popen(void)
 }
 
 static eth_t
+_open_string(void)
+{
+  eth_args args = eth_start(1);
+  eth_t str = eth_arg2(args, eth_string_type);
+  FILE *stream = fmemopen(eth_str_cstr(str), eth_str_len(str), "r");
+  eth_t file = eth_open_stream(stream);
+  eth_set_file_data(file, str, (void*)eth_unref);
+  eth_ref(str);
+  eth_return(args, file);
+}
+
+static eth_t
 _close(void)
 {
   eth_t file = *eth_sp++;
@@ -777,6 +789,7 @@ _eth_init_builtins(void)
   eth_define(g_mod,     "stderr", eth_stderr);
   eth_define(g_mod,     "__open", eth_create_proc(      _open, 2, NULL, NULL));
   eth_define(g_mod,    "__popen", eth_create_proc(     _popen, 2, NULL, NULL));
+  eth_define(g_mod, "__open_string", eth_create_proc(_open_string, 1, NULL, NULL));
   eth_define(g_mod,      "close", eth_create_proc(     _close, 1, NULL, NULL));
   eth_define(g_mod,      "input", eth_create_proc(     _input, 1, NULL, NULL));
   eth_define(g_mod,      "print", eth_create_proc(     _print, 1, NULL, NULL));

@@ -37,6 +37,7 @@ _read_line_of(void)
       }
     }
   }
+  eth_drop(file);
   return eth_create_string_from_ptr2(line, nrd);
 }
 

@@ -126,6 +126,17 @@ let vector_tests =
   ]
 in
 
+let io_tests =
+  [
+    ("open_string_in", fn ->
+      let str = "1 + 1" in
+      let stream = open_string_in str in
+      nil
+      --IO.read_line_of stream eq str
+  ),
+  ]
+in
+
 let sumres (nok, nfail) (nok', nfail') =
   (nok + nok', nfail + nfail')
 in
@@ -138,6 +149,7 @@ let (nok, nfail) =
     , ("regexp", regexp_tests)
     , ("list", list_tests)
     , ("vector", vector_tests)
+    , ("io", io_tests)
     ]
 in
 exit 1 when nfail > 0;

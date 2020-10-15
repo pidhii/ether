@@ -1137,6 +1137,9 @@ eth_t
 eth_open_fd(int fd, const char *mod);
 
 eth_t
+eth_open_stream(FILE *stream);
+
+eth_t
 eth_open_pipe(const char *command, const char *mod);
 
 int
@@ -1150,6 +1153,9 @@ eth_close(eth_t x);
 
 FILE*
 eth_get_file_stream(eth_t x);
+
+void
+eth_set_file_data(eth_t x, void *data, void (*dtor)(void*));
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                ranges

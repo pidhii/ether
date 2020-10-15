@@ -17,6 +17,8 @@ typedef struct {
   eth_header header;
   FILE *stream;
   int flag;
+  void *data;
+  void (*dtor)(void*);
 } file;
 
 extern inline int
@@ -56,6 +58,7 @@ static void
 destroy_file(eth_type *type, eth_t x)
 {
   file *f = (void*)x;
+
   if (eth_is_open(x))
   {
     if (eth_close(x))
@@ -66,7 +69,19 @@ destroy_file(eth_type *type, eth_t x)
         eth_warning("fclose: %s", strerror(errno));
     }
   }
+
+  if (f->dtor)
+    f->dtor(f->data);
+
   free(f);
+}
+
+static void
+init_file(void *f)
+{
+  eth_init_header(f, eth_file_type);
+  ((file*)f)->data = NULL;
+  ((file*)f)->dtor = NULL;
 }
 
 void
@@ -79,9 +94,9 @@ _eth_init_file_type(void)
   eth_stdin  = ETH(&_stdin);
   eth_stdout = ETH(&_stdout);
   eth_stderr = ETH(&_stderr);
-  eth_init_header(eth_stdin, eth_file_type);
-  eth_init_header(eth_stdout, eth_file_type);
-  eth_init_header(eth_stderr, eth_file_type);
+  init_file(eth_stdin);
+  init_file(eth_stdout);
+  init_file(eth_stderr);
   _stdin.stream = stdin;
   _stdin.flag = OPEN;
   _stdout.stream = stdout;
@@ -100,7 +115,7 @@ eth_open(const char *path, const char *mod)
   if (stream == NULL)
     return NULL;
   file *f = malloc(sizeof(file));
-  eth_init_header(f, eth_file_type);
+  init_file(f);
   f->stream = stream;
   f->flag = OPEN;
   return ETH(f);
@@ -113,7 +128,17 @@ eth_open_fd(int fd, const char *mod)
   if (stream == NULL)
     return NULL;
   file *f = malloc(sizeof(file));
-  eth_init_header(f, eth_file_type);
+  init_file(f);
+  f->stream = stream;
+  f->flag = OPEN;
+  return ETH(f);
+}
+
+eth_t
+eth_open_stream(FILE *stream)
+{
+  file *f = malloc(sizeof(file));
+  init_file(f);
   f->stream = stream;
   f->flag = OPEN;
   return ETH(f);
@@ -126,9 +151,16 @@ eth_open_pipe(const char *command, const char *mod)
   if (stream == NULL)
     return NULL;
   file *f = malloc(sizeof(file));
-  eth_init_header(f, eth_file_type);
+  init_file(f);
   f->stream = stream;
   f->flag = OPEN | PIPE;
   return ETH(f);
 }
 
+void
+eth_set_file_data(eth_t x, void *data, void (*dtor)(void*))
+{
+  file *f = (file*)x;
+  f->data = data;
+  f->dtor = dtor;
+}

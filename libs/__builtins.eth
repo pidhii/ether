@@ -97,6 +97,7 @@ let pub open_out path = __open path "w"
 let pub open_append path = __open path "a"
 let pub open_pipe_in cmd = __popen cmd "r"
 let pub open_pipe_out cmd = __popen cmd "w"
+let pub open_string_in = __open_string
 
 --------------------------------------------------------------------------------
 --                                System
