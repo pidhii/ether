@@ -421,7 +421,7 @@ let rec pub transpose xs =
   else []
 in
 
-let pub get l k = car $ drop k l in
+let pub get k l = car $ drop k l in
 
 nil;
 

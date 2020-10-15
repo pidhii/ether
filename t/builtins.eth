@@ -28,10 +28,9 @@ let string_tests =
     ("substr", fn ->
       let str = "Hello World!" in
       List.all? id [
-        sub str 0 4 eq "Hell",
-        sub str (6...) eq "World!",
-        sub str (...4) eq "Hello",
-        sub str (4..6) eq "o W"]),
+        sub (6...) str eq "World!",
+        sub (...4) str eq "Hello",
+        sub (4..6) str eq "o W"]),
     ("strstr", fn -> strstr "a;b,c" ";" == 1 && not strstr_opt "" ","),
     ("find", fn ->
       find "45" "123456" eq (3, 3+2) && find \[3-5]+/ "123456" eq (2, 2+3)),
@@ -114,13 +113,13 @@ let list_tests =
       let t1 = transpose [[1,2,3],[4,5,6]] eq [[1,4],[2,5],[3,6]]
       and t2 = transpose [[10,11],[20],[],[30,31,32]] eq [[10,20,30],[11,31],[32]]
       in t1 && t2)
-  , ("get", fn -> get [0,1,2,3] 2 == 2)
+  , ("get", fn -> get 2 [0,1,2,3] == 2)
   ]
 in
 
 let vector_tests =
   let v = Vector.of_list [1, 2, 3] in
-  [ ("of_list", fn -> Vector.(get v 0, get v 1, get v 2) eq (1, 2, 3))
+  [ ("of_list", fn -> Vector.(get 0 v, get 1 v, get 2 v) eq (1, 2, 3))
   , ("back", fn -> Vector.back v eq 3)
   , ("front", fn -> Vector.front v eq 1)
   , ("push", fn -> Vector.back (Vector.push v 42) eq 42 && Vector.back v eq 3)

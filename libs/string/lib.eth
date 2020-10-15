@@ -62,11 +62,11 @@ let pub join sep xs =
     List.fold_left (fn x y -> cat [x, sep, y]) hd tl
   else invalid_argument ()
 in
-let pub sub s x =
+let pub sub x s =
   if let l .. r = x then __substr s l (r - l + 1)
   else if let l... = x then __substr s l (len s - l)
   else if let ...r = x then __substr s 0 (r + 1)
-  else fn y -> __substr s x y;
+  else invalid_argument ()
 in
 
 --------------------------------------------------------------------------------

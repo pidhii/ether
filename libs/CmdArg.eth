@@ -17,14 +17,14 @@ let get_options cfg os =
   and handle_long_option o os kws pos =
     if let Some brk = String.strstr_opt o "=" then
       -- Long option with '=' 
-      let lopt = String.sub o (2 .. brk-1) in
+      let lopt = String.sub (2 .. brk-1) o in
       let {has_arg, val} = get_rules lopt in
       if has_arg then
-        let arg = String.sub o (brk + 1 ...) in
+        let arg = String.sub (brk + 1 ...) o in
         loop os ((val, arg) :: kws) pos
       else raise Unexpected_argument
     else
-      let lopt = String.sub o (2...) in
+      let lopt = String.sub (2...) o in
       let {has_arg, val} = get_rules lopt in
       if has_arg then
         if let arg::os = os then
@@ -33,12 +33,12 @@ let get_options cfg os =
       else loop os ((val, true) :: kws) pos
 
   and handle_short_option o os kws pos =
-    let shopt = String.sub o 1 1 in
+    let shopt = String.sub (1..1) o in
     let {has_arg, val} = get_rules shopt in
     if String.len o > 2 then
       -- Option and argument are merged 
       if has_arg then
-        let arg = String.sub o (2...) in
+        let arg = String.sub (2...) o in
         loop os ((val, arg) :: kws) pos
       else raise Unexpected_argument
     else

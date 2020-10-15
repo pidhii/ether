@@ -1,4 +1,4 @@
-Os.chdir (List.get command_line 1);
+Os.chdir (List.get 1 command_line);
 
 let fail! =
   system "dope uninstall foo &>/dev/null";

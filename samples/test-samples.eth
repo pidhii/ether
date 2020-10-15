@@ -1,5 +1,5 @@
 
-OS.chdir (List.get command_line 1);
+OS.chdir (List.get 1 command_line);
 
 let test_mergesort! =
   let origlist = [1,9,4,5,7,6,8,2,3] in

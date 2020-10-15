@@ -50,14 +50,6 @@ let utc_date! =
     else String.chop line
 in
 
-let realpath path =
-  let pipe = open_pipe_in (format "realpath '%d'" path) in
-  let line = read_line_of pipe in
-  if close pipe /= 0
-    then raise System_error
-    else String.chop line
-in
-
 let elf? path =
   read_of (open_in path) 4 eq "\x7fELF"
 in
@@ -148,8 +140,8 @@ let install dir args =
   -- Update registry
   printf "> updating registry\n";
   let date = utc_date! or "<undefined>" in
-  let source_dir = realpath dir or "<undefined>" in
-  let install_dir = realpath moddir or "<undefined>" in
+  let source_dir = Os.realpath dir or "<undefined>" in
+  let install_dir = Os.realpath moddir or "<undefined>" in
   let db = {name, date, source_dir, install_dir} :: db in
   update_db db;
 

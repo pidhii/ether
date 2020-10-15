@@ -32,8 +32,8 @@ module =
   let pub getenv = __getenv
 
   let pub realpath path =
-    if String.sub path (0..1) eq "~/"
-    then __realpath (getenv "HOME" ++ String.sub path (1...))
+    if String.sub (0..1) path eq "~/"
+    then __realpath (getenv "HOME" ++ String.sub (1...) path)
     else __realpath path
 
   let pub mkdtemp =
