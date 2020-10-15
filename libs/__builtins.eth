@@ -73,8 +73,14 @@ let pub die msg =
 
 
 let pub create_env defs =
-  { defs, load = fn {defs} path -> __builtin_load path defs }
-let pub load path = __builtin_load path []
+  { defs
+  , load = fn {defs} path -> __load path defs
+  , load_stream = fn {defs} file -> __load_stream file defs
+  , load_string = fn {defs} str -> __load_stream (__open_string str) defs
+  }
+let pub load path = __load path []
+let pub load_stream file = __load_stream file []
+let pub load_string str = __load_stream (__open_string str) []
 
 --------------------------------------------------------------------------------
 --                                   IO

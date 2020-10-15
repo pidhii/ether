@@ -1126,6 +1126,7 @@ eth_destroy_record_hn(eth_type *type, eth_t x);
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 extern
 eth_type *eth_file_type;
+#define eth_is_file(x) ((x)->type == eth_file_type)
 
 extern
 eth_t eth_stdin, eth_stdout, eth_stderr;

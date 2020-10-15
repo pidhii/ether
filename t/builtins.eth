@@ -131,9 +131,15 @@ let io_tests =
     ("open_string_in", fn ->
       let str = "1 + 1" in
       let stream = open_string_in str in
-      nil
-      --IO.read_line_of stream eq str
-  ),
+      IO.read_line_of stream eq str),
+  ]
+in
+
+let load_tests =
+  [
+    ("load_string", fn ->
+      let str = "let pub foo = 42 in 1 + 1" in
+      load_string str eq (2, [("foo",42)]))
   ]
 in
 
@@ -150,6 +156,7 @@ let (nok, nfail) =
     , ("list", list_tests)
     , ("vector", vector_tests)
     , ("io", io_tests)
+    , ("load", load_tests)
     ]
 in
 exit 1 when nfail > 0;

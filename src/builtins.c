@@ -652,6 +652,7 @@ _load(void)
     if (def->type != tup2)
     {
       eth_drop_2(path, env);
+      eth_destroy_module(envmod);
       return eth_exn(eth_type_error());
     }
     eth_t key = eth_tup_get(def, 0);
@@ -692,6 +693,82 @@ _load(void)
   eth_remove_module(g_env, id);
   eth_destroy_module(mod);
   return ret;
+}
+
+static eth_t
+_load_stream(void)
+{
+  static int cnt = 1;
+  eth_use_tuple_as(tup2, 2);
+
+  eth_t file = *eth_sp++;
+  eth_t env = *eth_sp++;
+  if (eth_unlikely(not eth_is_file(file)))
+    goto error_1;
+
+  eth_module *envmod = eth_create_module(NULL);
+  for (eth_t it = env; eth_is_pair(it); it = eth_cdr(it))
+  {
+    eth_t def = eth_car(it);
+    if (def->type != tup2)
+      goto error_2;
+
+    eth_t key = eth_tup_get(def, 0);
+    eth_t val = eth_tup_get(def, 1);
+    if (not eth_is_str(key))
+      goto error_2;
+
+    eth_define(envmod, eth_str_cstr(key), val);
+  }
+
+  char id[42];
+  sprintf(id, "load.%d", cnt++);
+
+  eth_ast *ast = eth_parse(eth_get_file_stream(file));
+  if (not ast)
+    goto error_3;
+
+  eth_module *mod = eth_create_module(id);
+  eth_t ret;
+  int ok = eth_load_module_from_ast2(g_env, g_env, mod, ast, &ret, envmod);
+  eth_destroy_module(envmod);
+  eth_drop_ast(ast);
+  if (not ok)
+    goto error_4;
+
+  {
+    eth_t acc = eth_nil;
+    int ndefs = eth_get_ndefs(mod);
+    eth_def defs[ndefs];
+    eth_get_defs(mod, defs);
+    for (int i = 0; i < ndefs; ++i)
+      acc = eth_cons(eth_tup2(eth_str(defs[i].ident), defs[i].val), acc);
+
+    ret = eth_tup2(ret, acc);
+    eth_drop_2(file, env);
+    eth_remove_module(g_env, id);
+    eth_destroy_module(mod);
+    return ret;
+  }
+
+error_1:
+  eth_drop_2(file, env);
+  return eth_exn(eth_type_error());
+
+error_2:
+  eth_drop_2(file, env);
+  eth_destroy_module(envmod);
+  return eth_exn(eth_type_error());
+
+error_3:
+  eth_drop_2(file, env);
+  eth_destroy_module(envmod);
+  return eth_exn(eth_failure());
+
+error_4:
+  eth_drop_2(file, env);
+  eth_destroy_module(mod);
+  return eth_exn(eth_failure());
 }
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -801,7 +878,8 @@ _eth_init_builtins(void)
   eth_define(g_mod,      "raise", eth_create_proc(     _raise, 1, NULL, NULL));
   eth_define(g_mod,       "exit", eth_create_proc(     __exit, 1, NULL, NULL));
   // ---
-  eth_define(g_mod, "__builtin_load", eth_create_proc(_load, 2, NULL, NULL));
+  eth_define(g_mod, "__load", eth_create_proc(_load, 2, NULL, NULL));
+  eth_define(g_mod, "__load_stream", eth_create_proc(_load_stream, 2, NULL, NULL));
   // ---
   eth_define(g_mod, "__Lazy_create", eth_create_proc(_Lazy_create, 1, NULL, NULL));
 
