@@ -52,4 +52,7 @@ module =
     __mkdtemp
 
   let pub fork = __fork
+
+  let pub pipe = __pipe
+  let pub pipe2 = __pipe2
 end
