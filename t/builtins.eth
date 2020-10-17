@@ -136,10 +136,12 @@ let io_tests =
 in
 
 let load_tests =
-  [
-    ("load_string", fn ->
+  [ ("load_string", fn ->
       let str = "let pub foo = 42 in 1 + 1" in
       load_string str eq (2, [("foo",42)]))
+  , ("create_env:load_string", fn ->
+      let env = create_env [("a", 1), ("b", 2)] in
+      env:load_string "a + b" eq (3, nil))
   ]
 in
 
