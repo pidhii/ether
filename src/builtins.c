@@ -351,10 +351,10 @@ _open(void)
     eth_t exn;
     switch (errno)
     {
-      case EINVAL: exn = eth_exn(eth_invalid_argument()); break;
+      case EINVAL: exn = eth_invalid_argument(); break;
       default: exn = eth_system_error(errno); break;
     }
-    eth_return(args, exn);
+    eth_throw(args, exn);
   }
   eth_return(args, file);
 }
@@ -371,10 +371,10 @@ _popen(void)
     eth_t exn;
     switch (errno)
     {
-      case EINVAL: exn = eth_exn(eth_invalid_argument()); break;
-      default: exn = eth_exn(eth_system_error(errno)); break;
+      case EINVAL: exn = eth_invalid_argument(); break;
+      default: exn = eth_system_error(errno); break;
     }
-    eth_return(args, exn);
+    eth_throw(args, exn);
   }
   eth_return(args, file);
 }
