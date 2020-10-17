@@ -3,6 +3,10 @@
 #include <errno.h>
 #include <stdlib.h>
 
+
+ETH_MODULE("ether:io");
+
+
 static eth_t
 _read_line_of(void)
 {
@@ -88,6 +92,73 @@ _read_of(void)
   buf[nrd] = '\0';
   return eth_create_string_from_ptr2(buf, nrd);
 }
+
+#define DEF_READ_NUM(NAME, TYPE)                       \
+  static eth_t                                         \
+  _read_##NAME##_of(void)                              \
+  {                                                    \
+    eth_use_symbol(End_of_file);                       \
+    eth_use_symbol(Failure);                           \
+                                                       \
+    eth_args args = eth_start(1);                      \
+    eth_t file = eth_arg2(args, eth_file_type);        \
+    FILE *stream = eth_get_file_stream(file);          \
+    TYPE buf;                                          \
+    size_t nrd = fread(&buf, sizeof(TYPE), 1, stream); \
+    if (nrd == 0)                                      \
+    {                                                  \
+      if (feof(stream))                                \
+        eth_throw(args, End_of_file);                  \
+      else if (ferror(stream))                         \
+        eth_throw(args, eth_system_error(0));          \
+    }                                                  \
+    else if (nrd != 1)                                 \
+    {                                                  \
+      eth_throw(args, Failure);                        \
+    }                                                  \
+    eth_return(args, eth_num(buf));                    \
+  }
+
+#define DEF_WRITE_NUM(NAME, TYPE)                     \
+  static eth_t                                        \
+  _write_##NAME##_to(void)                            \
+  {                                                   \
+    eth_args args = eth_start(2);                     \
+    eth_t file = eth_arg2(args, eth_file_type);       \
+    eth_t num = eth_arg2(args, eth_number_type);      \
+    FILE *stream = eth_get_file_stream(file);         \
+    TYPE buf = eth_num_val(num);                      \
+    clearerr(stream);                                 \
+    errno = 0;                                        \
+    size_t nwr = fwrite(&buf, sizeof buf, 1, stream); \
+    if (ferror(stream))                               \
+    {                                                 \
+      switch (errno)                                  \
+      {                                               \
+        case EINVAL:                                  \
+        case EBADF:                                   \
+          eth_throw(args, eth_invalid_argument());    \
+      }                                               \
+      eth_throw(args, eth_system_error(0));           \
+    }                                                 \
+    eth_return(args, eth_nil);                        \
+  }
+
+#define DEF_READ_WRITE_NUM(NAME, TYPE) \
+  DEF_READ_NUM(NAME, TYPE) \
+  DEF_WRITE_NUM(NAME, TYPE)
+
+DEF_READ_WRITE_NUM(int8, int8_t);
+DEF_READ_WRITE_NUM(int16, int16_t);
+DEF_READ_WRITE_NUM(int32, int32_t);
+DEF_READ_WRITE_NUM(int64, int64_t);
+DEF_READ_WRITE_NUM(uint8, uint8_t);
+DEF_READ_WRITE_NUM(uint16, uint16_t);
+DEF_READ_WRITE_NUM(uint32, uint32_t);
+DEF_READ_WRITE_NUM(uint64, uint64_t);
+DEF_READ_WRITE_NUM(float, float);
+DEF_READ_WRITE_NUM(double, double);
+
 
 static eth_t
 _read_file(void)
@@ -220,7 +291,7 @@ _write_to(void)
       case EBADF:
         eth_throw(args, eth_invalid_argument());
     }
-    eth_throw(args, eth_sym("System_error"));
+    eth_throw(args, eth_system_error(0));
   }
   eth_end_unref(args);
   return eth_nil;
@@ -289,6 +360,26 @@ ether_module(eth_module *mod, eth_env *toplvl)
 {
   eth_define(mod, "read_line_of", eth_proc(_read_line_of, 1));
   eth_define(mod, "read_of", eth_proc(_read_of, 2));
+  eth_define(mod, "read_i8_of", eth_proc(_read_int8_of, 1));
+  eth_define(mod, "read_i16_of", eth_proc(_read_int16_of, 1));
+  eth_define(mod, "read_i32_of", eth_proc(_read_int32_of, 1));
+  eth_define(mod, "read_i64_of", eth_proc(_read_int64_of, 1));
+  eth_define(mod, "read_u8_of", eth_proc(_read_uint8_of, 1));
+  eth_define(mod, "read_u16_of", eth_proc(_read_uint16_of, 1));
+  eth_define(mod, "read_u32_of", eth_proc(_read_uint32_of, 1));
+  eth_define(mod, "read_u64_of", eth_proc(_read_uint64_of, 1));
+  eth_define(mod, "read_f32_of", eth_proc(_read_float_of, 1));
+  eth_define(mod, "read_f64_of", eth_proc(_read_double_of, 1));
+  eth_define(mod, "write_i8_to", eth_proc(_write_int8_to, 2));
+  eth_define(mod, "write_i26_to", eth_proc(_write_int16_to, 2));
+  eth_define(mod, "write_i32_to", eth_proc(_write_int32_to, 2));
+  eth_define(mod, "write_i64_to", eth_proc(_write_int64_to, 2));
+  eth_define(mod, "write_u8_to", eth_proc(_write_uint8_to, 2));
+  eth_define(mod, "write_u26_to", eth_proc(_write_uint16_to, 2));
+  eth_define(mod, "write_u32_to", eth_proc(_write_uint32_to, 2));
+  eth_define(mod, "write_u64_to", eth_proc(_write_uint64_to, 2));
+  eth_define(mod, "write_f32_to", eth_proc(_write_float_to, 2));
+  eth_define(mod, "write_f64_to", eth_proc(_write_double_to, 2));
   eth_define(mod, "read_file", eth_proc(_read_file, 1));
   eth_define(mod, "__printf", eth_proc(_printf, 2));
   eth_define(mod, "write_to", eth_proc(_write_to, 2));

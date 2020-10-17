@@ -3,6 +3,16 @@ module =
 -- Input:
 -- * read_of (C)
 -- * read
+-- * read_i8_of (C)
+-- * read_i16_of (C)
+-- * read_i32_of (C)
+-- * read_i64_of (C)
+-- * read_u8_of (C)
+-- * read_u16_of (C)
+-- * read_u32_of (C)
+-- * read_u64_of (C)
+-- * read_f32_of (C)
+-- * read_f64_of (C)
 -- * read_line_of (C)
 -- * read_line_of_opt
 -- * read_line
@@ -16,6 +26,16 @@ module =
 -- * eprintf
 -- * write_to (C)
 -- * write
+-- * write_i8_to (C)
+-- * write_i16_to (C)
+-- * write_i32_to (C)
+-- * write_i64_to (C)
+-- * write_u8_to (C)
+-- * write_u16_to (C)
+-- * write_u32_to (C)
+-- * write_u64_to (C)
+-- * write_f32_to (C)
+-- * write_f64_to (C)
 --
 -- Miscelenious:
 -- * tell (C)
