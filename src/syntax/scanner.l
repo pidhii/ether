@@ -53,10 +53,13 @@ pop_quote()
     destroy_quote(cod_vec_pop(g_quotes));
   }
 
+static cod_vec(int) g_fmtbracecnt;
+
 void
 _eth_init_scanner(void)
   {
     cod_vec_init(g_quotes);
+    cod_vec_init(g_fmtbracecnt);
   }
 
 void
@@ -64,6 +67,7 @@ _eth_cleanup_scanner(void)
   {
     assert(g_quotes.len == 0);
     cod_vec_destroy(g_quotes);
+    cod_vec_destroy(g_fmtbracecnt);
   }
 
 %}
@@ -72,6 +76,7 @@ _eth_cleanup_scanner(void)
 %option reentrant
 %option interactive
 
+%x QSTRING
 %x STRING
 %x REGEXP
 %x COMMENT
@@ -124,9 +129,14 @@ OPERATOR [-+%^.$:!<>*/=&|∘]+
   BEGIN(STRING);
   return '"';
 }
+\' {
+  push_quote(QUOTES_DEFAULT, NULL);
+  BEGIN(QSTRING);
+  return '"';
+}
 "{.help|" {
   push_quote(QUOTES_STRING, ".help");
-  BEGIN(STRING);
+  BEGIN(QSTRING);
   return HELP;
 }
 "{"[-a-zA-Z0-9_+]+"|" {
@@ -143,26 +153,35 @@ OPERATOR [-+%^.$:!<>*/=&|∘]+
   yylval->character = yytext[yyleng-1];
   return START_REGEXP;
 }
-<STRING>\\\n
-<STRING>"\\0"  { yylval->character = '\0'; return CHAR; }
-<STRING>"\\a"  { yylval->character = '\a'; return CHAR; }
-<STRING>"\\b"  { yylval->character = '\b'; return CHAR; }
-<STRING>"\\e"  { yylval->character = '\x1b'; return CHAR; }
-<STRING>"\\f"  { yylval->character = '\f'; return CHAR; }
-<STRING>"\\n"  { yylval->character = '\n'; return CHAR; }
-<STRING>"\\r"  { yylval->character = '\r'; return CHAR; }
-<STRING>"\\t"  { yylval->character = '\t'; return CHAR; }
-<STRING>"\\v"  { yylval->character = '\v'; return CHAR; }
-<STRING>"\\?"  { yylval->character = '\?'; return CHAR; }
-<STRING>"\\x"[0-9a-fA-F]{1,2} {
+<QSTRING,STRING>\\\n
+<QSTRING,STRING>"\\0"  { yylval->character = '\0'; return CHAR; }
+<QSTRING,STRING>"\\a"  { yylval->character = '\a'; return CHAR; }
+<QSTRING,STRING>"\\b"  { yylval->character = '\b'; return CHAR; }
+<QSTRING,STRING>"\\e"  { yylval->character = '\x1b'; return CHAR; }
+<QSTRING,STRING>"\\f"  { yylval->character = '\f'; return CHAR; }
+<QSTRING,STRING>"\\n"  { yylval->character = '\n'; return CHAR; }
+<QSTRING,STRING>"\\r"  { yylval->character = '\r'; return CHAR; }
+<QSTRING,STRING>"\\t"  { yylval->character = '\t'; return CHAR; }
+<QSTRING,STRING>"\\v"  { yylval->character = '\v'; return CHAR; }
+<QSTRING,STRING>"\\?"  { yylval->character = '\?'; return CHAR; }
+<QSTRING,STRING>"\\x"[0-9a-fA-F]{1,2} {
   char *endptr;
   yylval->character = strtol(yytext + 2, &endptr, 16);
   assert(*endptr == '\0');
   return CHAR;
 }
 <STRING>"\\\"" { yylval->character = '"'; return CHAR; }
-<STRING>"\\\\" { yylval->character = '\\'; return CHAR; }
-<REGEXP>"\\/"  { yylval->character = '/'; return CHAR; }
+<QSTRING>"\\\'" { yylval->character = '\''; return CHAR; }
+<QSTRING,STRING>"\\\\" { yylval->character = '\\'; return CHAR; }
+<QSTRING,REGEXP>"\\/"  { yylval->character = '/'; return CHAR; }
+
+<STRING>"\\{" { yylval->character = '{'; return CHAR; }
+<STRING>"{" {
+  cod_vec_push(g_fmtbracecnt, 0);
+  BEGIN(INITIAL);
+  return START_FORMAT;
+}
+
 <STRING>\" {
   if (cod_vec_last(g_quotes).tag == QUOTES_DEFAULT)
   {
@@ -176,7 +195,20 @@ OPERATOR [-+%^.$:!<>*/=&|∘]+
     return CHAR;
   }
 }
-<STRING>"|.help}" {
+<QSTRING>\' {
+  if (cod_vec_last(g_quotes).tag == QUOTES_DEFAULT)
+  {
+    pop_quote();
+    BEGIN(INITIAL);
+    return '"';
+  }
+  else
+  {
+    yylval->character = '"';
+    return CHAR;
+  }
+}
+<QSTRING>"|.help}" {
   if (strcmp(".help", cod_vec_last(g_quotes).str) == 0)
   {
     pop_quote();
@@ -223,8 +255,8 @@ OPERATOR [-+%^.$:!<>*/=&|∘]+
   yylval->integer = flag;
   return END_REGEXP;
 }
-<STRING,REGEXP>. { yylval->character = yytext[0]; return CHAR; }
-<STRING>\n     { yylval->character = yytext[0]; return CHAR; }
+<QSTRING,STRING,REGEXP>. { yylval->character = yytext[0]; return CHAR; }
+<QSTRING,STRING>\n     { yylval->character = yytext[0]; return CHAR; }
 
 nan                                 |
 inf                                 |
@@ -290,7 +322,6 @@ __deprecated { return DEPRECATED; }
 "*"|"/" |
 "("|")" |
 "["|"]" |
-"{"|"}" |
 "="     |
 ","     |
 ";"     { return yytext[0]; }
@@ -326,6 +357,23 @@ lnot    { return LNOT; }
 "."\s*"(" { return DOT_OPEN1; }
 "."\s*"[" { return DOT_OPEN2; }
 
+"{" {
+  if (g_fmtbracecnt.len > 0)
+    cod_vec_last(g_fmtbracecnt) ++;
+  return '{';
+}
+"}" {
+  if (g_fmtbracecnt.len > 0)
+  {
+    if (cod_vec_last(g_fmtbracecnt)-- == 0)
+    {
+      g_fmtbracecnt.len --;
+      BEGIN(STRING);
+    }
+    return END_FORMAT;
+  }
+  return '}';
+}
 
 "("(mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|not|lnot)")" |
 "("{OPERATOR}")"     {

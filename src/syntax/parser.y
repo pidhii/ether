@@ -179,6 +179,7 @@ int _eth_start_token = -1;
 
 // =============================================================================
 %token START_REPL UNDEFINED
+%token START_FORMAT END_FORMAT
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %token<number> NUMBER
 %token<string> SYMBOL CAPSYMBOL
@@ -248,6 +249,7 @@ int _eth_start_token = -1;
 %type<patvec> FnArgs
 %type<string> Help MaybeHelp
 %type<charvec> String
+%type<ast> FmtString FmtStringAux
 %type<ast> RegExp
 %type<charvec> StringAux
 %type<pattern> AtomicPattern FormPattern Pattern
@@ -342,6 +344,7 @@ Atom
     $$ = eth_ast_cval(eth_create_string_from_ptr2($1.data, $1.len - 1));
     LOC($$, @$);
   }
+  | FmtString
   | RegExp
   | '('')' { $$ = eth_ast_cval(eth_nil); LOC($$, @$); }
   | '['']' { $$ = eth_ast_cval(eth_nil); }
@@ -764,6 +767,14 @@ String
   : '"' StringAux '"' { $$ = $2; }
 ;
 
+FmtString
+  : '"' FmtStringAux '"' {
+    eth_ast *fmt = eth_ast_cval(eth_get_builtin("__fmt"));
+    eth_ast *p[1] = { $2 };
+    $$ = eth_ast_apply(fmt, p, 1);
+  }
+;
+
 MaybeHelp
   : { $$ = NULL; }
   | Help
@@ -806,6 +817,36 @@ StringAux
     for (const char *p = $2; *p; ++p)
       cod_vec_push($$, *p);
     free($2);
+  }
+;
+
+FmtStringAux
+  /* To distinguish FmtString from simple String */
+  : StringAux START_FORMAT Expr END_FORMAT StringAux {
+    eth_ast *tmp;
+
+    cod_vec_push($1, 0);
+    tmp = eth_ast_cval(eth_create_string_from_ptr2($1.data, $1.len - 1));
+    $$ = eth_ast_binop(ETH_CONS, tmp, eth_ast_cval(eth_nil));
+
+    $$ = eth_ast_binop(ETH_CONS, $3, $$);
+    /*LOC($$, @$);*/
+
+    cod_vec_push($5, 0);
+    tmp = eth_ast_cval(eth_create_string_from_ptr2($5.data, $5.len - 1));
+    $$ = eth_ast_binop(ETH_CONS, tmp, $$);
+  }
+  | FmtStringAux START_FORMAT Expr END_FORMAT StringAux {
+    eth_ast *tmp;
+
+    $$ = $1;
+
+    $$ = eth_ast_binop(ETH_CONS, $3, $$);
+    /*LOC($$, @$);*/
+
+    cod_vec_push($5, 0);
+    tmp = eth_ast_cval(eth_create_string_from_ptr2($5.data, $5.len - 1));
+    $$ = eth_ast_binop(ETH_CONS, tmp, $$);
   }
 ;
 

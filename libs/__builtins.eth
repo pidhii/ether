@@ -82,6 +82,16 @@ let pub load path = __load path []
 let pub load_stream file = __load_stream file []
 let pub load_string str = __load_stream (__open_string str) []
 
+
+let pub __fmt l =
+  let rec loop l acc =
+    if let x :: xs = l then
+      let x = if string? x then x else format "%w" x in
+      loop xs (x ++ acc)
+    else acc
+  in
+  loop l ""
+
 --------------------------------------------------------------------------------
 --                                   IO
 --
