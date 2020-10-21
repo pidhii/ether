@@ -79,10 +79,7 @@ _realpath(void)
   eth_t path = eth_arg2(args, eth_string_type);
   char buf[PATH_MAX];
   if (not realpath(eth_str_cstr(path), buf))
-  {
-    eth_t err = eth_sym(eth_errno_to_str(errno));
-    eth_throw(args, System_error(err));
-  }
+    eth_throw(args, eth_system_error(errno));
   eth_return(args, eth_str(buf));
 }
 
