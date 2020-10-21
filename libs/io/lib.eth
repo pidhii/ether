@@ -65,26 +65,15 @@ let pub seek file pos =
     else raise Invalid_argument
   in __seek file offs whence
 
-let compose_va f g =
-  let rec aux x =
-    if function? x then
-      fn y -> aux (x y)
-      --x >> aux
-    else f x
-  in aux g
-
-let pub shell =
-  let aux cmd =
-    let pipe = open_pipe_in cmd in
-    let rec loop acc =
-      if let Some data = read_of_opt pipe 0x100
-        then loop (acc ++ data)
-        else acc
-    in
-    let out = loop "" in
-    if close pipe == 0 then out
-    else raise Failure
+let pub shell cmd =
+  let pipe = open_pipe_in cmd in
+  let rec loop acc =
+    if let Some data = read_of_opt pipe 0x100
+      then loop (acc ++ data)
+      else acc
   in
-  compose_va aux format
+  let out = loop "" in
+  if close pipe == 0 then out
+  else raise Failure
 
 end

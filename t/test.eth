@@ -147,7 +147,7 @@ let file = open_out path in
 write_to file "Hello there!";
 close file;
 print ("out.txt:", read_file $ open_in path);
-system "rm -v %d" path ;
+system "rm -v {path}";
 
 begin
   let list? x = x is nil || pair? x in

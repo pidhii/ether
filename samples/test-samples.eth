@@ -7,7 +7,7 @@ let test_mergesort! =
     origlist
     |> List.map (format "%d")
     |> String.join "\n"
-    |> IO.shell {CMD|ether ./mergesort.eth <<<'%d' | grep "Sorted list"|CMD}
+    |> (x -> IO.shell {q|ether ./mergesort.eth <<<'{x}' | grep "Sorted list"|q})
     |> String.match \\[.+\]/
     |> car
   in

@@ -121,8 +121,7 @@ let pub eprint = __print_to stderr
 
 --------------------------------------------------------------------------------
 --                                System
-let pub system = compose_va __system format
---let pub system = __system <<* format in
+let pub system = __system
 
 --------------------------------------------------------------------------------
 --                                Errors
