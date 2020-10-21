@@ -278,8 +278,16 @@ _rev_filter_map(void)
     eth_reserve_stack(1);
     eth_sp[0] = eth_car(it);
     const eth_t v = eth_apply(f, 1);
-    if (eth_is_exn(v) && eth_what(v) == Filter_out)
-      eth_drop(v);
+    if (eth_is_exn(v))
+    {
+      if (eth_what(v) == Filter_out)
+        eth_drop(v);
+      else
+      {
+        eth_drop(acc);
+        eth_rethrow(args, v);
+      }
+    }
     else
       acc = eth_cons(v, acc);
   }
