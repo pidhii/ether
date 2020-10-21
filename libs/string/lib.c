@@ -511,13 +511,14 @@ _to_number(void)
     return eth_exn(eth_failure());
   }
 
-  while (*endptr++)
+  while (*endptr)
   {
     if (not isspace(*endptr))
     {
       eth_drop(x);
       return eth_exn(eth_failure());
     }
+    endptr ++;
   }
 
   eth_drop(x);

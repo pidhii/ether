@@ -14,29 +14,46 @@ let string_tests =
   [
     ("cat", fn -> cat ["a", "b", "c"] eq "abc"),
     ("join", fn -> join "," ["a", "b", "c"] eq "a,b,c"),
-    ("chr", fn -> chr 0x61 eq "a"),
-    ("ord", fn -> ord "a" eq 0x61),
-    ("len", fn -> len "1234" == 4),
     ("create", fn -> len (create 10) == 10),
     ("make", fn -> make 10 "@" eq "@@@@@@@@@@" && make 2 "" eq "\0\0"),
+
+    ("len", fn -> len "1234" == 4),
     ("to_upper", fn -> to_upper "AbcD" eq "ABCD"),
     ("to_lower", fn -> to_lower "AbcD" eq "abcd"),
+    ("chr", fn -> chr 0x61 eq "a"),
+    ("ord", fn -> ord "a" eq 0x61),
+    ("to_number", fn ->
+      List.all? (x -> x == 42) [
+        to_number "42",
+        to_number " 42 ",
+        to_number "0x2A"
+      ]
+    ),
+    ("to_symbol", fn ->
+      to_symbol "Foo" is Foo && to_symbol " Foo " not eq Foo),
+
     ("chomp", fn -> chomp "asd\n\n" eq "asd" && chomp "asd" eq "asd"),
     ("chop", fn -> chop "asd" eq "as" && chop "" eq ""),
-    ("strcmp", fn -> cmp "asdf" "asdf" == 0),
-    ("strcasecmp", fn -> casecmp "asdf" "ASdF" == 0),
-    ("substr", fn ->
+
+    ("sub", fn ->
       let str = "Hello World!" in
       List.all? id [
         sub (6...) str eq "World!",
         sub (...4) str eq "Hello",
-        sub (4..6) str eq "o W"]),
-    ("strstr", fn -> strstr "a;b,c" ";" == 1 && not strstr_opt "" ","),
+        sub (4..6) str eq "o W"
+      ]
+    ),
+    ("get", fn -> get 2 "1234" eq "3"),
+
+    ("cmp", fn -> cmp "asdf" "asdf" == 0),
+    ("casecmp", fn -> casecmp "asdf" "ASdF" == 0),
+
     ("find", fn ->
       find "45" "123456" eq (3, 3+2) && find \[3-5]+/ "123456" eq (2, 2+3)),
+
     ("match", fn -> match \[^^]\K(\w+)\s+(\w)/ "a bu c" eq ["bu c", "bu", "c"]),
-    ("gsub", fn -> gsub \\s+/ (const "-") "a   s f  f f   " eq "a-s-f-f-f-"),
     ("split", fn -> split \\s+/ "asd asdf asdf " eq ["asd", "asdf", "asdf", ""]),
+    ("gsub", fn -> gsub \\s+/ (const "-") "a   s f  f f   " eq "a-s-f-f-f-"),
   ]
 in
 

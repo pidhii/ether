@@ -2,7 +2,6 @@
 --------------------------------------------------------------------------------
 --                                Strings
 -- Constructors:
--- * format
 -- * cat (C)
 -- * join
 -- * create
@@ -21,8 +20,9 @@
 -- * chomp (C)
 -- * chop (C)
 --
--- Slicing (C):
+-- Element access (C):
 -- * sub
+-- * get
 --
 -- Comparison:
 -- * cmp (C)
@@ -62,25 +62,22 @@ let pub join sep xs =
     List.fold_left (fn x y -> cat [x, sep, y]) hd tl
   else invalid_argument ()
 in
+
 let pub sub x s =
   if let l .. r = x then __substr s l (r - l + 1)
   else if let l... = x then __substr s l (len s - l)
   else if let ...r = x then __substr s 0 (r + 1)
   else invalid_argument ()
 in
+let pub get i s = __substr s i 1 in
 
 --------------------------------------------------------------------------------
 --                                Regexp
 -- * match (C)
 -- * rev_split (C)
 -- * split
+-- * gsub
 let pub split re str = List.rev $ rev_split re str in
-
-let pub strstr_opt = __strstr_opt in
-let pub strstr s pat =
-  if let Some k = strstr_opt s pat then k
-  else failure ()
-in
 
 let pub find pat s =
   if regexp? pat then __find_regexp pat s
