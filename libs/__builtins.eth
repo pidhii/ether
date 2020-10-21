@@ -68,7 +68,7 @@ let compose_va f g =
 --let ( >>* ) = flip ( <<* ) in
 
 let pub die msg =
-  print msg;
+  __print_to stderr msg;
   exit 1
 
 
@@ -106,7 +106,8 @@ let pub __fmt l =
 -- * input (C)
 --
 -- Output:
--- * print (C)
+-- * print
+-- * eprint
 --
 let pub open_in path = __open path "r"
 let pub open_out path = __open path "w"
@@ -114,6 +115,9 @@ let pub open_append path = __open path "a"
 let pub open_pipe_in cmd = __popen cmd "r"
 let pub open_pipe_out cmd = __popen cmd "w"
 let pub open_string_in = __open_string
+
+let pub print = __print_to stdout
+let pub eprint = __print_to stderr
 
 --------------------------------------------------------------------------------
 --                                System

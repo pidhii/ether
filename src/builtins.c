@@ -495,21 +495,23 @@ _input(void)
 }
 
 static eth_t
-_print(void)
+_print_to(void)
 {
+  eth_t file = *eth_sp++;
   eth_t x = *eth_sp++;
 
   if (eth_is_tuple(x->type))
   {
     for (int i = 0; i < eth_tuple_size(x->type); ++i)
     {
-      if (i > 0) putc('\t', stdout);
-      eth_display(eth_tup_get(x, i), stdout);
+      if (i > 0) putc('\t', eth_get_file_stream(file));
+      eth_display(eth_tup_get(x, i), eth_get_file_stream(file));
     }
   }
   else
-    eth_display(x, stdout);
-  putc('\n', stdout);
+    eth_display(x, eth_get_file_stream(file));
+  putc('\n', eth_get_file_stream(file));
+  eth_drop(file);
   eth_drop(x);
   return eth_nil;
 }
@@ -869,7 +871,7 @@ _eth_init_builtins(void)
   eth_define(g_mod, "__open_string", eth_create_proc(_open_string, 1, NULL, NULL));
   eth_define(g_mod,      "close", eth_create_proc(     _close, 1, NULL, NULL));
   eth_define(g_mod,      "input", eth_create_proc(     _input, 1, NULL, NULL));
-  eth_define(g_mod,      "print", eth_create_proc(     _print, 1, NULL, NULL));
+  eth_define(g_mod, "__print_to", eth_create_proc(  _print_to, 2, NULL, NULL));
   // ---
   eth_define(g_mod,   "__system", eth_create_proc(    _system, 1, NULL, NULL));
   // ---
