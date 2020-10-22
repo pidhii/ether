@@ -192,7 +192,7 @@ int _eth_start_token = -1;
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %nonassoc IN FN IFLET WHENLET
 %nonassoc OPEN USING AS UNQUALIFIED MODULE
-%nonassoc DOT_OPEN1 DOT_OPEN2
+%nonassoc DOT_OPEN1 DOT_OPEN2 DOT_OPEN3
 %nonassoc LARROW
 %nonassoc PUB BUILTIN DEPRECATED
 %nonassoc LIST_DDOT
@@ -318,6 +318,29 @@ FnAtom
     cod_vec_riter($3, i, x, acc = eth_ast_binop(ETH_CONS, x, acc));
     cod_vec_destroy($3);
     LOC(acc, $3);
+
+    $$ = eth_ast_import($1, "", NULL, 0, acc);
+    LOC($$, @1);
+    free($1);
+  }
+  | CapIdent DOT_OPEN3 Record MaybeComa '}' {
+    eth_type *type = eth_record_type($3.keys.data, $3.keys.len);
+    eth_ast *acc = eth_ast_make_record(type, $3.keys.data, $3.vals.data, $3.keys.len);
+    cod_vec_iter($3.keys, i, x, free(x));
+    cod_vec_destroy($3.keys);
+    cod_vec_destroy($3.vals);
+    LOC(acc, @$);
+
+    $$ = eth_ast_import($1, "", NULL, 0, acc);
+    LOC($$, @1);
+    free($1);
+  }
+  | CapIdent DOT_OPEN3 Expr WITH Record MaybeComa '}' {
+    eth_ast *acc = eth_ast_update($3, $5.vals.data, $5.keys.data, $5.vals.len);
+    cod_vec_destroy($5.vals);
+    cod_vec_iter($5.keys, i, x, free(x));
+    cod_vec_destroy($5.keys);
+    LOC(acc, @$);
 
     $$ = eth_ast_import($1, "", NULL, 0, acc);
     LOC($$, @1);

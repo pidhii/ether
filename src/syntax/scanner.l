@@ -356,6 +356,7 @@ lnot    { return LNOT; }
 "|>"    { return PIPE; }
 "."\s*"(" { return DOT_OPEN1; }
 "."\s*"[" { return DOT_OPEN2; }
+"."\s*"{" { return DOT_OPEN3; }
 
 "{" {
   if (g_fmtbracecnt.len > 0)
