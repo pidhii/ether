@@ -6,6 +6,7 @@ let fail! =
 in
 
 system "dope install ./foo" == 0 || fail!;
-system "dope reinstall ./foo" == 0 || fail!;
+system "dope uninstall foo" == 0 || fail!;
+system "dope install ./foo" == 0 || fail!;
 system "dope uninstall foo" == 0 || fail!;
 
