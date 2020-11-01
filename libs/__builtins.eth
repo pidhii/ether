@@ -1,5 +1,3 @@
-module =
-
 let pub __builtin (+) x y = x + y
 let pub __builtin (-) x y = x - y
 let pub __builtin (*) x y = x * y
@@ -30,7 +28,7 @@ let pub (++) x y = x ++ y
 
 let pub __builtin (not) x = not x
 
-let pub (∘) f g x = f (g x)
+--let pub (∘) f g x = f (g x)
 
 -- Application
 let pub ($) f x = f x
@@ -57,18 +55,15 @@ let pub uncurry f = fn (x, y) -> f x y
 let pub even? x = x mod 2 == 0
 let pub odd?  x = x mod 2 == 1
 
---let ( *<< ) f g =
 let compose_va f g =
   let rec aux x =
     if function? x then
       fn y -> aux (x y)
-      --x >> aux
     else f x
-  in aux g
---let ( >>* ) = flip ( <<* ) in
+  aux g
 
 let pub die msg =
-  __print_to stderr msg;
+  __print_to stderr msg
   exit 1
 
 
@@ -86,10 +81,9 @@ let pub load_string str = __load_stream (__open_string str) []
 let pub __fmt l =
   let rec loop l acc =
     if let x :: xs = l then
-      let x = if string? x then x else format "%w" x in
+      let x = if string? x then x else format "%w" x
       loop xs (x ++ acc)
     else acc
-  in
   loop l ""
 
 --------------------------------------------------------------------------------
@@ -130,4 +124,3 @@ let pub failure () = raise Failure
 let pub invalid_argument () = raise Invalid_argument
 let pub type_error () = raise Type_error
 
-end -- module

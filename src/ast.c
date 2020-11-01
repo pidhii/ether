@@ -657,3 +657,67 @@ eth_ast_multimatch(eth_match_table *table, eth_ast *const exprs[])
   return ast;
 }
 
+
+static eth_ast_pattern*
+ast_to_pattern(eth_ast *ast, bool *e)
+{
+  switch (ast->tag)
+  {
+    case ETH_AST_CVAL:
+      return eth_ast_constant_pattern(ast->cval.val);
+
+    case ETH_AST_IDENT:
+      if (strcmp(ast->ident.str, "_") == 0)
+        return eth_ast_dummy_pattern();
+      else
+        return eth_ast_ident_pattern(ast->ident.str);
+
+    case ETH_AST_BINOP:
+      if (ast->binop.op == ETH_CONS)
+      {
+        char *fields[2] = { "car", "cdr" };
+        eth_ast_pattern *pats[2] = {
+          ast_to_pattern(ast->binop.lhs, e),
+          ast_to_pattern(ast->binop.rhs, e)
+        };
+        return eth_ast_unpack_pattern(eth_pair_type, fields, pats, 2);
+      }
+      break;
+
+    case ETH_AST_MKRCRD:
+    {
+      int n = ast->mkrcrd.n;
+      eth_ast_pattern *fldpats[n];
+      for (int i = 0; i < n; ++i)
+        fldpats[i] = ast_to_pattern(ast->mkrcrd.vals[i], e);
+      if (eth_is_tuple(ast->mkrcrd.type))
+        return eth_ast_unpack_pattern(ast->mkrcrd.type, ast->mkrcrd.fields, fldpats, n);
+      else if (eth_is_record(ast->mkrcrd.type))
+        return eth_ast_record_pattern(ast->mkrcrd.fields, fldpats, n);
+      else
+      {
+        eth_error("undexpected type in record-AST");
+        abort();
+      }
+    }
+
+    default:
+      break;
+  }
+
+  *e = true;
+  return eth_ast_dummy_pattern();
+}
+
+eth_ast_pattern*
+eth_ast_to_pattern(eth_ast *ast)
+{
+  bool e = false;
+  eth_ast_pattern *ret = ast_to_pattern(ast, &e);
+  if (e)
+  {
+    eth_drop_ast_pattern(ret);
+    return NULL;
+  }
+  return ret;
+}

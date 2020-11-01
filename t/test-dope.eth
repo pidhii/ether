@@ -1,12 +1,15 @@
-Os.chdir (List.get 1 command_line);
+let [_, dope, testDir] = command_line
+Os.chdir testDir
 
+system "echo ether: `which ether`"
+print "dope: {dope}"
+system "echo pwd: $PWD"
 let fail! =
-  system "dope uninstall foo &>/dev/null";
-  exit 1;
-in
+  system "ether {dope} uninstall foo &>/dev/null"
+  exit 1
 
-system "dope install ./foo" == 0 || fail!;
-system "dope uninstall foo" == 0 || fail!;
-system "dope install ./foo" == 0 || fail!;
-system "dope uninstall foo" == 0 || fail!;
+system "dope install ./foo" == 0 || fail!
+system "dope uninstall foo" == 0 || fail!
+system "dope install ./foo" == 0 || fail!
+system "dope uninstall foo" == 0 || fail!
 

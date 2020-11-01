@@ -47,9 +47,12 @@ clean:
 cleanall:
 	@rm -rfv Release Debug
 
-test: _test_Debug _test_Release
-_test_%:
-	@source ./env.sh $*/install && test -d $* && $(MAKE) -C $*/build test #CTEST_OUTPUT_ON_FAILURE=1
+test: test_Debug test_Release
+.ONESHELL:
+test_%:
+	source ./env.sh $*/install
+	test -d $*
+	$(MAKE) -C $*/build test #CTEST_OUTPUT_ON_FAILURE=1
 
 fuzzy: t/test.eth
 	valgrind --leak-check=full ./Debug/install/bin/ether --log=debug -Lt t/builtins.eth

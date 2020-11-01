@@ -1,17 +1,17 @@
 #!/bin/env ether
 
-open IO in
-open String (chop, chomp, split, match, to_number) in
-open List (map, rev_filter_map, sort) in
+open IO
+open String (chop, chomp, split, match, to_number)
+open List (map, rev_filter_map, sort)
 
 module Utl =
   -- Get direcory containing modules
   let pub module_path =
-    let pipe = open_pipe_in "ether --prefix" in
-    let prefix = IO.read_line_of pipe |> String.chop in
+    let pipe = open_pipe_in "ether --prefix"
+    let prefix = IO.read_line_of pipe |> String.chop
     if close pipe /= 0
-      then raise Failed_to_resolve_prefix
-      else prefix ++ "/lib/ether"
+    then raise Failed_to_resolve_prefix
+    else prefix ++ "/lib/ether"
 
   -- Checks whether a file exists in the file system
   let pub exist? path =
@@ -20,51 +20,54 @@ module Utl =
 
   let pub mkdir path =
     unless system "mkdir -vp '{path}'" == 0
-      then raise System_error
+    then raise System_error
 
   let pub copy_file src dst =
-    print "> copy \"{src}\" -> \"{dst}\"";
+    print "> copy \"{src}\" -> \"{dst}\""
     open_in src |> IO.read_file |> IO.write_to (open_out dst)
 
   let pub create_symlink src dst =
     unless system "ln -vs '{src}' '{dst}'" == 0
-      then raise System_error
+    then raise System_error
 
   let pub unlink path =
     unless system "rm -rfv '{path}'" == 0
-      then raise System_error
+    then raise System_error
 
   let pub unlink_quite path =
     unless system "rm -rf '{path}'" == 0
-      then raise System_error
+    then raise System_error
 
   let pub utc_date! =
-    let pipe = open_pipe_in "date -u +'%x %X'" in
-    let line = IO.read_line_of pipe in
+    let pipe = open_pipe_in "date -u +'%x %X'"
+    let line = IO.read_line_of pipe
     if close pipe /= 0
-      then raise System_error
-      else String.chop line
+    then raise System_error
+    else String.chop line
 
   let pub elf? path = IO.read_of (open_in path) 4 eq "\x7fELF"
 
   let pub do_in dir thunk =
-    let cwd = Os.getcwd! in
-    Os.chdir dir;
-    (try thunk!  with e -> Os.chdir cwd; raise e);
+    let cwd = Os.getcwd!
+    Os.chdir dir
+    try
+      thunk!
+    with e ->
+      Os.chdir cwd
+      raise e
     Os.chdir cwd
 
   let pub do_in_tempdir thunk =
-    let cwd = Os.getcwd! in
+    let cwd = Os.getcwd!
 
-    let tempdir = Os.mkdtemp "/tmp/dope-tmp.XXXXXX" in
-    Os.chdir tempdir;
+    let tempdir = Os.mkdtemp "/tmp/dope-tmp.XXXXXX"
+    Os.chdir tempdir
     let cleanup! =
-      unlink_quite tempdir;
-      Os.chdir cwd;
-    in
+      unlink_quite tempdir
+      Os.chdir cwd
 
-    let thunk_result = (try thunk! with e -> cleanup!; raise e) in
-    cleanup!;
+    let thunk_result = try thunk! with e -> cleanup!; raise e
+    cleanup!
     thunk_result
 
 
@@ -74,12 +77,11 @@ module Utl =
         if ans =~ \[Yy](es)?/ then true
         else if ans =~ \[Nn]o?/ then false
         else loop (input prompt2)
-      in
       loop (input prompt1)
     else
       confirm? (x, "> try again (yes/no): ")
-end;
-open Utl in
+end
+open Utl
 
 
 module DB =
@@ -91,26 +93,25 @@ module DB =
 
   -- Get registry of installed modules
   let pub load path =
-    { db = first $ load path if exist? path else []
+    { db = (first $ load path) if exist? path else []
     , path
 
-    -- Get module record
-    , get_module_opt = fn {db} name ->
-      L.find_opt (fn {name = name'} -> S.casecmp name name' == 0) db
+    , get_module_opt = {db} name ->
+        L.find_opt ({name = name'} -> S.casecmp name name' == 0) db
 
     , remove = fn ({db} as self) name ->
-      {self with
-        db = L.remove (fn {name = name'} -> S.casecmp name' name == 0) db
-      }
+        {self with
+          db = L.remove ({name = name'} -> S.casecmp name' name == 0) db
+        }
 
     , add = fn ({db} as self) entry ->
-      {self with db = entry :: db}
+        {self with db = entry :: db}
 
-    , update = fn {db, path} ->
-        let dbfile = open_out path in
+    , update = {db, path} ->
+        let dbfile = open_out path
         IO.write_to dbfile (format "%w\n" db)
     }
-end;
+end
 
 
 module ModuleInfo =
@@ -121,13 +122,12 @@ module ModuleInfo =
     -- Get all tags
     IO.shell "cd {repodir}; git tag" |> S.chop |> S.split \\s+/
     -- Decode version-tags into major, minor and a patch.
-    |> L.rev_filter_map (fn tag ->
+    |> L.rev_filter_map $ tag ->
       if let [_, major, minor, patch] = S.match \([0-9]+)\.([0-9]+)\.([0-9]+)/ tag then
         (tag, L.map S.to_number [major, minor, patch])
       else raise Filter_out
-    )
     -- Sort versions.
-    |> L.sort (fn (_, a) (_, b) ->
+    |> L.sort $ (_, a) (_, b) ->
       let rec loop xs ys =
         if let x :: xs' = xs then
           if let y :: ys' = ys then
@@ -135,27 +135,24 @@ module ModuleInfo =
             else x == y && loop xs' ys'
           else true
         else true
-      in
       loop a b
-    )
     |> L.map first
 
   let pub load_config dir args =
-    let (_, conf) =
+    let _, conf =
       try
-        let env = create_env [("command_line", args), ("root", dir)] in
+        let env = create_env [("command_line", args), ("root", dir)]
         env:load (dir ++ "/install.eth")
       with _ ->
-        eprint "> error: failed to load install-script";
+        eprint "> error: failed to load install-script"
         raise Failure
-    in
     { name = L.assoc "name" conf
     , files = L.assoc "files" conf or []
     , main = L.assoc "main" conf
     , build = L.assoc_opt "build" conf
     , post_install = L.assoc_opt "post_install" conf
     }
-end;
+end
 
 
 module DBEntry =
@@ -166,7 +163,7 @@ module DBEntry =
     repository = nil,
     version = nil,
   }
-end;
+end
 
 
 module Install =
@@ -175,137 +172,125 @@ module Install =
   using String as S
 
   let pub build_and_install {conf, modentry, db, dir, args} =
-    let {name, files, main, build, post_install} = conf in
+    let {name, files, main, build, post_install} = conf
 
     -- Check if module name is unique
-    print name;
-    when db:get_module_opt name then begin
-      eprint "> error: module already present";
-      raise Failure;
-    end;
+    print name
+    when db:get_module_opt name then
+      eprint "> error: module already present"
+      raise Failure
 
     -- Build (if build-hook is speciefied)
-    when let Some build = build then do_in dir (fn ->
-      print "> building module {name}";
-      build!;
-    );
+    when let Some build = build then do_in dir $ fn ->
+      print "> building module {name}"
+      build!
 
     -- Start installation
-    print "> installing module {name}";
+    print "> installing module {name}"
     -- Create separate direcory for new module
-    let moddir = module_path ++ "/" ++ name in
-    mkdir moddir;
+    let moddir = module_path ++ "/" ++ name
+    mkdir moddir
     -- Copy module sources
-    main::files |> L.iter (file ->
-      copy_file (dir ++ "/" ++ file) (moddir ++ "/" ++ file);
-    );
-    print "> all files copied";
+    main::files |> L.iter $ file ->
+      copy_file (dir ++ "/" ++ file) (moddir ++ "/" ++ file)
+
+    print "> all files copied"
 
     -- Create symlink to main
-    let mainext = ".so" if elf? (dir ++ "/" ++ main) else ".eth" in
-    let mainpath = moddir ++ "/__main__" ++ mainext in
-    unless exist? mainpath
-      then create_symlink (moddir ++ "/" ++ main) mainpath;
+    let mainext = ".so" if elf? (dir ++ "/" ++ main) else ".eth"
+    let mainpath = moddir ++ "/__main__" ++ mainext
+    unless exist? mainpath then
+      create_symlink (moddir ++ "/" ++ main) mainpath
 
-    when let Some post_install = post_install then
-      do_in dir (fn ->
-        print "> running post-install hooks";
-        post_install!;
-      );
+    when let Some post_install = post_install then do_in dir $ fn ->
+      print "> running post-install hooks"
+      post_install!
 
-    {modentry with
-      name,
-      date = utc_date! or "<undefined>",
-      install_dir = Os.realpath moddir or "<undefined>",
+    { modentry with name,
+        date = utc_date! or "<undefined>",
+        install_dir = Os.realpath moddir or "<undefined>",
     }
-end;
+end
 
 
 let uninstall name =
-  let db = DB.(load default_path) in
+  let db = DB.(load default_path)
 
-  if let Some {install_dir} = db:get_module_opt name then begin
+  if let Some {install_dir} = db:get_module_opt name then
     -- Remove module directory
-    print "> uninstalling module '{name}'";
-    unlink install_dir;
+    print "> uninstalling module '{name}'"
+    unlink install_dir
     -- Update registry
-    print "> updating registry";
-    let db = db:remove name in
+    print "> updating registry"
+    let db = db:remove name
     db:update
-  end else begin
-    eprint "> error: no such module";
-    raise Failure;
-  end
-in
+  else
+    eprint "> error: no such module"
+    raise Failure
 
 
 let list_modules! =
-  let {db} = DB.(load default_path) in
+  let {db} = DB.(load default_path)
   if db is [] then
     print "> no installed modules"
   else
     let f isfirst modentry =
-      print "" unless isfirst;
-      list modentry |> List.iter (fn (k, v) ->
+      print "" unless isfirst
+      list modentry |> List.iter $ (k, v) ->
         print "\e[4m{k}\e[0m: {v}"
-      );
-      false;
-    in List.fold_left f true db
-in
+      false
+    List.fold_left f true db
 
 
 let basename path =
-  let [_, tail] = String.match \\/?([^\/]+)$/ path in
+  let [_, tail] = String.match \\/?([^\/]+)$/ path
   tail
-in
 
 let help! =
-  print "\e[1mUSAGE:\e[0m";
-  print "  {basename $ car command_line} COMMAND [OPTIONS]";
-  print "";
-  print "\e[1mCOMMANDS:\e[0m";
-  print "  help      h           Show this message.";
-  print "  install   i   <dir>   Install package.";
-  print "  uninstall rm  <name>  Uninstall package.";
-  print "  list      ls          List installed packages.";
-  print "";
-  print "  Furethermore, each command may contain additional options. For  instance  one";
-  print "  can check --help for any command to, probably, find out more.";
-in
+  print "\e[1mUSAGE:\e[0m"
+  print "  {basename $ car command_line} COMMAND [OPTIONS]"
+  print ""
+  print "\e[1mCOMMANDS:\e[0m"
+  print "  help      h           Show this message."
+  print "  install   i   <dir>   Install package."
+  print "  uninstall rm  <name>  Uninstall package."
+  print "  list      ls          List installed packages."
+  print ""
+  print "  Furethermore, each command may contain additional options. For  instance  one"
+  print "  can check --help for any command to, probably, find out more."
 
 let help_help! =
-  print "\e[1mUSAGE:\e[0m";
-  print "  {basename $ car command_line} help [OPTIONS]";
-  print "";
-  print "\e[1mOPTIONS:\e[0m";
-  print "  --help   -h             Show this message.";
-  print$"  --dev                   Show help for the library developper. It will display\n"
-      ++"                          information about installation procedure and  how  to\n"
-      ++"                          set up your library so that  it  could  be  installed\n"
-      ++"                          with this script.";
-in
+  print "\e[1mUSAGE:\e[0m"
+  print "  {basename $ car command_line} help [OPTIONS]"
+  print ""
+  print "\e[1mOPTIONS:\e[0m"
+  print "  --help   -h             Show this message."
+  print$"  --dev                   Show help for the library developper. It will display\n" ++
+        "                          information about installation procedure and  how  to\n" ++
+        "                          set up your library so that  it  could  be  installed\n" ++
+        "                          with this script."
 
 let help_dev! =
   let text = {TEXT|
-In order to make library installable by  the Dope it may be supplied with appro-
-priate steering which will contain information on  all files  required  for  the
-library dependencies, entry point,  and routines responsible  for  building  the
+In  order to  make library  installable  by the  Dope  it may  be supplied  with
+appropriate steering  which will contain  information on all files  required for
+the library dependencies, entry point, and routines responsible for building the
 library.
 
 Libraries are installed in the directory:
 
   |TEXT} ++ module_path ++ {TEXT|/<lib-name>
 
-where  the first part  of  the path  is obtained  as  "<ether-prefix>/lib/ether"
-(check \`$ ether --prefx\`). And template tree of the directory <lib-name> is:
+where the first part of the path is obtained a "<ether-prefix>/lib/ether" (check
+\`$ ether --prefx\`). And template tree of the directory <lib-name> is:
 
                 <lib-name>
                 ├── __main__.[eth|so] -> <entry-point>
                 ├── <entry-point>
                 ├── ... all other files specified in steering
 
-Sterring is to be provided via a script  "<lib-root>/install.eth".  It  provides
-configuration via a public variables. Following is the list of variables  to  be
+Sterring is  to be provided  via a script "<lib-root>/install.eth".  It provides
+configuration via a  public variables. Following is the list  of variables to be
 provided:
 
   - \e[4mname\e[0m: String with the name of the library. In order to make the name  flexi-
@@ -326,138 +311,132 @@ provided:
     after the installation.  E.g. one may remove all object files  and  compiled
     library itself.
 
-Installation script will be evaluated within the root directory of  the  library
-(the one passed to the Dope).  Command-line arguments provided by the user  will
-be available via the \`command_line\`-variable; and the root directory --  via the
+Installation script will  be evaluated within the root directory  of the library
+(the one passed  to the Dope). Command-line arguments provided  by the user will
+be available via the \`command_line\`-variable; and  the root directory -- via the
 \`root\`-variable.
 |TEXT}
-  in
-  system "LESS=-FX /usr/bin/less -R <<TEXT{text}TEXT";
-in
+  system "LESS=-FX /usr/bin/less -R <<TEXT{text}TEXT"
 
 let install_help! =
-  print "\e[1mUSAGE:\e[0m";
-  print "  {basename $ car command_line} install [OPTIONS] [<command_line> ...]";
-  print "";
-  print "\e[1mOPTIONS:\e[0m";
-  print "  --help   -h             Show this message.";
-in
+  print "\e[1mUSAGE:\e[0m"
+  print "  {basename $ car command_line} install [OPTIONS] [<command_line> ...]"
+  print ""
+  print "\e[1mOPTIONS:\e[0m"
+  print "  --help   -h             Show this message."
 
 
 --------------------------------- Main -----------------------------------------
-when List.len command_line < 2 then begin
-  help!;
-  exit 1;
-end;
+when List.len command_line < 2 then
+  help!
+  exit 1
 
-let dopepath :: cmd :: command_line = command_line in
-try
-  if cmd eq "help" || cmd eq "h" then
-    let options =
-      [ {name = "dev", val = "dev", has_arg = false}
-      , {name = "help", val = "help", has_arg = false}
-      , {name = "h", val = "help", has_arg = false}
-      ]
-    in
-    let (opts, _) = CmdArg.get options command_line in
-    if List.assoc_opt "help" opts then help_help!
-    else if List.assoc_opt "dev" opts then help_dev!
-    else help!
+let dopepath :: cmd :: command_line = command_line
+--try
+if cmd eq "help" || cmd eq "h" then
+  let options =
+    [
+      { name = "dev", val = "dev", has_arg = false },
+      { name = "help", val = "help", has_arg = false },
+      { name = "h", val = "help", has_arg = false }
+    ]
+  let opts, _ = CmdArg.get options command_line
 
-  else if cmd eq "list" || cmd eq "ls" || cmd eq "l" then
-    list_modules!
+  if List.assoc_opt "help" opts then help_help!
+  else if List.assoc_opt "dev" opts then help_dev!
+  else help!
 
-  else if cmd eq "install" || cmd eq "i" then
-    let options =
-      [ {name = "help", val = "help", has_arg = false}
-      , {name = "h", val = "help", has_arg = false}
-      ]
-    in
-    let (opts, args) = CmdArg.get options command_line in
+else if cmd eq "list" || cmd eq "ls" || cmd eq "l" then
+  list_modules!
 
-    if List.assoc_opt "help" opts then
-      install_help!
-    else
-      -- - - - - - - - - - - - - - - - - - - - --
-      -- Install module from a git repository  --
-      -- - - - - - - - - - - - - - - - - - - - --
-      if let url :: modargs = args then begin
-        -- URL may be a local path. In this case we need it to be a full path
-        -- to be able to clone from the temporary directory.
-        let url = Os.realpath url if exist? url else url in
+else if cmd eq "install" || cmd eq "i" then
+  let options =
+    [
+      { name = "help", val = "help", has_arg = false },
+      { name = "h", val = "help", has_arg = false }
+    ]
+  let opts, args = CmdArg.get options command_line
 
-        -- Check if repository exists.
-        unless system "git ls-remote -h '{url}' &>/dev/null" == 0 then begin
-          eprint "> error: \"{url}\" is not a git repository";
-          exit 1;
-        end;
+  if List.assoc_opt "help" opts then
+    install_help!
+  else
+    -- - - - - - - - - - - - - - - - - - - - --
+    -- Install module from a git repository  --
+    -- - - - - - - - - - - - - - - - - - - - --
+    if let url :: modargs = args then
+      -- URL may be a local path. In this case we need it to be a full path
+      -- to be able to clone from the temporary directory.
+      let url = Os.realpath url if exist? url else url
 
-        -- Name of the temporary directory where to clone the repo.
-        let tmpdir = "dir" in
+      -- Check if repository exists.
+      unless system "git ls-remote -h '{url}' &>/dev/null" == 0 then
+        eprint "> error: \"{url}\" is not a git repository"
+        exit 1
 
-        -- Load database with all installed modules.
-        let db = DB.(load default_path) in
+      -- Name of the temporary directory where to clone the repo.
+      let tmpdir = "dir"
 
-        -- Clone repository to a temporary directory. There we will build it and
-        -- probably install.
-        let modentry = do_in_tempdir $ fn ->
-          unless system "git clone '{url}' '{tmpdir}'" == 0 then begin
-            eprint "> error: failed to clone repository";
-            exit 1;
-          end;
+      -- Load database with all installed modules.
+      let db = DB.(load default_path)
 
-          let version =
-            let versions = ModuleInfo.get_versions tmpdir in
-            if versions is [] then begin
-              print "> module does not have any releases";
-              if confirm? "> install from the latest commit (yes/no): "
-                then Commit (shell "cd {tmpdir}; git rev-parse HEAD" |> chop)
-                else (print "> exiting then"; exit 0);
-            end else begin
-              print "> available versions of the module: {versions}";
-              when car versions not eq chop (shell "cd {tmpdir}; git describe --tags") then
-                unless system "cd {tmpdir}; git checkout {car versions}" == 0 then begin
-                  eprint "> error: failed to checkout lates version-tag";
-                  exit 1;
-                end;
-              Tag (car versions)
-            end
-          in
-          print "> installing {version}";
+      -- Clone repository to a temporary directory. There we will build it and
+      -- probably install.
+      let modentry = do_in_tempdir $ fn ->
+        unless system "git clone '{url}' '{tmpdir}'" == 0 then
+          eprint "> error: failed to clone repository"
+          exit 1
 
-          let modentry = DBEntry.{empty with repository = url, version} in
-          let conf = ModuleInfo.load_config tmpdir modargs in
-          Install.build_and_install {modentry, conf, db, dir = tmpdir, args = modargs}
-        in
+        let version =
+          let versions = ModuleInfo.get_versions tmpdir
+          if versions is [] then
+            print "> module does not have any releases"
+            if confirm? "> install from the latest commit (yes/no): " then
+              Commit (shell "cd {tmpdir}; git rev-parse HEAD" |> chop)
+            else
+              print "> exiting then"
+              exit 0
+          else
+            print "> available versions of the module: {versions}"
+            when car versions not eq chop (shell "cd {tmpdir}; git describe --tags") then
+              unless system "cd {tmpdir}; git checkout {car versions}" == 0 then
+                eprint "> error: failed to checkout lates version-tag"
+                exit 1
+            Tag (car versions)
 
-        -- Update registry
-        print "> updating registry";
-        (db:add modentry):update
+        print "> installing {version}"
 
-      end else begin -- let url :: modargs = agrs
-        eprint "> error: missing module-directory path";
-        eprint "> see `{basename dopepath} install --help`";
-        exit 1;
-      end
+        let modentry = DBEntry.{empty with repository = url, version}
+        let conf = ModuleInfo.load_config tmpdir modargs
+        Install.build_and_install {modentry, conf, db, dir = tmpdir, args = modargs}
 
-  else if cmd eq "uninstall" || cmd eq "rm" then
-    let options =
-      [ {name = "help", val = "help", has_arg = false}
-      , {name = "h", val = "help", has_arg = false}
-      ]
-    in
-    let (opts, args) = CmdArg.get options command_line in
-    if List.assoc_opt "help" opts then die "unimplemented"
-    else
-      let [modname] = args in
-      uninstall modname
+      -- Update registry
+      print "> updating registry"
+      (db:add modentry):update
 
-  else begin
-    eprint "> error: undefined command, {cmd}";
-    eprint "> see `{basename dopepath} help` for avaliable commands";
-    exit 1;
-  end
+    else -- let url :: modargs = agrs
+      eprint "> error: missing module-directory path"
+      eprint "> see `{basename dopepath} install --help`"
+      exit 1
 
-with e ->
-  eprint "> failure";
-  exit 1;
+else if cmd eq "uninstall" || cmd eq "rm" then
+  let options =
+    [
+      { name = "help", val = "help", has_arg = false },
+      { name = "h", val = "help", has_arg = false }
+    ]
+  let opts, args = CmdArg.get options command_line
+
+  if List.assoc_opt "help" opts then
+    die "unimplemented"
+  else
+    let [modname] = args
+    uninstall modname
+
+else
+  eprint "> error: undefined command, {cmd}"
+  eprint "> see `{basename dopepath} help` for avaliable commands"
+  exit 1
+
+--with e ->
+  --eprint "> failure"
+  --exit 1

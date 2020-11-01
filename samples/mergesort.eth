@@ -14,11 +14,11 @@ let split xs =
     -- done
     if let _::_::fast = fast then
       --Now move slow iterator by one position and continue the loop
-      let x :: slow = slow in
+      let x :: slow = slow
       loop slow fast (x :: acc)
     else (acc, slow)
-  in loop xs xs nil
-in
+
+  loop xs xs nil
 
 -- Merge two sorted lists preserving order.
 let merge xs ys =
@@ -37,19 +37,17 @@ let merge xs ys =
     else
       -- No more xs left, append all remaining ys to the result
       List.rev_append acc ys
-  in
+
   loop xs ys nil
-in
 
 -- Sort a list of numbers in increasing order.
 let rec sort xs =
   -- Check if length of the list is greater than 1; otherwize, there is nothing
   -- to sort
   if let _::_::_ = xs then
-    let (l, r) = split xs in
+    let (l, r) = split xs
     merge (sort l) (sort r)
   else xs
-in
 
 -- Read a list of numbers.
 let read_list file =
@@ -69,7 +67,6 @@ let read_list file =
   let read_line_opt file =
     try Some (IO.read_line_of file)
     with End_of_file -> ()
-  in
 
   -- And here is the actual loop to read the list
   let rec loop acc =
@@ -78,15 +75,14 @@ let read_list file =
       -- role of `$` is to have the lowest precedence of all operators
       loop $ String.(to_number $ chomp x) :: acc
     else acc
-  in loop nil
-in
+  loop nil
 
 -- Read a list from standard input.
 --
 -- Press <ENTER> after each entered number. ...we could have done it better,
 -- however I think this is out of the scope of this tutorial.
 -- Use <C-d> (close input) to finish entering the list.
-let l = read_list stdin in
+let l = read_list stdin
 print ("Given list:", l);
 
 -- Sort it

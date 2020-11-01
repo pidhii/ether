@@ -77,9 +77,10 @@ eth_print_location_opt(eth_location *loc, FILE *stream, int opt)
 
   if (opt & ETH_LOPT_FILE)
   {
-    char buf[PATH_MAX];
-    eth_get_location_file(loc, buf);
-    fprintf(stream, "%s:\n", buf);
+    //char buf[PATH_MAX];
+    //eth_get_location_file(loc, buf);
+    //fprintf(stream, "%s:\n", buf);
+    fprintf(stream, "%s:\n", loc->filepath);
 
     if (opt & ETH_LOPT_NEWLINES)
       putc('\n', stream);

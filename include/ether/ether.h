@@ -1744,9 +1744,25 @@ eth_ast* __attribute__((malloc))
 eth_ast_let(eth_ast_pattern *const pats[], eth_ast *const *vals, int n,
     eth_ast *body);
 
+static void
+eth_set_let_expr(eth_ast *let, eth_ast *expr)
+{
+  eth_ref_ast(expr);
+  eth_unref_ast(let->let.body);
+  let->let.body = expr;
+}
+
 eth_ast* __attribute__((malloc))
 eth_ast_letrec(eth_ast_pattern *const pats[], eth_ast *const *vals, int n,
     eth_ast *body);
+
+static void
+eth_set_letrec_expr(eth_ast *let, eth_ast *expr)
+{
+  eth_ref_ast(expr);
+  eth_unref_ast(let->letrec.body);
+  let->let.body = expr;
+}
 
 eth_ast* __attribute__((malloc))
 eth_ast_binop(eth_binop op, eth_ast *lhs, eth_ast *rhs);
@@ -1767,6 +1783,14 @@ eth_ast_match(eth_ast_pattern *pat, eth_ast *expr, eth_ast *thenbr,
 eth_ast* __attribute__((malloc))
 eth_ast_import(const char *module, const char *alias, char *const nams[],
     int nnam, eth_ast *body);
+
+static void
+eth_set_import_expr(eth_ast *import, eth_ast *expr)
+{
+  eth_ref_ast(expr);
+  eth_unref_ast(import->import.body);
+  import->import.body = expr;
+}
 
 eth_ast*
 eth_ast_module(const char *name, eth_ast *body);
@@ -1793,8 +1817,19 @@ eth_ast_update(eth_ast *src, eth_ast *const vals[], char *const fields[], int n)
 eth_ast*
 eth_ast_assert(eth_ast *expr, eth_ast *body);
 
+static void
+eth_set_assert_body(eth_ast *asrt, eth_ast *body)
+{
+  eth_ref_ast(body);
+  eth_unref_ast(asrt->assert.body);
+  asrt->assert.body = body;
+}
+
 eth_ast*
 eth_ast_multimatch(eth_match_table *table, eth_ast *const exprs[]);
+
+eth_ast_pattern*
+eth_ast_to_pattern(eth_ast *ast);
 
 /** @} AstNodes */
 

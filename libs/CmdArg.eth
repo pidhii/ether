@@ -4,7 +4,6 @@ let get_options cfg os =
   let get_rules opt =
     try List.find (fn {name} -> name eq opt) cfg
     with Failure -> raise Undefined_option
-  in
 
   let rec loop os kws pos =
     if let o::os = os then
@@ -17,15 +16,15 @@ let get_options cfg os =
   and handle_long_option o os kws pos =
     if let (brk, _) = String.find "=" o then
       -- Long option with '=' 
-      let lopt = String.sub (2 .. brk-1) o in
-      let {has_arg, val} = get_rules lopt in
+      let lopt = String.sub (2 .. brk-1) o
+      let {has_arg, val} = get_rules lopt
       if has_arg then
-        let arg = String.sub (brk + 1 ...) o in
+        let arg = String.sub (brk + 1 ...) o
         loop os ((val, arg) :: kws) pos
       else raise Unexpected_argument
     else
-      let lopt = String.sub (2...) o in
-      let {has_arg, val} = get_rules lopt in
+      let lopt = String.sub (2...) o
+      let {has_arg, val} = get_rules lopt
       if has_arg then
         if let arg::os = os then
           loop os ((val, arg) :: kws) pos
@@ -33,12 +32,12 @@ let get_options cfg os =
       else loop os ((val, true) :: kws) pos
 
   and handle_short_option o os kws pos =
-    let shopt = String.sub (1..1) o in
-    let {has_arg, val} = get_rules shopt in
+    let shopt = String.sub (1..1) o
+    let {has_arg, val} = get_rules shopt
     if String.len o > 2 then
       -- Option and argument are merged 
       if has_arg then
-        let arg = String.sub (2...) o in
+        let arg = String.sub (2...) o
         loop os ((val, arg) :: kws) pos
       else raise Unexpected_argument
     else
@@ -47,10 +46,8 @@ let get_options cfg os =
           loop os ((val, arg) :: kws) pos
         else raise Missing_argument
       else loop os ((val, true) :: kws) pos
-  in
 
   loop os [] []
-in
 
 let pub get =
 {.help|
@@ -68,6 +65,5 @@ let pub get =
   * <list-of-arguments> is a list of strings to be parsed (to parse command-line
     arguments passed to your script use \`cdr command_line\`.
 |.help}
-  get_options in
+  get_options
 
-()

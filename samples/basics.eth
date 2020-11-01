@@ -1,15 +1,15 @@
 
 -- Simple function
-let square x = x * x in
-print (square 2);
+let square x = x * x
+print (square 2)
 
 
 -- Recursive function
 let rec factorial x =
   if x <= 1 then 1
   else x * factorial (x - 1)
-in
-print (factorial 3);
+
+print (factorial 3)
 
 
 -- Multiple cross-referencing functions
@@ -17,40 +17,40 @@ let rec even? x =
   x == 0 || odd? (x - 1)
 and odd? x =
   x /= 0 && even? (x - 1)
-in
-print (even? 42);
+
+print (even? 42)
 
 
 -- Better way to write factorial: tail-recursion
 let rec factorial2 x acc =
   if x <= 1 then acc
   else factorial2 (x - 1) (acc * x)
-in
-print (factorial2 1000000 1);
+
+print (factorial2 1000000 1)
 
 
 -- Symbols
-print Symbols_begin_with_UpperCase_character;
+print Symbols_begin_with_UpperCase_character
 
 
 -- Exception handling
 try factorial 1000000
-with Stack_overflow -> print "Stack overflow";
+with Stack_overflow -> print "Stack overflow"
 
 
 -- Currying
-let add x y = x + y in
-let increment = add 1 in
-print (increment 3);
+let add x y = x + y
+let increment = add 1
+print (increment 3)
 
 
 -- Lists
-print ([1, 2, 3] eq 1 :: 2 :: 3 :: []);
+print ([1, 2, 3] eq 1 :: 2 :: 3 :: [])
 
 
 -- Pattern matching
-let x :: xs = [1, 2, 3] in
-print (x, xs);
+let x :: xs = [1, 2, 3]
+print (x, xs)
 
 
 -- Higher order functions
@@ -58,38 +58,36 @@ let rec map f xs =
   if let x :: xs' = xs then
     f x :: map f xs'
   else []
-in
-print (map increment [1, 2, 3]);
+
+print (map increment [1, 2, 3])
 
 
 -- Closures
-print (map (fn x -> x^2) [1, 2, 3]);
+print (map (x -> x^2) [1, 2, 3])
 
 
 -- Tuples
-let (a, b) = (A, B) in
-print (a, b);
+let (a, b) = (A, B)
+print (a, b)
 
 
 -- Records
-let { login } = { name = "Jill", login = "Mikle Jackson" } in
-print login;
+let { login } = { name = "Jill", login = "Mikle Jackson" }
+print login
 
 
 -- Variants (tagged wrapper-types)
-let safe_div x y = Some (x / y) if y /= 0 else false in
-let Some x = safe_div 1 2 in
-print x;
+let safe_div x y = Some (x / y) if y /= 0 else false
+let Some x = safe_div 1 2
+print x
+
 
 -- FizzBuzz
 --
 -- `|>` is a "pipe"-operator from OCaml: `x |> f` is equivalent to `f x`
 -- `()` is a synonim for `nil`.
--- And you can find here alternative way to write if-statement:
---   `<then> if <cond> else <else>`
-[1 .. 100] |> List.iter (fn i ->
-  print i if i mod 3 /= 0 && i mod 5 /= 0 else
-  print "Fizz" if i mod 3 == 0 else
-  print "Buzz" if i mod 5 == 0 else ()
-);
+[1 .. 100] |> List.iter $ i ->
+  if i mod 3 == 0 then print "FIZZ"
+  else if i mod 5 == 0 then print "BUZZ"
+  else print i
 

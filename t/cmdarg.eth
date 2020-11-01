@@ -4,73 +4,58 @@ let options = [
   {name = "a", val = "short-arg", has_arg = true},
   {name = "f", val = "short-no-arg", has_arg = false}
 ]
-in
 
 let tests = [
-  -- test-1
-  let cmd =
-    ["first","--long-arg","arg","second","--long-no-arg","-a","1","-f","third"]
-  in
-  let (kw, pos) = CmdArg.get options cmd in
+  let cmd = ["first", "--long-arg", "arg", "second", "--long-no-arg", "-a", "1", "-f", "third"]
+  let (kw, pos) = CmdArg.get options cmd
   ("test-1", fn -> List.all? id [
       pos eq ["first", "second", "third"],
       List.assoc "long-arg" kw eq "arg",
       List.assoc "long-no-arg" kw eq true,
       List.assoc "short-arg" kw eq "1",
       List.assoc "short-no-arg" kw eq true,
-    ]),
+  ]),
 
-  -- test-2
   let cmd =
     ["first","--long-arg=arg","second","--long-no-arg","-a1","-f","third"]
-  in
-  let (kw, pos) = CmdArg.get options cmd in
+  let (kw, pos) = CmdArg.get options cmd
   ("test-2", fn -> List.all? id [
       pos eq ["first", "second", "third"],
       List.assoc "long-arg" kw eq "arg",
       List.assoc "long-no-arg" kw eq true,
       List.assoc "short-arg" kw eq "1",
-      List.assoc "short-no-arg" kw eq true,
-    ]),
+      List.assoc "short-no-arg" kw eq true]),
 
-  -- test-3
-  let cmd = ["--long-arg="] in
-  let (kw, pos) = CmdArg.get options cmd in
+  let cmd = ["--long-arg="]
+  let (kw, pos) = CmdArg.get options cmd
   ("test-3", fn -> List.assoc "long-arg" kw eq ""),
 
-  -- test-4
-  let cmd = ["--long-arg"] in
+  let cmd = ["--long-arg"]
   ("test-4", fn ->
     try CmdArg.get options cmd; false
     with e -> e eq Missing_argument),
 
-  -- test-5
-  let cmd = ["-a"] in
+  let cmd = ["-a"]
   ("test-5", fn ->
     try CmdArg.get options cmd; false
     with e -> e eq Missing_argument),
 
-  -- test-6
-  let cmd = ["--long-no-arg=x"] in
+  let cmd = ["--long-no-arg=x"]
   ("test-6", fn ->
     try CmdArg.get options cmd; false
     with e -> e eq Unexpected_argument),
 
-  -- test-7
-  let cmd = ["-fx"] in
+  let cmd = ["-fx"]
   ("test-7", fn ->
     try CmdArg.get options cmd; false
     with e -> e eq Unexpected_argument),
 
-  -- test-8
-  let cmd = ["-o"] in
+  let cmd = ["-o"]
   ("test-8", fn ->
     try CmdArg.get options cmd; false
     with e -> e eq Undefined_option),
-
 ]
-in
 
-let (nok, nfail) = Test.run [(nil, tests)] in
+let (nok, nfail) = Test.run [(nil, tests)]
 exit 1 when nfail > 0;
 
