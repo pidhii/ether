@@ -326,7 +326,7 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
 
 <IGNORE_INDENT>[[:space:]]*","[[:space:]]* { return ','; }
 
-<IGNORE_INDENT>"}" {
+<IGNORE_INDENT>[[:space:]]*"}" {
   PREV_STATE();
   if (g_fmtbracecnt.len > 0 and cod_vec_last(g_fmtbracecnt)-- == 0)
   {
@@ -493,7 +493,7 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
 <QSTRING,REGEXP>"\\/"  { yylval->character = '/'; return CHAR; }
 
 <STRING>"\\{" { yylval->character = '{'; return CHAR; }
-<STRING>"{" {
+<STRING>"{"[[:space:]]* {
   cod_vec_push(g_fmtbracecnt, 0);
   ENTER_STATE(IGNORE_INDENT);
   return START_FORMAT;

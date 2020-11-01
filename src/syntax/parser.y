@@ -281,16 +281,16 @@ Entry
   : StmtSeq { g_result = $1; }
   | KEEP_BLOCK StmtSeq { g_result = $2; }
 
-  /*| START_REPL LET Binds {*/
-    /*g_result = eth_ast_let($3.pats.data, $3.vals.data, $3.pats.len, eth_ast_cval(eth_nil));*/
-    /*cod_vec_destroy($3.pats);*/
-    /*cod_vec_destroy($3.vals);*/
-  /*}*/
-  /*| START_REPL LET REC Binds {*/
-    /*g_result = eth_ast_letrec($4.pats.data, $4.vals.data, $4.pats.len, eth_ast_cval(eth_nil));*/
-    /*cod_vec_destroy($4.pats);*/
-    /*cod_vec_destroy($4.vals);*/
-  /*}*/
+  | START_REPL LET Binds {
+    g_result = eth_ast_let($3.pats.data, $3.vals.data, $3.pats.len, eth_ast_cval(eth_nil));
+    cod_vec_destroy($3.pats);
+    cod_vec_destroy($3.vals);
+  }
+  | START_REPL LET REC Binds {
+    g_result = eth_ast_letrec($4.pats.data, $4.vals.data, $4.pats.len, eth_ast_cval(eth_nil));
+    cod_vec_destroy($4.pats);
+    cod_vec_destroy($4.vals);
+  }
   | START_REPL Stmt {
     g_result = $2;
   }
