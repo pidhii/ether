@@ -228,7 +228,7 @@ OPERATOR {OPCHR}+|mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|eq|not|lnot
 <INDENT>^" "*/[^[:space:]] {
   PREV_STATE();
 
-  if (yyleng < g_cur_indent)
+  if ((int)yyleng < g_cur_indent)
   {
     /* Will yield KEEP_BLOCK right after the last END_BLOCK (as we are at the
      * moment at a line which is KEEP_BLOCKed to some block). */
@@ -265,7 +265,7 @@ OPERATOR {OPCHR}+|mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|eq|not|lnot
     int token = cod_vec_pop(_eth_primary_tokens);
     return token;
   }
-  else if (yyleng > g_cur_indent)
+  else if ((int)yyleng > g_cur_indent)
   {
     /* Create new indent level */
     struct indent_level indent;
