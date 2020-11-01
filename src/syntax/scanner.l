@@ -470,18 +470,18 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
   yylval->character = yytext[yyleng-1];
   return START_REGEXP;
 }
-<QSTRING,STRING>\\\n
-<QSTRING,STRING>"\\0"  { yylval->character = '\0'; return CHAR; }
-<QSTRING,STRING>"\\a"  { yylval->character = '\a'; return CHAR; }
-<QSTRING,STRING>"\\b"  { yylval->character = '\b'; return CHAR; }
-<QSTRING,STRING>"\\e"  { yylval->character = '\x1b'; return CHAR; }
-<QSTRING,STRING>"\\f"  { yylval->character = '\f'; return CHAR; }
-<QSTRING,STRING>"\\n"  { yylval->character = '\n'; return CHAR; }
-<QSTRING,STRING>"\\r"  { yylval->character = '\r'; return CHAR; }
-<QSTRING,STRING>"\\t"  { yylval->character = '\t'; return CHAR; }
-<QSTRING,STRING>"\\v"  { yylval->character = '\v'; return CHAR; }
-<QSTRING,STRING>"\\?"  { yylval->character = '\?'; return CHAR; }
-<QSTRING,STRING>"\\x"[0-9a-fA-F]{1,2} {
+<STRING>\\\n
+<STRING>"\\0"  { yylval->character = '\0'; return CHAR; }
+<STRING>"\\a"  { yylval->character = '\a'; return CHAR; }
+<STRING>"\\b"  { yylval->character = '\b'; return CHAR; }
+<STRING>"\\e"  { yylval->character = '\x1b'; return CHAR; }
+<STRING>"\\f"  { yylval->character = '\f'; return CHAR; }
+<STRING>"\\n"  { yylval->character = '\n'; return CHAR; }
+<STRING>"\\r"  { yylval->character = '\r'; return CHAR; }
+<STRING>"\\t"  { yylval->character = '\t'; return CHAR; }
+<STRING>"\\v"  { yylval->character = '\v'; return CHAR; }
+<STRING>"\\?"  { yylval->character = '\?'; return CHAR; }
+<STRING>"\\x"[0-9a-fA-F]{1,2} {
   char *endptr;
   yylval->character = strtol(yytext + 2, &endptr, 16);
   assert(*endptr == '\0');
@@ -489,7 +489,7 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
 }
 <STRING>"\\\"" { yylval->character = '"'; return CHAR; }
 <QSTRING>"\\\'" { yylval->character = '\''; return CHAR; }
-<QSTRING,STRING>"\\\\" { yylval->character = '\\'; return CHAR; }
+<STRING>"\\\\" { yylval->character = '\\'; return CHAR; }
 <QSTRING,REGEXP>"\\/"  { yylval->character = '/'; return CHAR; }
 
 <STRING>"\\{" { yylval->character = '{'; return CHAR; }
