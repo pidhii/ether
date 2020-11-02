@@ -614,6 +614,8 @@ module { return MODULE; }
 lazy   { return LAZY; }
 assert { return ASSERT; }
 
+defined { return DEFINED; }
+
 nil   { yylval->constant = eth_nil;   return CONST; }
 true  { yylval->constant = eth_true;  return CONST; }
 false { yylval->constant = eth_false; return CONST; }

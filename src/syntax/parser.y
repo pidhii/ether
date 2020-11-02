@@ -204,6 +204,7 @@ extern cod_vec(int) _eth_primary_tokens;
 %nonassoc BEGINN END
 %nonassoc DO DONE
 %nonassoc CASE OF
+%nonassoc DEFINED
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %right RARROW
 %right ';' ',' START_BLOCK END_BLOCK KEEP_BLOCK
@@ -534,6 +535,12 @@ StmtSeq
 
 Expr
   : Form
+
+  | DEFINED Ident {
+    $$ = eth_ast_defined($2);
+    free($2);
+    LOC($$, @$);
+  }
 
   | OPEN CapIdent MaybeImports {
     if ($3.data) $$ = eth_ast_import($2, NULL, $3.data, $3.len, dummy_ast());

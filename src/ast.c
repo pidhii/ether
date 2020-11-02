@@ -304,6 +304,10 @@ destroy_ast_node(eth_ast *ast)
       eth_unref_ast(ast->assert.body);
       break;
 
+    case ETH_AST_DEFINED:
+      free(ast->defined.ident);
+      break;
+
     case ETH_AST_MULTIMATCH:
       for (int i = 0; i < ast->multimatch.table->h; ++i)
         eth_unref_ast(ast->multimatch.exprs[i]);
@@ -607,6 +611,14 @@ eth_ast_assert(eth_ast *expr, eth_ast *body)
   eth_ast *ast = create_ast_node(ETH_AST_ASSERT);
   eth_ref_ast(ast->assert.expr = expr);
   eth_ref_ast(ast->assert.body = body);
+  return ast;
+}
+
+eth_ast*
+eth_ast_defined(const char *ident)
+{
+  eth_ast *ast = create_ast_node(ETH_AST_DEFINED);
+  ast->defined.ident = strdup(ident);
   return ast;
 }
 

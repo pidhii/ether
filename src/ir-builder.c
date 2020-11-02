@@ -650,10 +650,22 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
     case ETH_AST_IF:
     {
       eth_ir_node *cond = build(bldr, ast->iff.cond, e);
-      eth_ir_node *thenbr = build(bldr, ast->iff.then, e);
-      eth_ir_node *elsebr = build(bldr, ast->iff.els, e);
-      eth_ir_node *ret = eth_ir_if(cond, thenbr, elsebr);
-      return ret;
+      if (cond->tag == ETH_IR_CVAL)
+      {
+        eth_ir_node *ret;
+        if (cond->cval.val != eth_false)
+          ret = build(bldr, ast->iff.then, e);
+        else
+          ret = build(bldr, ast->iff.els, e);
+        eth_drop_ir_node(cond);
+        return ret;
+      }
+      else
+      {
+        eth_ir_node *thenbr = build(bldr, ast->iff.then, e);
+        eth_ir_node *elsebr = build(bldr, ast->iff.els, e);
+        return eth_ir_if(cond, thenbr, elsebr);
+      }
     }
 
     case ETH_AST_SEQ:
@@ -1113,6 +1125,11 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       eth_ir_node *okbr = build(bldr, ast->assert.body, e);
       eth_ir_node *errbr = eth_ir_throw(eth_ir_cval(eth_exn(Assertion_failed)));
       return eth_ir_if(expr, okbr, errbr);
+    }
+
+    case ETH_AST_DEFINED:
+    {
+      return eth_ir_cval(eth_boolean(find_var_deep(bldr, ast->defined.ident)));
     }
   }
 

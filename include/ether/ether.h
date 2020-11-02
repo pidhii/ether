@@ -1655,6 +1655,7 @@ typedef enum {
   ETH_AST_MKRCRD,
   ETH_AST_UPDATE,
   ETH_AST_ASSERT,
+  ETH_AST_DEFINED,
   ETH_AST_MULTIMATCH,
 } eth_ast_tag;
 
@@ -1705,6 +1706,7 @@ struct eth_ast {
     struct { eth_type *type; char **fields; eth_ast **vals; int n; } mkrcrd;
     struct { eth_ast *src, **vals; char **fields; int n; } update;
     struct { eth_ast *expr, *body; } assert;
+    struct { char *ident; } defined;
     struct { eth_match_table *table; eth_ast **exprs; } multimatch;
   };
   eth_location *loc;
@@ -1824,6 +1826,9 @@ eth_set_assert_body(eth_ast *asrt, eth_ast *body)
   eth_unref_ast(asrt->assert.body);
   asrt->assert.body = body;
 }
+
+eth_ast*
+eth_ast_defined(const char *ident);
 
 eth_ast*
 eth_ast_multimatch(eth_match_table *table, eth_ast *const exprs[]);

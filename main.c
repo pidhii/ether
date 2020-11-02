@@ -177,6 +177,7 @@ main(int argc, char **argv)
   // --
   eth_module *extravars = eth_create_module("<main>");
   eth_define(extravars, "command_line", argv_to_list(argc, argv, optind));
+  eth_define(extravars, "__main", eth_true);
 
   if (input == stdin) // REPL
   {
