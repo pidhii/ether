@@ -66,13 +66,37 @@ trimr(char *str)
 static void
 less(const char *text)
 {
-  int size = strlen("LESS=-FX /bin/less -R <<ETHER_HELP\n")
+  int size = strlen("LESS=-FX /bin/less -R << 'ETHER_HELP'\n")
            + strlen(text)
            + strlen("\nETHER_HELP");
   char buf[size+1];
-  sprintf(buf, "LESS=-FX /bin/less -R <<ETHER_HELP\n%s\nETHER_HELP", text);
+  sprintf(buf, "LESS=-FX /bin/less -R << 'ETHER_HELP'\n%s\nETHER_HELP", text);
   system(buf);
 }
+
+static void
+asciidoc(const char *text)
+{
+  int size = strlen("cat << 'ETHER_HELP' | asciidoc -o - - | w3m -T text/html\n")
+           + strlen(text)
+           + strlen("\nETHER_HELP");
+  char buf[size+1];
+  sprintf(buf, "cat << 'ETHER_HELP' | asciidoc -o - - | w3m -T text/html\n%s\nETHER_HELP", text);
+  system(buf);
+}
+
+
+static void
+asciidoc_less(const char *text)
+{
+  int size = strlen("cat << 'ETHER_HELP' | asciidoc -o - - | w3m -T text/html -dump -cols 80 | LESS=-FX /bin/less\n")
+           + strlen(text)
+           + strlen("\nETHER_HELP");
+  char buf[size+1];
+  sprintf(buf, "cat << 'ETHER_HELP' | asciidoc -o - - | w3m -T text/html -dump -cols 80 | LESS=-FX /bin/less\n%s\nETHER_HELP", text);
+  system(buf);
+}
+
 
 int
 main(int argc, char **argv)
@@ -242,9 +266,9 @@ main(int argc, char **argv)
         continue;
       }
       // show help for function
-      else if (strncmp(line, ".help ", 6) == 0)
+      else if (strncmp(line, ".help ", 6) == 0 || strncmp(line, ".h ", 3) == 0)
       {
-        char *ident = (char*)triml(line + 5);
+        char *ident = (char*)triml(strchr(line, ' '));
         trimr(ident);
         const char *orig = ident;
         const eth_module *mod = resolve_ident((const char**)&ident);
@@ -254,13 +278,23 @@ main(int argc, char **argv)
           if (def)
           {
             if (def->attr->help)
+            {
               // XXX: mutating help it here
-              less(def->attr->help);
+              // XXX: oh do I?
+              if (strncmp(line, ".help ", 6) == 0)
+                asciidoc(def->attr->help);
+              else
+                asciidoc_less(def->attr->help);
+            }
             else if (def->attr->loc)
-              eth_print_location_opt(def->attr->loc, stdout,
-                  ETH_LOPT_NOLINENO | ETH_LOPT_NOCOLOR);
+            {
+              int opt = ETH_LOPT_NOLINENO | ETH_LOPT_NOCOLOR;
+              eth_print_location_opt(def->attr->loc, stdout, opt);
+            }
             else
+            {
               eth_warning("no help available");
+            }
             return true;
           }
           else

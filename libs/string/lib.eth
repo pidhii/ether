@@ -32,24 +32,31 @@
 --
 
 let pub create =
-  --{.help|
---\e[1mUSAGE:\e[0m
-  --create number? -> string?
+{.help|
+= String.create
 
---\e[1mDESCRIPTION:\e[0m
-  --Create an uninitialized string of given length.
-  --|.help}
+== DESCRIPTION:
+Create an uninitialized string of given length.
+
+== SYNOPSIS
+
+  create number? -> string?
+|.help}
   __create
 
 let pub make =
---{.help|
---\e[1mUSAGE:\e[0m
-  --make number? string? -> string?
+{.help|
+= String.make
 
---\e[1mDESCRIPTION:\e[0m
-  --Create  a  string of given length filled with a first  character  of  supplied
-  --string. If it is of zero length, then the it is treated as 0-byte.
---|.help}
+== DESCRIPTION
+Create  a  string of given length filled with a first  character  of  supplied
+string. If it is of zero length, then the it is treated as 0-byte.
+
+== SYNOPSIS
+
+  make number? string? -> string?
+
+|.help}
   __make
 
 let pub join sep xs =

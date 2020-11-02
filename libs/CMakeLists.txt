@@ -91,18 +91,16 @@ install (TARGETS io DESTINATION ${IO_DST_DIR})
 install (FILES ${IO_SRC_DIR}/lib.eth DESTINATION ${IO_DST_DIR})
 
 # RegExp
-if (ENABLE_REGEXP)
-  set (REGEXP_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/regexp)
-  set (REGEXP_DST_DIR lib/ether/regexp)
-  add_library (regexp SHARED ${REGEXP_SRC_DIR}/lib.c)
-  set_target_properties (regexp
-    PROPERTIES
-      POSITION_INDEPENDENT_CODE ON
-      PREFIX ""
-      OUTPUT_NAME "regexp")
-  install (TARGETS regexp DESTINATION ${REGEXP_DST_DIR})
-  install (FILES ${REGEXP_SRC_DIR}/lib.eth DESTINATION ${REGEXP_DST_DIR})
-endif (ENABLE_REGEXP)
+set (REGEXP_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/regexp)
+set (REGEXP_DST_DIR lib/ether/regexp)
+add_library (regexp SHARED ${REGEXP_SRC_DIR}/lib.c)
+set_target_properties (regexp
+  PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    PREFIX ""
+    OUTPUT_NAME "regexp")
+install (TARGETS regexp DESTINATION ${REGEXP_DST_DIR})
+install (FILES ${REGEXP_SRC_DIR}/lib.eth DESTINATION ${REGEXP_DST_DIR})
 
 # OS
 set (OS_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/os)
