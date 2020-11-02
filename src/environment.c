@@ -29,7 +29,7 @@ static void
 destroy_module_entry(void *ptr)
 {
   module_entry *ent = ptr;
-  eth_debug("calling DTOR for module '%s'", eth_get_module_name(ptr));
+  eth_debug("calling DTOR for module '%s'", eth_get_module_name(ent->mod));
   eth_destroy_module(ent->mod);
   if (ent->dl)
     dlclose(ent->dl);

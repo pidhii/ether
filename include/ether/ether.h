@@ -1245,8 +1245,14 @@ eth_vec_get(eth_t v, int k);
 void
 eth_push_mut(eth_t vec, eth_t x);
 
-eth_t __attribute__((flatten))
+eth_t
 eth_push_pers(eth_t v, eth_t x);
+
+void
+eth_insert_mut(eth_t v, int k, eth_t x);
+
+eth_t
+eth_insert_pers(eth_t v, int k, eth_t x);
 
 eth_t
 eth_front(eth_t v);

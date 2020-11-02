@@ -124,8 +124,92 @@ find_node(const vector_tree *tree, int *restrict k)
     *k -= isub << log2cap;
     curr = curr->subnodes[isub];
   }
-  eth_debug("isub: %d", isub);
   return curr;
+}
+
+static vector_node*
+copy_path_aux(const vector_node *curr, int log2cap, int lvl, int *restrict k,
+    vector_node **leaf)
+{
+  if (lvl > 1)
+  {
+    log2cap -= NODE_SIZE_LOG2;
+    int isub = *k >> log2cap;
+    *k -= isub << log2cap;
+
+    vector_node *newnode = copy_branch(curr);
+    vector_node *newsubnode =
+      copy_path_aux(curr->subnodes[isub], log2cap, lvl-1, k, leaf);
+
+    dec_node(newnode->subnodes[isub]);
+    ref_node(newnode->subnodes[isub] = newsubnode);
+    return newnode;
+  }
+  return *leaf = copy_leaf(curr);
+}
+
+static vector_node*
+copy_path(vector_tree *tree, int *restrict k)
+{
+  /* No copying untill encountered a node with multiple references. */
+  vector_node *curr = tree->root;
+  vector_node *prev = NULL;
+  int log2cap = NODE_SIZE_LOG2 * tree->depth;
+  int lvl, isub = -1;
+  for (lvl = tree->depth; lvl > 1 and curr->rc == 1; --lvl)
+  {
+    log2cap -= NODE_SIZE_LOG2;
+    isub = *k >> log2cap;
+    *k -= isub << log2cap;
+    prev = curr;
+    curr = curr->subnodes[isub];
+  }
+
+  if (lvl == 1)
+  {
+    if (curr->rc == 1)
+    {
+      /* Nothing has to be copied. Just update the leaf. */
+      return curr;
+    }
+    else
+    {
+      /* Copy leaf-node. */
+      vector_node *newleaf = copy_leaf(curr);
+      ref_node(newleaf);
+      if (prev)
+      {
+        dec_node(prev->subnodes[isub] /* = curr */);
+        prev->subnodes[isub] = newleaf;
+      }
+      else /* root-node is a leaf-node */
+      {
+        dec_node(tree->root);
+        tree->root = newleaf;
+      }
+      return newleaf;
+    }
+  }
+  else /* lvl > 1 => curr->rc != 1 */
+  {
+    /* Copy the path to the desired leaf. */
+    vector_node *newleaf;
+    vector_node *newpath = copy_path_aux(curr, log2cap, lvl, k, &newleaf);
+    ref_node(newpath);
+    if (prev == NULL /* we copied the root */)
+    {
+      assert(tree->root->rc > 1);
+      dec_node(tree->root);
+      tree->root = newpath;
+    }
+    else /* copied subpath */
+    {
+      assert(prev->subnodes[isub]->rc > 1);
+      dec_node(prev->subnodes[isub]);
+      prev->subnodes[isub] = curr;
+    }
+    return newleaf;
+  }
 }
 
 static void
@@ -210,7 +294,7 @@ push_node(vector_tree *restrict tree, vector_node *node)
   // Empty tree
   // - - - - - -
   {
-    tree->root = node;
+    ref_node(tree->root = node);
     tree->size += NODE_SIZE;
     tree->depth = 1;
   }
@@ -326,6 +410,35 @@ push(vector *vec, eth_t x)
   eth_ref(vec->tail->leafs[vec->tailsize++] = x);
 }
 
+static void
+insert(vector *vec, int k, eth_t x)
+{
+  if (k >= vec->tree.size)
+  {
+    /* Insert in the tail. */
+    k -= vec->tree.size;
+    if (vec->tail->rc > 1)
+    {
+      /* Have to copy the tail-node. */
+      vector_node *newtail = copy_leaf(vec->tail);
+      ref_node(newtail);
+      dec_node(vec->tail);
+      vec->tail = newtail;
+    }
+    eth_ref(x);
+    eth_unref(vec->tail->leafs[k]);
+    vec->tail->leafs[k] = x;
+  }
+  else /* k < vec->tree.size */
+  {
+    /* Insert in the tree. */
+    vector_node *leaf = copy_path(&vec->tree, &k);
+    eth_ref(x);
+    eth_unref(leaf->leafs[k]);
+    leaf->leafs[k] = x;
+  }
+}
+
 static eth_t
 front(vector *vec)
 {
@@ -374,6 +487,20 @@ eth_push_pers(eth_t v, eth_t x)
 {
   vector *vec = copy_vector(VECTOR(v));
   push(vec, x);
+  return ETH(vec);
+}
+
+void __attribute__((flatten))
+eth_insert_mut(eth_t v, int k, eth_t x)
+{
+  insert(VECTOR(v), k, x);
+}
+
+eth_t __attribute__((flatten))
+eth_insert_pers(eth_t v, int k, eth_t x)
+{
+  vector *vec = copy_vector(VECTOR(v));
+  insert(vec, k, x);
   return ETH(vec);
 }
 

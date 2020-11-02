@@ -54,6 +54,39 @@ push(void)
 }
 
 static eth_t
+insert(void)
+{
+  eth_use_symbol(Range_error);
+  eth_t v = *eth_sp++;
+  eth_t k = *eth_sp++;
+  eth_t x = *eth_sp++;
+  if (eth_unlikely(not eth_is_vec(v) or not eth_is_num(k)))
+  {
+    eth_drop_3(v, k, x);
+    return eth_exn(eth_type_error());
+  }
+  int len = eth_vec_len(v);
+  int kval = eth_num_val(k);
+  if (eth_unlikely(kval < 0 or kval >= len))
+  {
+    eth_drop_3(v, k, v);
+    return eth_exn(Range_error);
+  }
+  if (v->rc == 0 and v != x)
+  {
+    eth_insert_mut(v, kval, x);
+    eth_drop(k);
+    return v;
+  }
+  else
+  {
+    eth_t ret = eth_insert_pers(v, kval, x);
+    eth_drop(k);
+    return ret;
+  }
+}
+
+static eth_t
 front(void)
 {
   eth_use_symbol(Range_error)
@@ -110,7 +143,6 @@ get(void)
   }
   int len = eth_vec_len(v);
   int kval = eth_num_val(k);
-  eth_debug("len = %d, k = %d", len, kval);
   if (eth_unlikely(kval < 0 or kval >= len))
   {
     eth_drop_2(v, k);
@@ -129,6 +161,7 @@ ether_module(eth_module *mod, eth_env *topenv)
   eth_define(mod, "of_list", eth_create_proc(of_list, 1, NULL, NULL));
   eth_define(mod, "len", eth_create_proc(len, 1, NULL, NULL));
   eth_define(mod, "push", eth_create_proc(push, 2, NULL, NULL));
+  eth_define(mod, "insert", eth_create_proc(insert, 3, NULL, NULL));
   eth_define(mod, "front", eth_create_proc(front, 1, NULL, NULL));
   eth_define(mod, "back", eth_create_proc(back, 1, NULL, NULL));
   eth_define(mod, "get", eth_create_proc(get, 2, NULL, NULL));
