@@ -358,11 +358,6 @@ FnAtom
     LOC($$, @1);
     free($1);
   }
-  | Atom ':' SYMBOL {
-    eth_ast *access = eth_ast_access($1, $3);
-    $$ = eth_ast_apply(access, &$1, 1);
-    free($3);
-  }
 
   | '('')' { $$ = eth_ast_cval(eth_nil); LOC($$, @$); }
   | '(' Expr DDOT Expr ')' { char *fields[] = { "l", "r" }; eth_ast *vals[] = { $2, $4 }; $$ = eth_ast_make_record(eth_rangelr_type, fields, vals, 2); }
@@ -393,21 +388,30 @@ FnAtom
     cod_vec_destroy($2.keys);
     cod_vec_destroy($2.vals);
   }
-;
 
-Atom
-  : FnAtom
-  | '_' { $$ = eth_ast_ident("_"); }
-  | CAPSYMBOL { $$ = eth_ast_cval(eth_sym($1)); free($1); LOC($$, @$); }
-  | NUMBER { $$ = eth_ast_cval(eth_create_number($1)); LOC($$, @$); }
-  | CONST  { $$ = eth_ast_cval($1); LOC($$, @$); }
-  | String {
-    cod_vec_push($1, 0);
-    $$ = eth_ast_cval(eth_create_string_from_ptr2($1.data, $1.len - 1));
-    LOC($$, @$);
+  | '{' Stmt WITH Record MaybeComa '}' {
+    $$ = eth_ast_update($2, $4.vals.data, $4.keys.data, $4.vals.len);
+    cod_vec_destroy($4.vals);
+    cod_vec_iter($4.keys, i, x, free(x));
+    cod_vec_destroy($4.keys);
   }
-  | FmtString
-  | RegExp
+  | '{' Stmt WITH START_BLOCK Record MaybeComa END_BLOCK '}' {
+    $$ = eth_ast_update($2, $5.vals.data, $5.keys.data, $5.vals.len);
+    cod_vec_destroy($5.vals);
+    cod_vec_iter($5.keys, i, x, free(x));
+    cod_vec_destroy($5.keys);
+  }
+
+  | FnAtom '.' SYMBOL {
+    $$ = eth_ast_access($1, $3);
+    free($3);
+  }
+  | FnAtom ':' SYMBOL {
+    eth_ast *access = eth_ast_access($1, $3);
+    $$ = eth_ast_apply(access, &$1, 1);
+    free($3);
+  }
+
   | '[' Expr DDOT Expr ']' %prec LIST_DDOT {
     eth_ast *p[2] = { $2, $4 };
     eth_ast *range = eth_ast_cval(eth_get_builtin("__inclusive_range"));
@@ -444,19 +448,22 @@ Atom
       $$ = eth_ast_apply(map, p, 2);
     }
   }
-  | '{' Stmt WITH Record MaybeComa '}' {
-    $$ = eth_ast_update($2, $4.vals.data, $4.keys.data, $4.vals.len);
-    cod_vec_destroy($4.vals);
-    cod_vec_iter($4.keys, i, x, free(x));
-    cod_vec_destroy($4.keys);
-  }
-  | '{' Stmt WITH START_BLOCK Record MaybeComa END_BLOCK '}' {
-    $$ = eth_ast_update($2, $5.vals.data, $5.keys.data, $5.vals.len);
-    cod_vec_destroy($5.vals);
-    cod_vec_iter($5.keys, i, x, free(x));
-    cod_vec_destroy($5.keys);
-  }
 
+;
+
+Atom
+  : FnAtom
+  | '_' { $$ = eth_ast_ident("_"); }
+  | CAPSYMBOL { $$ = eth_ast_cval(eth_sym($1)); free($1); LOC($$, @$); }
+  | NUMBER { $$ = eth_ast_cval(eth_create_number($1)); LOC($$, @$); }
+  | CONST  { $$ = eth_ast_cval($1); LOC($$, @$); }
+  | String {
+    cod_vec_push($1, 0);
+    $$ = eth_ast_cval(eth_create_string_from_ptr2($1.data, $1.len - 1));
+    LOC($$, @$);
+  }
+  | FmtString
+  | RegExp
   | MODULE CAPSYMBOL '=' Block KEEP_BLOCK END {
     $$ = eth_ast_module($2, $4);
     LOC($$, @1);
