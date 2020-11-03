@@ -395,12 +395,18 @@ FnAtom
     cod_vec_iter($4.keys, i, x, free(x));
     cod_vec_destroy($4.keys);
   }
-  | '{' Stmt WITH START_BLOCK Record MaybeComa END_BLOCK '}' {
+  | '{' Stmt WITH KEEP_BLOCK Record MaybeComa '}' {
     $$ = eth_ast_update($2, $5.vals.data, $5.keys.data, $5.vals.len);
     cod_vec_destroy($5.vals);
     cod_vec_iter($5.keys, i, x, free(x));
     cod_vec_destroy($5.keys);
   }
+  /*| '{' Stmt WITH START_BLOCK Record MaybeComa END_BLOCK '}' {*/
+    /*$$ = eth_ast_update($2, $5.vals.data, $5.keys.data, $5.vals.len);*/
+    /*cod_vec_destroy($5.vals);*/
+    /*cod_vec_iter($5.keys, i, x, free(x));*/
+    /*cod_vec_destroy($5.keys);*/
+  /*}*/
 
   | FnAtom '.' SYMBOL {
     $$ = eth_ast_access($1, $3);
@@ -944,10 +950,17 @@ Args
 ;
 
 ArgsAux
-  : Args
+  : Atom {
+    cod_vec_init($$);
+    cod_vec_push($$, $1);
+  }
   | ArgsAux KEEP_BLOCK Atom {
     $$ = $1;
     cod_vec_push($$, $3);
+  }
+  | ArgsAux Atom {
+    $$ = $1;
+    cod_vec_push($$, $2);
   }
 ;
 
@@ -1311,11 +1324,23 @@ Record
     cod_vec_push($$.keys, $1);
     cod_vec_push($$.vals, $3);
   }
+  | START_BLOCK SYMBOL '=' StmtSeq END_BLOCK {
+    cod_vec_init($$.keys);
+    cod_vec_init($$.vals);
+    cod_vec_push($$.keys, $2);
+    cod_vec_push($$.vals, $4);
+  }
   | SYMBOL {
     cod_vec_init($$.keys);
     cod_vec_init($$.vals);
     cod_vec_push($$.keys, $1);
     cod_vec_push($$.vals, eth_ast_ident($1));
+  }
+  | START_BLOCK SYMBOL END_BLOCK {
+    cod_vec_init($$.keys);
+    cod_vec_init($$.vals);
+    cod_vec_push($$.keys, $2);
+    cod_vec_push($$.vals, eth_ast_ident($2));
   }
   | Record ',' SYMBOL '=' StmtSeq {
     $$ = $1;
