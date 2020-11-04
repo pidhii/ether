@@ -105,6 +105,7 @@ OPERATOR {OPCHR}+|mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|eq|not|lnot
     if (token == START_REPL)
     {
       eth_debug("enable interactive mode");
+      assert(yyextra->isrepl);
       yy_set_interactive(1);
     }
     return token;

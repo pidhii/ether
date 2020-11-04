@@ -33,6 +33,7 @@ struct eth_scanner_data {
   cod_vec(int) indlvlstack;
   cod_vec(int) statestack;
   int curstate;
+  bool isrepl;
 };
 
 static inline void

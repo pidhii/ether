@@ -1850,6 +1850,12 @@ typedef struct eth_scanner_data eth_scanner_data;
 eth_scanner* __attribute__((malloc))
 eth_create_scanner(FILE *stream);
 
+eth_scanner* __attribute__((malloc))
+eth_create_repl_scanner(FILE *stream);
+
+bool
+eth_is_repl_scanner(eth_scanner *scan);
+
 void
 eth_destroy_scanner(eth_scanner *scan);
 

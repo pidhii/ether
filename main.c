@@ -332,7 +332,7 @@ main(int argc, char **argv)
 
         // parse input-buffer
         FILE *bufstream = fmemopen(buf.data, buf.len, "r");
-        eth_scanner *scan = eth_create_scanner(bufstream);
+        eth_scanner *scan = eth_create_repl_scanner(bufstream);
         eth_ast *expr = eth_parse_repl(scan);
         eth_destroy_scanner(scan);
         fclose(bufstream);

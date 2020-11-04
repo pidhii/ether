@@ -1437,7 +1437,10 @@ yyerror(void *locp_ptr, eth_scanner *yyscanner, const char *what)
   YYLTYPE *locp = locp_ptr;
 
   g_iserror = true;
-  eth_warning("%s", what);
+
+  const char eofstr[] = "syntax error, unexpected end of file";
+  if (not eth_is_repl_scanner(yyscanner) or strncmp(what, eofstr, sizeof eofstr - 1) != 0)
+    eth_warning("%s", what);
   const char *path = filename(eth_get_scanner_input(yyscanner));
   if (path)
   {

@@ -42,8 +42,17 @@ eth_create_scanner(FILE *stream)
   cod_vec_init(data->indlvlstack);
   cod_vec_init(data->statestack);
   data->curstate = 0 /* INITIAL */;
+  data->isrepl = false;
   yyset_extra(data, scan);
 
+  return scan;
+}
+
+eth_scanner*
+eth_create_repl_scanner(FILE *stream)
+{
+  eth_scanner *scan = eth_create_scanner(stream);
+  eth_get_scanner_data(scan)->isrepl = true;
   return scan;
 }
 
@@ -74,3 +83,10 @@ eth_get_scanner_data(eth_scanner *scan)
 {
   return yyget_extra(scan);
 }
+
+bool
+eth_is_repl_scanner(eth_scanner *scan)
+{
+  return eth_get_scanner_data(scan)->isrepl;
+}
+
