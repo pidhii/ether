@@ -558,8 +558,6 @@ as     { return AS; }
 try    { return TRY; }
 with   { return WITH; }
 or     { return OR; }
-begin  { return BEGINN; }
-end    { return END; }
 do     { return DO; }
 done   { return DONE; }
 case   { return CASE; }

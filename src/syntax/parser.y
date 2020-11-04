@@ -202,7 +202,6 @@ static bool g_iserror;
 %nonassoc LARROW
 %nonassoc PUB BUILTIN DEPRECATED
 %nonassoc LIST_DDOT
-%nonassoc BEGINN END
 %nonassoc DO DONE
 %nonassoc CASE OF
 %nonassoc DEFINED
@@ -301,7 +300,6 @@ Entry
 FnAtom
   : Ident { $$ = eth_ast_ident($1); free($1); LOC($$, @$); }
   | '(' StmtSeq ')' { $$ = $2; }
-  | BEGINN Block KEEP_BLOCK END { $$ = $2; }
   | FnAtom '!' { $$ = eth_ast_apply($1, NULL, 0); LOC($$, @$); }
   | CapIdent DOT_OPEN1 StmtSeq ')' {
     $$ = eth_ast_import($1, "", NULL, 0, $3);
@@ -471,7 +469,7 @@ Atom
   }
   | FmtString
   | RegExp
-  | MODULE CAPSYMBOL '=' Block KEEP_BLOCK END {
+  | MODULE CAPSYMBOL '=' Block {
     $$ = eth_ast_module($2, $4);
     LOC($$, @1);
     free($2);

@@ -80,7 +80,7 @@ module Utl =
       loop (input prompt1)
     else
       confirm? (x, "> try again (yes/no): ")
-end
+
 open Utl
 
 
@@ -111,7 +111,6 @@ module DB =
         let dbfile = open_out path
         IO.write_to dbfile (format "%w\n" db)
     }
-end
 
 
 module ModuleInfo =
@@ -152,7 +151,6 @@ module ModuleInfo =
     , build = L.assoc_opt "build" conf
     , post_install = L.assoc_opt "post_install" conf
     }
-end
 
 
 module DBEntry =
@@ -163,7 +161,6 @@ module DBEntry =
     repository = nil,
     version = nil,
   }
-end
 
 
 module Install =
@@ -210,7 +207,6 @@ module Install =
         date = utc_date! or "<undefined>",
         install_dir = Os.realpath moddir or "<undefined>",
     }
-end
 
 
 let uninstall name =
