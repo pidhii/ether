@@ -23,10 +23,17 @@ let pub __builtin (/=) x y = x /= y
 
 let pub __builtin (is) x y = x is y
 
-let pub __builtin (::) x y = x :: y
 let pub (++) x y = x ++ y
 
+let pub __builtin (::) x y = x :: y
+
+let pub (,) a b = (a, b)
+let pub (,,) a b c = (a, b, c)
+let pub (,,,) a b c d = (a, b, c, d)
+let pub (,,,,) a b c d e = (a, b, c, d, e)
+
 let pub __builtin (not) x = not x
+
 
 --let pub (∘) f g x = f (g x)
 

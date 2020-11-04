@@ -671,7 +671,7 @@ lnot    { return LNOT; }
 ".."    { return DDOT; }
 "..."   { return DDDOT; }
 
-"("{OPERATOR}")"     {
+"("({OPERATOR}|","+)")"     {
   char *buf = malloc(yyleng - 2 + 1);
   strncpy(buf, yytext + 1, yyleng - 2);
   buf[yyleng - 2] = 0;
