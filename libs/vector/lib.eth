@@ -1,0 +1,15 @@
+
+let pub empty = of_list []
+
+-- TODO: optimize
+let pub init n f =
+  let rec loop i acc =
+    if i < n then
+      loop (i + 1) (push acc (f i))
+    else acc
+  loop 0 empty
+
+-- TODO: optimize
+let pub make n x =
+  init n (const x)
+

@@ -210,6 +210,16 @@ _list(void)
     eth_drop(x);
     return acc;
   }
+  else if (eth_is_vec(x))
+  {
+    // TODO: optimize
+    int n = eth_vec_len(x);
+    eth_t acc = eth_nil;
+    for (int i = n - 1; i >= 0; --i)
+      acc = eth_cons(eth_vec_get(x, i), acc);
+    eth_drop(x);
+    return acc;
+  }
   else
   {
     eth_drop(x);

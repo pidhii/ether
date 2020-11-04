@@ -34,6 +34,7 @@ set_target_properties (vector
     PREFIX ""
     OUTPUT_NAME "vector")
 install (TARGETS vector DESTINATION ${VECTOR_DST_DIR})
+install (FILES ${VECTOR_SRC_DIR}/lib.eth DESTINATION ${VECTOR_DST_DIR})
 
 # Arb
 if (ENABLE_ARB)

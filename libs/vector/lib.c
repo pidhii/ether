@@ -165,5 +165,7 @@ ether_module(eth_module *mod, eth_env *topenv)
   eth_define(mod, "front", eth_create_proc(front, 1, NULL, NULL));
   eth_define(mod, "back", eth_create_proc(back, 1, NULL, NULL));
   eth_define(mod, "get", eth_create_proc(get, 2, NULL, NULL));
+  if (not eth_add_module_script(mod, "./lib.eth", topenv))
+    return -1;
   return 0;
 }
