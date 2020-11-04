@@ -36,6 +36,27 @@ set_target_properties (vector
 install (TARGETS vector DESTINATION ${VECTOR_DST_DIR})
 install (FILES ${VECTOR_SRC_DIR}/lib.eth DESTINATION ${VECTOR_DST_DIR})
 
+# JSON
+if (ENABLE_JSON)
+  pkg_check_modules (JSON REQUIRED json-c)
+  if (JSON_FOUND)
+    set (JSON_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/json)
+    set (JSON_DST_DIR lib/ether/json)
+    add_library (json SHARED ${JSON_SRC_DIR}/lib.c)
+    set_target_properties (json
+      PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+        PREFIX ""
+        OUTPUT_NAME "json")
+    target_include_directories (json PRIVATE ${JSON_INCLUDE_DIRS})
+    target_link_directories (json PRIVATE ${JSON_LIBRARY_DIRS})
+    target_link_libraries (json PRIVATE ${JSON_LIBRARIES})
+    install (TARGETS json DESTINATION ${JSON_DST_DIR})
+  else (JSON_FOUND)
+    message (WARNING "Can't build Json-module.")
+  endif (JSON_FOUND)
+endif (ENABLE_JSON)
+
 # Arb
 if (ENABLE_ARB)
   check_include_file (arb.h ARB_AVAILABLE)

@@ -16,6 +16,7 @@ option (BUILD_STATIC_LIBRARY "Build static library \"ether.a\"" ON)
 # -------------------------------- Modules ------------------------------------
 option (ENABLE_ARB "Build an Arb-module" YES)
 option (ENABLE_GTK "Build a Gtk-module" YES)
+option (ENABLE_JSON "Build a Json-module" YES)
 # ------------------------------ Dev-Options -----------------------------------
 option (DISABLE_BUILTINS "Disable all builtins" OFF)
 
