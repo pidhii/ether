@@ -15,6 +15,8 @@
 #include "ether/ether.h"
 #include "codeine/vec.h"
 
+#include "scanner-data.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
@@ -52,7 +54,6 @@ dummy_ast()
 static const char *g_filename = NULL;
 static eth_ast* g_result;
 static bool g_iserror;
-extern cod_vec(int) _eth_primary_tokens;
 %}
 
 %code requires {
@@ -1412,10 +1413,22 @@ eth_parse(FILE *stream)
 }
 
 eth_ast*
-eth_parse_repl(FILE *stream)
+eth_parse_repl(eth_scanner *scan)
 {
-  cod_vec_push(_eth_primary_tokens, START_REPL);
-  return eth_parse(stream);
+  cod_vec_push(eth_get_scanner_data(scan)->primtoks, START_REPL);
+
+  g_result = NULL;
+  g_iserror = false;
+  g_filename = filename(eth_get_scanner_input(scan));
+  yyparse(scan);
+
+  if (g_iserror)
+  {
+    if (g_result)
+      eth_drop_ast(g_result);
+    g_result = NULL;
+  }
+  return g_result;
 }
 
 void

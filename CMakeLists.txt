@@ -57,6 +57,7 @@ set (CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -Ofast -flto")
 set (ETHER_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 include_directories (${ETHER_INCLUDE_DIR})
 include_directories (${CMAKE_SOURCE_DIR}/codeine/include)
+include_directories (${CMAKE_SOURCE_DIR}/src)
 
 
 ################################################################################

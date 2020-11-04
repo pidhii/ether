@@ -332,7 +332,9 @@ main(int argc, char **argv)
 
         // parse input-buffer
         FILE *bufstream = fmemopen(buf.data, buf.len, "r");
-        eth_ast *expr = eth_parse_repl(bufstream);
+        eth_scanner *scan = eth_create_scanner(bufstream);
+        eth_ast *expr = eth_parse_repl(scan);
+        eth_destroy_scanner(scan);
         fclose(bufstream);
 
         if (expr)
@@ -361,7 +363,7 @@ main(int argc, char **argv)
         else
         {
           // continue reading
-          cod_vec_push(buf, ' ');
+          cod_vec_push(buf, '\n');
           prompt = "@ ";
         }
       }

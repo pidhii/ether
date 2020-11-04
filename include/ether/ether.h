@@ -1845,6 +1845,7 @@ eth_ast_to_pattern(eth_ast *ast);
 /** @} AstNodes */
 
 typedef struct eth_scanner eth_scanner;
+typedef struct eth_scanner_data eth_scanner_data;
 
 eth_scanner* __attribute__((malloc))
 eth_create_scanner(FILE *stream);
@@ -1854,6 +1855,9 @@ eth_destroy_scanner(eth_scanner *scan);
 
 FILE*
 eth_get_scanner_input(eth_scanner *scan);
+
+eth_scanner_data*
+eth_get_scanner_data(eth_scanner *scan);
 
 eth_ast* __attribute__((malloc))
 eth_parse(FILE *stream);
@@ -2716,7 +2720,7 @@ eth_vm(eth_bytecode *bc);
 //                                REPL
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 eth_ast*
-eth_parse_repl(FILE *stream);
+eth_parse_repl(eth_scanner *scan);
 
 eth_t
 eth_eval(eth_env *topenv, eth_module *mod, eth_ast *ast);

@@ -1,6 +1,8 @@
 %{
 #include "ether/ether.h"
 
+#include "scanner-data.h"
+
 #include <pcre.h>
 #include <ctype.h>
 #include <unistd.h>
@@ -25,6 +27,19 @@ ETH_MODULE("ether:scanner");
         }                                       \
     }
 
+#define YY_EXTRA_TYPE eth_scanner_data*
+#define primtoks (yyextra->primtoks)
+#define commentcnt (yyextra->commentcnt)
+#define fmtbracecnt (yyextra->fmtbracecnt)
+#define quotestack (yyextra->quotestack)
+#define push_quote(tag, str) _push_quote(yyextra, tag, str)
+#define pop_quote() _pop_quote(yyextra)
+#define indentstack (yyextra->indentstack)
+#define curindent (yyextra->curindent)
+#define indlvlstack (yyextra->indlvlstack)
+#define statestack (yyextra->statestack)
+#define curstate (yyextra->curstate)
+
 #include "parser.h"
 
 #include <string.h>
@@ -46,87 +61,25 @@ filename(FILE *fp)
   return filename;
 }
 
-cod_vec(int) _eth_primary_tokens;
-static int g_comment_cnt = 0;
-
-enum { QUOTES_DEFAULT, QUOTES_STRING };
-typedef struct { int tag; char *str; } quote;
-
-static inline void
-destroy_quote(quote q)
-  {
-    if (q.tag == QUOTES_STRING)
-      free(q.str);
-  }
-
-static cod_vec(quote) g_quotes;
-
-static inline void
-push_quote(int tag, const char *maybestr)
-  {
-    quote q = { .tag = tag, .str = maybestr ? strdup(maybestr) : NULL };
-    cod_vec_push(g_quotes, q);
-  }
-
-static inline void
-pop_quote()
-  {
-    destroy_quote(cod_vec_pop(g_quotes));
-  }
-
-static cod_vec(int) g_fmtbracecnt;
-
-struct indent_level { int nspaces; bool issilent; };
-static cod_vec(struct indent_level) g_indent_stack;
-static int g_cur_indent = 0;
-
-static cod_vec(int) g_indentlvl_stack;
-
-static cod_vec(int) g_state_stack;
-static int g_cur_state = 0 /* INITIAL */;
-
-#define ENTER_STATE(state)                    \
-  do {                                        \
-    /*eth_trace("ENTER '" #state "'");*/      \
-    cod_vec_push(g_state_stack, g_cur_state); \
-    BEGIN((g_cur_state = state));             \
+#define ENTER_STATE(state)               \
+  do {                                   \
+    /*eth_trace("ENTER '" #state "'");*/ \
+    cod_vec_push(statestack, curstate);  \
+    BEGIN((curstate = state));           \
   } while (0)
 
-#define PREV_STATE()                                   \
-  do {                                                 \
-    /*eth_trace("POP STATE");*/                        \
-    BEGIN((g_cur_state = cod_vec_pop(g_state_stack))); \
+#define PREV_STATE()                             \
+  do {                                           \
+    /*eth_trace("POP STATE");*/                  \
+    BEGIN((curstate = cod_vec_pop(statestack))); \
   } while (0)
 
 /*#define CHANGE_STATE(state)                    \*/
   /*do {                                         \*/
     /*eth_trace("CHANGE STATE TO '" #state "'"); \*/
-    /*g_cur_state = state;                       \*/
+    /*curstate = state;                       \*/
     /*BEGIN(state);                              \*/
   /*} while (0)*/
-
-void
-_eth_init_scanner(void)
-  {
-    cod_vec_init(_eth_primary_tokens);
-    cod_vec_init(g_quotes);
-    cod_vec_init(g_fmtbracecnt);
-    cod_vec_init(g_indent_stack);
-    cod_vec_init(g_state_stack);
-    cod_vec_init(g_indentlvl_stack);
-  }
-
-void
-_eth_cleanup_scanner(void)
-  {
-    cod_vec_destroy(_eth_primary_tokens);
-    assert(g_quotes.len == 0);
-    cod_vec_destroy(g_quotes);
-    cod_vec_destroy(g_fmtbracecnt);
-    cod_vec_destroy(g_indent_stack);
-    cod_vec_destroy(g_state_stack);
-    cod_vec_destroy(g_indentlvl_stack);
-  }
 %}
 
 %option noyywrap
@@ -146,9 +99,9 @@ OPERATOR {OPCHR}+|mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|eq|not|lnot
 %%
 
 %{
-  if (_eth_primary_tokens.len > 0)
+  if (primtoks.len > 0)
   {
-    int token = cod_vec_pop(_eth_primary_tokens);
+    int token = cod_vec_pop(primtoks);
     if (token == START_REPL)
     {
       eth_debug("enable interactive mode");
@@ -170,10 +123,10 @@ OPERATOR {OPCHR}+|mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|eq|not|lnot
 <INITIAL,INDENT,IGNORE_INDENT>[[:space:]]*"--[[" {
   ENTER_STATE(COMMENT);
 }
-<COMMENT>"--[[" { g_comment_cnt += 1; }
+<COMMENT>"--[[" { commentcnt += 1; }
 <COMMENT>"]]" {
-  if (g_comment_cnt > 0)
-    g_comment_cnt -= 1;
+  if (commentcnt > 0)
+    commentcnt -= 1;
   else
     PREV_STATE();
 }
@@ -185,18 +138,18 @@ OPERATOR {OPCHR}+|mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|eq|not|lnot
    * 1. Close all preceding blocks up to `|>`-indentation.
    * 2. Return to INITIAL-state.
    */
-  cod_vec_push(_eth_primary_tokens, PIPE);
+  cod_vec_push(primtoks, PIPE);
 
   int newindent = yyleng - 2;
 
   /* Drop preceding indent-levels */
-  int diff = g_cur_indent - newindent;
+  int diff = curindent - newindent;
   while (diff > 0)
   {
-    assert(g_indent_stack.len > 0);
-    struct indent_level indent = cod_vec_pop(g_indent_stack);
+    assert(indentstack.len > 0);
+    indent_level indent = cod_vec_pop(indentstack);
     if (not indent.issilent)
-      cod_vec_push(_eth_primary_tokens, END_BLOCK);
+      cod_vec_push(primtoks, END_BLOCK);
     diff -= indent.nspaces;
   }
   if (diff < 0)
@@ -213,14 +166,14 @@ OPERATOR {OPCHR}+|mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|eq|not|lnot
   }
 
   /* Create new indent level */
-  /*struct indent_level indent;*/
-  /*indent.nspaces = newindent - g_cur_indent;*/
+  /*indent_level indent;*/
+  /*indent.nspaces = newindent - curindent;*/
   /*indent.issilent = true;*/
-  /*cod_vec_push(g_indent_stack, indent);*/
-  g_cur_indent = newindent;
+  /*cod_vec_push(indentstack, indent);*/
+  curindent = newindent;
 
   PREV_STATE();
-  return cod_vec_pop(_eth_primary_tokens);
+  return cod_vec_pop(primtoks);
 }
 "|>" return PIPE;
 
@@ -228,20 +181,20 @@ OPERATOR {OPCHR}+|mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|eq|not|lnot
 <INDENT>^" "*/[^[:space:]] {
   PREV_STATE();
 
-  if ((int)yyleng < g_cur_indent)
+  if ((int)yyleng < curindent)
   {
     /* Will yield KEEP_BLOCK right after the last END_BLOCK (as we are at the
      * moment at a line which is KEEP_BLOCKed to some block). */
-    cod_vec_push(_eth_primary_tokens, KEEP_BLOCK);
+    cod_vec_push(primtoks, KEEP_BLOCK);
 
     /* Drop indent-levels */
-    int diff = g_cur_indent - yyleng;
+    int diff = curindent - yyleng;
     while (diff > 0)
     {
-      assert(g_indent_stack.len > 0);
-      struct indent_level indent = cod_vec_pop(g_indent_stack);
+      assert(indentstack.len > 0);
+      indent_level indent = cod_vec_pop(indentstack);
       if (not indent.issilent)
-        cod_vec_push(_eth_primary_tokens, END_BLOCK);
+        cod_vec_push(primtoks, END_BLOCK);
       diff -= indent.nspaces;
     }
     if (diff < 0)
@@ -258,27 +211,27 @@ OPERATOR {OPCHR}+|mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|eq|not|lnot
     }
 
     /* Update indentation */
-    g_cur_indent = yyleng;
+    curindent = yyleng;
 
     /* ...we need something to return, so just pick a top element from the stack
      * (it will exsist since we allways push KEEP_BLOCK above) */
-    int token = cod_vec_pop(_eth_primary_tokens);
+    int token = cod_vec_pop(primtoks);
     return token;
   }
-  else if ((int)yyleng > g_cur_indent)
+  else if ((int)yyleng > curindent)
   {
     /* Create new indent level */
-    struct indent_level indent;
-    indent.nspaces = yyleng - g_cur_indent;
+    indent_level indent;
+    indent.nspaces = yyleng - curindent;
     indent.issilent = false;
-    cod_vec_push(g_indent_stack, indent);
+    cod_vec_push(indentstack, indent);
 
     /* Update indentation */
-    g_cur_indent = yyleng;
+    curindent = yyleng;
 
     return START_BLOCK;
   }
-  else /* yyleng == g_cur_indent */
+  else /* yyleng == curindent */
   {
     return KEEP_BLOCK;
   }
@@ -311,15 +264,15 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
 <IGNORE_INDENT>\n
 
 <IGNORE_INDENT>"."[[:space:]]*"{" {
-  if (g_fmtbracecnt.len > 0)
-    cod_vec_last(g_fmtbracecnt) ++;
+  if (fmtbracecnt.len > 0)
+    cod_vec_last(fmtbracecnt) ++;
   ENTER_STATE(IGNORE_INDENT); /* Need it to properly handle patterns */
   return DOT_OPEN3;
 }
 
 <IGNORE_INDENT>"{" {
-  if (g_fmtbracecnt.len > 0)
-    cod_vec_last(g_fmtbracecnt) ++;
+  if (fmtbracecnt.len > 0)
+    cod_vec_last(fmtbracecnt) ++;
   ENTER_STATE(IGNORE_INDENT); /* Need it to properly handle patterns */
   return '{';
 }
@@ -328,9 +281,9 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
 
 <IGNORE_INDENT>[[:space:]]*"}" {
   PREV_STATE();
-  if (g_fmtbracecnt.len > 0 and cod_vec_last(g_fmtbracecnt)-- == 0)
+  if (fmtbracecnt.len > 0 and cod_vec_last(fmtbracecnt)-- == 0)
   {
-    cod_vec_pop(g_fmtbracecnt);
+    cod_vec_pop(fmtbracecnt);
     return END_FORMAT;
   }
   return '}';
@@ -345,7 +298,7 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
  /*****************************************************************************/
 ("."[[:space:]]*)?[[({][[:space:]]* {
   /* Save number of indent levels before entering braces. */
-  cod_vec_push(g_indentlvl_stack, g_indent_stack.len);
+  cod_vec_push(indlvlstack, indentstack.len);
 
   /* If there is a line-break after the brace, set indentation w.r.t. the RHS;
    * otherwize, keep current indentation. */
@@ -355,11 +308,11 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
     int newindent = strlen(p + 1);
 
     /* Create new indent-level. */
-    struct indent_level indent;
+    indent_level indent;
     indent.issilent = true;
-    indent.nspaces = newindent - g_cur_indent;
-    cod_vec_push(g_indent_stack, indent);
-    g_cur_indent = newindent;
+    indent.nspaces = newindent - curindent;
+    cod_vec_push(indentstack, indent);
+    curindent = newindent;
   }
 
   /* Start braces. */
@@ -378,18 +331,18 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
 }
 
 [[:space:]]*","[[:space:]]* {
-  cod_vec_push(_eth_primary_tokens, ',');
+  cod_vec_push(primtoks, ',');
 
   /* Drop all gained indentation levels. */
-  int nindwas = cod_vec_last(g_indentlvl_stack);
-  int nindnow = g_indent_stack.len;
+  int nindwas = cod_vec_last(indlvlstack);
+  int nindnow = indentstack.len;
   int n = nindnow - nindwas;
   while (n--)
   {
-    struct indent_level indent = cod_vec_pop(g_indent_stack);
+    indent_level indent = cod_vec_pop(indentstack);
     if (not indent.issilent)
-      cod_vec_push(_eth_primary_tokens, END_BLOCK);
-    g_cur_indent -= indent.nspaces;
+      cod_vec_push(primtoks, END_BLOCK);
+    curindent -= indent.nspaces;
   }
 
   /* If there is a line-break between RHS and LHS of a coma, set indentation
@@ -400,32 +353,32 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
     int newindent = strlen(p + 1);
 
     /* Create new indent-level. */
-    struct indent_level indent;
+    indent_level indent;
     indent.issilent = true;
-    indent.nspaces = newindent - g_cur_indent;
-    cod_vec_push(g_indent_stack, indent);
-    g_cur_indent = newindent;
+    indent.nspaces = newindent - curindent;
+    cod_vec_push(indentstack, indent);
+    curindent = newindent;
   }
 
-  return cod_vec_pop(_eth_primary_tokens);
+  return cod_vec_pop(primtoks);
 }
 
 [[:space:]]*[\])}] {
-  cod_vec_push(_eth_primary_tokens, yytext[yyleng-1]);
+  cod_vec_push(primtoks, yytext[yyleng-1]);
 
   /* Drop all gained indentation levels. */
-  int nindwas = cod_vec_pop(g_indentlvl_stack);
-  int nindnow = g_indent_stack.len;
+  int nindwas = cod_vec_pop(indlvlstack);
+  int nindnow = indentstack.len;
   int n = nindnow - nindwas;
   while (n--)
   {
-    struct indent_level indent = cod_vec_pop(g_indent_stack);
+    indent_level indent = cod_vec_pop(indentstack);
     if (not indent.issilent)
-      cod_vec_push(_eth_primary_tokens, END_BLOCK);
-    g_cur_indent -= indent.nspaces;
+      cod_vec_push(primtoks, END_BLOCK);
+    curindent -= indent.nspaces;
   }
 
-  return cod_vec_pop(_eth_primary_tokens);
+  return cod_vec_pop(primtoks);
 }
  /*****************************************************************************/
 
@@ -494,13 +447,13 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
 
 <STRING>"\\{" { yylval->character = '{'; return CHAR; }
 <STRING>"{"[[:space:]]* {
-  cod_vec_push(g_fmtbracecnt, 0);
+  cod_vec_push(fmtbracecnt, 0);
   ENTER_STATE(IGNORE_INDENT);
   return START_FORMAT;
 }
 
 <STRING>\" {
-  if (cod_vec_last(g_quotes).tag == QUOTES_DEFAULT)
+  if (cod_vec_last(quotestack).tag == QUOTES_DEFAULT)
   {
     pop_quote();
     PREV_STATE();
@@ -513,7 +466,7 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
   }
 }
 <QSTRING>\' {
-  if (cod_vec_last(g_quotes).tag == QUOTES_DEFAULT)
+  if (cod_vec_last(quotestack).tag == QUOTES_DEFAULT)
   {
     pop_quote();
     PREV_STATE();
@@ -526,7 +479,7 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
   }
 }
 <QSTRING>"|.help}" {
-  if (strcmp(".help", cod_vec_last(g_quotes).str) == 0)
+  if (strcmp(".help", cod_vec_last(quotestack).str) == 0)
   {
     pop_quote();
     PREV_STATE();
@@ -542,7 +495,7 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
   char buf[yyleng-1];
   memcpy(buf, yytext+1, yyleng-2);
   buf[yyleng-2] = '\0';
-  if (strcmp(buf, cod_vec_last(g_quotes).str) == 0)
+  if (strcmp(buf, cod_vec_last(quotestack).str) == 0)
   {
     pop_quote();
     PREV_STATE();
@@ -695,32 +648,33 @@ lnot    { return LNOT; }
 }
 
 <<EOF>> {
-  cod_vec_push(_eth_primary_tokens, EOF);
-  while (g_cur_indent > 0)
+  /* TODO: don't clean up here (due to REPL) */
+  cod_vec_push(primtoks, EOF);
+  while (curindent > 0)
   {
-    struct indent_level indent = cod_vec_pop(g_indent_stack);
+    indent_level indent = cod_vec_pop(indentstack);
     if (not indent.issilent)
-      cod_vec_push(_eth_primary_tokens, END_BLOCK);
-    g_cur_indent -= indent.nspaces;
+      cod_vec_push(primtoks, END_BLOCK);
+    curindent -= indent.nspaces;
   }
-  if (g_cur_indent < 0)
+  if (curindent < 0)
   {
     eth_error("malformed indentation");
     abort();
   }
-  assert(g_indent_stack.len == 0);
+  assert(indentstack.len == 0);
 
   /* Clean up state stack */
-  while (g_state_stack.len > 0)
-    g_cur_state = cod_vec_pop(g_state_stack);
-  assert(g_cur_state == INITIAL);
+  while (statestack.len > 0)
+    curstate = cod_vec_pop(statestack);
+  assert(curstate == INITIAL);
 
-  int token = cod_vec_pop(_eth_primary_tokens);
+  int token = cod_vec_pop(primtoks);
   return token;
 }
 
 . {
-  eth_warning("undefined symbol '%c', state %d", yytext[0], g_cur_state);
+  eth_warning("undefined symbol '%c', state %d", yytext[0], curstate);
   return UNDEFINED;
 }
 

@@ -132,9 +132,6 @@ eth_init(const int *argc)
   extern void _eth_init_alloc(void);
   _eth_init_alloc();
 
-  extern void _eth_init_scanner(void);
-  _eth_init_scanner();
-
   extern void _eth_init_magic(void);
   _eth_init_magic();
 
@@ -193,9 +190,6 @@ eth_init(const int *argc)
 void
 eth_cleanup(void)
 {
-  extern void _eth_cleanup_scanner(void);
-  _eth_cleanup_scanner();
-
   extern void _eth_cleanup_builtins(void);
   _eth_cleanup_builtins();
 
