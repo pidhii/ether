@@ -4,7 +4,27 @@ open IO
 open String (chomp, split, match, to_number)
 open List (map, rev_filter_map, sort)
 
+
+module Logging =
+  let pub paint text =
+    "\e[48;5;232;38;5;231m{text}\e[0m"
+
+  let pub info msg =
+    print $ paint " {msg} "
+
+  let pub error msg =
+    eprint "\e[48;5;196;38;5;232;1mdope-error\e[0m\e[48;5;232;38;5;231m:{paint " {msg} "}"
+
+  let pub fatal_error msg =
+    error msg
+    exit 1
+
+open Logging
+
+
 module Utl =
+  open Logging
+
   -- Get direcory containing modules
   let pub module_path =
     let pipe = open_pipe_in "ether --prefix"
@@ -23,7 +43,7 @@ module Utl =
     then raise System_error
 
   let pub copy_file src dst =
-    print "> copy \"{src}\" -> \"{dst}\""
+    info "copy \"{src}\" -> \"{dst}\""
     open_in src |> IO.read_file |> IO.write_to (open_out dst)
 
   let pub create_symlink src dst =
@@ -60,7 +80,7 @@ module Utl =
   let pub do_in_tempdir thunk =
     let cwd = Os.getcwd!
 
-    let tempdir = Os.mkdtemp "/tmp/dope-tmp.XXXXXX"
+    let tempdir = Os.mkdtemp "/tmp/dope-XXXXXX"
     Os.chdir tempdir
     let cleanup! =
       unlink_quite tempdir
@@ -79,7 +99,7 @@ module Utl =
         else loop (input prompt2)
       loop (input prompt1)
     else
-      confirm? (x, "> try again (yes/no): ")
+      confirm? (x, paint " try again (yes/no): ")
 
 open Utl
 
@@ -95,25 +115,60 @@ module DB =
   let pub load path =
     { db = (first $ load path) if exist? path else []
     , path
-
     , get_module_opt = {db} name ->
         L.find_opt ({name = name'} -> S.casecmp name name' == 0) db
-
     , remove = fn ({db} as self) name ->
         {self with
           db = L.remove ({name = name'} -> S.casecmp name' name == 0) db
         }
-
     , add = fn ({db} as self) entry ->
         {self with db = entry :: db}
-
     , update = {db, path} ->
         let dbfile = open_out path
         IO.write_to dbfile (format "%w\n" db)
     }
 
+module Git =
+  let pub repository? url =
+    system "git ls-remote -h '{url}' &>/dev/null" == 0
+
+  let pub clone url dir =
+    unless system "git clone '{url}' '{dir}'" == 0 then raise Failure
+    { dir
+    , current_commit = {dir} ->
+        IO.shell "cd {dir}; git rev-parse HEAD"
+    , current_tag = {dir} ->
+        IO.shell "cd {dir}; git describe --tags"
+    , checkout = {dir} commit ->
+        unless system "cd {dir}; git checkout {commit}" == 0
+        then raise Failure
+    }
+
+
+module GitHub =
+  let pub search_repositories tgt_name =
+    let ans =
+      IO.shell "curl -s 'https://api.github.com/search/repositories?q={tgt_name}'"
+      |> Json.parse
+
+    let total_count = List.assoc "total_count" ans
+
+    open List
+    assoc "items" ans
+    -- Build items into more practical structure.
+    |> map $ repo ->
+      let name = assoc "name" repo
+      let full_name = assoc "full_name" repo
+      let clone_url = assoc "clone_url" repo
+      let description = assoc "description" repo
+      {name, full_name, clone_url, description}
+    -- Remove items with name mismatch
+    |> filter $ {name} -> name eq tgt_name
+
 
 module ModuleInfo =
+  open Logging
+
   using String as S
   using List as L
 
@@ -143,7 +198,7 @@ module ModuleInfo =
         let env = create_env [("command_line", args), ("root", dir)]
         env:load (dir ++ "/install.eth")
       with _ ->
-        eprint "> error: failed to load install-script"
+        error "failed to load install-script"
         raise Failure
     { name = L.assoc "name" conf
     , files = L.assoc "files" conf or []
@@ -164,7 +219,9 @@ module DBEntry =
 
 
 module Install =
+  open Logging
   open Utl
+
   using List as L
   using String as S
 
@@ -174,16 +231,16 @@ module Install =
     -- Check if module name is unique
     print name
     when db:get_module_opt name then
-      eprint "> error: module already present"
+      error "module already present"
       raise Failure
 
     -- Build (if build-hook is speciefied)
     when let Some build = build then do_in dir $ fn ->
-      print "> building module {name}"
+      info "building module {name}"
       build!
 
     -- Start installation
-    print "> installing module {name}"
+    info "installing module {name}"
     -- Create separate direcory for new module
     let moddir = module_path ++ "/" ++ name
     mkdir moddir
@@ -191,7 +248,7 @@ module Install =
     main::files |> L.iter $ file ->
       copy_file (dir ++ "/" ++ file) (moddir ++ "/" ++ file)
 
-    print "> all files copied"
+    info "module is ready for use"
 
     -- Create symlink to main
     let mainext = ".so" if elf? (dir ++ "/" ++ main) else ".eth"
@@ -200,7 +257,7 @@ module Install =
       create_symlink (moddir ++ "/" ++ main) mainpath
 
     when let Some post_install = post_install then do_in dir $ fn ->
-      print "> running post-install hooks"
+      info "running post-install hooks"
       post_install!
 
     { modentry with name,
@@ -214,21 +271,21 @@ let uninstall name =
 
   if let Some {install_dir} = db:get_module_opt name then
     -- Remove module directory
-    print "> uninstalling module '{name}'"
+    info "uninstalling module '{name}'"
     unlink install_dir
     -- Update registry
-    print "> updating registry"
+    info "updating registry"
     let db = db:remove name
     db:update
   else
-    eprint "> error: no such module"
+    error "no such module"
     raise Failure
 
 
 let list_modules! =
   let {db} = DB.(load default_path)
   if db is [] then
-    print "> no installed modules"
+    info "no installed modules"
   else
     let f isfirst modentry =
       print "" unless isfirst
@@ -328,111 +385,134 @@ when List.len command_line < 2 then
   exit 1
 
 let dopepath :: cmd :: command_line = command_line
---try
-if cmd eq "help" || cmd eq "h" then
-  let options =
-    [
-      { name = "dev", val = "dev", has_arg = false },
-      { name = "help", val = "help", has_arg = false },
-      { name = "h", val = "help", has_arg = false }
-    ]
-  let opts, _ = CmdArg.get options command_line
+try
+  if cmd eq "help" || cmd eq "h" then
+    let options =
+      [
+        { name = "dev", val = "dev", has_arg = false },
+        { name = "help", val = "help", has_arg = false },
+        { name = "h", val = "help", has_arg = false }
+      ]
+    let opts, _ = CmdArg.get options command_line
 
-  if List.assoc_opt "help" opts then help_help!
-  else if List.assoc_opt "dev" opts then help_dev!
-  else help!
+    if List.assoc_opt "help" opts then help_help!
+    else if List.assoc_opt "dev" opts then help_dev!
+    else help!
 
-else if cmd eq "list" || cmd eq "ls" || cmd eq "l" then
-  list_modules!
+  else if cmd eq "list" || cmd eq "ls" || cmd eq "l" then
+    list_modules!
 
-else if cmd eq "install" || cmd eq "i" then
-  let options =
-    [
-      { name = "help", val = "help", has_arg = false },
-      { name = "h", val = "help", has_arg = false }
-    ]
-  let opts, args = CmdArg.get options command_line
+  else if cmd eq "install" || cmd eq "i" then
+    let options =
+      [
+        { name = "help", val = "help", has_arg = false },
+        { name = "h", val = "help", has_arg = false }
+      ]
+    let opts, args = CmdArg.get options command_line
 
-  if List.assoc_opt "help" opts then
-    install_help!
-  else
-    -- - - - - - - - - - - - - - - - - - - - --
-    -- Install module from a git repository  --
-    -- - - - - - - - - - - - - - - - - - - - --
-    if let url :: modargs = args then
-      -- URL may be a local path. In this case we need it to be a full path
-      -- to be able to clone from the temporary directory.
-      let url = Os.realpath url if exist? url else url
+    if List.assoc_opt "help" opts then
+      install_help!
+    else
+      -- - - - - - - - - - - - - - - - - - - - --
+      -- Install module from a git repository  --
+      -- - - - - - - - - - - - - - - - - - - - --
+      if let url :: modargs = args then
+        let url =
+          -- URL may be a local path. In this case we need it to be a full path
+          -- to be able to clone from the temporary directory.
+          if exist? url then Os.realpath url else
+            -- Resolve repository path.
+            if Git.repository? url then url else
+              -- Not a valied URL. Search on GitHub.
+              let github_matches =
+                try GitHub.search_repositories url
+                with _ -> fatal_error "\"{url}\" is not a git repository"
 
-      -- Check if repository exists.
-      unless system "git ls-remote -h '{url}' &>/dev/null" == 0 then
-        eprint "> error: \"{url}\" is not a git repository"
+              if let [github_repo] = github_matches then
+                -- Single match! Perfect!
+                info "found GitHub repository: {github_repo.full_name}"
+                github_repo.clone_url
+              else if github_matches is [] then
+                -- No matches
+                fatal_error "\"{url}\" is not a git repository"
+              else
+                -- Multiple matches. Have to select only a single one of these.
+                info "multiple repositories match the name, select one to install:"
+                do_in_tempdir $ fn ->
+                  let tmp = open_out "list"
+                  github_matches |> List.iter $ github_repo ->
+                    write_to tmp github_repo.full_name
+
+                  let ans = shell {q|select x in $(cat list) Cancel; do test -n "$x" && break; done; echo $x|q}
+                  if ans eq "" || ans eq "Cancel"
+                  then info "exiting then"; exit 0
+                  else (List.find (x -> x:full_name eq ans) github_matches).clone_url
+
+        -- Load database with all installed modules.
+        let db = DB.(load default_path)
+
+        -- Clone repository to a temporary directory. There we will build it and
+        -- probably install.
+        let modentry = do_in_tempdir $ fn ->
+          let git_repo =
+            try Git.clone url "dir"
+            with Failure -> fatal_error "failed to clone repository"
+
+          -- Figure out a version of the module to use. If version-tags
+          -- available will install the latest version. Otherwize, use latest
+          -- commit in the repository.
+          let version =
+            let versions = ModuleInfo.get_versions git_repo.dir
+            if versions is [] then
+              -- No releases available. Try to install from the latest commit
+              -- if user accepts it.
+              info "module does not have any releases"
+              if confirm? (paint " install from the latest commit (yes/no): ")
+              then Commit git_repo:current_commit
+              else info "exiting then"; exit 0
+            else
+              -- Will use latest version. Check if current commit corresponds to
+              -- the latest version, if not - checkout desired commit.
+              info "available versions of the module: {versions}"
+              let latest = car versions
+              when git_repo:current_tag not eq latest then
+                try git_repo:checkout latest
+                with Failure -> fatal_error "failed to checkout '{latest}'"
+              Tag latest
+
+          info "installing {version}"
+
+          let modentry = DBEntry.{empty with repository = url, version}
+          let conf = ModuleInfo.load_config git_repo.dir modargs
+          Install.build_and_install {modentry, conf, db, dir = git_repo.dir, args = modargs}
+
+        -- Update registry
+        info "updating registry"
+        (db:add modentry):update
+
+      else -- let url :: modargs = agrs
+        error "missing module-directory path"
+        info "see `{basename dopepath} install --help`"
         exit 1
 
-      -- Name of the temporary directory where to clone the repo.
-      let tmpdir = "dir"
+  else if cmd eq "uninstall" || cmd eq "rm" then
+    let options =
+      [
+        { name = "help", val = "help", has_arg = false },
+        { name = "h", val = "help", has_arg = false }
+      ]
+    let opts, args = CmdArg.get options command_line
 
-      -- Load database with all installed modules.
-      let db = DB.(load default_path)
+    if List.assoc_opt "help" opts then
+      die "unimplemented"
+    else
+      let [modname] = args
+      uninstall modname
 
-      -- Clone repository to a temporary directory. There we will build it and
-      -- probably install.
-      let modentry = do_in_tempdir $ fn ->
-        unless system "git clone '{url}' '{tmpdir}'" == 0 then
-          eprint "> error: failed to clone repository"
-          exit 1
-
-        let version =
-          let versions = ModuleInfo.get_versions tmpdir
-          if versions is [] then
-            print "> module does not have any releases"
-            if confirm? "> install from the latest commit (yes/no): " then
-              Commit (shell "cd {tmpdir}; git rev-parse HEAD" |> chomp)
-            else
-              print "> exiting then"
-              exit 0
-          else
-            print "> available versions of the module: {versions}"
-            when car versions not eq chomp (shell "cd {tmpdir}; git describe --tags") then
-              unless system "cd {tmpdir}; git checkout {car versions}" == 0 then
-                eprint "> error: failed to checkout lates version-tag"
-                exit 1
-            Tag (car versions)
-
-        print "> installing {version}"
-
-        let modentry = DBEntry.{empty with repository = url, version}
-        let conf = ModuleInfo.load_config tmpdir modargs
-        Install.build_and_install {modentry, conf, db, dir = tmpdir, args = modargs}
-
-      -- Update registry
-      print "> updating registry"
-      (db:add modentry):update
-
-    else -- let url :: modargs = agrs
-      eprint "> error: missing module-directory path"
-      eprint "> see `{basename dopepath} install --help`"
-      exit 1
-
-else if cmd eq "uninstall" || cmd eq "rm" then
-  let options =
-    [
-      { name = "help", val = "help", has_arg = false },
-      { name = "h", val = "help", has_arg = false }
-    ]
-  let opts, args = CmdArg.get options command_line
-
-  if List.assoc_opt "help" opts then
-    die "unimplemented"
   else
-    let [modname] = args
-    uninstall modname
+    error "undefined command, {cmd}"
+    info "see `{basename dopepath} help` for avaliable commands"
+    exit 1
 
-else
-  eprint "> error: undefined command, {cmd}"
-  eprint "> see `{basename dopepath} help` for avaliable commands"
+with e ->
   exit 1
-
---with e ->
-  --eprint "> failure"
-  --exit 1
