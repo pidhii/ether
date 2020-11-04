@@ -68,8 +68,9 @@ let pub shell cmd =
   let pipe = open_pipe_in cmd
   let rec loop acc =
     if let Some data = read_of_opt pipe 0x100
-    then loop (acc ++ data)
-    else acc
-  let out = loop ""
+    then loop (data :: acc)
+    else List.rev acc |> String.cat |> String.chomp
+  let out = loop []
   if close pipe == 0 then out
   else raise Failure
+

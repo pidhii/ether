@@ -1,14 +1,14 @@
 #!/bin/env ether
 
 open IO
-open String (chop, chomp, split, match, to_number)
+open String (chomp, split, match, to_number)
 open List (map, rev_filter_map, sort)
 
 module Utl =
   -- Get direcory containing modules
   let pub module_path =
     let pipe = open_pipe_in "ether --prefix"
-    let prefix = IO.read_line_of pipe |> String.chop
+    let prefix = IO.read_line_of pipe |> String.chomp
     if close pipe /= 0
     then raise Failed_to_resolve_prefix
     else prefix ++ "/lib/ether"
@@ -43,7 +43,7 @@ module Utl =
     let line = IO.read_line_of pipe
     if close pipe /= 0
     then raise System_error
-    else String.chop line
+    else String.chomp line
 
   let pub elf? path = IO.read_of (open_in path) 4 eq "\x7fELF"
 
@@ -120,7 +120,7 @@ module ModuleInfo =
 
   let pub get_versions repodir =
     -- Get all tags
-    IO.shell "cd {repodir}; git tag" |> S.chop |> S.split \\s+/
+    IO.shell "cd {repodir}; git tag" |> S.chomp |> S.split \\s+/
     -- Decode version-tags into major, minor and a patch.
     |> L.rev_filter_map $ tag ->
       if let [_, major, minor, patch] = S.match \([0-9]+)\.([0-9]+)\.([0-9]+)/ tag then
@@ -391,13 +391,13 @@ else if cmd eq "install" || cmd eq "i" then
           if versions is [] then
             print "> module does not have any releases"
             if confirm? "> install from the latest commit (yes/no): " then
-              Commit (shell "cd {tmpdir}; git rev-parse HEAD" |> chop)
+              Commit (shell "cd {tmpdir}; git rev-parse HEAD" |> chomp)
             else
               print "> exiting then"
               exit 0
           else
             print "> available versions of the module: {versions}"
-            when car versions not eq chop (shell "cd {tmpdir}; git describe --tags") then
+            when car versions not eq chomp (shell "cd {tmpdir}; git describe --tags") then
               unless system "cd {tmpdir}; git checkout {car versions}" == 0 then
                 eprint "> error: failed to checkout lates version-tag"
                 exit 1
