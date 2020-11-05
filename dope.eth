@@ -42,9 +42,9 @@ module Utl =
     unless system "mkdir -vp '{path}'" == 0
     then raise System_error
 
-  let pub copy_file src dst =
-    info "copy \"{src}\" -> \"{dst}\""
-    open_in src |> IO.read_file |> IO.write_to (open_out dst)
+  let pub copy src dst =
+    unless system "cp -rv '{src}' '{dst}'" == 0
+    then raise System_error
 
   let pub create_symlink src dst =
     unless system "ln -vs '{src}' '{dst}'" == 0
@@ -129,20 +129,59 @@ module DB =
     }
 
 module Git =
+  open IO
+  using String as Str
+
   let pub repository? url =
     system "git ls-remote -h '{url}' &>/dev/null" == 0
 
-  let pub clone url dir =
-    unless system "git clone '{url}' '{dir}'" == 0 then raise Failure
-    { dir
-    , current_commit = {dir} ->
-        IO.shell "cd {dir}; git rev-parse HEAD"
-    , current_tag = {dir} ->
-        IO.shell "cd {dir}; git describe --tags"
-    , checkout = {dir} commit ->
-        unless system "cd {dir}; git checkout {commit}" == 0
-        then raise Failure
-    }
+  let pub list_versions url =
+    let refs = shell "git ls-remote -t '{url}'"
+    if refs eq ""
+    then []
+    else
+      refs
+      |> Str.split \\n/
+      |> List.map $ line ->
+          let [_, tag] = Str.match \refs\/tags\/(.+)/ line in tag
+      -- Decode version-tags into major, minor and a patch.
+      |> List.rev_filter_map $ tag ->
+        if let [_, major, minor, patch] = Str.match \([0-9]+)\.([0-9]+)\.([0-9]+)/ tag then
+          (tag, List.map Str.to_number [major, minor, patch])
+        else raise Filter_out
+      -- Sort versions.
+      |> List.sort $ (_, a) (_, b) ->
+        let rec loop xs ys =
+          if let x :: xs' = xs then
+            if let y :: ys' = ys then
+              if x > y then true
+              else x == y && loop xs' ys'
+            else true
+          else true
+        loop a b
+      |> List.map first
+
+  let pub head_commit url =
+    let line = shell "git ls-remote -h '{url}'"
+    let [_, commit] = Str.match \^([0-9a-z]+)\s/ line
+    commit
+
+  let pub clone {url, dir, version} =
+    unless system "git clone --progress '{url}' '{dir}'" == 0
+    then raise $ GitFailure "git clone failed"
+    let dir = Os.realpath dir
+
+    let checkout what =
+      unless system "cd {dir}; git checkout {what}" == 0
+      then raise $ GitFailure "checkout failed"
+
+    if let Commit commit = version then
+      unless shell "cd {dir}; git rev-parse HEAD" eq commit
+      then checkout commit
+    else
+      let Tag tag = version
+      unless shell "cd {dir}; git describe --tags" eq tag
+      then checkout tag
 
 
 module GitHub =
@@ -171,26 +210,6 @@ module ModuleInfo =
 
   using String as S
   using List as L
-
-  let pub get_versions repodir =
-    -- Get all tags
-    IO.shell "cd {repodir}; git tag" |> S.chomp |> S.split \\s+/
-    -- Decode version-tags into major, minor and a patch.
-    |> L.rev_filter_map $ tag ->
-      if let [_, major, minor, patch] = S.match \([0-9]+)\.([0-9]+)\.([0-9]+)/ tag then
-        (tag, L.map S.to_number [major, minor, patch])
-      else raise Filter_out
-    -- Sort versions.
-    |> L.sort $ (_, a) (_, b) ->
-      let rec loop xs ys =
-        if let x :: xs' = xs then
-          if let y :: ys' = ys then
-            if x > y then true
-            else x == y && loop xs' ys'
-          else true
-        else true
-      loop a b
-    |> L.map first
 
   let pub load_config dir args =
     let _, conf =
@@ -225,14 +244,15 @@ module Install =
   using List as L
   using String as S
 
-  let pub build_and_install {conf, modentry, db, dir, args} =
+  let pub build_and_install {conf, modentry, db, dir, args, owerwrite} =
     let {name, files, main, build, post_install} = conf
 
     -- Check if module name is unique
     print name
     when db:get_module_opt name then
-      error "module already present"
-      raise Failure
+      unless owerwrite then
+        error "module already present"
+        raise Failure
 
     -- Build (if build-hook is speciefied)
     when let Some build = build then do_in dir $ fn ->
@@ -246,7 +266,7 @@ module Install =
     mkdir moddir
     -- Copy module sources
     main::files |> L.iter $ file ->
-      copy_file (dir ++ "/" ++ file) (moddir ++ "/" ++ file)
+      copy (dir ++ "/" ++ file) (moddir ++ "/" ++ file)
 
     info "module is ready for use"
 
@@ -264,6 +284,46 @@ module Install =
         date = utc_date! or "<undefined>",
         install_dir = Os.realpath moddir or "<undefined>",
     }
+
+  let pub fetch {repo_url, version} =
+    let repo_dir = "repo_dir"
+    try Git.clone {url = repo_url, dir = repo_dir, version}
+    with GitFailure what -> fatal_error what
+    repo_dir
+
+  -- Clone repository to a temporary directory. There we will build it and
+  -- probably install.
+  let pub install {db, repo_url, version, args, owerwrite} =
+    do_in_tempdir $ fn ->
+      info "fetching '{repo_url}' ({version})"
+      let repo_dir = fetch {repo_url, version}
+      info "installing {version}"
+      let conf = ModuleInfo.load_config repo_dir args
+      let modentry = DBEntry.{empty with repository = repo_url, version}
+      build_and_install {modentry, conf, db, dir = repo_dir, args, owerwrite}
+
+
+module Update =
+  let pub check_update {name, local_version, repo_url} =
+    let remote_versions = Git.list_versions repo_url
+    if remote_versions is not [] then
+      if let Tag local_version_tag = local_version then
+        when local_version_tag not eq car remote_versions then
+          { new_version = Tag (car remote_versions)
+          , info_mesg =
+              "new version for module '{name}' is available: {car remote_versions}"
+          }
+      else
+        { new_version = Tag (car remote_versions)
+        , info_mesg = "release for module '{name}' is now avaialble"
+        }
+    else -- remote_versions is []
+      let Commit local_commit = local_version
+      let remote_head = Git.head_commit repo_url
+      when local_commit not eq remote_head then
+        { new_version = Commit remote_head
+        , info_mesg = "new commit for module '{name}' is available: {remote_head}"
+        }
 
 
 let uninstall name =
@@ -304,10 +364,12 @@ let help! =
   print "  {basename $ car command_line} COMMAND [OPTIONS]"
   print ""
   print "\e[1mCOMMANDS:\e[0m"
-  print "  help      h           Show this message."
-  print "  install   i   <dir>   Install package."
-  print "  uninstall rm  <name>  Uninstall package."
-  print "  list      ls          List installed packages."
+  print "  help      h                Show this message."
+  print "  install   i   <dir>        Install package."
+  print "  uninstall rm  <name>       Uninstall package."
+  print "  list      ls               List installed packages."
+  print "  check-updates              Check installed modules for updates."
+  print "  update [<name> <args>...]  Update module.'"
   print ""
   print "  Furethermore, each command may contain additional options. For  instance  one"
   print "  can check --help for any command to, probably, find out more."
@@ -385,134 +447,171 @@ when List.len command_line < 2 then
   exit 1
 
 let dopepath :: cmd :: command_line = command_line
-try
-  if cmd eq "help" || cmd eq "h" then
-    let options =
-      [
-        { name = "dev", val = "dev", has_arg = false },
-        { name = "help", val = "help", has_arg = false },
-        { name = "h", val = "help", has_arg = false }
-      ]
-    let opts, _ = CmdArg.get options command_line
+--try
+if cmd eq "help" || cmd eq "h" then
+  let options =
+    [
+      { name = "dev", val = "dev", has_arg = false },
+      { name = "help", val = "help", has_arg = false },
+      { name = "h", val = "help", has_arg = false }
+    ]
+  let opts, _ = CmdArg.get options command_line
 
-    if List.assoc_opt "help" opts then help_help!
-    else if List.assoc_opt "dev" opts then help_dev!
-    else help!
+  if List.assoc_opt "help" opts then help_help!
+  else if List.assoc_opt "dev" opts then help_dev!
+  else help!
 
-  else if cmd eq "list" || cmd eq "ls" || cmd eq "l" then
-    list_modules!
+else if cmd eq "list" || cmd eq "ls" || cmd eq "l" then
+  list_modules!
 
-  else if cmd eq "install" || cmd eq "i" then
-    let options =
-      [
-        { name = "help", val = "help", has_arg = false },
-        { name = "h", val = "help", has_arg = false }
-      ]
-    let opts, args = CmdArg.get options command_line
+else if cmd eq "install" || cmd eq "i" then
+  let options =
+    [
+      { name = "help", val = "help", has_arg = false },
+      { name = "h", val = "help", has_arg = false }
+    ]
+  let opts, args = CmdArg.get options command_line
 
-    if List.assoc_opt "help" opts then
-      install_help!
-    else
-      -- - - - - - - - - - - - - - - - - - - - --
-      -- Install module from a git repository  --
-      -- - - - - - - - - - - - - - - - - - - - --
-      if let url :: modargs = args then
-        let url =
-          -- URL may be a local path. In this case we need it to be a full path
-          -- to be able to clone from the temporary directory.
-          if exist? url then Os.realpath url else
-            -- Resolve repository path.
-            if Git.repository? url then url else
-              -- Not a valied URL. Search on GitHub.
-              let github_matches =
-                try GitHub.search_repositories url
-                with _ -> fatal_error "\"{url}\" is not a git repository"
+  if List.assoc_opt "help" opts then
+    install_help!
+  else
+    -- - - - - - - - - - - - - - - - - - - - --
+    -- Install module from a git repository  --
+    -- - - - - - - - - - - - - - - - - - - - --
+    if let url :: modargs = args then
+      let repo_url =
+        -- URL may be a local path. In this case we need it to be a full path
+        -- to be able to clone from the temporary directory.
+        if exist? url then Os.realpath url else
+          -- Resolve repository path.
+          if Git.repository? url then url else
+            -- Not a valied URL. Search on GitHub.
+            let github_matches =
+              try GitHub.search_repositories url
+              with _ -> fatal_error "\"{url}\" is not a git repository"
 
-              if let [github_repo] = github_matches then
-                -- Single match! Perfect!
-                info "found GitHub repository: {github_repo.full_name}"
-                github_repo.clone_url
-              else if github_matches is [] then
-                -- No matches
-                fatal_error "\"{url}\" is not a git repository"
-              else
-                -- Multiple matches. Have to select only a single one of these.
-                info "multiple repositories match the name, select one to install:"
-                do_in_tempdir $ fn ->
-                  let tmp = open_out "list"
-                  github_matches |> List.iter $ github_repo ->
-                    write_to tmp github_repo.full_name
-
-                  let ans = shell {q|select x in $(cat list) Cancel; do test -n "$x" && break; done; echo $x|q}
-                  if ans eq "" || ans eq "Cancel"
-                  then info "exiting then"; exit 0
-                  else (List.find (x -> x:full_name eq ans) github_matches).clone_url
-
-        -- Load database with all installed modules.
-        let db = DB.(load default_path)
-
-        -- Clone repository to a temporary directory. There we will build it and
-        -- probably install.
-        let modentry = do_in_tempdir $ fn ->
-          let git_repo =
-            try Git.clone url "dir"
-            with Failure -> fatal_error "failed to clone repository"
-
-          -- Figure out a version of the module to use. If version-tags
-          -- available will install the latest version. Otherwize, use latest
-          -- commit in the repository.
-          let version =
-            let versions = ModuleInfo.get_versions git_repo.dir
-            if versions is [] then
-              -- No releases available. Try to install from the latest commit
-              -- if user accepts it.
-              info "module does not have any releases"
-              if confirm? (paint " install from the latest commit (yes/no): ")
-              then Commit git_repo:current_commit
-              else info "exiting then"; exit 0
+            if let [github_repo] = github_matches then
+              -- Single match! Perfect!
+              info "found GitHub repository: {github_repo.full_name}"
+              github_repo.clone_url
+            else if github_matches is [] then
+              -- No matches
+              fatal_error "\"{url}\" is not a git repository"
             else
-              -- Will use latest version. Check if current commit corresponds to
-              -- the latest version, if not - checkout desired commit.
-              info "available versions of the module: {versions}"
-              let latest = car versions
-              when git_repo:current_tag not eq latest then
-                try git_repo:checkout latest
-                with Failure -> fatal_error "failed to checkout '{latest}'"
-              Tag latest
+              -- Multiple matches. Have to select only a single one of these.
+              info "multiple repositories match the name, select one to install:"
+              do_in_tempdir $ fn ->
+                let tmp = open_out "list"
+                github_matches |> List.iter $ github_repo ->
+                  write_to tmp github_repo.full_name
 
-          info "installing {version}"
+                let ans = shell {q|select x in $(cat list) Cancel; do test -n "$x" && break; done; echo $x|q}
+                if ans eq "" || ans eq "Cancel"
+                then info "exiting then"; exit 0
+                else (List.find (x -> x:full_name eq ans) github_matches).clone_url
 
-          let modentry = DBEntry.{empty with repository = url, version}
-          let conf = ModuleInfo.load_config git_repo.dir modargs
-          Install.build_and_install {modentry, conf, db, dir = git_repo.dir, args = modargs}
+      -- Figure out a version of the module to use. If version-tags
+      -- available will install the latest version. Otherwize, use latest
+      -- commit in the repository.
+      let version =
+        let versions = Git.list_versions repo_url or []
+        if versions is [] then
+          -- No releases available. Try to install from the latest commit
+          -- if user accepts it.
+          info "module does not have any releases"
+          if confirm? (paint " install from the latest commit (yes/no): ")
+          then Commit (Git.head_commit repo_url)
+          else info "exiting then"; exit 0
+        else
+          -- Will use latest version. Check if current commit corresponds to
+          -- the latest version, if not - checkout desired commit.
+          info "available versions of the module: {versions}"
+          let latest = car versions
+          info "latest: {latest}"
+          Tag latest
 
+      -- Install
+      let db = DB.(load default_path)
+      let modentry = Install.install {
+        db, repo_url, version, args = modargs, owerwrite = true
+      }
+
+      -- Update registry
+      info "updating registry"
+      (db:add modentry):update
+
+    else -- let url :: modargs = agrs
+      error "missing module-directory path"
+      info "see `{basename dopepath} install --help`"
+      exit 1
+
+else if cmd eq "uninstall" || cmd eq "rm" then
+  let options = [
+      { name = "help", val = "help", has_arg = false },
+      { name = "h", val = "help", has_arg = false }
+    ]
+  let opts, args = CmdArg.get options command_line
+
+  if List.assoc_opt "help" opts then
+    die "unimplemented"
+  else
+    let [modname] = args
+    uninstall modname
+
+else if cmd eq "check-updates" then
+  let db = DB.(load default_path)
+  db.db |> List.iter $ {name, version = local_version, repository = repo_url} ->
+    when let {info_mesg} = Update.check_update {name, local_version, repo_url}
+    then info info_mesg
+
+else if cmd eq "update" then
+  let options = [
+    { name = "help", val = "help", has_arg = false },
+    { name = "h", val = "help", has_arg = false },
+  ]
+  let opts, args = CmdArg.get options command_line
+  if List.assoc_opt "help" opts then
+    die "unimplemented"
+  else if args eq [] then
+    -- Update all modules.
+    let db = DB.(load default_path)
+    db.db |> List.iter $ {name, version = local_version, repository = repo_url} ->
+      when let {new_version} = Update.check_update {name, local_version, repo_url} then
+        -- Install
+        let db = DB.(load default_path)
+        let modentry = Install.install {
+          db, repo_url, version = new_version, args = [], owerwrite = true
+        }
         -- Update registry
         info "updating registry"
-        (db:add modentry):update
-
-      else -- let url :: modargs = agrs
-        error "missing module-directory path"
-        info "see `{basename dopepath} install --help`"
-        exit 1
-
-  else if cmd eq "uninstall" || cmd eq "rm" then
-    let options =
-      [
-        { name = "help", val = "help", has_arg = false },
-        { name = "h", val = "help", has_arg = false }
-      ]
-    let opts, args = CmdArg.get options command_line
-
-    if List.assoc_opt "help" opts then
-      die "unimplemented"
-    else
-      let [modname] = args
-      uninstall modname
-
+        ((db:remove name):add modentry):update
   else
-    error "undefined command, {cmd}"
-    info "see `{basename dopepath} help` for avaliable commands"
-    exit 1
+    let name::args = args
+    let db = DB.(load default_path)
+    if let Some {repository, version} = db:get_module_opt name then
+      if let {new_version} = Update.check_update {
+        name, local_version = version, repo_url = repository
+      } then
+        -- Install
+        let db = DB.(load default_path)
+        let modentry = Install.install {
+          db, args,
+          repo_url = repository,
+          version = new_version,
+          owerwrite = true
+        }
+        -- Update registry
+        info "updating registry"
+        ((db:remove name):add modentry):update
+      else
+        info "already using the latest version of '{name}'"
+    else
+      fatal_error "no such module, '{name}'"
 
-with e ->
+else
+  error "undefined command, {cmd}"
+  info "see `{basename dopepath} help` for avaliable commands"
   exit 1
+
+--with e ->
+  --exit 1
