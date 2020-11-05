@@ -1317,13 +1317,13 @@ List
 ;
 
 Record
-  : SYMBOL '=' StmtSeq {
+  : SYMBOL '=' StmtOrBlock {
     cod_vec_init($$.keys);
     cod_vec_init($$.vals);
     cod_vec_push($$.keys, $1);
     cod_vec_push($$.vals, $3);
   }
-  | START_BLOCK SYMBOL '=' StmtSeq END_BLOCK {
+  | START_BLOCK SYMBOL '=' StmtOrBlock END_BLOCK {
     cod_vec_init($$.keys);
     cod_vec_init($$.vals);
     cod_vec_push($$.keys, $2);
@@ -1341,7 +1341,7 @@ Record
     cod_vec_push($$.keys, $2);
     cod_vec_push($$.vals, eth_ast_ident($2));
   }
-  | Record ',' SYMBOL '=' StmtSeq {
+  | Record ',' SYMBOL '=' StmtOrBlock {
     $$ = $1;
     cod_vec_push($$.keys, $3);
     cod_vec_push($$.vals, $5);
