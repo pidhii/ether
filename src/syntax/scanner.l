@@ -297,14 +297,26 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
 
 
  /*****************************************************************************/
-("."[[:space:]]*)?[[({][[:space:]]* {
+("."([[:space:]]*"--".*\n)*[[:space:]]*)?[[({]([[:space:]]*"--".*\n)*[[:space:]]* {
+  /* Remove comments.*/
+  char text[yyleng+1];
+  int leng = 0;
+  for (char *p = yytext; *p; ++p)
+  {
+    if (yyleng - (p - yytext) > 1 and strncmp(p, "--", 2) == 0)
+      while (*++p != '\n');
+    else
+      text[leng++] = *p;
+  }
+  text[leng] = '\0';
+
   /* Save number of indent levels before entering braces. */
   cod_vec_push(indlvlstack, indentstack.len);
 
   /* If there is a line-break after the brace, set indentation w.r.t. the RHS;
    * otherwize, keep current indentation. */
   char *p;
-  if ((p = strrchr(yytext, '\n')))
+  if ((p = strrchr(text, '\n')))
   {
     int newindent = strlen(p + 1);
 
@@ -318,8 +330,8 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
 
   /* Start braces. */
   int brace;
-  for (p = yytext + yyleng - 1; isspace(*p); --p);
-  if (yytext[0] == '.')
+  for (p = text + leng - 1; isspace(*p); --p);
+  if (text[0] == '.')
   {
     switch (*p)
     {
@@ -331,9 +343,19 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
   return *p;
 }
 
-[[:space:]]*","[[:space:]]* {
-  cod_vec_push(primtoks, ',');
+[[:space:]]*([[:space:]]*"--".*\n)*","([[:space:]]*"--".*\n)*[[:space:]]* {
+  /* Remove comments.*/
+  char text[yyleng+1];
+  int leng = 0;
+  for (char *p = yytext; *p; ++p)
+  {
+    if (yyleng - (p - yytext) > 1 and strncmp(p, "--", 2) == 0)
+      while (*++p != '\n');
+    text[leng++] = *p;
+  }
+  text[leng] = '\0';
 
+  cod_vec_push(primtoks, ',');
   /* Drop all gained indentation levels. */
   int nindwas = cod_vec_last(indlvlstack);
   int nindnow = indentstack.len;
@@ -349,7 +371,7 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
   /* If there is a line-break between RHS and LHS of a coma, set indentation
    * w.r.t. the RHS; otherwize, keep current indentation. */
   char *p;
-  if ((p = strrchr(yytext, '\n')))
+  if ((p = strrchr(text, '\n')))
   {
     int newindent = strlen(p + 1);
 
@@ -364,7 +386,7 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
   return cod_vec_pop(primtoks);
 }
 
-[[:space:]]*[\])}] {
+([[:space:]]*"--".*\n)*[[:space:]]*[\])}] {
   cod_vec_push(primtoks, yytext[yyleng-1]);
 
   /* Drop all gained indentation levels. */
