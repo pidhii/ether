@@ -76,8 +76,40 @@ find_weak_ref_idx(rec_scope *scp, int vid)
 //                               BUILDER
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 typedef enum {
+  /**
+   * @brief Default RC rules for temporaries.
+   *
+   * **RC Policy**
+   * Initialy an object is not referenced.
+   * If \ref kill_value_T() handled the rease of an object, it will be
+   * referenced right after it is created and kept referenced untill end if its
+   * lifetime. Otherwize, object will be dropped right after the creation.
+   */
   RC_RULES_DEFAULT,
+
+  /**
+   * @brief Disable automatic reference counting.
+   */
   RC_RULES_DISABLE,
+
+  /**
+   * @brief Rules for Phi-nodes.
+   *
+   * ONLY allowed for true Phi-nodes, i.e. SSA temporaries owned by the IF- and
+   * TRY-forms.
+   *
+   * **RC Policy**
+   * Object MUST be referenced by hand at MOV instructions. Note, it does not
+   * imply, in general, the need for REF instruction. The statement stress that
+   * it just has to be *referenced* without specifying a way to ensure/acomplish
+   * this. Object is fed to \ref kill_value_T() launched at the instruction next
+   * to the parent form (IF/TRY). If *user* is found and thus release of the
+   * object is handled by the algorithm, we are done. Otherwize, lifetime is
+   * defined branch-wise. Each branch is handled separately and independently of
+   * the others. For each branch:
+   * 1. lifetime start is at MOV (it must always present).
+   * ..TODO..
+   */
   RC_RULES_PHI,
   RC_RULES_UNREF,
 } rc_rules;
@@ -609,8 +641,20 @@ assert_number(ssa_builder *bldr, eth_ssa_tape *tape, int vid, eth_location *loc,
   }
 }
 
+/**
+ * @brief Build SSA-pattern.
+ *
+ * @param[in,out] bldr IR builder.
+ * @param pat IR-pattern.
+ * @param expr SSA value identifier refering to the expression to be matched by
+ *  the pattern.
+ * @param myrules Whether 
+ * @param[out] e Will be set to `true` in case of errors.
+ *
+ * @return SSA-pattern.
+ */
 static eth_ssa_pattern*
-build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
+build_pattern(ssa_builder *bldr, const eth_ir_pattern *pat, int expr, bool myrules,
     bool *e)
 {
   switch (pat->tag)
@@ -654,6 +698,8 @@ build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
 
       // set up aliasing variable
       bldr->vars[pat->unpack.varid] = expr;
+      if (myrules)
+        bldr->vinfo[expr]->rules = RC_RULES_DEFAULT;
 
       eth_ssa_pattern *pats[pat->unpack.n];
       int vids[pat->unpack.n];
@@ -723,6 +769,8 @@ build_pattern(ssa_builder *bldr, eth_ir_pattern *pat, int expr, bool myrules,
     {
       // set up aliasing variable
       bldr->vars[pat->record.varid] = expr;
+      if (myrules)
+        bldr->vinfo[expr]->rules = RC_RULES_DEFAULT;
 
       eth_ssa_pattern *pats[pat->record.n];
       int vids[pat->record.n];

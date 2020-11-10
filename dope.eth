@@ -574,8 +574,9 @@ else if cmd eq "update" then
     die "unimplemented"
   else if args eq [] then
     -- Update all modules.
-    let db = DB.(load default_path)
-    db.db |> List.iter $ {name, version = local_version, repository = repo_url} ->
+    DB.(load default_path).db |> List.iter $ {
+      name, version = local_version, repository = repo_url
+    } ->
       when let {new_version} = Update.check_update {name, local_version, repo_url} then
         -- Install
         let db = DB.(load default_path)
