@@ -43,6 +43,15 @@ eth_ast_ident_pattern(const char *ident)
   return pat;
 }
 
+void
+eth_set_ident_attr(eth_ast_pattern *ident, eth_attr *attr)
+{
+  eth_ref_attr(attr);
+  if (ident->ident.attr)
+    eth_unref_attr(ident->ident.attr);
+  ident->ident.attr = attr;
+}
+
 eth_ast_pattern*
 eth_ast_unpack_pattern(eth_type *type, char *const fields[],
     eth_ast_pattern *const pats[], int n)

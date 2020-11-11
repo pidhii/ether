@@ -2,7 +2,7 @@
 /* Just for the sake of safety. */
 %define parse.lac full
 /* LAR(1) has issues after adding module-syntax. */
-%define lr.type ielr
+/*%define lr.type ielr*/
 /* Reentrant parser: */
 %define api.pure true
 %param {eth_scanner *yyscanner}
@@ -26,6 +26,11 @@
 ETH_MODULE("ether:parser")
 
 
+static const char *g_filename = NULL;
+static eth_ast* g_result;
+static bool g_iserror;
+
+
 extern
 int yylex();
 
@@ -45,15 +50,22 @@ static eth_ast*
 dummy_ast()
 { return eth_ast_cval(eth_nil); }
 
+static eth_attr*
+_create_attr(int aflag, void *locpp)
+{
+  eth_attr *attr = eth_create_attr(aflag);
+  if (g_filename)
+    eth_set_location(attr, location(locpp));
+  return attr;
+}
+#define create_attr(aflag, locp) \
+  _create_attr(aflag, &locp)
+
 #define LOC(ast, locp)                            \
   do {                                            \
     if (g_filename)                               \
       eth_set_ast_location(ast, location(&locp)); \
   } while (0)
-
-static const char *g_filename = NULL;
-static eth_ast* g_result;
-static bool g_iserror;
 %}
 
 %code requires {
@@ -266,7 +278,7 @@ static bool g_iserror;
 %type<patvec> PatternList
 %type<boolean> MaybeComaDots
 %type<record> Record
-%type<record_pattern> ReocrdPattern
+%type<record_pattern> RecordPattern
 %type<lc_aux> LcAux
 %type<ast> Block
 %type<ast> StmtOrBlock
@@ -1165,7 +1177,7 @@ AtomicPattern
   | '('')' { $$ = eth_ast_constant_pattern(eth_nil); }
   | '['']' { $$ = eth_ast_constant_pattern(eth_nil); }
   | '(' Pattern ')' { $$ = $2; }
-  | '{' ReocrdPattern '}' {
+  | '{' RecordPattern '}' {
     $$ = eth_ast_record_pattern($2.keys.data, $2.vals.data, $2.keys.len);
     cod_vec_iter($2.keys, i, x, free(x));
     cod_vec_destroy($2.keys);
@@ -1264,12 +1276,19 @@ PatternList
   }
 ;
 
-ReocrdPattern
+RecordPattern
   : SYMBOL {
     cod_vec_init($$.keys);
     cod_vec_init($$.vals);
     cod_vec_push($$.keys, $1);
     cod_vec_push($$.vals, eth_ast_ident_pattern($1));
+  }
+  | Attribute SYMBOL {
+    cod_vec_init($$.keys); cod_vec_init($$.vals);
+    eth_ast_pattern *idpat = eth_ast_ident_pattern($2);
+    eth_set_ident_attr(idpat, create_attr($1, @2));
+    cod_vec_push($$.keys, $2);
+    cod_vec_push($$.vals, idpat);
   }
   | SYMBOL '=' NoComaPattern {
     cod_vec_init($$.keys);
@@ -1277,12 +1296,19 @@ ReocrdPattern
     cod_vec_push($$.keys, $1);
     cod_vec_push($$.vals, $3);
   }
-  | ReocrdPattern ',' SYMBOL {
+  | RecordPattern ',' SYMBOL {
     $$ = $1;
     cod_vec_push($$.keys, $3);
     cod_vec_push($$.vals, eth_ast_ident_pattern($3));
   }
-  | ReocrdPattern ',' SYMBOL '=' NoComaPattern {
+  | RecordPattern ',' Attribute SYMBOL {
+    $$ = $1;
+    eth_ast_pattern *idpat = eth_ast_ident_pattern($4);
+    eth_set_ident_attr(idpat, create_attr($3, @4));
+    cod_vec_push($$.keys, $4);
+    cod_vec_push($$.vals, idpat);
+  }
+  | RecordPattern ',' SYMBOL '=' NoComaPattern {
     $$ = $1;
     cod_vec_push($$.keys, $3);
     cod_vec_push($$.vals, $5);

@@ -45,7 +45,7 @@ eth_create_module(const char *name)
   mod->defscap = 0x10;
   mod->defs = malloc(sizeof(eth_def) * mod->defscap);
   mod->env = eth_create_empty_env();
-  eth_add_module_path(mod->env, ".");
+  eth_add_module_path(mod->env, "."); // XXX: remove this
   cod_vec_init(mod->clos);
   return mod;
 }
