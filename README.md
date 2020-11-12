@@ -1,3 +1,9 @@
+
+<p align='center'>
+  <img src="./ether-logo.1280x640.png">
+</p>
+
+
 - [Examples](#examples)
 - [Build and installation](#build-and-installation)
 - [Running in interactive mode](#repl)
@@ -5,8 +11,6 @@
 - [Ether Wiki](https://github.com/pidhii/ether/wiki)
 - [Where to get help](#where-to-get-help)
 - [FAQ](#faq)
-
-
 
 # [Check-list](#check-list)
 - [x] REPL
