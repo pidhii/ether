@@ -409,13 +409,10 @@ eth_vm(eth_bytecode *bc)
 
       OP(MKSCP)
       {
-        eth_t wrefs[ip->mkscp.data->nwref];
         eth_function *clos[ip->mkscp.data->nclos];
-        for (size_t i = 0; i < ip->mkscp.data->nwref; ++i)
-          wrefs[i] = r[ip->mkscp.data->wrefs[i]];
         for (size_t i = 0; i < ip->mkscp.data->nclos; ++i)
           clos[i] = ETH_FUNCTION(r[ip->mkscp.data->clos[i]]);
-        eth_create_scp(clos, ip->mkscp.data->nclos, wrefs, ip->mkscp.data->nwref);
+        eth_create_scp(clos, ip->mkscp.data->nclos);
         FAST_DISPATCH_NEXT();
       }
 

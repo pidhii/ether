@@ -59,6 +59,10 @@ string. If it is of zero length, then the it is treated as 0-byte.
 |.help}
   __make
 
+-- TODO: optimize
+let pub rev s =
+  list s |> List.rev |> cat
+
 let pub join sep xs =
   if xs is nil then ""
   else if let hd::[] = xs then hd

@@ -264,14 +264,14 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
  /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 <IGNORE_INDENT>\n
 
-<IGNORE_INDENT>"."[[:space:]]*"{" {
+<IGNORE_INDENT>"."[[:space:]]*"{"[[:space:]]* {
   if (fmtbracecnt.len > 0)
     cod_vec_last(fmtbracecnt) ++;
   ENTER_STATE(IGNORE_INDENT); /* Need it to properly handle patterns */
   return DOT_OPEN3;
 }
 
-<IGNORE_INDENT>"{" {
+<IGNORE_INDENT>"{"[[:space:]]* {
   if (fmtbracecnt.len > 0)
     cod_vec_last(fmtbracecnt) ++;
   ENTER_STATE(IGNORE_INDENT); /* Need it to properly handle patterns */
@@ -362,6 +362,7 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
   int n = nindnow - nindwas;
   while (n--)
   {
+    assert(indentstack.len > 0);
     indent_level indent = cod_vec_pop(indentstack);
     if (not indent.issilent)
       cod_vec_push(primtoks, END_BLOCK);
@@ -390,11 +391,13 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
   cod_vec_push(primtoks, yytext[yyleng-1]);
 
   /* Drop all gained indentation levels. */
+  assert(indlvlstack.len > 0);
   int nindwas = cod_vec_pop(indlvlstack);
   int nindnow = indentstack.len;
   int n = nindnow - nindwas;
   while (n--)
   {
+    assert(indentstack.len > 0);
     indent_level indent = cod_vec_pop(indentstack);
     if (not indent.issilent)
       cod_vec_push(primtoks, END_BLOCK);

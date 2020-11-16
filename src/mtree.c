@@ -1,15 +1,15 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -18,45 +18,39 @@
 #include <stdlib.h>
 #include <string.h>
 
-eth_mtree_ctor*
-eth_create_const_ctor(eth_t cval)
+void
+eth_init_mtree_case(int n; eth_mtree_case *c, const eth_type *type, const int offs[n],
+    const int ssavids[n], int n, eth_mtree *tree)
 {
-  eth_mtree_ctor *ctor = malloc(sizeof(eth_mtree_ctor));
-  ctor->tag = ETH_MTREE_CONST;
-  eth_ref(ctor->cval = cval);
-  return ctor;
-}
-
-eth_mtree_ctor*
-eth_create_unpack_ctor(eth_type *type, int *offs, int *vids, int n)
-{
-  eth_mtree_ctor *ctor = malloc(sizeof(eth_mtree_ctor));
-  ctor->tag = ETH_MTREE_UNPACK;
-  ctor->unpack.type = type;
-  ctor->unpack.offs = malloc(sizeof(int) * n);
-  memcpy(ctor->unpack.offs, offs, sizeof(int) * n);
-  ctor->unpack.vids = malloc(sizeof(int) * n);
-  memcpy(ctor->unpack.vids, vids, sizeof(int) * n);
-  ctor->unpack.n = n;
-  return ctor;
+  c->type = type;
+  c->offs = malloc(sizeof(int) * n);
+  c->ssavids = malloc(sizeof(int) * n);
+  c->n = n;
+  c->tree = tree;
+  memcpy(c->offs, offs, sizeof(int) * n);
+  memcpy(c->ssavids, ssavids, sizeof(int) * n);
 }
 
 void
-eth_destroy_mtree_ctor(eth_mtree_ctor *ctor)
+eth_cleanup_mtree_case(eth_mtree_case *c)
 {
-  switch (ctor->tag)
-  {
-    case ETH_MTREE_CONST:
-      eth_unref(ctor->cval);
-      break;
+  free(c->offs);
+  free(c->ssavids);
+  eth_destroy_mtree(c->tree);
+}
 
-    case ETH_MTREE_UNPACK:
-      free(ctor->unpack.offs);
-      free(ctor->unpack.vids);
-      break;
-  }
+void
+eth_init_mtree_ccase(eth_mtree_ccase *c, eth_t cval, eth_mtree *tree)
+{
+  eth_ref(c->cval = cval);
+  c->tree = tree;
+}
 
-  free(ctor);
+void
+eth_cleanup_mtree_ccase(eth_mtree_ccase *c)
+{
+  eth_unref(c->cval);
+  eth_destroy_mtree(c->tree);
 }
 
 eth_mtree*
@@ -77,13 +71,30 @@ eth_create_leaf(eth_insn *body)
 }
 
 eth_mtree*
-eth_create_switch(const eth_mtree_case L[], int n)
+eth_create_switch(int ncases; int ssavid, const eth_mtree_case cases[ncases],
+    int ncases, eth_mtree *dflt)
 {
   eth_mtree *t = malloc(sizeof(eth_mtree));
   t->tag = ETH_MTREE_SWITCH;
-  t->swtch.n = n;
-  t->swtch.L = malloc(sizeof(eth_mtree_case) * n);
-  memcpy(t->swtch.L, L, sizeof(eth_mtree_case) * n);
+  t->swtch.ssavid = ssavid;
+  t->swtch.cases = malloc(sizeof(eth_mtree_case) * ncases);
+  t->swtch.ncases = ncases;
+  memcpy(t->swtch.cases, cases, sizeof(eth_mtree_case) * ncases);
+  t->swtch.dflt = dflt;
+  return t;
+}
+
+eth_mtree*
+eth_create_cswitch(int ncases; int ssavid, const eth_mtree_ccase cases[ncases],
+    int ncases, eth_mtree *dflt)
+{
+  eth_mtree *t = malloc(sizeof(eth_mtree));
+  t->tag = ETH_MTREE_CSWITCH;
+  t->cswtch.ssavid = ssavid;
+  t->cswtch.cases = malloc(sizeof(eth_mtree_ccase) * ncases);
+  t->cswtch.ncases = ncases;
+  memcpy(t->cswtch.cases, cases, sizeof(eth_mtree_ccase) * ncases);
+  t->cswtch.dflt = dflt;
   return t;
 }
 
@@ -100,14 +111,17 @@ eth_destroy_mtree(eth_mtree *t)
       break;
 
     case ETH_MTREE_SWITCH:
-      for (int i = 0; i < t->swtch.n; ++i)
-      {
-        eth_mtree_case *c = t->swtch.L + i;
-        if (c->ctor)
-          eth_destroy_mtree_ctor(c->ctor);
-        eth_destroy_mtree(c->tree);
-      }
-      free(t->swtch.L);
+      for (int i = 0; i < t->swtch.ncases; ++i)
+        eth_cleanup_mtree_case(t->swtch.cases + i);
+      free(t->swtch.cases);
+      eth_destroy_mtree(t->swtch.dflt);
+      break;
+
+    case ETH_MTREE_CSWITCH:
+      for (int i = 0; i < t->cswtch.ncases; ++i)
+        eth_cleanup_mtree_ccase(t->cswtch.cases + i);
+      free(t->cswtch.cases);
+      eth_destroy_mtree(t->cswtch.dflt);
       break;
   }
 

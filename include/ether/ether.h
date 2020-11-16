@@ -84,8 +84,7 @@ typedef float eth_number_t;
 # error Undefined value of ETH_NUMBER_TYPE.
 #endif
 
-typedef struct eth_type eth_type;
-typedef struct eth_magic eth_magic;
+typedef struct eth_type eth_type; /**< @ingroup Type */
 typedef struct eth_header eth_header;
 typedef struct eth_header* eth_t;
 typedef struct eth_ast eth_ast;
@@ -100,7 +99,6 @@ typedef struct eth_ssa eth_ssa;
 typedef struct eth_ssa_tape eth_ssa_tape;
 typedef struct eth_bc_insn eth_bc_insn;
 typedef struct eth_bytecode eth_bytecode;
-typedef struct eth_scp eth_scp;
 
 typedef struct eth_function eth_function;
 typedef struct eth_mut_ref eth_mut_ref;
@@ -357,10 +355,16 @@ eth_free_h6(void *ptr);
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                               TYPE
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-typedef struct {
-  char *name;
-  ptrdiff_t offs;
-} eth_field;
+/** @defgroup Type Type
+ * @brief Internal representation for types.
+ * @{ */
+
+/** @ingroup Type */
+struct eth_field {
+  char *name; /**< @brief Field name */
+  ptrdiff_t offs; /**< @brief Field offset. @todo ...offset from what? */
+};
+typedef struct eth_field eth_field;
 
 #define ETH_TFLAG_PLAIN   0x01
 #define ETH_TFLAG_TUPLE   (ETH_TFLAG_PLAIN | 1 << 1)
@@ -450,6 +454,8 @@ eth_get_field_id_by_offs(const eth_type *type, ptrdiff_t offs);
 void
 eth_destroy_type(eth_type *type);
 
+/** @} Type */
+
 void
 eth_write(eth_t x, FILE *out);
 
@@ -461,45 +467,13 @@ eth_equal(eth_t x, eth_t y);
 
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
-//                                 MAGIC
-// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-eth_magic*
-eth_create_magic(void);
-
-void
-eth_ref_magic(eth_magic *magic);
-
-void
-eth_unref_magic(eth_magic *magic);
-
-void
-eth_drop_magic(eth_magic *magic);
-
-eth_magic*
-eth_get_magic(eth_word_t magicid);
-
-eth_word_t
-eth_get_magic_id(eth_magic *magic);
-
-eth_scp* const*
-eth_get_scopes(eth_magic *magic, int *n);
-
-int
-eth_add_scope(eth_magic *magic, eth_scp *scp);
-
-int
-eth_remove_scope(eth_magic *magic, eth_scp *scp);
-
-
-// ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                             OBJECT HEADER
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 #define ETH_MAGIC_NONE (-1)
 #define ETH_RC_MAX UINT32_MAX
 struct eth_header {
   eth_type *type;
-  eth_word_t rc;
-  eth_sword_t magic;
+  eth_dword_t rc;
 };
 #define ETH(x) ((eth_t)(x))
 
@@ -509,7 +483,6 @@ eth_init_header(void *ptr, eth_type *type)
   eth_header *hdr = (eth_header*)ptr;
   hdr->type = type;
   hdr->rc = 0;
-  hdr->magic = ETH_MAGIC_NONE;
 }
 
 static inline void
@@ -521,12 +494,7 @@ eth_force_delete(eth_t x)
 static inline void
 eth_delete(eth_t x)
 {
-  extern void _eth_delete_magic(eth_t x);
-
-  if (eth_likely(x->magic == -1))
-    eth_force_delete(x);
-  else
-    _eth_delete_magic(x);
+  eth_force_delete(x);
 }
 
 static inline void
@@ -559,23 +527,21 @@ eth_drop(eth_t x)
     eth_delete(x);
 }
 
-eth_magic*
-eth_require_magic(eth_t x);
-
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                            RECURSIVE SCOPE
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-struct eth_scp {
-  eth_function **clos; /* Scope closures. Note: clos ⊆ wrefs (XXX NO!). */
-  eth_t *wrefs; /* Recursive variables and closures created inside scope. */
-  size_t nclos; /* Length of clos-array. */
-  size_t nwref; /* Length of wrefs-array. */
-  size_t rc; /* Count wrefs with non-zero RC. */
-};
+/** @defgroup RecScp Recursive Scope
+ * @{ */
+
+typedef struct {
+  eth_function **clos; /**< Scope closures. */
+  size_t nclos; /**< Length of clos-array. */
+  size_t rc; /**< Count members with non-zero RC. */
+} eth_scp;
 
 eth_scp*
-eth_create_scp(eth_function **clos, int nclos, eth_t *wrefs, int nwref);
+eth_create_scp(eth_function **clos, int nclos);
 
 void
 eth_destroy_scp(eth_scp *scp);
@@ -583,24 +549,43 @@ eth_destroy_scp(eth_scp *scp);
 void
 eth_drop_out(eth_scp *scp);
 
+/** @} RecScp */
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                             BUILTIN TYPES
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+/** @defgroup BuiltinTypes Builtin Types
+ * @brief Builtin data types.
+ * @{ */
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                               number
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+/** @defgroup Number Number
+ * @brief The only numeric type natively supported by Ether.
+ * @{ */
+
 extern
 eth_type *eth_number_type;
+
+/** @brief Check wheter the object is a number. */
 #define eth_is_num(x) ((x)->type == eth_number_type)
 
+/** @brief Internal representation of the number. */
 typedef struct {
   eth_header header;
   eth_number_t val;
 } eth_number;
+/** @brief Cast arbitrary pointer into a pointer to \ref eth_number. */
 #define ETH_NUMBER(x) ((eth_number*)(x))
+/**
+ * @brief Get value of a number
+ * @return \ref eth_number_t (which usually corresponds to a long double).
+ */
 #define eth_num_val(x) (ETH_NUMBER(x)->val)
 
-static inline eth_t __attribute__((malloc))
+/** @brief Create a number object. */
+inline static eth_t __attribute__((malloc))
 eth_create_number(eth_number_t val)
 {
   eth_number *num = (eth_number*)eth_alloc_h2();
@@ -608,6 +593,7 @@ eth_create_number(eth_number_t val)
   num->val = val;
   return ETH(num);
 }
+/** @copydoc eth_create_number */
 #define eth_num eth_create_number
 
 #define _ETH_TEST_SNUM(name, type)                    \
@@ -624,6 +610,8 @@ eth_create_number(eth_number_t val)
     eth_number_t num = eth_num_val(x);                \
     return (num <= type##_MAX) & (num >= 0);          \
   }
+/** @name Test compatibility with native C numeric types
+ * @{ */
 // native C integer types
 _ETH_TEST_SNUM(char, CHAR)
 _ETH_TEST_SNUM(signed_char, SCHAR)
@@ -653,8 +641,11 @@ _ETH_TEST_UNUM(uintmax, UINTMAX)
 _ETH_TEST_SNUM(float, FLT)
 _ETH_TEST_SNUM(double, DBL)
 _ETH_TEST_SNUM(long_double, LDBL)
+/** @} */
 #undef _ETH_TEST_SNUM
 #undef _ETH_TEST_UNUM
+
+/** @} Number */
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                               function
@@ -1275,6 +1266,8 @@ eth_front(eth_t v);
 eth_t
 eth_back(eth_t v);
 
+/** @} BuiltinTypes */
+
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                             ATTRIBUTES
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -1484,16 +1477,14 @@ typedef enum {
 
   /**
    * @brief Match with a constant
-   *
-   * @note Currently only works for values which can equal physical equality.
    */
   ETH_PATTERN_CONSTANT,
 
   /**
    * @brief Destructure (arbitrary) record
    *
-   * @note Currently can be used to access **a** field of **any** plain type.
-   * (simultanious access to multiple fields only works for records)
+   * @note Currently can be also used to access **a** field of **any** plain
+   * type (one-pass load of multiple fields only works for records).
    */
   ETH_PATTERN_RECORD,
 } eth_pattern_tag;
@@ -2247,8 +2238,14 @@ eth_specialize(const eth_ir *ir);
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                STATIC SINGLE ASSIGNEMENT REPRESENTATION
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-/*
- * Note: unpack.type is NULL if no type check required.
+/** @defgroup SSA Static Single Assignment representation
+ * @{ */
+
+/***************************************************************************//**
+ * @defgroup SsaPatterns SSA Patterns
+ * @{ */
+/**
+ * @note Unpack.type is NULL if no type check required.
  */
 typedef enum {
   ETH_TEST_IS,
@@ -2288,56 +2285,102 @@ eth_ssa_record_pattern(size_t const ids[], int const vids[],
 
 void
 eth_destroy_ssa_pattern(eth_ssa_pattern *pat);
+/** @} SsaPatterns */
 
-enum {
-  /* Disable writes BEFORE given instruction. */
-  ETH_IFLAG_NOBEFORE = (1 << 0),
-  ETH_IFLAG_ENTRYPOINT = (1 << 1),
-};
+/***************************************************************************//**
+ * @defgroup MTree Match-Tree
+ * @brief Decision tree implementing multi-pattern matching.
+ *
+ * ### REFERENCES
+ * Luc Maranget. 2008. Compiling pattern matching to good decision trees.
+ * In Proceedings of the 2008 ACM SIGPLAN workshop on ML (ML '08).
+ * Association for Computing Machinery, New York, NY, USA, 35–46.
+ * DOI: https://doi.org/10.1145/1411304.1411311
+ * @{ */
 
+/** -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -
+ * @defgroup MTreeCase Match-Tree case clauses
+ * @{ */
 typedef struct eth_mtree eth_mtree;
 
-typedef enum {
-  ETH_MTREE_CONST,
-  ETH_MTREE_UNPACK,
-} eth_mtree_ctor_tag;
+/**
+ * @brief Case clause for compound type.
+ *
+ */
+typedef struct {
+  const eth_type *type; /**< @brief Type identifying a *head-pattern* of the
+                         * *switch*. */
+  int *offs; /**< @brief Offsets of the fields (of the \ref type) to be loaded
+              * into \ref eth_mtree_case::ssavids. */
+  int *ssavids; /**< @brief SSA-VIDs for the unpacked values. */
+  int n; /**< @brief Length of \ref offs and \ref ssavids arrays. */
+  eth_mtree *tree; /**< @brief Tree to be evaluated on successfull match to the
+                    * \ref eth_mtree_case::type. */
+} eth_mtree_case;
+
+/**
+ * @brief Initialize a case-clause.
+ *
+ * @param c[out] Pointer to an eth_mtree_case to be initialized.
+ * @param type Type identifying a *head-pattern* of the *switch*.
+ * @param offs Offsets of the fields (of the \ref type) to be loaded into \ref
+ *             ssavids.
+ * @param ssavids SSA-VIDs for the unpacked values.
+ * @param n Length of \ref offs and \ref ssavids arrays.
+ * @param tree Tree to be evaluated on successfull match to the \ref type.
+ */
+void
+eth_init_mtree_case(int n; eth_mtree_case *c, const eth_type *type,
+    const int offs[n], const int ssavids[n], int n, eth_mtree *tree);
+
+/**
+ * @brief Deallocate resources asquired by an eth_mtree_case..
+ */
+void
+eth_cleanup_mtree_case(eth_mtree_case *c);
 
 typedef struct {
-  eth_mtree_ctor_tag tag;
-  union {
-    eth_t cval;
-    struct { eth_type *type; int *offs, *vids, n; } unpack;
-  };
-} eth_mtree_ctor;
-
-eth_mtree_ctor*
-eth_create_const_ctor(eth_t cval);
-
-eth_mtree_ctor*
-eth_create_unpack_ctor(eth_type *type, int *offs, int *vids, int n);
+  eth_t cval;
+  eth_mtree *tree;
+} eth_mtree_ccase;
 
 void
-eth_destroy_mtree_ctor(eth_mtree_ctor *ctor);
+eth_init_mtree_ccase(eth_mtree_ccase *c, eth_t cval, eth_mtree *tree);
 
-typedef struct {
-  eth_mtree_ctor *ctor;
-  eth_mtree *tree;
-} eth_mtree_case;
+void
+eth_cleanup_mtree_ccase(eth_mtree_ccase *c);
+
+/** @} MTreeCase */
 
 typedef enum {
   ETH_MTREE_FAIL,
   ETH_MTREE_LEAF,
   ETH_MTREE_SWITCH,
+  ETH_MTREE_CSWITCH,
 } eth_mtree_tag;
 
+/**
+ * ```
+ * mtree = Fail
+ *       | Leaf code
+ *       | Switch ssavid case... default
+ *       | CSwitch ssavid ccase... default
+ *
+ * case = Case type (offs ssavid)... mtree
+ *
+ * ccase = CCase const mtree
+ *
+ * default = mtree
+ * ```
+ */
 struct eth_mtree {
   eth_mtree_tag tag;
   union {
     eth_insn *leaf;
-    struct {
-      int n;
-      eth_mtree_case *L;
-    } swtch;
+    struct { int ssavid; eth_mtree_case *cases; int ncases; eth_mtree *dflt; }
+      swtch;
+    struct { int ssavid; eth_mtree_ccase *cases; int ncases; eth_mtree *dflt; }
+      cswtch;
   };
 };
 
@@ -2348,10 +2391,25 @@ eth_mtree*
 eth_create_leaf(eth_insn *body);
 
 eth_mtree*
-eth_create_switch(const eth_mtree_case L[], int n);
+eth_create_switch(int ncases; int ssavid, const eth_mtree_case cases[ncases],
+    int ncases, eth_mtree *dflt);
+
+eth_mtree*
+eth_create_cswitch(int ncases; int ssavid, const eth_mtree_ccase cases[ncases],
+    int ncases, eth_mtree *dflt);
 
 void
 eth_destroy_mtree(eth_mtree *t);
+
+/** @} MTree */
+/** -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -
+ * @defgroup SsaInsn SSA instructions
+ * @{ */
+enum {
+  /* Disable writes BEFORE given instruction. */
+  ETH_IFLAG_NOBEFORE = (1 << 0),
+  ETH_IFLAG_ENTRYPOINT = (1 << 1),
+};
 
 typedef enum {
   ETH_INSN_NOP,
@@ -2417,7 +2475,7 @@ struct eth_insn {
     struct { int arity; } alcfn;
     struct { int *vids, n; } pop;
     struct { int *vids, n; } cap;
-    struct { int *clos, nclos, *wrefs, nwref; } mkscp;
+    struct { int *clos, nclos; } mkscp;
     struct { int tryid, vid; } catch;
     struct { int id, likely; eth_insn *trybr, *catchbr; } try;
     struct { } getexn;
@@ -2506,7 +2564,7 @@ eth_insn* __attribute__((malloc))
 eth_insn_cap(int const vids[], int n);
 
 eth_insn* __attribute__((malloc))
-eth_insn_mkscp(int *clos, int nclos, int *wrefs, int nwref);
+eth_insn_mkscp(int *clos, int nclos);
 
 eth_insn* __attribute__((malloc))
 eth_insn_catch(int tryid, int vid);
@@ -2520,9 +2578,10 @@ eth_insn_getexn(int out);
 eth_insn* __attribute__((malloc))
 eth_insn_mkrcrd(int out, int const vids[], eth_type *type);
 
-// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-//                             SSA tape
-// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+/** @} SsaInsn */
+/** -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -
+ * @defgroup SsaTape SSA tape
+ * @{ */
 struct eth_ssa_tape {
   eth_insn *head;
   eth_insn *point;
@@ -2546,9 +2605,10 @@ eth_insert_insn_before(eth_insn *where, eth_insn *insn);
 void
 eth_insert_insn_after(eth_insn *where, eth_insn *insn);
 
-// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-//                             SSA chunk
-// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+/** @} SsaTape */
+/** -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -
+ * @defgroup SsaChunk SSA chunk
+ * @{ */
 struct eth_ssa {
   int rc;
   int nvals;
@@ -2571,6 +2631,8 @@ eth_drop_ssa(eth_ssa *ssa);
 void
 eth_dump_ssa(const eth_insn *insn, FILE *stream);
 
+/** @} SsaChunk */
+/** @} SSA */
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                               BYTECODE
@@ -2699,7 +2761,7 @@ struct eth_bc_insn {
     } fn, finfn;
     struct { uint64_t out; int arity; } alcfn;
     struct { uint64_t vid0, n; } cap;
-    struct { struct { uint64_t *clos, nclos, *wrefs, nwref; } *restrict data; }
+    struct { struct { uint64_t *clos, nclos; } *restrict data; }
       mkscp;
 
     struct { uint64_t out; uint32_t vid, offs; } load;

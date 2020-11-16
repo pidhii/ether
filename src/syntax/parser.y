@@ -239,9 +239,9 @@ _create_attr(int aflag, void *locpp)
 // level 4:
 %right CONS PPLUS
 // level 5:
-%left '+' '-'
+%left '+' '-' MOD
 // level 6:
-%left '*' '/' MOD LAND LOR LXOR
+%left '*' '/' LAND LOR LXOR
 // level 7:
 %right '^' LSHL LSHR ASHL ASHR
 // level 8:
@@ -371,7 +371,7 @@ FnAtom
   }
 
   | '('')' { $$ = eth_ast_cval(eth_nil); LOC($$, @$); }
-  | '(' Expr DDOT Expr ')' { char *fields[] = { "l", "r" }; eth_ast *vals[] = { $2, $4 }; $$ = eth_ast_make_record(eth_rangelr_type, fields, vals, 2); }
+  /*| '(' Expr DDOT Expr ')' { char *fields[] = { "l", "r" }; eth_ast *vals[] = { $2, $4 }; $$ = eth_ast_make_record(eth_rangelr_type, fields, vals, 2); }*/
   | '['']' { $$ = eth_ast_cval(eth_nil); }
   | '[' List MaybeComa ']' {
     $$ = eth_ast_cval(eth_nil);
@@ -806,6 +806,7 @@ Expr
   | Expr EQ_TILD KEEP_BLOCK Expr { eth_ast *args[] = { $1, $4 }; eth_ast *fn = eth_ast_ident("=~"); $$ = eth_ast_apply(fn, args, 2); LOC($$, @$); }
   | Expr EQ_TILD START_BLOCK Expr END_BLOCK { eth_ast *args[] = { $1, $4 }; eth_ast *fn = eth_ast_ident("=~"); $$ = eth_ast_apply(fn, args, 2); LOC($$, @$); }
 
+  | Expr DDOT Expr { char *fields[] = { "l", "r" }; eth_ast *vals[] = { $1, $3 }; $$ = eth_ast_make_record(eth_rangelr_type, fields, vals, 2); }
   | Expr DDDOT { char *fields[] = { "l" }; eth_ast *vals[] = { $1 }; $$ = eth_ast_make_record(eth_rangel_type, fields, vals, 1); }
   | DDDOT Expr { char *fields[] = { "r" }; eth_ast *vals[] = { $2 }; $$ = eth_ast_make_record(eth_ranger_type, fields, vals, 1); }
 

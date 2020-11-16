@@ -1,15 +1,15 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -43,7 +43,6 @@ struct weak_ref {
 };
 
 typedef struct {
-  cod_vec(weak_ref) wrefs;
   cod_vec(closure) clos;
 } rec_scope;
 
@@ -51,7 +50,6 @@ static rec_scope*
 create_rec_scope(void)
 {
   rec_scope *scp = malloc(sizeof(rec_scope));
-  cod_vec_init(scp->wrefs);
   cod_vec_init(scp->clos);
   return scp;
 }
@@ -59,18 +57,9 @@ create_rec_scope(void)
 static void
 destroy_rec_scope(rec_scope *scp)
 {
-  cod_vec_destroy(scp->wrefs);
   cod_vec_destroy(scp->clos);
   free(scp);
 }
-
-static int
-find_weak_ref_idx(rec_scope *scp, int vid)
-{
-  cod_vec_iter(scp->wrefs, i, x, if (x.vid == vid) return i);
-  return -1;
-}
-
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                               BUILDER
@@ -377,14 +366,7 @@ deffer_closure(ssa_builder *bldr, int vid, eth_ir_node *ctor)
   assert(bldr->recscp);
   closure c = { .vid = vid, .ctor = ctor };
   cod_vec_push(bldr->recscp->clos, c);
-}
-
-static void
-add_rec_variable(ssa_builder *bldr, int vid)
-{
-  assert(bldr->recscp);
-  weak_ref wref = { .vid = vid };
-  cod_vec_push(bldr->recscp->wrefs, wref);
+  bldr->vinfo[vid]->isrec = true;
 }
 
 static void
@@ -400,18 +382,14 @@ finalize_rec_scope(ssa_builder *bldr, eth_ssa_tape *tape, bool *e)
   cod_vec_iter(scp->clos, i, x, build_fn(bldr, tape, x.ctor, x.vid, e));
 
   // remove marks from recursive variables
-  cod_vec_iter(scp->wrefs, i, x, bldr->vinfo[x.vid]->isrec = false);
+  cod_vec_iter(scp->clos, i, x, bldr->vinfo[x.vid]->isrec = false);
 
   // build scope
-  int nwref = scp->wrefs.len;
-  int wrefs[nwref];
   int nclos = scp->clos.len;
   int clos[nclos];
-  for (int i = 0; i < nwref; ++i)
-    wrefs[i] = scp->wrefs.data[i].vid;
   for (int i = 0; i < nclos; ++i)
     clos[i] = scp->clos.data[i].vid;
-  eth_write_insn(tape, eth_insn_mkscp(clos, nclos, wrefs, nwref));
+  eth_write_insn(tape, eth_insn_mkscp(clos, nclos));
 
   destroy_rec_scope(scp);
   bldr->recscp = NULL;
@@ -648,7 +626,7 @@ assert_number(ssa_builder *bldr, eth_ssa_tape *tape, int vid, eth_location *loc,
  * @param pat IR-pattern.
  * @param expr SSA value identifier refering to the expression to be matched by
  *  the pattern.
- * @param myrules Whether 
+ * @param myrules ..TODO..
  * @param[out] e Will be set to `true` in case of errors.
  *
  * @return SSA-pattern.
@@ -698,7 +676,7 @@ build_pattern(ssa_builder *bldr, const eth_ir_pattern *pat, int expr, bool myrul
 
       // set up aliasing variable
       bldr->vars[pat->unpack.varid] = expr;
-      if (myrules)
+      if (myrules) // TODO: don't do this if alias is not used
         bldr->vinfo[expr]->rules = RC_RULES_DEFAULT;
 
       eth_ssa_pattern *pats[pat->unpack.n];
@@ -769,7 +747,7 @@ build_pattern(ssa_builder *bldr, const eth_ir_pattern *pat, int expr, bool myrul
     {
       // set up aliasing variable
       bldr->vars[pat->record.varid] = expr;
-      if (myrules)
+      if (myrules) // TODO: don't do this if alias is not used
         bldr->vinfo[expr]->rules = RC_RULES_DEFAULT;
 
       eth_ssa_pattern *pats[pat->record.n];
@@ -799,7 +777,7 @@ is_wildcard(const eth_ir_pattern *pat)
  * Select column following `First Row'-heuristic.
  */
 static inline int
-select_column(eth_ir_match_table *P)
+select_column(const eth_ir_match_table *P)
 {
   assert(P->h > 0);
   for (int i = 0; i < P->w; ++i)
@@ -845,8 +823,27 @@ cmp_patterns(const eth_ir_pattern *p1, const eth_ir_pattern *p2)
   }
 }
 
+static int
+get_pattern_arity(const eth_ir_pattern *pat)
+{
+  switch (pat->tag)
+  {
+    case ETH_PATTERN_DUMMY:
+    case ETH_PATTERN_IDENT:
+    case ETH_PATTERN_CONSTANT:
+      return 1;
+
+    case ETH_PATTERN_UNPACK:
+      return pat->unpack.n;
+
+    default:
+      eth_error("unsupported multimatch pattern");
+      abort();
+  }
+}
+
 static eth_mtree*
-build_mtree(ssa_builder *bldr, eth_ir_match_table *P, eth_ir_node *o[], int phi,
+build_mtree(ssa_builder *bldr, const eth_ir_match_table *P, int o[], int phi,
     bool istc, bool *e)
 {
   /*
@@ -894,23 +891,62 @@ build_mtree(ssa_builder *bldr, eth_ir_match_table *P, eth_ir_node *o[], int phi,
     return leaf;
   }
 
-  /*
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    * Build Switch.
    */
-  int col = select_column(P);
-  // --
-  bool visited[P->h];
+  /*
+   * Pick a column.
+   */
+  int l = select_column(P);
+
+  /*
+   * Construct a set H of constructor equivalence classes.
+   */
+  typedef cod_vec(int) int_vec;
+  cod_vec(int_vec) H; /* Set of equivalence classes. */
+  cod_vec_init(H);
+  bool visited[P->h]; /* Will mark visited rows. */
   memset(visited, 0, sizeof visited);
-  // --
   for (int i = 0; i < P->h; ++i)
   {
-    if (not visited[i])
+    if (visited[i])
+      continue;
+
+    /* Pick a representative for a new equivalence class. */
+    const eth_ir_pattern *c = P->tab[i][l];
+    /* Now scann remaining rows and accumulate the equivalance class. */
+    int_vec cclass;
+    cod_vec_init(cclass);
+    for (int j = i; j < P->h; ++j)
     {
-      for (int j = 0; j < P->h; ++j)
+      if (visited[i])
+        continue;
+      if (cmp_patterns(c, P->tab[j][l]))
       {
-        // ...
-        abort();
+        cod_vec_push(cclass, j);
+        visited[j] = true;
       }
+    }
+    cod_vec_push(H, cclass);
+  }
+
+  for (size_t ic = 0; ic < H.len; ++ic)
+  {
+    int arity = get_pattern_arity(P->tab[H.data[ic].data[0]][l]);
+    int no = P->w - 1 + arity;
+    int na = H.data[ic].len;
+
+    /* Create new SSA-vids for unpacked fields. */
+
+    /* Construct new object-vector. */
+    int oc[no];
+    for (int i = 0; i < no; ++i)
+    {
+      if (i < l)
+        oc[i] = o[i];
+      else if (i < l + arity)
+        /*oc[i] = */
+        {};
     }
   }
 }
@@ -1099,10 +1135,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
 
     case ETH_IR_ENDFIX:
     {
-      for (int i = 0; i < ir->endfix.n; ++i)
-        add_rec_variable(bldr, bldr->vars[ir->endfix.vars[i]]);
       finalize_rec_scope(bldr, tape, e);
-
       return build(bldr, tape, ir->endfix.body, istc, e);
     }
 
@@ -1432,11 +1465,6 @@ is_using(eth_insn *insn, int vid)
       for (int i = 0; i < insn->mkscp.nclos; ++i)
       {
         if (insn->mkscp.clos[i] == vid)
-          return true;
-      }
-      for (int i = 0; i < insn->mkscp.nwref; ++i)
-      {
-        if (insn->mkscp.wrefs[i] == vid)
           return true;
       }
       return false;

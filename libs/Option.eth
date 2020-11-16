@@ -4,6 +4,10 @@ let pub none = false
 
 let pub option? x = x is of Some _
 
+let pub map f opt =
+  if let Some x = opt then f x
+  else opt
+
 let pub unwrap x =
   if let Some x = x then x
   else raise Unwrap_error

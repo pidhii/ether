@@ -37,8 +37,8 @@ def job_user():
 def job_native():
     return foldl(add, 0, [x + 1 for x in range(0, n) if iseven(x)])
 
-# job = job_user
-job = job_native
+job = job_user
+# job = job_native
 
 print(job())
 for _ in range(700):

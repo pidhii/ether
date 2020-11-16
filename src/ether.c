@@ -1,15 +1,15 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -147,9 +147,6 @@ eth_init(const int *argc)
   extern void _eth_init_alloc(void);
   _eth_init_alloc();
 
-  extern void _eth_init_magic(void);
-  _eth_init_magic();
-
   extern void _eth_init_number_type(void);
   _eth_init_number_type();
 
@@ -236,9 +233,6 @@ eth_cleanup(void)
   extern void _eth_cleanup_variant_types(void);
   _eth_cleanup_variant_types();
 
-  extern void _eth_cleanup_magic(void);
-  _eth_cleanup_magic();
-
   extern void _eth_cleanup_alloc(void);
   _eth_cleanup_alloc();
 
@@ -294,44 +288,6 @@ eth_unop_name(eth_unop op)
   return sym[op];
 }
 
-
-eth_magic*
-eth_require_magic(eth_t x)
-{
-  if (x->magic == ETH_MAGIC_NONE)
-  {
-    eth_magic *magic = eth_create_magic();
-    x->magic = eth_get_magic_id(magic);
-    eth_ref_magic(magic);
-    return magic;
-  }
-  else
-  {
-    return eth_get_magic(x->magic);
-  }
-}
-
-void
-_eth_delete_magic(eth_t x)
-{
-  eth_magic *magic = eth_get_magic(x->magic);
-
-  // drop out from each scope
-  int nscp;
-  eth_scp *const *scps = eth_get_scopes(magic, &nscp);
-  if (nscp > 0)
-  {
-    for (int i = 0; i < nscp; ++i)
-      eth_drop_out(scps[i]);
-  }
-  else
-  {
-    // evaluate destructor
-    eth_force_delete(x);
-    // release magic
-    eth_unref_magic(magic);
-  }
-}
 
 eth_t
 eth_system_error(int err)

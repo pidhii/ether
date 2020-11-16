@@ -46,7 +46,6 @@ destroy_insn(eth_bc_insn *insn)
 
     case ETH_OPC_MKSCP:
       free(insn->mkscp.data->clos);
-      free(insn->mkscp.data->wrefs);
       free(insn->mkscp.data);
       break;
 
@@ -404,19 +403,15 @@ write_finfn(bc_builder *bldr, int out, int arity, eth_source *src,
 }
 
 static int
-write_mkscp(bc_builder *bldr, int *clos, int nclos, int *wrefs, int nwref)
+write_mkscp(bc_builder *bldr, int *clos, int nclos)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_MKSCP;
   insn->mkscp.data = malloc(sizeof *insn->mkscp.data);
   insn->mkscp.data->clos = malloc(sizeof(size_t) * nclos);
   insn->mkscp.data->nclos = nclos;
-  insn->mkscp.data->wrefs = malloc(sizeof(size_t) * nwref);
-  insn->mkscp.data->nwref = nwref;
   for (int i = 0; i < nclos; ++i)
     insn->mkscp.data->clos[i] = clos[i];
-  for (int i = 0; i < nwref; ++i)
-    insn->mkscp.data->wrefs[i] = wrefs[i];
   return bldr->len - 1;
 }
 
@@ -945,14 +940,11 @@ end_if:
 
       case ETH_INSN_MKSCP:
       {
-        int nwref = ip->mkscp.nwref;
         int nclos = ip->mkscp.nclos;
-        int wrefs[nwref], clos[nclos];
-        for (int i = 0; i < nwref; ++i)
-          wrefs[i] = get_reg(bldr, ip->mkscp.wrefs[i]);
+        int clos[nclos];
         for (int i = 0; i < nclos; ++i)
           clos[i] = get_reg(bldr, ip->mkscp.clos[i]);
-        write_mkscp(bldr, clos, nclos, wrefs, nwref);
+        write_mkscp(bldr, clos, nclos);
         break;
       }
 

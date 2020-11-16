@@ -180,7 +180,6 @@ eth_destroy_insn(eth_insn *insn)
 
     case ETH_INSN_MKSCP:
       free(insn->mkscp.clos);
-      free(insn->mkscp.wrefs);
       break;
 
     case ETH_INSN_TRY:
@@ -458,15 +457,12 @@ eth_insn_cap(int const vids[], int n)
 }
 
 eth_insn*
-eth_insn_mkscp(int *clos, int nclos, int *wrefs, int nwref)
+eth_insn_mkscp(int *clos, int nclos)
 {
   eth_insn *insn = create_insn(ETH_INSN_MKSCP);
   insn->mkscp.clos = malloc(sizeof(int) * nclos);
   insn->mkscp.nclos = nclos;
-  insn->mkscp.wrefs = malloc(sizeof(int) * nwref);
-  insn->mkscp.nwref = nwref;
   memcpy(insn->mkscp.clos, clos, sizeof(int) * nclos);
-  memcpy(insn->mkscp.wrefs, wrefs, sizeof(int) * nwref);
   return insn;
 }
 
@@ -679,8 +675,6 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
 
     case ETH_INSN_MKSCP:
       fputs("mkscp <wref: ", stream);
-      for (int i = 0; i < insn->mkscp.nwref; ++i)
-        fprintf(stream, i > 0 ? " %%%d" : "%%%d", insn->mkscp.wrefs[i]);
       fputs("; clos: ", stream);
       for (int i = 0; i < insn->mkscp.nclos; ++i)
         fprintf(stream, i > 0 ? " %%%d" : "%%%d", insn->mkscp.clos[i]);

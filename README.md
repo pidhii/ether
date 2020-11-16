@@ -41,7 +41,7 @@
 
 
 
-# [Optimization](optimizations)
+# [Optimization](#optimizations)
 - [x] Smart reference counting
 - [ ] Capture unpacked fields if available
 - [ ] Unpack structs outside closure (if applicable)

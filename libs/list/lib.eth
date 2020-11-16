@@ -389,7 +389,6 @@ let pub assoc k l =
   if let Some v = assoc_opt k l then v
   else failure ()
 
-
 let rec pub assq_opt x l =
   if let kv::l = l then
     if let (k, v) = kv then
@@ -406,9 +405,9 @@ let pub assq k l =
 let rec pub transpose xs =
   if let xs :: xss = xs then
     if let x :: xs = xs then
-      let f l = car l if pair? l else raise Filter_out
+      let f l = if let hd::_ = l then hd else raise Filter_out
       let head = x :: filter_map f xss
-      let f l = cdr l if pair? l else raise Filter_out
+      let f l = if let _::tl = l then tl else raise Filter_out
       let tail = transpose (xs :: filter_map f xss)
       head :: tail
     else transpose xss
