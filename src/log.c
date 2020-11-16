@@ -20,6 +20,21 @@
 
 enum eth_log_level eth_log_level = ETH_LOG_WARNING;
 
+static
+int g_indent = 0;
+
+void
+eth_indent_log(void)
+{
+  g_indent += 2;
+}
+
+void
+eth_dedent_log(void)
+{
+  g_indent -= 2;
+}
+
 void
 eth_log_aux(bool enable, const char *module, const char *file, const char *func,
     int line, const char *style, FILE *os, const char *fmt, ...)
@@ -34,6 +49,14 @@ eth_log_aux(bool enable, const char *module, const char *file, const char *func,
 #else
   fprintf(os, "[%s ether \e[0m] ", style);
 #endif
+
+  for (int i = 0; i < g_indent; ++i)
+  {
+    if (i % 2 == 0)
+      fputs("¦", os);
+    else
+      fputc(' ', os);
+  }
 
   va_list arg;
   va_start(arg, fmt);

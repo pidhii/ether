@@ -672,7 +672,7 @@ _load(void)
     return eth_exn(eth_type_error());
   }
 
-  eth_module *envmod = eth_create_module(NULL);
+  eth_module *envmod = eth_create_module(NULL, NULL);
   for (eth_t it = env; eth_is_pair(it); it = eth_cdr(it))
   {
     eth_t def = eth_car(it);
@@ -696,7 +696,7 @@ _load(void)
   char id[42];
   sprintf(id, "load.%d", cnt++);
 
-  eth_module *mod = eth_create_module(id);
+  eth_module *mod = eth_create_module(id, NULL);
   eth_t ret;
   int ok = eth_load_module_from_script2(g_env, g_env, mod, eth_str_cstr(path),
       &ret, envmod);
@@ -733,7 +733,7 @@ _load_stream(void)
   if (eth_unlikely(not eth_is_file(file)))
     goto error_1;
 
-  eth_module *envmod = eth_create_module(NULL);
+  eth_module *envmod = eth_create_module(NULL, NULL);
   for (eth_t it = env; eth_is_pair(it); it = eth_cdr(it))
   {
     eth_t def = eth_car(it);
@@ -755,7 +755,7 @@ _load_stream(void)
   if (not ast)
     goto error_3;
 
-  eth_module *mod = eth_create_module(id);
+  eth_module *mod = eth_create_module(id, NULL);
   eth_t ret;
   int ok = eth_load_module_from_ast2(g_env, g_env, mod, ast, &ret, envmod);
   eth_destroy_module(envmod);
@@ -855,7 +855,7 @@ _eth_init_builtins(void)
     eth_add_module_path(g_env, buf);
   }
 
-  g_mod = eth_create_module("Builtins");
+  g_mod = eth_create_module("Builtins", NULL);
 
 #if not defined(ETHER_DISABLE_BUILTINS)
   eth_debug("loading builtins");

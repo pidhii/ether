@@ -1,15 +1,15 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -30,6 +30,7 @@ typedef struct {
 // TODO: use hash table
 struct eth_module {
   char *name;
+  const eth_module *parent;
   int ndefs, defscap;
   eth_def *defs;
   eth_env *env;
@@ -37,15 +38,17 @@ struct eth_module {
 };
 
 eth_module*
-eth_create_module(const char *name)
+eth_create_module(const char *name, const eth_module *parent)
 {
   eth_module *mod = malloc(sizeof(eth_module));
   mod->name = name ? strdup(name) : strdup("<unnamed-module>");
+  mod->parent = parent;
   mod->ndefs = 0;
   mod->defscap = 0x10;
   mod->defs = malloc(sizeof(eth_def) * mod->defscap);
   mod->env = eth_create_empty_env();
   eth_add_module_path(mod->env, "."); // XXX: remove this
+  eth_set_env_parent(mod->env, mod);
   cod_vec_init(mod->clos);
   return mod;
 }
@@ -73,6 +76,12 @@ const char*
 eth_get_module_name(const eth_module *mod)
 {
   return mod->name;
+}
+
+const eth_module*
+eth_get_module_parent(const eth_module *mod)
+{
+  return mod->parent;
 }
 
 int

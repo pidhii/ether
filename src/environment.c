@@ -1,15 +1,15 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -60,6 +60,7 @@ struct eth_env {
   cod_vec(char*) modpath;
   cod_vec(exit_handle) exithndls;
   cod_hash_map *mods;
+  eth_module *parent;
 };
 
 eth_env*
@@ -69,6 +70,7 @@ eth_create_empty_env(void)
   cod_vec_init(env->modpath);
   cod_vec_init(env->exithndls);
   env->mods = cod_hash_map_new();
+  env->parent = NULL;
   return env;
 }
 
@@ -95,6 +97,18 @@ eth_destroy_env(eth_env *env)
   cod_vec_destroy(env->modpath);
   cod_hash_map_delete(env->mods, destroy_module_entry);
   free(env);
+}
+
+eth_module*
+eth_get_env_parent(eth_env *env)
+{
+  return env->parent;
+}
+
+void
+eth_set_env_parent(eth_env *env, eth_module *mod)
+{
+  env->parent = mod;
 }
 
 bool
@@ -285,13 +299,26 @@ eth_load_module_from_ast2(eth_env *topenv, eth_env *env, eth_module *mod,
   else
     eth_debug("loading script-module %s", eth_get_module_name(mod));
 
-  if (ent)
-    ; // will update existing module
+  const char *parentname = NULL;
+  eth_module *parent;
+  if ((parent = eth_get_env_parent(env)))
+    parentname = eth_get_module_name(parent);
   else
+    parentname = "<no-parent>";
+
+  if (ent)
+    eth_debug("module '%s' will be updated", eth_get_module_name(mod));
+  else
+  {
+    eth_debug("init module entry '%s' in '%s'", eth_get_module_name(mod),
+        parentname);
     ent = add_module(env, mod, 0);
+  }
 
   int ok = load_from_ast(topenv, mod, ast, ret, uservars);
   ent->flag |= ETH_MFLAG_READY;
+  eth_debug("entry for '%s' in '%s' is now READY", eth_get_module_name(mod),
+      parentname);
   if (not ok)
   {
     eth_remove_module(env, eth_get_module_name(mod));
@@ -325,6 +352,7 @@ eth_load_module_from_script2(eth_env *topenv, eth_env *env, eth_module *mod,
   if (file == NULL)
     return false;
 
+  eth_debug("parse '%s' from \"%s\"", eth_get_module_name(mod), path);
   eth_ast *ast = eth_parse(file);
   fclose(file);
   if (ast == NULL)
@@ -414,10 +442,21 @@ eth_load_module_from_elf(eth_env *topenv, eth_env *env, eth_module *mod,
   strcpy(dirbuf, fullpath);
   char *dir = dirname(dirbuf);
 
-  chdir(dir);
+  const char *parentname = NULL;
+  eth_module *parent;
+  if ((parent = eth_get_env_parent(env)))
+    parentname = eth_get_module_name(parent);
+  else
+    parentname = "<no-parent>";
+    eth_debug("init module entry '%s' in '%s'", eth_get_module_name(mod),
+        parentname);
   module_entry *ent = add_module(env, mod, 0);
+
+  chdir(dir);
   void *dl = load_from_elf(topenv, env, mod, fullpath);
   ent->flag |= ETH_MFLAG_READY;
+  eth_debug("entry for '%s' in '%s' is now READY", eth_get_module_name(mod),
+      parentname);
   chdir(cwd);
 
   if (not dl)
@@ -442,6 +481,7 @@ static bool
 resolve_path_by_name(eth_env *env, const char *name, char *path)
 {
   eth_debug("searching for '%s'", name);
+  eth_indent_log();
 
   static char buf[4109]; // to suppress gcc warning
   eth_debug("[%s] check \"%s\"", name, name);
@@ -451,6 +491,8 @@ resolve_path_by_name(eth_env *env, const char *name, char *path)
     if (S_ISREG(mode))
     {
       eth_debug("[%s] found file \"%s\"", name, path);
+      eth_dedent_log();
+      eth_debug("found sources \e[38;5;2;1m✓\e[0m");
       return true;
     }
 
@@ -464,36 +506,61 @@ resolve_path_by_name(eth_env *env, const char *name, char *path)
       sprintf(buf, "%s/__main__.eth", dir);
       eth_debug("[%s] check \"%s\"", name, buf);
       if (realpath(buf, path))
+      {
+        eth_dedent_log();
+        eth_debug("found sources \e[38;5;2;1m✓\e[0m");
         return true;
+      }
 
       sprintf(buf, "%s/__main__.so", dir);
       eth_debug("[%s] check \"%s\"", name, buf);
       if (realpath(buf, path))
+      {
+        eth_dedent_log();
+        eth_debug("found sources \e[38;5;2;1m✓\e[0m");
         return true;
+      }
 
       sprintf(buf, "%s/%s.eth", dir, name);
       eth_debug("[%s] check \"%s\"", name, buf);
       if (realpath(buf, path))
+      {
+        eth_dedent_log();
+        eth_debug("found sources \e[38;5;2;1m✓\e[0m");
         return true;
+      }
 
       sprintf(buf, "%s/%s.so", dir, name);
       eth_debug("[%s] check \"%s\"", name, buf);
       if (realpath(buf, path))
+      {
+        eth_dedent_log();
+        eth_debug("found sources \e[38;5;2;1m✓\e[0m");
         return true;
+      }
     }
   }
 
   sprintf(buf, "%s.eth", name);
   eth_debug("[%s] check \"%s\"", name, buf);
   if (eth_resolve_path(env, buf, path))
+  {
+    eth_dedent_log();
+    eth_debug("found sources \e[38;5;2;1m✓\e[0m");
     return true;
+  }
 
   sprintf(buf, "%s.so", name);
   eth_debug("[%s] check \"%s\"", name, buf);
   if (eth_resolve_path(env, buf, path))
+  {
+    eth_dedent_log();
+    eth_debug("found sources \e[38;5;2;1m✓\e[0m");
     return true;
+  }
 
-  eth_debug("[%s] serach failed", name);
+  eth_dedent_log();
+  eth_debug("search failed \e[38;5;1;1m✗\e[0m", name);
   return false;
 }
 
@@ -524,9 +591,18 @@ find_module_in_env(eth_env *env, const char *name, bool *e)
 
     module_entry *ent;
     if ((ent = get_module_entry(env, topname)))
-      return find_module_in_env(eth_get_env(ent->mod), p + 1, e);
+    {
+      eth_debug("search for '%s' in '%s'", p + 1, topname);
+      eth_indent_log();
+      eth_module *ret = find_module_in_env(eth_get_env(ent->mod), p + 1, e);
+      eth_dedent_log();
+      return ret;
+    }
     else
+    {
+      eth_debug("module '%s' is not available", topname);
       return NULL;
+    }
   }
   else
   {
@@ -586,7 +662,7 @@ load_module(eth_env *topenv, eth_env *env, const char *name)
     }
   }
 
-  eth_module *mod = eth_create_module(topname);
+  eth_module *mod = eth_create_module(topname, eth_get_env_parent(env));
   bool ok;
   if (is_elf(path))
     ok = eth_load_module_from_elf(topenv, env, mod, path);
@@ -610,11 +686,17 @@ eth_require_module(eth_env *topenv, eth_env *env, const char *name)
 
   // search available modules
   bool e = false;
-  if ((mod = find_module_in_env(env, name, &e)))
-    return mod;
-  else if (e)
-    return NULL;
-  else
-    return load_module(topenv, env, name);
+  mod = find_module_in_env(env, name, &e);
+  if (e) return NULL;
+  if (mod) return mod;
+  /*mod = find_module_in_env(topenv, name, ignoreready, &e);*/
+  /*if (e) return NULL;*/
+  /*if (mod) return mod;*/
+
+  eth_debug("load '%s'", name);
+  eth_indent_log();
+  eth_module *ret = load_module(topenv, env, name);
+  eth_dedent_log();
+  return ret;
 }
 

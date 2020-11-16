@@ -139,6 +139,12 @@ void
 eth_log_aux(bool enable, const char *module, const char *file, const char *func,
     int line, const char *style, FILE *os, const char *fmt, ...);
 
+void
+eth_indent_log(void);
+
+void
+eth_dedent_log(void);
+
 #define eth_debug(fmt, ...)                          \
   eth_log_aux(                                       \
       eth_log_level <= ETH_LOG_DEBUG,                \
@@ -1315,13 +1321,16 @@ typedef struct {
 } eth_def;
 
 eth_module* __attribute__((malloc))
-eth_create_module(const char *name);
+eth_create_module(const char *name, const eth_module *parent);
 
 void
 eth_destroy_module(eth_module *mod);
 
 const char*
 eth_get_module_name(const eth_module *mod);
+
+const eth_module*
+eth_get_module_parent(const eth_module *mod);
 
 int
 eth_get_ndefs(const eth_module *mod);
@@ -1366,6 +1375,12 @@ eth_create_empty_env(void);
 
 void
 eth_destroy_env(eth_env *env);
+
+eth_module*
+eth_get_env_parent(eth_env *env);
+
+void
+eth_set_env_parent(eth_env *env, eth_module *mod);
 
 bool
 eth_add_module_path(eth_env *env, const char *path);

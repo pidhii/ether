@@ -1,15 +1,15 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -171,7 +171,46 @@ resolve_var_path(ir_builder *bldr, const eth_module *mod, const char *path,
   return true;
 }
 
-const eth_module*
+static const char*
+get_env_parent_name(eth_env *env)
+{
+  eth_module *parent;
+  if ((parent = eth_get_env_parent(env)))
+    return eth_get_module_name(parent);
+  else
+    return "<no-parent>";
+}
+
+static eth_module*
+require_module_aux(eth_env *topenv, eth_env *env, const char *name)
+{
+  eth_debug("require module '%s' from '%s'", name,
+      get_env_parent_name(env));
+  eth_indent_log();
+  eth_module *ret = eth_require_module(topenv, env, name);
+  eth_dedent_log();
+  if (ret)
+    eth_debug("module found \e[38;5;2;1m✓\e[0m");
+  else
+    eth_debug("module not found \e[38;5;1;1m✗\e[0m");
+  return ret;
+}
+
+static const eth_module*
+find_module_aux(ir_builder *bldr, const char *name)
+{
+  eth_debug("check module '%s' in visited modules", name);
+  eth_indent_log();
+  const eth_module *ret = find_module(bldr, name);
+  eth_dedent_log();
+  if (ret)
+    eth_debug("module found \e[38;5;2;1m✓\e[0m");
+  else
+    eth_debug("module not found \e[38;5;1;1m✗\e[0m");
+  return ret;
+}
+
+static const eth_module*
 require_module(ir_builder *bldr, const char *name)
 {
   assert(bldr->env);
@@ -189,39 +228,54 @@ require_module(ir_builder *bldr, const char *name)
   else
     strcpy(topname, name);
 
-  // 1. try to load as a submodule
-  // 2. else, load with global environment
-  // 3. else, load from imported modules
-  const eth_module *topmod = NULL, *mod = NULL;
-  if (bldr->mod)
+  const eth_module *topmod = NULL;
+
+  /* Check modules already accessed by current builder. */
+  if ((topmod = find_module_aux(bldr, name)))
+    goto found_old;
+
+  /* Otherwize, search in modules from above. */
+  for (const eth_module *m = bldr->mod; m; m = eth_get_module_parent(m))
   {
-    topmod = eth_require_module(bldr->env, eth_get_env(bldr->mod), topname);
-    if (not istop)
-      mod = eth_require_module(bldr->env, eth_get_env(bldr->mod), name);
+    if ((topmod = require_module_aux(bldr->env, eth_get_env(m), topname)))
+    {
+      eth_debug("found module '%s' in upper module '%s'", name,
+          eth_get_module_name(m));
+      goto found_new;
+    }
   }
-  if (not mod)
+
+  /* Otherwize, search in the top-level environment. */
+  if ((topmod = require_module_aux(bldr->env, bldr->env, topname)))
+    goto found_new;
+
+  if (not topmod)
   {
-    topmod = eth_require_module(bldr->env, bldr->env, topname);
-    if (not istop)
-      mod = eth_require_module(bldr->env, bldr->env, name);
-  }
-  if (not topmod or not istop and not mod)
-  {
-    topmod = find_module(bldr, name);
-    if (not istop)
-      mod = find_module(bldr, name);
-  }
-  if (not topmod or not istop and not mod)
-  {
-    eth_warning("failed to resolv module %s", name);
+    eth_warning("failed to resolve %s", topname);
     return NULL;
   }
 
-  if (istop)
-    mod = topmod;
-
+found_new:
   add_module(bldr, topname, topmod);
-  return mod;
+
+found_old:
+  if (istop)
+  {
+    /* done */
+    return topmod;
+  }
+  else
+  {
+    /* resolve submodule (we already found the root) */
+    const eth_module *mod =
+      require_module_aux(bldr->env, eth_get_env(topmod), name);
+    if (not mod)
+    {
+      eth_warning("failed to resolve %s", name);
+      return NULL;
+    }
+    return mod;
+  }
 }
 
 /*
@@ -937,17 +991,25 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
     case ETH_AST_MODULE:
     {
       // create module
-      eth_module *mod = eth_create_module(ast->module.name);
+      eth_module *mod = eth_create_module(ast->module.name, bldr->mod);
       eth_env *env = bldr->mod ? eth_get_env(bldr->mod) : bldr->env;
+      if (bldr->mod)
+      {
+        eth_debug("create submodule %s.%s", eth_get_module_name(bldr->mod),
+            ast->module.name);
+      }
+      eth_indent_log();
       eth_t modret;
       if (not eth_load_module_from_ast(bldr->env, env, mod, ast->module.body, &modret))
       {
+        eth_dedent_log();
         eth_destroy_module(mod);
         *e = 1;
         eth_error("failed to create module");
         eth_print_location(ast->loc, stderr);
         return eth_ir_error();
       }
+      eth_dedent_log();
       // import in current environment
       import_default(bldr, mod, NULL);
       return eth_ir_cval(modret);

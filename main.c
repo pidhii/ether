@@ -217,7 +217,7 @@ main(int argc, char **argv)
   eth_env *env = eth_create_env();
   cod_vec_iter(L, i, path, eth_add_module_path(env, path));
   // --
-  eth_module *extravars = eth_create_module("<main>");
+  eth_module *extravars = eth_create_module("<main>", NULL);
   eth_define(extravars, "command_line", argv_to_list(argc, argv, optind));
   eth_define(extravars, "__main", eth_true);
 
@@ -658,6 +658,20 @@ completion_generator(const char *text, int state)
             continue;
           cod_vec_push(matches, strdup(defs[i].ident));
         }
+      }
+    }
+    // check submodules
+    int nsubmod = eth_get_nmodules(eth_get_env(mod));
+    const eth_module *submods[nsubmod];
+    eth_get_modules(eth_get_env(mod), submods, nsubmod);
+    for (int i = 0; i < nsubmod; ++i)
+    {
+      const char *modname = eth_get_module_name(submods[i]);
+      if (strncmp(modname, ident, identlen) == 0)
+      {
+        char *path = malloc(strlen(prefix) + strlen(modname) + 2);
+        sprintf(path, "%s%s", prefix, modname);
+        cod_vec_push(matches, path);
       }
     }
 
