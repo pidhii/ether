@@ -91,6 +91,7 @@ typedef struct eth_ast eth_ast;
 typedef struct eth_ir_node eth_ir_node;
 typedef struct eth_ir eth_ir;
 typedef struct eth_env eth_env;
+typedef struct eth_root eth_root;
 typedef struct eth_module eth_module;
 typedef struct eth_var eth_var;
 typedef struct eth_var_list eth_var_list;
@@ -1365,8 +1366,9 @@ eth_get_builtin(const char *name);
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                           environment
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-#define ETH_MFLAG_READY (1 << 0)
-
+/** @defgroup Env Environment
+ * @brief The thing managing modules.
+ * @{ */
 eth_env* __attribute__((malloc))
 eth_create_env(void);
 
@@ -1398,31 +1400,31 @@ bool
 eth_remove_module(eth_env *env, const char *name);
 
 eth_module*
-eth_require_module(eth_env *topenv, eth_env *env, const char *name);
+eth_require_module(eth_root *root, eth_env *env, const char *name);
 
 bool
-eth_load_module_from_script(eth_env *topenv, eth_env *env, eth_module *mod,
+eth_load_module_from_script(eth_root *root, eth_env *env, eth_module *mod,
     const char *path, eth_t *ret);
 
 bool
-eth_load_module_from_ast(eth_env *topenv, eth_env *env, eth_module *mod,
+eth_load_module_from_ast(eth_root *root, eth_env *env, eth_module *mod,
     eth_ast *ast, eth_t *ret);
 
 bool
-eth_load_module_from_script2(eth_env *topenv, eth_env *env, eth_module *mod,
+eth_load_module_from_script2(eth_root *root, eth_env *env, eth_module *mod,
     const char *path, eth_t *ret, eth_module *uservars);
 
 bool
-eth_load_module_from_ast2(eth_env *topenv, eth_env *env, eth_module *mod,
+eth_load_module_from_ast2(eth_root *root, eth_env *env, eth_module *mod,
     eth_ast *ast, eth_t *ret, eth_module *uservars);
 
 bool
-eth_load_module_from_elf(eth_env *topenv, eth_env *env, eth_module *mod,
+eth_load_module_from_elf(eth_root *root, eth_env *env, eth_module *mod,
     const char *path);
 
 static bool
-eth_add_module_script(eth_module *self, const char *path, eth_env *topenv)
-{ return eth_load_module_from_script2(topenv, NULL, self, path, NULL, self); }
+eth_add_module_script(eth_module *self, const char *path, eth_root *root)
+{ return eth_load_module_from_script2(root, NULL, self, path, NULL, self); }
 
 int
 eth_get_nmodules(const eth_env *env);
@@ -1430,6 +1432,45 @@ eth_get_nmodules(const eth_env *env);
 void
 eth_get_modules(const eth_env *env, const eth_module *out[], int n);
 
+/** @name Root environment
+ * @{ */
+eth_root* __attribute__((malloc))
+eth_create_root(eth_env *env);
+
+void
+eth_destroy_root(eth_root *root);
+
+eth_env*
+eth_get_root_env(const eth_root *root);
+
+/**
+ * @brief Memorize a path and the corresponding module not to load it twice.
+ *
+ * @param root Top level enironment.
+ * @param path Full path to the module entry.
+ * @param mod Module instance.
+ *
+ * @note If _path_ was already memorized earlier, new _mod_ will **NOT**
+ *       override the one set previously.
+ *
+ * @see Use eth_get_memorized_module() to check if a path is already in use.
+ */
+void
+eth_memorize_path_module(eth_root *root, const char *path,
+    const eth_module *mod);
+
+/**
+ * @brief Get memorized module located under given path.
+ *
+ * @param root Top level environment.
+ * @param path Full path to the module entry.
+ *
+ * @return Module instance or `NULL`.
+ */
+eth_module*
+eth_get_memorized_module(const eth_root *root, const char *path);
+/** @} Root environment */
+/** @} Env */
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                              LOCATIONS
@@ -2172,10 +2213,10 @@ void
 eth_destroy_ir_defs(eth_ir_defs *defs);
 
 eth_ir*
-eth_build_ir(eth_ast *ast, eth_env *env, eth_module *uservars);
+eth_build_ir(eth_ast *ast, eth_root *root, eth_module *uservars);
 
 eth_ir*
-eth_build_module_ir(eth_ast *ast, eth_env *env, eth_module *mod,
+eth_build_module_ir(eth_ast *ast, eth_root *root, eth_module *mod,
     eth_ir_defs *defs, eth_module *uservars);
 
 
@@ -2827,7 +2868,7 @@ eth_ast*
 eth_parse_repl(eth_scanner *scan);
 
 eth_t
-eth_eval(eth_env *topenv, eth_module *mod, eth_ast *ast);
+eth_eval(eth_root *root, eth_module *mod, eth_ast *ast);
 
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><

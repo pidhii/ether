@@ -2,7 +2,7 @@
 let pub some x = Some x
 let pub none = false
 
-let pub option? x = x is of Some _
+let pub some? x = x is of Some _
 
 let pub map f opt =
   if let Some x = opt then f x

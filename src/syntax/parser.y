@@ -830,34 +830,34 @@ Expr
 Stmt
   : Expr
 
-  | IF Expr MaybeKeepBlock THEN Stmt ELSE StmtOrBlock {
+  | IF Stmt MaybeKeepBlock THEN Stmt ELSE StmtOrBlock {
     $$ = eth_ast_if($2, $5, $7);
     LOC($$, @$);
   }
-  | IF Expr MaybeKeepBlock THEN StmtOrBlock KEEP_BLOCK ELSE StmtOrBlock {
+  | IF Stmt MaybeKeepBlock THEN StmtOrBlock KEEP_BLOCK ELSE StmtOrBlock {
     $$ = eth_ast_if($2, $5, $8);
     LOC($$, @$);
   }
 
-  | UNLESS Expr MaybeKeepBlock THEN StmtOrBlock {
+  | UNLESS Stmt MaybeKeepBlock THEN StmtOrBlock {
     $$ = eth_ast_if($2, eth_ast_cval(eth_nil), $5);
     LOC($$, @$);
   }
-  | WHEN Expr MaybeKeepBlock THEN StmtOrBlock {
+  | WHEN Stmt MaybeKeepBlock THEN StmtOrBlock {
     $$ = eth_ast_if($2, $5, eth_ast_cval(eth_nil));
     LOC($$, @$);
   }
 
-  | IFLET Pattern '=' Expr MaybeKeepBlock THEN Stmt ELSE StmtOrBlock {
+  | IFLET Pattern '=' StmtOrBlock MaybeKeepBlock THEN Stmt ELSE StmtOrBlock {
     $$ = eth_ast_match($2, $4, $7, $9);
     LOC($$, @$);
   }
-  | IFLET Pattern '=' Expr MaybeKeepBlock THEN StmtOrBlock KEEP_BLOCK ELSE StmtOrBlock {
+  | IFLET Pattern '=' StmtOrBlock MaybeKeepBlock THEN StmtOrBlock KEEP_BLOCK ELSE StmtOrBlock {
     $$ = eth_ast_match($2, $4, $7, $10);
     LOC($$, @$);
   }
 
-  | WHENLET Pattern '=' Expr MaybeKeepBlock THEN StmtOrBlock {
+  | WHENLET Pattern '=' StmtOrBlock MaybeKeepBlock THEN StmtOrBlock {
     $$ = eth_ast_match($2, $4, $7, eth_ast_cval(eth_nil));
     LOC($$, @$);
   }

@@ -367,18 +367,18 @@ module Update =
         when local_version_tag not eq car remote_versions then
           { new_version = Tag (car remote_versions)
           , info_mesg =
-              "new version for module '{name}' is available: {car remote_versions}"
+              "new version of \e[1m{name}\e[22m is available: {car remote_versions}"
           }
       else
         { new_version = Tag (car remote_versions)
-        , info_mesg = "release for module '{name}' is now avaialble"
+        , info_mesg = "release of \e[1m{name}\e[22m is now avaialble"
         }
     else -- remote_versions is []
       let Commit local_commit = local_version
       let remote_head = Git.head_commit repo_url
       when local_commit not eq remote_head then
         { new_version = Commit remote_head
-        , info_mesg = "new commit for module '{name}' is available: {remote_head}"
+        , info_mesg = "new commit of \e[1m{name}\e[22m is available: {remote_head}"
         }
 
 
@@ -645,7 +645,7 @@ let commands =
             IO.write_to stdout $ paint " checking \e[1m{name}\e[22m ... "
             IO.flush stdout
             if let {info_mesg} = Update.check_update {name, local_version, repo_url}
-            then info info_mesg; cnt + 1
+            then write_to stdout "\e[2K\r"; info info_mesg; cnt + 1
             else write_to stdout "\e[2K\r"; cnt
           ) 0 db
         when cnt == 0 then info "no updates available, all modules are up to date"

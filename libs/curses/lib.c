@@ -483,7 +483,7 @@ _wredrawln(void)
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 int
-ether_module(eth_module *mod, eth_env *topenv)
+ether_module(eth_module *mod, eth_root *topenv)
 {
   window_type = eth_create_type("WINDOW");
   window_type->destroy = destroy_window;

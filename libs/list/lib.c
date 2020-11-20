@@ -316,7 +316,7 @@ _rev_filter_map(void)
 }
 
 int
-ether_module(eth_module *mod, eth_env *topenv)
+ether_module(eth_module *mod, eth_root *topenv)
 {
   eth_define(mod, "__len", eth_create_proc(_length, 1, NULL, NULL));
   eth_define(mod, "__rev_append", eth_create_proc(_rev_append, 2, NULL, NULL));

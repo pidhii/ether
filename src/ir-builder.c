@@ -32,7 +32,7 @@ typedef struct {
 
 typedef struct ir_builder {
   struct ir_builder *parent;
-  eth_env *env; // top-level environment
+  eth_root *root; // top-level environment
   eth_module *mod; // this module
   bool istoplvl;
   eth_var_list *vars;
@@ -50,7 +50,7 @@ create_ir_builder(ir_builder *parent)
   ir_builder *bldr = malloc(sizeof(ir_builder));
   bldr->parent = parent;
   bldr->mod = NULL;
-  bldr->env = parent ? parent->env : NULL;
+  bldr->root = parent ? parent->root : NULL;
   bldr->istoplvl = false;
   bldr->vars = eth_create_var_list();
   bldr->capoffs = 0;
@@ -151,7 +151,7 @@ resolve_var_path(ir_builder *bldr, const eth_module *mod, const char *path,
     memcpy(modname, path, modnamelen);
     modname[modnamelen] = '\0';
 
-    eth_module *submod = eth_require_module(bldr->env, eth_get_env(mod), modname);
+    eth_module *submod = eth_require_module(bldr->root, eth_get_env(mod), modname);
     if (submod == NULL)
     {
       eth_warning("no submodule %s in %s", modname, eth_get_module_name(mod));
@@ -182,12 +182,12 @@ get_env_parent_name(eth_env *env)
 }
 
 static eth_module*
-require_module_aux(eth_env *topenv, eth_env *env, const char *name)
+require_module_aux(eth_root *root, eth_env *env, const char *name)
 {
   eth_debug("require module '%s' from '%s'", name,
       get_env_parent_name(env));
   eth_indent_log();
-  eth_module *ret = eth_require_module(topenv, env, name);
+  eth_module *ret = eth_require_module(root, env, name);
   eth_dedent_log();
   if (ret)
     eth_debug("module found \e[38;5;2;1m✓\e[0m");
@@ -213,7 +213,7 @@ find_module_aux(ir_builder *bldr, const char *name)
 static const eth_module*
 require_module(ir_builder *bldr, const char *name)
 {
-  assert(bldr->env);
+  assert(bldr->root);
 
   char *p;
   char topname[256];
@@ -237,7 +237,7 @@ require_module(ir_builder *bldr, const char *name)
   /* Otherwize, search in modules from above. */
   for (const eth_module *m = bldr->mod; m; m = eth_get_module_parent(m))
   {
-    if ((topmod = require_module_aux(bldr->env, eth_get_env(m), topname)))
+    if ((topmod = require_module_aux(bldr->root, eth_get_env(m), topname)))
     {
       eth_debug("found module '%s' in upper module '%s'", name,
           eth_get_module_name(m));
@@ -246,7 +246,8 @@ require_module(ir_builder *bldr, const char *name)
   }
 
   /* Otherwize, search in the top-level environment. */
-  if ((topmod = require_module_aux(bldr->env, bldr->env, topname)))
+  if ((topmod =
+        require_module_aux(bldr->root, eth_get_root_env(bldr->root), topname)))
     goto found_new;
 
   if (not topmod)
@@ -268,7 +269,7 @@ found_old:
   {
     /* resolve submodule (we already found the root) */
     const eth_module *mod =
-      require_module_aux(bldr->env, eth_get_env(topmod), name);
+      require_module_aux(bldr->root, eth_get_env(topmod), name);
     if (not mod)
     {
       eth_warning("failed to resolve %s", name);
@@ -992,7 +993,8 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
     {
       // create module
       eth_module *mod = eth_create_module(ast->module.name, bldr->mod);
-      eth_env *env = bldr->mod ? eth_get_env(bldr->mod) : bldr->env;
+      eth_env *env =
+        bldr->mod ? eth_get_env(bldr->mod) : eth_get_root_env(bldr->root);
       if (bldr->mod)
       {
         eth_debug("create submodule %s.%s", eth_get_module_name(bldr->mod),
@@ -1000,7 +1002,8 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       }
       eth_indent_log();
       eth_t modret;
-      if (not eth_load_module_from_ast(bldr->env, env, mod, ast->module.body, &modret))
+      if (not eth_load_module_from_ast(bldr->root, env, mod, ast->module.body,
+            &modret))
       {
         eth_dedent_log();
         eth_destroy_module(mod);
@@ -1216,14 +1219,14 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
 }
 
 static eth_ir*
-build_ir(eth_ast *ast, eth_env *env, eth_module *mod, eth_ir_defs *defs,
+build_ir(eth_ast *ast, eth_root *root, eth_module *mod, eth_ir_defs *defs,
     eth_module *uservars)
 {
   eth_ir *ret;
   int e = 0;
 
   ir_builder *bldr = create_ir_builder(NULL);
-  bldr->env = env;
+  bldr->root = root;
   bldr->istoplvl = true;
   bldr->mod = mod;
 
@@ -1263,16 +1266,16 @@ build_ir(eth_ast *ast, eth_env *env, eth_module *mod, eth_ir_defs *defs,
 }
 
 eth_ir*
-eth_build_ir(eth_ast *ast, eth_env *env, eth_module *uservars)
+eth_build_ir(eth_ast *ast, eth_root *root, eth_module *uservars)
 {
-  return build_ir(ast, env, NULL, NULL, uservars);
+  return build_ir(ast, root, NULL, NULL, uservars);
 }
 
 eth_ir*
-eth_build_module_ir(eth_ast *ast, eth_env *env, eth_module *mod,
+eth_build_module_ir(eth_ast *ast, eth_root *root, eth_module *mod,
     eth_ir_defs *defs, eth_module *uservars)
 {
-  return build_ir(ast, env, mod, defs, uservars);
+  return build_ir(ast, root, mod, defs, uservars);
 }
 
 void

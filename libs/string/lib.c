@@ -42,7 +42,10 @@ static eth_t
 _make(void)
 {
   eth_args args = eth_start(2);
-  int len = eth_num_val(eth_arg2(args, eth_number_type));
+  eth_t leng = eth_arg2(args, eth_number_type);
+  if (not eth_is_size(leng))
+    eth_throw(args, eth_invalid_argument());
+  int len = eth_num_val(leng);
   char c = *eth_str_cstr(eth_arg2(args, eth_string_type));
   char *str;
   if (c == 0)
@@ -557,7 +560,7 @@ _to_symbol(void)
 
 
 int
-ether_module(eth_module *mod, eth_env *topenv)
+ether_module(eth_module *mod, eth_root *topenv)
 {
   eth_define(mod, "__create", eth_create_proc(_create, 1, NULL, NULL));
   eth_define(mod, "__make", eth_create_proc(_make, 2, NULL, NULL));

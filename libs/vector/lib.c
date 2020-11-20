@@ -171,7 +171,7 @@ get(void)
 }
 
 int
-ether_module(eth_module *mod, eth_env *topenv)
+ether_module(eth_module *mod, eth_root *topenv)
 {
   eth_define(mod, "of_list", eth_create_proc(of_list, 1, NULL, NULL));
   eth_define(mod, "len", eth_create_proc(len, 1, NULL, NULL));

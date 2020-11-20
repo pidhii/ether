@@ -250,7 +250,7 @@ _of_string(void)
 }
 
 int
-ether_module(eth_module *mod, eth_env *topenv)
+ether_module(eth_module *mod, eth_root *topenv)
 {
   // Init
   init_arb_type();

@@ -45,7 +45,7 @@ set_pub(eth_ast_pattern *pat)
 }
 
 eth_t
-eth_eval(eth_env *topenv, eth_module *mod, eth_ast *ast)
+eth_eval(eth_root *root, eth_module *mod, eth_ast *ast)
 {
   switch (ast->tag)
   {
@@ -57,7 +57,7 @@ eth_eval(eth_env *topenv, eth_module *mod, eth_ast *ast)
         set_pub(ast->let.pats[i]);
 
       eth_ir_defs defs;
-      eth_ir *ir = eth_build_module_ir(ast, topenv, mod, &defs, mod);
+      eth_ir *ir = eth_build_module_ir(ast, root, mod, &defs, mod);
       if (not ir)
         return NULL;
 
@@ -98,7 +98,7 @@ eth_eval(eth_env *topenv, eth_module *mod, eth_ast *ast)
 
     default:
     {
-      eth_ir *ir = eth_build_ir(ast, topenv, mod);
+      eth_ir *ir = eth_build_ir(ast, root, mod);
       if (not ir)
         return NULL;
 

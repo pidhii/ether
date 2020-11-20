@@ -91,7 +91,7 @@ parse(void)
 
 
 int
-ether_module(eth_module *mod, eth_env *toplvl)
+ether_module(eth_module *mod, eth_root *toplvl)
 {
   eth_define(mod, "parse", eth_proc(parse, 1));
   return 0;

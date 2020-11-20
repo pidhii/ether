@@ -481,7 +481,7 @@ _gtk_css_provider_load_from_path(void)
 //                               Main
 ////////////////////////////////////////////////////////////////////////////////
 int
-ether_module(eth_module *mod, eth_env *topenv)
+ether_module(eth_module *mod, eth_root *topenv)
 {
   init_gobject();
   eth_add_destructor(mod, gobject_type, (void*)eth_destroy_type);

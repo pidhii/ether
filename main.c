@@ -1,15 +1,15 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -50,7 +50,7 @@ static
 eth_module *repl_defs;
 
 static
-eth_env *repl_env;
+eth_root *repl_root;
 
 static const eth_module*
 resolve_ident(const char** ident);
@@ -215,6 +215,7 @@ main(int argc, char **argv)
   eth_init(&argc);
 
   eth_env *env = eth_create_env();
+  eth_root *root = eth_create_root(env);
   cod_vec_iter(L, i, path, eth_add_module_path(env, path));
   // --
   eth_module *extravars = eth_create_module("<main>", NULL);
@@ -237,7 +238,7 @@ main(int argc, char **argv)
     // set up autocomplete
     rl_attempted_completion_function = completer;
     repl_defs = mod;
-    repl_env = env;
+    repl_root = root;
 
     // load previous history
     using_history();
@@ -368,7 +369,7 @@ main(int argc, char **argv)
           buf.len = 0;
 
           // evaluate expression
-          eth_t ret = eth_eval(env, mod, expr);
+          eth_t ret = eth_eval(root, mod, expr);
           if (ret and ret != eth_nil)
           {
             eth_printf("~w\n", ret);
@@ -396,7 +397,7 @@ main(int argc, char **argv)
     if (ast)
     {
       eth_debug("build IR");
-      eth_ir *ir = eth_build_ir(ast, env, extravars);
+      eth_ir *ir = eth_build_ir(ast, root, extravars);
       eth_drop_ast(ast);
       if (ir)
       {
@@ -477,7 +478,7 @@ main(int argc, char **argv)
     }
   }
 
-  eth_destroy_env(env);
+  eth_destroy_root(root);
   eth_destroy_module(extravars);
 
   cod_vec_destroy(L);
@@ -577,7 +578,7 @@ resolve_ident(const char** ident)
     char modname[modnamelen + 1];
     memcpy(modname, *ident, modnamelen);
     modname[modnamelen] = '\0';
-    mod = eth_require_module(repl_env, repl_env, modname);
+    mod = eth_require_module(repl_root, eth_get_root_env(repl_root), modname);
     if (mod == NULL)
     {
       eth_warning("no module '%s'", modname);

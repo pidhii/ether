@@ -28,7 +28,7 @@ ETH_MODULE("ether:builtins")
 
 
 static
-eth_env *g_env;
+eth_root *g_root;
 
 static
 eth_module *g_mod;
@@ -698,8 +698,8 @@ _load(void)
 
   eth_module *mod = eth_create_module(id, NULL);
   eth_t ret;
-  int ok = eth_load_module_from_script2(g_env, g_env, mod, eth_str_cstr(path),
-      &ret, envmod);
+  int ok = eth_load_module_from_script2(g_root, eth_get_root_env(g_root), mod,
+      eth_str_cstr(path), &ret, envmod);
   eth_destroy_module(envmod);
   if (not ok)
   {
@@ -717,7 +717,7 @@ _load(void)
 
   ret = eth_tup2(ret, acc);
   eth_drop_2(path, env);
-  eth_remove_module(g_env, id);
+  eth_remove_module(eth_get_root_env(g_root), id);
   eth_destroy_module(mod);
   return ret;
 }
@@ -757,7 +757,8 @@ _load_stream(void)
 
   eth_module *mod = eth_create_module(id, NULL);
   eth_t ret;
-  int ok = eth_load_module_from_ast2(g_env, g_env, mod, ast, &ret, envmod);
+  int ok = eth_load_module_from_ast2(g_root, eth_get_root_env(g_root), mod, ast,
+      &ret, envmod);
   eth_destroy_module(envmod);
   eth_drop_ast(ast);
   if (not ok)
@@ -773,7 +774,7 @@ _load_stream(void)
 
     ret = eth_tup2(ret, acc);
     eth_drop_2(file, env);
-    eth_remove_module(g_env, id);
+    eth_remove_module(eth_get_root_env(g_root), id);
     eth_destroy_module(mod);
     return ret;
   }
@@ -848,11 +849,12 @@ _eth_init_builtins(void)
 {
   char buf[PATH_MAX];
 
-  g_env = eth_create_empty_env();
+  eth_env *env = eth_create_empty_env();
+  g_root = eth_create_root(env);
   if (eth_get_prefix())
   {
     sprintf(buf, "%s/lib/ether", eth_get_prefix());
-    eth_add_module_path(g_env, buf);
+    eth_add_module_path(env, buf);
   }
 
   g_mod = eth_create_module("Builtins", NULL);
@@ -911,27 +913,27 @@ _eth_init_builtins(void)
   eth_define(g_mod, "__Lazy_create", eth_create_proc(_Lazy_create, 1, NULL, NULL));
 
 
-  if (not eth_resolve_path(g_env, "__builtins.eth", buf))
+  if (not eth_resolve_path(env, "__builtins.eth", buf))
   {
     eth_error("can't find builtins");
     abort();
   }
   eth_debug("- loading \"%s\"", buf);
-  if (not eth_load_module_from_script(g_env, g_env, g_mod, buf, NULL))
+  if (not eth_load_module_from_script(g_root, env, g_mod, buf, NULL))
   {
     eth_error("failed to load builtins");
     abort();
   }
   eth_debug("builtins were succesfully loaded");
 #else
-  eth_add_module(g_env, g_mod); // to prevent memory leak
+  eth_add_module(env, g_mod); // to prevent memory leak
 #endif
 }
 
 void
 _eth_cleanup_builtins(void)
 {
-  eth_destroy_env(g_env);
+  eth_destroy_root(g_root);
 }
 
 const eth_module*

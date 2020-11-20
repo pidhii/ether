@@ -40,7 +40,7 @@ _study(void)
 }
 
 int
-ether_module(eth_module *mod, eth_env *topenv)
+ether_module(eth_module *mod, eth_root *topenv)
 {
   eth_define(mod, "_create", eth_create_proc(_create, 2, NULL, NULL));
   eth_define(mod, "_study", eth_create_proc(_study, 1, NULL, NULL));

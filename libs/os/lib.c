@@ -159,7 +159,7 @@ _pipe2(void)
 
 
 int
-ether_module(eth_module *mod, eth_env *topenv)
+ether_module(eth_module *mod, eth_root *topenv)
 {
   eth_define(mod, "__chdir", eth_proc(_chdir, 1));
 

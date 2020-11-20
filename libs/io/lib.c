@@ -371,7 +371,7 @@ _flush(void)
 }
 
 int
-ether_module(eth_module *mod, eth_env *toplvl)
+ether_module(eth_module *mod, eth_root *toplvl)
 {
   eth_define(mod, "read_line_of", eth_proc(_read_line_of, 1));
   eth_define(mod, "read_of", eth_proc(_read_of, 2));
