@@ -1,15 +1,15 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -672,7 +672,7 @@ _load(void)
     return eth_exn(eth_type_error());
   }
 
-  eth_module *envmod = eth_create_module(NULL, NULL);
+  eth_module *envmod = eth_create_module(NULL, NULL, NULL);
   for (eth_t it = env; eth_is_pair(it); it = eth_cdr(it))
   {
     eth_t def = eth_car(it);
@@ -696,7 +696,7 @@ _load(void)
   char id[42];
   sprintf(id, "load.%d", cnt++);
 
-  eth_module *mod = eth_create_module(id, NULL);
+  eth_module *mod = eth_create_module(id, NULL, NULL);
   eth_t ret;
   int ok = eth_load_module_from_script2(g_root, eth_get_root_env(g_root), mod,
       eth_str_cstr(path), &ret, envmod);
@@ -733,7 +733,7 @@ _load_stream(void)
   if (eth_unlikely(not eth_is_file(file)))
     goto error_1;
 
-  eth_module *envmod = eth_create_module(NULL, NULL);
+  eth_module *envmod = eth_create_module(NULL, NULL, NULL);
   for (eth_t it = env; eth_is_pair(it); it = eth_cdr(it))
   {
     eth_t def = eth_car(it);
@@ -755,7 +755,7 @@ _load_stream(void)
   if (not ast)
     goto error_3;
 
-  eth_module *mod = eth_create_module(id, NULL);
+  eth_module *mod = eth_create_module(id, NULL, NULL);
   eth_t ret;
   int ok = eth_load_module_from_ast2(g_root, eth_get_root_env(g_root), mod, ast,
       &ret, envmod);
@@ -857,7 +857,7 @@ _eth_init_builtins(void)
     eth_add_module_path(env, buf);
   }
 
-  g_mod = eth_create_module("Builtins", NULL);
+  g_mod = eth_create_module("Builtins", NULL, NULL);
 
 #if not defined(ETHER_DISABLE_BUILTINS)
   eth_debug("loading builtins");

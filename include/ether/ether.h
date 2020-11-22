@@ -1322,7 +1322,7 @@ typedef struct {
 } eth_def;
 
 eth_module* __attribute__((malloc))
-eth_create_module(const char *name, const eth_module *parent);
+eth_create_module(const char *name, const eth_module *parent, const char *dir);
 
 void
 eth_destroy_module(eth_module *mod);
@@ -1369,27 +1369,84 @@ eth_get_builtin(const char *name);
 /** @defgroup Env Environment
  * @brief The thing managing modules.
  * @{ */
-eth_env* __attribute__((malloc))
-eth_create_env(void);
-
+/** @brief Create new empty environment. */
 eth_env* __attribute__((malloc))
 eth_create_empty_env(void);
 
+/**
+ * @brief Create new environment.
+ *
+ * This environment will automaticly have a canonical module-path being added.
+ * It is equivalent to:
+ * ```
+ * eth_env *env = eth_create_empty_env();
+ * sprintf(path, "%s/lib/ether", eth_get_prefix());
+ * eth_add_module_path(env, path);
+ * ```
+ * However, when the *prefix* is not available, it will not yield an error, but
+ * the corresponding path wont be added. Thus in this case this function is
+ * equivalent to the eth_create_empty_env().
+ */
+eth_env* __attribute__((malloc))
+eth_create_env(void);
+
+/** @brief Destroy environemnt. */
 void
 eth_destroy_env(eth_env *env);
 
+/**
+ * @brief Get the module owning an environment.
+ * @return Module instance or `NULL` if *env* is owned by a module.
+ */
 eth_module*
 eth_get_env_parent(eth_env *env);
 
+/** @brief Set parent module of the environment. */
 void
 eth_set_env_parent(eth_env *env, eth_module *mod);
 
+/**
+ * @brief Add a directory to be searched during module query.
+ * @return `true` on success, or `false` in case of invalid path.
+ */
 bool
 eth_add_module_path(eth_env *env, const char *path);
 
+/**
+ * @brief Add a callback on module finalization.
+ *
+ * This callback will be invoked by the environment destuctor.
+ *
+ * Can be used to implement `atexit (3)` -like functions.
+ *
+ * A use case motivated this utility is to implement
+ * <a href="https://libuv.org/">libuv</a> which can now call start its main loop
+ * at finalization of the root environment.
+ *
+ * @param env Environment.
+ * @param cb Callback.
+ * @param data User data to be passed to the callback upon evaluation.
+ */
 void
 eth_add_exit_handle(eth_env *env, void (*cb)(void*), void *data);
 
+/**
+ * @brief Search for a file or directory in a module directories list.
+ *
+ * For each *directory* in *module direcories list* check wheter a
+ * concatenation of *directory* and a *path* yields a valid path to a
+ * file/directory. Once a file/directory is found, query stops and obtaind
+ * full path is returned.
+ *
+ * @param env Environment to be queried.
+ * @param path Relative path to a file/directory.
+ * @param[out] fullpath Buffer to be filled with resolved full path on success.
+ *                      On failure, content of supplied array is undefined.
+ *
+ * @return `true` on success; otherwize, `false` is returned.
+ *
+ * @see eth_add_module() to append a path to the list.
+ */
 bool
 eth_resolve_path(eth_env *env, const char *path, char *fullpath);
 
@@ -1399,9 +1456,12 @@ eth_add_module(eth_env *env, eth_module *mod);
 bool
 eth_remove_module(eth_env *env, const char *name);
 
+/** @brief Get module instance by name. */
 eth_module*
 eth_require_module(eth_root *root, eth_env *env, const char *name);
 
+/** @name Loading modules from scripts or shared libraries
+ * @{ */
 bool
 eth_load_module_from_script(eth_root *root, eth_env *env, eth_module *mod,
     const char *path, eth_t *ret);
@@ -1425,12 +1485,16 @@ eth_load_module_from_elf(eth_root *root, eth_env *env, eth_module *mod,
 static bool
 eth_add_module_script(eth_module *self, const char *path, eth_root *root)
 { return eth_load_module_from_script2(root, NULL, self, path, NULL, self); }
+/** @} */
 
+/** @name Access list of modules
+ * @{ */
 int
 eth_get_nmodules(const eth_env *env);
 
 void
 eth_get_modules(const eth_env *env, const eth_module *out[], int n);
+/** @} */
 
 /** @name Root environment
  * @{ */

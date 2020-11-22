@@ -22,6 +22,7 @@
 #include <errno.h>
 #include <string.h>
 #include <time.h>
+#include <libgen.h>
 
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -198,14 +199,15 @@ main(int argc, char **argv)
     }
   }
 
+  char *filepath = NULL;
   FILE *input = stdin;
   if (optind != argc)
   {
-    char *path = argv[optind];
-    input = fopen(path, "r");
+    filepath = argv[optind];
+    input = fopen(filepath, "r");
     if (input == NULL)
     {
-      eth_error("failed to open file \"%s\", %s", path, strerror(errno));
+      eth_error("failed to open file \"%s\", %s", filepath, strerror(errno));
       cod_vec_destroy(L);
       exit(EXIT_FAILURE);
     }
@@ -218,7 +220,11 @@ main(int argc, char **argv)
   eth_root *root = eth_create_root(env);
   cod_vec_iter(L, i, path, eth_add_module_path(env, path));
   // --
-  eth_module *extravars = eth_create_module("<main>", NULL);
+  char filedir[PATH_MAX];
+  strcpy(filedir, filepath);
+  dirname(filedir);
+  eth_module *extravars =
+    eth_create_module("<main>", NULL, input == stdin ? "." : filedir);
   eth_define(extravars, "command_line", argv_to_list(argc, argv, optind));
   eth_define(extravars, "__main", eth_true);
 

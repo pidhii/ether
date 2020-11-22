@@ -635,7 +635,7 @@ find_module_in_env(eth_env *env, const char *name, bool *e)
 static eth_module*
 load_module(eth_root *root, eth_env *env, const char *name)
 {
-  char path[PATH_MAX];
+  char path[PATH_MAX], dir[PATH_MAX];
   int namelen = strlen(name);
   int topnamelen;
   char topname[namelen + 1];
@@ -680,7 +680,8 @@ load_module(eth_root *root, eth_env *env, const char *name)
     return mod;
   }
 
-  mod = eth_create_module(topname, eth_get_env_parent(env));
+  strcpy(dir, path);
+  mod = eth_create_module(topname, eth_get_env_parent(env), dirname(dir));
   bool ok;
   if (is_elf(path))
     ok = eth_load_module_from_elf(root, env, mod, path);

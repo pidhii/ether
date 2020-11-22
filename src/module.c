@@ -38,7 +38,7 @@ struct eth_module {
 };
 
 eth_module*
-eth_create_module(const char *name, const eth_module *parent)
+eth_create_module(const char *name, const eth_module *parent, const char *dir)
 {
   eth_module *mod = malloc(sizeof(eth_module));
   mod->name = name ? strdup(name) : strdup("<unnamed-module>");
@@ -47,7 +47,8 @@ eth_create_module(const char *name, const eth_module *parent)
   mod->defscap = 0x10;
   mod->defs = malloc(sizeof(eth_def) * mod->defscap);
   mod->env = eth_create_empty_env();
-  eth_add_module_path(mod->env, "."); // XXX: remove this
+  if (dir)
+    eth_add_module_path(mod->env,dir);
   eth_set_env_parent(mod->env, mod);
   cod_vec_init(mod->clos);
   return mod;

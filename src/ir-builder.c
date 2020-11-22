@@ -992,7 +992,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
     case ETH_AST_MODULE:
     {
       // create module
-      eth_module *mod = eth_create_module(ast->module.name, bldr->mod);
+      eth_module *mod = eth_create_module(ast->module.name, bldr->mod, NULL);
       eth_env *env =
         bldr->mod ? eth_get_env(bldr->mod) : eth_get_root_env(bldr->root);
       if (bldr->mod)
