@@ -1,15 +1,15 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -108,6 +108,7 @@ create_bc_builder(int nvals, int ntries)
   cod_vec_init(bldr->cchjmps);
   bldr->catches = malloc(sizeof(int) * ntries);
   bldr->vmap = malloc(sizeof(int) * nvals);
+  for (int i = 0; i < nvals; bldr->vmap[i++] = -1);
   bldr->regcnt = 0;
   bldr->entrypoint = -1;
   return bldr;
@@ -135,6 +136,7 @@ static int
 get_reg(bc_builder *bldr, int vid)
 {
   assert(vid >= 0);
+  assert(bldr->vmap[vid] >= 0);
   return bldr->vmap[vid];
 }
 

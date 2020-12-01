@@ -220,11 +220,16 @@ main(int argc, char **argv)
   eth_root *root = eth_create_root(env);
   cod_vec_iter(L, i, path, eth_add_module_path(env, path));
   // --
-  char filedir[PATH_MAX];
-  strcpy(filedir, filepath);
-  dirname(filedir);
-  eth_module *extravars =
-    eth_create_module("<main>", NULL, input == stdin ? "." : filedir);
+  const char *modpath;
+  if (filepath)
+  {
+    static char filedir[PATH_MAX];
+    strcpy(filedir, filepath);
+    modpath = dirname(filedir);
+  }
+  else
+    modpath = ".";
+  eth_module *extravars = eth_create_module("<main>", NULL, modpath);
   eth_define(extravars, "command_line", argv_to_list(argc, argv, optind));
   eth_define(extravars, "__main", eth_true);
 
