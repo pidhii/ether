@@ -281,7 +281,8 @@ destroy_ast_node(eth_ast *ast)
       break;
 
     case ETH_AST_MODULE:
-      free(ast->module.name);
+      if (ast->module.name)
+        free(ast->module.name);
       eth_unref_ast(ast->module.body);
       break;
 
@@ -536,7 +537,7 @@ eth_ast*
 eth_ast_module(const char *name, eth_ast *body)
 {
   eth_ast *ast = create_ast_node(ETH_AST_MODULE);
-  ast->module.name = strdup(name);
+  ast->module.name = name ? strdup(name) : NULL;
   eth_ref_ast(ast->module.body = body);
   return ast;
 }

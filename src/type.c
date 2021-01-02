@@ -1,15 +1,15 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -49,10 +49,6 @@ create_type(const char *name, int nfields)
   type->destroy = default_destroy;
   type->write = eth_default_write;
   type->display = default_display;
-  type->to_number = cast_error;
-  type->to_function = cast_error;
-  type->to_string = cast_error;
-  type->to_pair = cast_error;
   type->equal = NULL;
   type->nfields = 0;
   type->fields = NULL;

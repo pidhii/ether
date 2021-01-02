@@ -38,7 +38,7 @@
 #   warning "No support for `restrict'-qualifier"
 # endif
 
-/* Disable mungling during linkage. */
+/* Disable mangling during linkage. */
 extern "C" {
 
 /* I used 'try', 'catch' and 'throw' keywords in the header (shame on me), so
@@ -386,11 +386,6 @@ struct eth_type {
   void (*write)(eth_type *type, eth_t x, FILE *out);
   void (*display)(eth_type *type, eth_t x, FILE *out);
   bool (*equal)(eth_type *type, eth_t x, eth_t y);
-
-  eth_t (*to_number)(eth_type *type, eth_t x);
-  eth_t (*to_function)(eth_type *type, eth_t x);
-  eth_t (*to_string)(eth_type *type, eth_t x);
-  eth_t (*to_pair)(eth_type *type, eth_t x);
 
   uint8_t flag;
 
@@ -1347,6 +1342,9 @@ eth_define(eth_module *mod, const char *ident, eth_t val);
 
 void
 eth_define_attr(eth_module *mod, const char *ident, eth_t val, eth_attr *attr);
+
+void
+eth_copy_defs(const eth_module *src, eth_module *dst);
 
 eth_def*
 eth_find_def(const eth_module *mod, const char *ident);

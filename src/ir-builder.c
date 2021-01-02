@@ -42,6 +42,8 @@ typedef struct ir_builder {
   cod_vec(int  ) defvarids;
   cod_vec(eth_attr*) defattrs;
   cod_vec(module_entry) mods;
+  int immcnt;
+  eth_module *gvars; // global pre-evaluated constants
 } ir_builder;
 
 static ir_builder*
@@ -55,6 +57,8 @@ create_ir_builder(ir_builder *parent)
   bldr->vars = eth_create_var_list();
   bldr->capoffs = 0;
   bldr->nvars = 0;
+  bldr->immcnt = 0;
+  bldr->gvars = eth_create_module(NULL, NULL, NULL);
   cod_vec_init(bldr->defidents);
   cod_vec_init(bldr->defvarids);
   cod_vec_init(bldr->defattrs);
@@ -79,6 +83,7 @@ destroy_ir_builder(ir_builder *bldr)
     free(ent.name);
   }
   cod_vec_destroy(bldr->mods);
+  eth_destroy_module(bldr->gvars);
   free(bldr);
 }
 
@@ -323,7 +328,7 @@ require_var(ir_builder *bldr, const char *ident, eth_var *ret)
     {
       if (require_var(bldr->parent, ident, ret))
       {
-        // immediately return constants (don't perform capture)
+        // immidiately return constants (don't perform capture)
         if (ret->cval)
           return true;
         int vid = new_vid(bldr);
@@ -753,7 +758,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       eth_ir_node *vals[ast->let.n];
       for (int i = 0; i < ast->let.n; ++i)
         vals[i] = build_with_toplvl(bldr, ast->let.vals[i], e, false);
-      return build_let(bldr, 0, ast, vals, bldr->vars->len - bldr->capoffs, e);
+      return build_let(bldr, 0, ast, vals, bldr->vars->len - bldr->capoffs,e);
     }
 
     case ETH_AST_LETREC:
@@ -977,7 +982,10 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       if (ast->import.nams)
         ok = import_names(bldr, mod, ast->import.nams, ast->import.nnam);
       else if (ast->import.alias and ast->import.alias[0] == 0)
+      {
+        eth_copy_defs(mod, bldr->gvars);
         import_unqualified(bldr, mod);
+      }
       else
         import_default(bldr, mod, ast->import.alias);
 
@@ -994,6 +1002,22 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
 
     case ETH_AST_MODULE:
     {
+      if (not bldr->istoplvl)
+      {
+        eth_error("can only create submodules within the top-level scope");
+        return eth_ir_error();
+      }
+
+      const char *name = ast->module.name;
+      bool isimmidiate = false;
+      char namebuf[256];
+      if (not ast->module.name)
+      {
+        isimmidiate = true;
+        sprintf(namebuf, "<imm%d>", bldr->immcnt++);
+        name = namebuf;
+      }
+
       // create module
       eth_module *mod = eth_create_module(ast->module.name, bldr->mod, NULL);
       eth_env *env =
@@ -1005,8 +1029,8 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       }
       eth_indent_log();
       eth_t modret;
-      if (not eth_load_module_from_ast(bldr->root, env, mod, ast->module.body,
-            &modret))
+      if (not eth_load_module_from_ast2(bldr->root, env, mod, ast->module.body,
+            &modret, bldr->gvars))
       {
         eth_dedent_log();
         eth_destroy_module(mod);
@@ -1016,8 +1040,16 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         return eth_ir_error();
       }
       eth_dedent_log();
-      // import in current environment
-      import_default(bldr, mod, NULL);
+
+      if (isimmidiate)
+      {
+        import_unqualified(bldr, mod);
+        eth_copy_defs(mod, bldr->gvars);
+      }
+      else
+      { // import in current environment
+        import_default(bldr, mod, NULL);
+      }
       return eth_ir_cval(modret);
     }
 
@@ -1238,7 +1270,10 @@ build_ir(eth_ast *ast, eth_root *root, eth_module *mod, eth_ir_defs *defs,
 
   // add extra variables supplied by user
   if (uservars)
+  {
+    eth_copy_defs(uservars, bldr->gvars);
     import_unqualified(bldr, uservars);
+  }
 
   eth_ir_node *body = build(bldr, ast, &e);
   if (e)

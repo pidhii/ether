@@ -129,6 +129,16 @@ eth_define(eth_module *mod, const char *ident, eth_t val)
   eth_define_attr(mod, ident, val, eth_create_attr(0));
 }
 
+void
+eth_copy_defs(const eth_module *src, eth_module *dst)
+{
+  for (int i = 0; i < src->ndefs; ++i)
+  {
+    const eth_def *def = src->defs + i;
+    eth_define_attr(dst, def->ident, def->val, def->attr);
+  }
+}
+
 eth_def*
 eth_find_def(const eth_module *mod, const char *ident)
 {

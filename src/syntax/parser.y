@@ -486,6 +486,10 @@ Atom
     LOC($$, @1);
     free($2);
   }
+  | MODULE '=' Block {
+    $$ = eth_ast_module(NULL, $3);
+    LOC($$, @1);
+  }
 ;
 
 Form
