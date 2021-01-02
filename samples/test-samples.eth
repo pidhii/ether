@@ -1,5 +1,5 @@
 
-OS.chdir (List.get 1 command_line)
+OS.chdir (List.get command_line 1)
 system "pwd"
 
 let test_mergesort! =

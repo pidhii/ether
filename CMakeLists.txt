@@ -78,8 +78,6 @@ set (SYNTAX_SRC ${BISON_parser_OUTPUTS} ${FLEX_scanner_OUTPUTS})
 add_library (ether_obj OBJECT ${ETHER_SRC} ${SYNTAX_SRC})
 target_include_directories (ether_obj PRIVATE ${CMAKE_BINARY_DIR})
 
-get_target_property(BUILD_FALGS ether_obj COMPILE_OPTIONS)
-
 # install headers:
 install (DIRECTORY ${ETHER_INCLUDE_DIR} DESTINATION ".")
 install (DIRECTORY "${CMAKE_SOURCE_DIR}/codeine/include/codeine" DESTINATION "include")

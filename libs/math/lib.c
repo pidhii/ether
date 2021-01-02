@@ -130,6 +130,7 @@ UNARY(_atanh, GNAME(atanh))
 // - erf
 // - hypot
 //
+UNARY(_sqrt, GNAME(sqrt))
 UNARY(_cbrt, GNAME(cbrt))
 UNARY(_exp2, GNAME(exp2))
 UNARY(_exp, GNAME(exp))
@@ -205,6 +206,7 @@ ether_module(eth_module *mod)
   eth_define(mod, "acosh", eth_create_proc(_acos, 1, NULL, NULL));
   eth_define(mod, "atanh", eth_create_proc(_atanh, 1, NULL, NULL));
   // --
+  eth_define(mod, "sqrt", eth_create_proc(_sqrt, 1, NULL, NULL));
   eth_define(mod, "cbrt", eth_create_proc(_cbrt, 1, NULL, NULL));
   eth_define(mod, "exp2", eth_create_proc(_exp2, 1, NULL, NULL));
   eth_define(mod, "exp", eth_create_proc(_exp, 1, NULL, NULL));
@@ -224,6 +226,7 @@ ether_module(eth_module *mod)
   // --
   eth_define(mod, "copysing", eth_create_proc(_copysign, 2, NULL, NULL));
   eth_define(mod, "frexp", eth_create_proc(_frexp, 1, NULL, NULL));
+
 
   return 0;
 }

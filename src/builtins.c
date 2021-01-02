@@ -187,6 +187,15 @@ _regexp_p(void)
 }
 
 static eth_t
+_vector_p(void)
+{
+  eth_t x = *eth_sp++;
+  eth_t ret = eth_boolean(x->type == eth_vector_type);
+  eth_drop(x);
+  return ret;
+}
+
+static eth_t
 _list(void)
 {
   eth_t x = *eth_sp++;
@@ -879,6 +888,7 @@ _eth_init_builtins(void)
   eth_define(g_mod,    "record?", eth_create_proc(  _record_p, 1, NULL, NULL));
   eth_define(g_mod,      "file?", eth_create_proc(    _file_p, 1, NULL, NULL));
   eth_define(g_mod,    "regexp?", eth_create_proc(  _regexp_p, 1, NULL, NULL));
+  eth_define(g_mod,    "vector?", eth_create_proc(  _vector_p, 1, NULL, NULL));
   // ---
   eth_define(g_mod,       "list", eth_create_proc(      _list, 1, NULL, NULL));
   // ---

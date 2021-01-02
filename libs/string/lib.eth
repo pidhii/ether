@@ -76,7 +76,7 @@ let pub sub x s =
   else if let ...r = x then __substr s 0 (r + 1)
   else invalid_argument ()
 
-let pub get i s = __substr s i 1
+let pub get s i = __substr s i 1
 
 --------------------------------------------------------------------------------
 --                                Regexp

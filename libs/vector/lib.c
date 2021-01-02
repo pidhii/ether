@@ -149,8 +149,8 @@ static eth_t
 get(void)
 {
   eth_use_symbol(Range_error)
-  eth_t k = *eth_sp++;
   eth_t v = *eth_sp++;
+  eth_t k = *eth_sp++;
   if (eth_unlikely(not (eth_is_vec(v) and eth_is_num(k))))
   {
     eth_drop_2(v, k);
