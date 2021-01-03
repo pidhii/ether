@@ -1658,10 +1658,41 @@ eth_is_wildcard(eth_pattern_tag tag)
  * the user.
  *
  * @{ */
+typedef enum {
+  /**
+   * @brief Dummy placeholder (i.e. `_`)
+   */
+  ETH_AST_PATTERN_DUMMY = ETH_PATTERN_DUMMY,
+
+  /**
+   * @brief Wildcard pattern for variable binding
+   */
+  ETH_AST_PATTERN_IDENT = ETH_PATTERN_IDENT,
+
+  /**
+   * @brief Destructure a value (of known type)
+   */
+  ETH_AST_PATTERN_UNPACK = ETH_PATTERN_UNPACK,
+
+  /**
+   * @brief Match with a constant
+   */
+  ETH_AST_PATTERN_CONSTANT = ETH_PATTERN_CONSTANT,
+
+  /**
+   * @brief Destructure (arbitrary) record
+   *
+   * @note Currently can be also used to access **a** field of **any** plain
+   * type (one-pass load of multiple fields only works for records).
+   */
+  ETH_AST_PATTERN_RECORD = ETH_PATTERN_RECORD,
+
+  ETH_AST_PATTERN_RECORD_STAR,
+} eth_ast_pattern_tag;
 
 typedef struct eth_ast_pattern eth_ast_pattern;
 struct eth_ast_pattern {
-  eth_pattern_tag tag; /**< @brief Pattern type */
+  eth_ast_pattern_tag tag; /**< @brief Pattern type */
   int rc; /**< @brief Reference counter */
 
   union {
@@ -1687,6 +1718,8 @@ struct eth_ast_pattern {
       int n; /**< N fields */
       char *alias; /**< Alias */
     } record; /**< @brief Record destructuring pattern */
+
+    struct { eth_attr *attr; char *alias; } recordstar;
   };
 };
 
@@ -1732,6 +1765,9 @@ eth_ast_constant_pattern(eth_t cval);
  */
 eth_ast_pattern*
 eth_ast_record_pattern(char *const fields[], eth_ast_pattern *pats[], int n);
+
+eth_ast_pattern*
+eth_ast_record_star_pattern();
 
 /**
  * Aliases are used to bind matched expression with an identifier.
@@ -1792,6 +1828,7 @@ typedef enum {
   ETH_AST_UPDATE,
   ETH_AST_ASSERT,
   ETH_AST_DEFINED,
+  ETH_AST_EVMAC,
   ETH_AST_MULTIMATCH,
 } eth_ast_tag;
 
@@ -1844,6 +1881,7 @@ struct eth_ast {
     struct { eth_ast *expr, *body; } assert;
     struct { char *ident; } defined;
     struct { eth_match_table *table; eth_ast **exprs; } multimatch;
+    struct { eth_ast *expr; } evmac;
   };
   eth_location *loc;
 };
@@ -1965,6 +2003,9 @@ eth_set_assert_body(eth_ast *asrt, eth_ast *body)
 
 eth_ast*
 eth_ast_defined(const char *ident);
+
+eth_ast*
+eth_ast_evmac(eth_ast *expr);
 
 eth_ast*
 eth_ast_multimatch(eth_match_table *table, eth_ast *const exprs[]);
@@ -2185,7 +2226,7 @@ eth_unref_ir(eth_ir *ir);
 
 typedef struct eth_var_cfg eth_var_cfg;
 struct eth_var_cfg {
-  char *ident;
+  const char *ident;
   eth_t cval;
   int vid;
   eth_attr *attr;
@@ -2198,7 +2239,7 @@ eth_dyn_var(char *ident, int vid, eth_attr *attr)
 }
 
 static inline eth_var_cfg
-eth_const_var(char *ident, eth_t cval, eth_attr *attr)
+eth_const_var(const char *ident, eth_t cval, eth_attr *attr)
 {
   return (eth_var_cfg) { .ident = ident, .cval = cval, .vid = -1, .attr = attr };
 }

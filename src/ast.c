@@ -1,15 +1,15 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -28,7 +28,7 @@ eth_ast_dummy_pattern(void)
 {
   eth_ast_pattern *pat = malloc(sizeof(eth_ast_pattern));
   pat->rc = 0;
-  pat->tag = ETH_PATTERN_DUMMY;
+  pat->tag = ETH_AST_PATTERN_DUMMY;
   return pat;
 }
 
@@ -37,7 +37,7 @@ eth_ast_ident_pattern(const char *ident)
 {
   eth_ast_pattern *pat = malloc(sizeof(eth_ast_pattern));
   pat->rc = 0;
-  pat->tag = ETH_PATTERN_IDENT;
+  pat->tag = ETH_AST_PATTERN_IDENT;
   pat->ident.str = strdup(ident);
   pat->ident.attr = NULL;
   return pat;
@@ -58,7 +58,7 @@ eth_ast_unpack_pattern(eth_type *type, char *const fields[],
 {
   eth_ast_pattern *pat = malloc(sizeof(eth_ast_pattern));
   pat->rc = 0;
-  pat->tag = ETH_PATTERN_UNPACK;
+  pat->tag = ETH_AST_PATTERN_UNPACK;
   pat->unpack.type = type;
   pat->unpack.fields = malloc(sizeof(char*) * n);
   pat->unpack.subpats = malloc(sizeof(eth_ast_pattern*) * n);
@@ -77,7 +77,7 @@ eth_ast_record_pattern(char *const fields[], eth_ast_pattern *pats[], int n)
 {
   eth_ast_pattern *pat = malloc(sizeof(eth_ast_pattern));
   pat->rc = 0;
-  pat->tag = ETH_PATTERN_RECORD;
+  pat->tag = ETH_AST_PATTERN_RECORD;
   pat->record.fields = malloc(sizeof(char*) * n);
   pat->record.subpats = malloc(sizeof(eth_ast_pattern*) * n);
   pat->record.n = n;
@@ -95,8 +95,19 @@ eth_ast_constant_pattern(eth_t val)
 {
   eth_ast_pattern *pat = malloc(sizeof(eth_ast_pattern));
   pat->rc = 0;
-  pat->tag = ETH_PATTERN_CONSTANT;
+  pat->tag = ETH_AST_PATTERN_CONSTANT;
   eth_ref(pat->constant.val = val);
+  return pat;
+}
+
+eth_ast_pattern*
+eth_ast_record_star_pattern()
+{
+  eth_ast_pattern *pat = malloc(sizeof(eth_ast_pattern));
+  pat->rc = 0;
+  pat->tag = ETH_AST_PATTERN_RECORD_STAR;
+  pat->recordstar.alias = NULL;
+  pat->recordstar.attr = NULL;
   return pat;
 }
 
@@ -105,16 +116,22 @@ eth_set_pattern_alias(eth_ast_pattern *pat, const char *alias)
 {
   switch (pat->tag)
   {
-    case ETH_PATTERN_UNPACK:
+    case ETH_AST_PATTERN_UNPACK:
       if (pat->unpack.alias)
         free(pat->unpack.alias);
       pat->unpack.alias = strdup(alias);
       break;
 
-    case ETH_PATTERN_RECORD:
+    case ETH_AST_PATTERN_RECORD:
       if (pat->record.alias)
         free(pat->record.alias);
       pat->record.alias = strdup(alias);
+      break;
+
+    case ETH_AST_PATTERN_RECORD_STAR:
+      if (pat->recordstar.alias)
+        free(pat->recordstar.alias);
+      pat->recordstar.alias = strdup(alias);
       break;
 
     default:
@@ -128,16 +145,16 @@ destroy_ast_pattern(eth_ast_pattern *pat)
 {
   switch (pat->tag)
   {
-    case ETH_PATTERN_DUMMY:
+    case ETH_AST_PATTERN_DUMMY:
       break;
 
-    case ETH_PATTERN_IDENT:
+    case ETH_AST_PATTERN_IDENT:
       if (pat->ident.attr)
         eth_unref_attr(pat->ident.attr);
       free(pat->ident.str);
       break;
 
-    case ETH_PATTERN_UNPACK:
+    case ETH_AST_PATTERN_UNPACK:
       for (int i = 0; i < pat->unpack.n; ++i)
       {
         free(pat->unpack.fields[i]);
@@ -149,11 +166,11 @@ destroy_ast_pattern(eth_ast_pattern *pat)
         free(pat->unpack.alias);
       break;
 
-    case ETH_PATTERN_CONSTANT:
+    case ETH_AST_PATTERN_CONSTANT:
       eth_unref(pat->constant.val);
       break;
 
-    case ETH_PATTERN_RECORD:
+    case ETH_AST_PATTERN_RECORD:
       for (int i = 0; i < pat->record.n; ++i)
       {
         free(pat->record.fields[i]);
@@ -163,6 +180,13 @@ destroy_ast_pattern(eth_ast_pattern *pat)
       free(pat->record.subpats);
       if (pat->record.alias)
         free(pat->record.alias);
+      break;
+
+    case ETH_AST_PATTERN_RECORD_STAR:
+      if (pat->recordstar.attr)
+        eth_unref_attr(pat->recordstar.attr);
+      if (pat->recordstar.alias)
+        free(pat->recordstar.alias);
       break;
   }
   free(pat);
@@ -331,6 +355,10 @@ destroy_ast_node(eth_ast *ast)
 
     case ETH_AST_DEFINED:
       free(ast->defined.ident);
+      break;
+
+    case ETH_AST_EVMAC:
+      eth_unref_ast(ast->evmac.expr);
       break;
 
     case ETH_AST_MULTIMATCH:
@@ -576,12 +604,12 @@ eth_ast_try(eth_ast_pattern *pat, eth_ast *try, eth_ast *catch, int likely)
   // to test for exit-object
   if (pat == NULL)
     pat = eth_ast_ident_pattern("");
-  else if (pat->tag == ETH_PATTERN_DUMMY)
+  else if (pat->tag == ETH_AST_PATTERN_DUMMY)
   {
     eth_drop_ast_pattern(pat);
     pat = eth_ast_ident_pattern("");
   }
-  bool check_exit = eth_is_wildcard(pat->tag);
+  bool check_exit = eth_is_wildcard((int)pat->tag);
 
   // use exception-pattern so that user is actually matching with `what'
   char *what = "what";
@@ -644,6 +672,14 @@ eth_ast_defined(const char *ident)
 {
   eth_ast *ast = create_ast_node(ETH_AST_DEFINED);
   ast->defined.ident = strdup(ident);
+  return ast;
+}
+
+eth_ast*
+eth_ast_evmac(eth_ast *expr)
+{
+  eth_ast *ast = create_ast_node(ETH_AST_EVMAC);
+  eth_ref_ast(ast->evmac.expr = expr);
   return ast;
 }
 

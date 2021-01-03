@@ -465,7 +465,7 @@ FnAtom
       $$ = eth_ast_apply(map, p, 2);
     }
   }
-
+  | '@' '(' StmtSeq ')' { $$ = eth_ast_evmac($3); LOC($$, @$); }
 ;
 
 Atom
@@ -1017,7 +1017,7 @@ Bind
     $$.val = $4;
     if ($3)
     {
-      if ($1->tag == ETH_PATTERN_IDENT)
+      if ($1->tag == ETH_AST_PATTERN_IDENT)
       {
         eth_set_help($1->ident.attr, $3);
         free($3);
@@ -1187,6 +1187,13 @@ AtomicPattern
     cod_vec_iter($2.keys, i, x, free(x));
     cod_vec_destroy($2.keys);
     cod_vec_destroy($2.vals);
+  }
+  | '{' Attribute '*' '}' {
+    $$ = eth_ast_record_star_pattern();
+    eth_attr *attr = eth_create_attr($2);
+    if (g_filename)
+      eth_set_location(attr, location(&@$));
+    eth_ref_attr($$->recordstar.attr = attr);
   }
   | '[' PatternList MaybeComaDots ']' {
     int n = $2.len;

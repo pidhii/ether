@@ -606,6 +606,7 @@ __deprecated { return DEPRECATED; }
 "."[[:space:]]*"(" { return DOT_OPEN1; }
 "."[[:space:]]*"[" { return DOT_OPEN2; }
 
+"@"     |
 "="     |
 "|"     |
 "_"     |

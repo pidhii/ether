@@ -22,24 +22,30 @@ set_pub(eth_ast_pattern *pat)
 {
   switch (pat->tag)
   {
-    case ETH_PATTERN_DUMMY:
-    case ETH_PATTERN_CONSTANT:
+    case ETH_AST_PATTERN_DUMMY:
+    case ETH_AST_PATTERN_CONSTANT:
       break;
 
-    case ETH_PATTERN_IDENT:
+    case ETH_AST_PATTERN_IDENT:
       if (not pat->ident.attr)
         eth_ref_attr(pat->ident.attr = eth_create_attr(0));
       pat->ident.attr->flag |= ETH_ATTR_PUB;
       break;
 
-    case ETH_PATTERN_UNPACK:
+    case ETH_AST_PATTERN_UNPACK:
       for (int i = 0; i < pat->unpack.n; ++i)
         set_pub(pat->unpack.subpats[i]);
       break;
 
-    case ETH_PATTERN_RECORD:
+    case ETH_AST_PATTERN_RECORD:
       for (int i = 0; i < pat->record.n; ++i)
         set_pub(pat->record.subpats[i]);
+      break;
+
+    case ETH_AST_PATTERN_RECORD_STAR:
+      if (not pat->recordstar.attr)
+        eth_ref_attr(pat->recordstar.attr = eth_create_attr(0));
+      pat->recordstar.attr->flag |= ETH_ATTR_PUB;
       break;
   }
 }

@@ -403,10 +403,10 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
 {
   switch (pat->tag)
   {
-    case ETH_PATTERN_DUMMY:
+    case ETH_AST_PATTERN_DUMMY:
       return eth_ir_dummy_pattern();
 
-    case ETH_PATTERN_IDENT:
+    case ETH_AST_PATTERN_IDENT:
     {
       int varid = new_vid(bldr);
 
@@ -426,7 +426,7 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
       return eth_ir_ident_pattern(varid);
     }
 
-    case ETH_PATTERN_UNPACK:
+    case ETH_AST_PATTERN_UNPACK:
     {
       eth_type *type = pat->unpack.type;
 
@@ -455,10 +455,10 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
       return eth_ir_unpack_pattern(alias, type, offs, pats, n);
     }
 
-    case ETH_PATTERN_CONSTANT:
+    case ETH_AST_PATTERN_CONSTANT:
       return eth_ir_constant_pattern(pat->constant.val);
 
-    case ETH_PATTERN_RECORD:
+    case ETH_AST_PATTERN_RECORD:
     {
       // aliasing:
       int alias = new_vid(bldr);
@@ -492,6 +492,12 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
 
       return eth_ir_record_pattern(alias, ids, pats, n);
     }
+
+    case ETH_AST_PATTERN_RECORD_STAR:
+      eth_error("wild record, {*}, is not allowed in this context");
+      *e = 1;
+      eth_print_location(loc, stderr);
+      return eth_ir_ident_pattern(-1); // just some dummy
   }
 
   eth_error("wtf");
@@ -509,6 +515,62 @@ build_with_toplvl(ir_builder *bldr, eth_ast *ast, int *e, bool savetop)
   return ret;
 }
 
+static eth_ir_pattern*
+build_record_star(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc,
+    eth_ir_node *expr, int *e)
+{
+  if (expr->tag != ETH_IR_CVAL)
+  {
+    eth_error("wild record is only allowed with constant expressions");
+    eth_print_location(loc, stderr);
+    *e = 1;
+    return NULL;
+  }
+
+  eth_t record = expr->cval.val;
+  if (not eth_is_record(record->type))
+  {
+    eth_error("target expression is not a record");
+    eth_print_location(loc, stderr);
+    *e = 1;
+    return NULL;
+  }
+
+  int n = eth_record_size(record->type);
+  size_t ids[n];
+  eth_ir_pattern *idpats[n];
+  for (int i = n - 1; i >= 0; --i)
+  {
+    const char *key = record->type->fields[i].name;
+    eth_t val = eth_tup_get(record, i);
+
+    int varid = new_vid(bldr);
+
+    // set up attribute
+    eth_attr *attr = NULL;
+    if (pat->recordstar.attr)
+    {
+      // handle PUB
+      attr = pat->recordstar.attr;
+      if (pat->recordstar.attr->flag & ETH_ATTR_PUB)
+        trace_pub_var(bldr, key, varid, attr, loc, e);
+      /*else*/
+      /*eth_drop_attr(attr);*/
+    }
+    eth_prepend_var(bldr->vars, eth_const_var(key, val, attr));
+    ids[i] = eth_get_symbol_id(eth_sym(key));
+    idpats[i] = eth_ir_ident_pattern(varid);
+  }
+
+  int alias = new_vid(bldr);
+  if (pat->recordstar.alias)
+  {
+    eth_prepend_var(bldr->vars,
+        eth_const_var(pat->recordstar.alias, record, NULL));
+  }
+  return eth_ir_record_pattern(alias, ids, idpats, n);
+}
+
 // TODO: flag as likely
 static eth_ir_node*
 build_let(ir_builder *bldr, int idx, const eth_ast *ast,
@@ -516,19 +578,41 @@ build_let(ir_builder *bldr, int idx, const eth_ast *ast,
 {
   if (idx < ast->let.n)
   {
-    eth_ir_pattern *pat = build_pattern(bldr, ast->let.pats[idx], ast->loc, e);
+    if (ast->let.pats[idx]->tag == ETH_AST_PATTERN_RECORD_STAR)
+    {
+      eth_ir_pattern *pat =
+        build_record_star(bldr, ast->let.pats[idx], ast->loc, vals[idx], e);
+      if (pat == NULL)
+      {
+        eth_drop_ir_node(vals[idx]);
+        return eth_ir_seq(eth_ir_error(),
+            build_let(bldr, idx + 1, ast, vals, nvars0, e));
+      }
+      /*eth_drop_ir_node(vals[idx]);*/
+      eth_ir_node *thenbr = build_let(bldr, idx + 1, ast, vals, nvars0, e);
+      eth_ir_node *elsebr = eth_ir_cval(eth_nil);
+      eth_ir_node *ret = eth_ir_match(pat, vals[idx], thenbr, elsebr);
+      eth_set_ir_location(ret, ast->loc);
+      ret->match.toplvl =
+        bldr->istoplvl ? ETH_TOPLVL_THEN : ETH_TOPLVL_NONE;
+      return ret;
+    }
+    else
+    {
+      eth_ir_pattern *pat = build_pattern(bldr, ast->let.pats[idx], ast->loc, e);
 
-    eth_ir_node *thenbr = build_let(bldr, idx + 1, ast, vals, nvars0, e);
+      eth_ir_node *thenbr = build_let(bldr, idx + 1, ast, vals, nvars0, e);
 
-    eth_t exn = eth_exn(eth_type_error());
-    eth_ir_node *elsebr = eth_ir_throw(eth_ir_cval(exn));
-    eth_set_ir_location(elsebr, ast->let.vals[idx]->loc);
+      eth_t exn = eth_exn(eth_type_error());
+      eth_ir_node *elsebr = eth_ir_throw(eth_ir_cval(exn));
+      eth_set_ir_location(elsebr, ast->let.vals[idx]->loc);
 
-    eth_ir_node *ret = eth_ir_match(pat, vals[idx], thenbr, elsebr);
-    eth_set_ir_location(ret, ast->loc);
-    ret->match.toplvl =
-      bldr->istoplvl ? ETH_TOPLVL_THEN : ETH_TOPLVL_NONE;
-    return ret;
+      eth_ir_node *ret = eth_ir_match(pat, vals[idx], thenbr, elsebr);
+      eth_set_ir_location(ret, ast->loc);
+      ret->match.toplvl =
+        bldr->istoplvl ? ETH_TOPLVL_THEN : ETH_TOPLVL_NONE;
+      return ret;
+    }
   }
   else
   {
@@ -1245,6 +1329,38 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
     case ETH_AST_DEFINED:
     {
       return eth_ir_cval(eth_boolean(find_var_deep(bldr, ast->defined.ident)));
+    }
+
+    case ETH_AST_EVMAC:
+    {
+      char name[256];
+      sprintf(name, "<mac%d>", bldr->immcnt++);
+
+      eth_module *mod = eth_create_module(name, bldr->mod, NULL);
+      eth_env *env =
+        bldr->mod ? eth_get_env(bldr->mod) : eth_get_root_env(bldr->root);
+      eth_t ret;
+      if (not eth_load_module_from_ast2(bldr->root, env, mod, ast->evmac.expr,
+            &ret, bldr->gvars))
+      {
+        eth_error("failed to evaluate macros");
+        eth_destroy_module(mod);
+        *e = 1;
+        eth_print_location(ast->loc, stderr);
+        return eth_ir_error();
+      }
+
+      if (eth_is_exn(ret))
+      {
+        eth_error("exception thrown during evaluation of macros (~w)", ret);
+        eth_drop(ret);
+        eth_destroy_module(mod);
+        *e = 1;
+        eth_print_location(ast->loc, stderr);
+        return eth_ir_error();
+      }
+
+      return eth_ir_cval(ret);
     }
   }
 
