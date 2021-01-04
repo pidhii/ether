@@ -2,7 +2,7 @@
 
 open IO
 open String (chomp, split, match, to_number)
-open List (map, rev_filter_map, sort)
+open List
 
 
 module Logging =
@@ -23,8 +23,6 @@ open Logging
 
 
 module Utl =
-  open Logging
-
   -- Get direcory containing modules
   let pub module_path =
     let pipe = open_pipe_in "ether --prefix"
@@ -143,8 +141,8 @@ module Algo =
             let dist1, mem = distance (i-1) j mem
             let dist2, mem = distance i (j-1) mem
             let dist3, mem = distance (i-1) (j-1) mem
-            --(List.reduce_left min [dist1 + 1, dist2 + 1, dist3 + ind i j], mem) -- original
-            (List.reduce_left min [dist1, dist2, dist3 + ind i j - 1], mem) -- mine
+            --(reduce_left min [dist1 + 1, dist2 + 1, dist3 + ind i j], mem) -- original
+            (reduce_left min [dist1, dist2, dist3 + ind i j - 1], mem) -- mine
           (dist, setmem i j dist mem)
 
     -- Compute distance.
@@ -152,9 +150,7 @@ module Algo =
 
 
 module DB =
-  open Utl
   using String as S
-  using List as L
 
   let pub default_path = module_path ++ "/__db.eth"
 
@@ -163,10 +159,10 @@ module DB =
     { db = (first $ load path) if exist? path else []
     , path
     , get_module_opt = {db} name ->
-        L.find_opt ({name = name'} -> S.casecmp name name' == 0) db
+        find_opt ({name = name'} -> S.casecmp name name' == 0) db
     , remove = fn ({db} as self) name ->
         {self with
-          db = L.remove ({name = name'} -> S.casecmp name' name == 0) db
+          db = remove ({name = name'} -> S.casecmp name' name == 0) db
         }
     , add = fn ({db} as self) entry ->
         {self with db = entry :: db}
@@ -177,7 +173,6 @@ module DB =
 
 module Git =
   open IO
-  open Utl
   using String as Str
 
   let pub repository? url =
@@ -192,15 +187,15 @@ module Git =
     else
       refs
       |> Str.split \\n/
-      |> List.map $ line ->
+      |> map $ line ->
           let [_, tag] = Str.match \refs\/tags\/(.+)/ line in tag
       -- Decode version-tags into major, minor and a patch.
-      |> List.rev_filter_map $ tag ->
+      |> rev_filter_map $ tag ->
         if let [_, major, minor, patch] = Str.match \([0-9]+)\.([0-9]+)\.([0-9]+)/ tag then
-          (tag, List.map Str.to_number [major, minor, patch])
+          (tag, map Str.to_number [major, minor, patch])
         else raise Filter_out
       -- Sort versions.
-      |> List.sort $ (_, a) (_, b) ->
+      |> sort $ (_, a) (_, b) ->
         let rec loop xs ys =
           if let x :: xs' = xs then
             if let y :: ys' = ys then
@@ -209,7 +204,7 @@ module Git =
             else true
           else true
         loop a b
-      |> List.map first
+      |> map first
 
   let pub head_commit url =
     require_network! unless exist? url
@@ -243,9 +238,8 @@ module GitHub =
       IO.shell "curl -s 'https://api.github.com/search/repositories?q={tgt_name}'"
       |> Json.parse
 
-    let total_count = List.assoc "total_count" ans
+    let total_count = assoc "total_count" ans
 
-    open List
     assoc "items" ans
     -- Build items into more practical structure.
     |> map $ repo ->
@@ -259,10 +253,7 @@ module GitHub =
 
 
 module ModuleInfo =
-  open Logging
-
   using String as S
-  using List as L
 
   let pub load_config dir args =
     let _, conf =
@@ -272,11 +263,11 @@ module ModuleInfo =
       with _ ->
         error "failed to load install-script"
         raise Failure
-    { name = L.assoc "name" conf
-    , files = L.assoc "files" conf or []
-    , main = L.assoc "main" conf
-    , build = L.assoc_opt "build" conf
-    , post_install = L.assoc_opt "post_install" conf
+    { name = assoc "name" conf
+    , files = assoc "files" conf or []
+    , main = assoc "main" conf
+    , build = assoc_opt "build" conf
+    , post_install = assoc_opt "post_install" conf
     }
 
 
@@ -291,10 +282,6 @@ module DBEntry =
 
 
 module Install =
-  open Logging
-  open Utl
-
-  using List as L
   using String as S
 
   let pub build_and_install {conf, modentry, db, dir, args, owerwrite} =
@@ -318,7 +305,7 @@ module Install =
     let moddir = module_path ++ "/" ++ name
     mkdir moddir
     -- Copy module sources
-    main::files |> L.iter $ file ->
+    main::files |> iter $ file ->
       copy (dir ++ "/" ++ file) (moddir ++ "/" ++ file)
 
     info "module is ready for use"
@@ -357,8 +344,6 @@ module Install =
 
 
 module Update =
-  open Utl
-
   let pub check_update {name, local_version, repo_url} =
     require_network! unless exist? repo_url
     let remote_versions = Git.list_versions repo_url
@@ -408,11 +393,11 @@ let list_modules! =
       let { name } = modentry
       info "module \e[1m{name}\e[21m:"
       list modentry
-      |> List.filter $ (k, _) -> k not eq "name"
-      |> List.iter $ (k, v) ->
+      |> filter $ (k, _) -> k not eq "name"
+      |> iter $ (k, v) ->
         info "- \e[4m{k}\e[24m: {v}"
       false
-    List.fold_left f true db
+    fold_left f true db
 
 
 let basename path =
@@ -505,7 +490,7 @@ let sub_command = { keys = [], handle = _ -> die "wtf" }
 
 
 --------------------------------- Main -----------------------------------------
-when List.len command_line < 2 then
+when len command_line < 2 then
   help!
   exit 1
 
@@ -524,8 +509,8 @@ let commands =
           ]
         let opts, _ = CmdArg.get options command_line
 
-        if List.assoc_opt "help" opts then help_help!
-        else if List.assoc_opt "dev" opts then help_dev!
+        if assoc_opt "help" opts then help_help!
+        else if assoc_opt "dev" opts then help_dev!
         else help!
     },
     {
@@ -543,7 +528,7 @@ let commands =
           ]
         let opts, args = CmdArg.get options command_line
 
-        if List.assoc_opt "help" opts then
+        if assoc_opt "help" opts then
           install_help!
         else
           -- - - - - - - - - - - - - - - - - - - - --
@@ -573,7 +558,7 @@ let commands =
                     info "multiple repositories match the name, select one to install:"
                     do_in_tempdir $ fn ->
                       let tmp = open_out "list"
-                      github_matches |> List.iter $ github_repo ->
+                      github_matches |> iter $ github_repo ->
                         write_to tmp github_repo.full_name
 
                       let ans = shell {sh|
@@ -583,7 +568,7 @@ let commands =
                       |sh}
                       if ans eq "" || ans eq "Cancel"
                       then info "exiting then"; exit 0
-                      else (List.find (x -> x:full_name eq ans) github_matches).clone_url
+                      else (find (x -> x:full_name eq ans) github_matches).clone_url
 
             -- Figure out a version of the module to use. If version-tags
             -- available will install the latest version. Otherwize, use latest
@@ -629,7 +614,7 @@ let commands =
           ]
         let opts, args = CmdArg.get options command_line
 
-        if List.assoc_opt "help" opts then
+        if assoc_opt "help" opts then
           die "unimplemented"
         else
           let [modname] = args
@@ -641,7 +626,7 @@ let commands =
         require_network!
         let { db } = DB.(load default_path)
         let cnt =
-          List.fold_left (cnt { name, version = local_version, repository = repo_url } ->
+          fold_left (cnt { name, version = local_version, repository = repo_url } ->
             IO.write_to stdout $ paint " checking \e[1m{name}\e[22m ... "
             IO.flush stdout
             if let {info_mesg} = Update.check_update {name, local_version, repo_url}
@@ -658,14 +643,19 @@ let commands =
           { name = "h", val = "help", has_arg = false },
         ]
         let opts, args = CmdArg.get options command_line
-        if List.assoc_opt "help" opts then
+        if assoc_opt "help" opts then
           die "unimplemented"
         else if args eq [] then
           -- Update all modules.
-          DB.(load default_path).db |> List.iter $ {
+          DB.(load default_path).db |> iter $ {
             name, version = local_version, repository = repo_url
           } ->
-            when let {new_version} = Update.check_update {name, local_version, repo_url} then
+            IO.write_to stdout $ paint " checking \e[1m{name}\e[22m ... "
+            IO.flush stdout
+            if let {new_version, info_mesg} =
+              Update.check_update {name, local_version, repo_url}
+            then
+              write_to stdout "\e[2K\r"; info info_mesg
               -- Install
               let db = DB.(load default_path)
               let modentry = Install.install {
@@ -674,6 +664,7 @@ let commands =
               -- Update registry
               info "updating registry"
               ((db:remove name):add modentry):update
+            else write_to stdout "\e[2K\r"
         else
           let name::args = args
           let db = DB.(load default_path)
@@ -691,7 +682,7 @@ let commands =
               }
               -- Update registry
               info "updating registry"
-              ((db:remove name):add modentry):update
+              db:(remove name):(add modentry):update
             else
               info "already using the latest version of '{name}'"
           else
@@ -700,7 +691,7 @@ let commands =
   ]
 
 let find_command_opt name =
-  List.find_opt ({ keys } -> List.member? name keys) commands
+  find_opt ({ keys } -> member? name keys) commands
 
 let main! =
   if let Some { handle } = find_command_opt cmd then
@@ -708,11 +699,11 @@ let main! =
   else
     error "undefined command: '{cmd}'"
 
-    let possible_commands = List.flat_map ({ keys } -> keys) commands
+    let possible_commands = flat_map ({ keys } -> keys) commands
     let cands =
       possible_commands
-      |> List.rev_map $ str -> (str, Algo.fuzzy_cmp str cmd)
-      |> List.sort $ (_, a) (_, b) -> a < b
+      |> rev_map $ str -> (str, Algo.fuzzy_cmp str cmd)
+      |> sort $ (_, a) (_, b) -> a < b
     info "did you mean '\e[1m{first $ car cands}\e[22m'?"
 
     info "see `{basename dopepath} help` for avaliable commands"

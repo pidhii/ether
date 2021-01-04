@@ -34,6 +34,7 @@ let string_tests =
 
     ("chomp", fn -> chomp "asd\n\n" eq "asd" && chomp "asd" eq "asd"),
     ("chop", fn -> chop "asd" eq "as" && chop "" eq ""),
+    ("trim", fn -> trim "\t\n\v asdf \v\t\n " eq "asdf" && trim "" eq ""),
 
     ("sub", fn ->
       let str = "Hello World!"

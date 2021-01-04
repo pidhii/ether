@@ -426,7 +426,17 @@ FnAtom
   | FnAtom ':' SYMBOL {
     eth_ast *access = eth_ast_access($1, $3);
     $$ = eth_ast_apply(access, &$1, 1);
+    LOC($$, @$);
     free($3);
+  }
+
+  | FnAtom ':' '(' SYMBOL Args ')' {
+    eth_ast *access = eth_ast_access($1, $4);
+    cod_vec_insert($5, $1, 0);
+    $$ = eth_ast_apply(access, $5.data, $5.len);
+    LOC($$, @$);
+    free($4);
+    cod_vec_destroy($5);
   }
 
   | '[' Expr DDOT Expr ']' %prec LIST_DDOT {

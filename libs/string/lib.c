@@ -311,6 +311,55 @@ _chop(void)
 }
 
 static eth_t
+_trim_left(void)
+{
+  eth_t x = *eth_sp++;
+  if (eth_unlikely(not eth_is_str(x)))
+  {
+    eth_drop(x);
+    return eth_exn(eth_type_error());
+  }
+  char *p = eth_str_cstr(x);
+  while (*p and isspace(*p)) ++p;
+
+  if (p == eth_str_cstr(x))
+    return x;
+
+  int nwlen = eth_str_len(x) - (p - eth_str_cstr(x));
+  if (x->rc == 0)
+  {
+    memmove(eth_str_cstr(x), p, nwlen + 1);
+    ETH_STRING(x)->len = nwlen;
+    return x;
+  }
+  else
+    return eth_create_string2(p, nwlen);
+}
+
+static eth_t
+_trim_right(void)
+{
+  eth_t x = *eth_sp++;
+  if (eth_unlikely(not eth_is_str(x)))
+  {
+    eth_drop(x);
+    return eth_exn(eth_type_error());
+  }
+  int len = eth_str_len(x);
+  if (len == 0) return x;
+  char *str = eth_str_cstr(x);
+  while (len > 0 and isspace(str[len-1])) len -= 1;
+  if (x->rc == 0)
+  {
+    str[len] = '\0';
+    ETH_STRING(x)->len = len;
+    return x;
+  }
+  else
+    return eth_create_string2(eth_str_cstr(x), len);
+}
+
+static eth_t
 _chr(void)
 {
   eth_t x = *eth_sp++;
@@ -575,6 +624,8 @@ ether_module(eth_module *mod, eth_root *topenv)
   eth_define(mod, "cat", eth_create_proc(_cat, 1, NULL, NULL));
   eth_define(mod, "chomp", eth_create_proc(_chomp, 1, NULL, NULL));
   eth_define(mod, "chop", eth_create_proc(_chop, 1, NULL, NULL));
+  eth_define(mod, "trim_left", eth_create_proc(_trim_left, 1, NULL, NULL));
+  eth_define(mod, "trim_right", eth_create_proc(_trim_right, 1, NULL, NULL));
   eth_define(mod, "chr", eth_create_proc(_chr, 1, NULL, NULL));
   eth_define(mod, "ord", eth_create_proc(_ord, 1, NULL, NULL));
   // --

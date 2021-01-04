@@ -18,6 +18,9 @@
 -- Stripping:
 -- * chomp (C)
 -- * chop (C)
+-- * trim_left (C)
+-- * trim_right (C)
+-- * trim
 --
 -- Element access (C):
 -- * sub
@@ -77,6 +80,8 @@ let pub sub x s =
   else invalid_argument ()
 
 let pub get s i = __substr s i 1
+
+let pub trim s = trim_left $ trim_right s
 
 --------------------------------------------------------------------------------
 --                                Regexp
