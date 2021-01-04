@@ -555,7 +555,7 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
 
 nan                                 |
 inf                                 |
-0[xX][0-9a-fA-F][0-9a-fA-F_]*       |
+0[xX][0-9a-fA-F][0-9a-fA-F_]*(\.[0-9a-fA-F]+[pP][-+]?[0-9a-fA-F]+)? |
 [0-9][0-9_]*(\.[0-9][0-9_]*)?([eE][-+]?[0-9][0-9_]*)? {
   char buf[yyleng+1];
   int buflen = 0;

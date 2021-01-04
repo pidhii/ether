@@ -38,13 +38,13 @@ number_write(eth_type *type, eth_t x, FILE *out)
 
 #if ETH_NUMBER_TYPE == ETH_NUMBER_LONGDOUBLE
   long double i, f = modfl(val, &i);
-  fprintf(out, f == 0 ? "%.Lf" : "%Lf", val);
+  fprintf(out, f == 0 ? "%.Lf" : "%Lg", val);
 #elif ETH_NUMBER_TYPE == ETH_NUMBER_DOUBLE
   double i, f = modf(val, &i);
-  fprintf(out, f == 0 ? "%.f" : "%f", val);
+  fprintf(out, f == 0 ? "%.f" : "%g", val);
 #else
   float i, f = modff(val, &i);
-  fprintf(out, f == 0 ? "%.f" : "%f", val);
+  fprintf(out, f == 0 ? "%.f" : "%g", val);
 #endif
 }
 
