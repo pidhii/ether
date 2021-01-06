@@ -379,6 +379,13 @@ typedef struct eth_field eth_field;
 #define ETH_TFLAG_VARIANT (ETH_TFLAG_PLAIN | 1 << 3)
 /*#define ETH_TFLAG_OBJECT  (ETH_TFLAG_RECORD | 1 << 4)*/
 
+typedef eth_t (*eth_method_t)(void);
+
+struct eth_methods {
+  int nmethods;
+  eth_method_t methods[];
+};
+
 struct eth_type {
   char *name;
   void (*destroy)(eth_type *type, eth_t x);
@@ -471,7 +478,6 @@ eth_equal(eth_t x, eth_t y);
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                             OBJECT HEADER
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-#define ETH_MAGIC_NONE (-1)
 #define ETH_RC_MAX UINT32_MAX
 struct eth_header {
   eth_type *type;
@@ -1197,6 +1203,24 @@ eth_is_range(eth_t x)
       or x->type == eth_rangel_type
       or x->type == eth_ranger_type
   ;
+}
+
+static inline bool
+eth_is_rangelr(eth_t x)
+{
+  return x->type == eth_rangelr_type;
+}
+
+static inline bool
+eth_is_rangel(eth_t x)
+{
+  return x->type == eth_rangel_type;
+}
+
+static inline bool
+eth_is_ranger(eth_t x)
+{
+  return x->type == eth_ranger_type;
 }
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --

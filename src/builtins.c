@@ -848,6 +848,157 @@ _Lazy_create(void)
 }
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                                 index
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+static eth_t
+unpack_index(eth_t idx, int seqlen, int *k)
+{
+  eth_use_symbol(Range_error)
+
+  if (eth_unlikely(not eth_is_int(idx)))
+    return eth_exn(eth_type_error());
+
+  *k = eth_num_val(idx);
+  if (*k < 0)
+    *k = seqlen - *k;
+
+  if (eth_unlikely(*k >= seqlen))
+    return eth_exn(Range_error);
+
+  return NULL;
+}
+
+static eth_t
+unpack_range(eth_t idx, int seqlen, int *kl, int *kr)
+{
+  eth_use_symbol(Range_error);
+  if (eth_is_rangelr(idx))
+  {
+    eth_t l = ETH_RANGELR(idx)->l;
+    eth_t r = ETH_RANGELR(idx)->r;
+    if (eth_unlikely(not eth_is_int(l) or not eth_is_int(r)))
+      return eth_exn(eth_type_error());
+    *kl = eth_num_val(l);
+    *kr = eth_num_val(r);
+  }
+  else if (eth_is_rangel(idx))
+  {
+    eth_t l = ETH_RANGEL(idx)->l;
+    if (eth_unlikely(not eth_is_int(l)))
+      return eth_exn(eth_type_error());
+    *kl = eth_num_val(l);
+    *kr = seqlen - 1;
+  }
+  else if (eth_is_ranger(idx))
+  {
+    eth_t r = ETH_RANGER(idx)->r;
+    if (eth_unlikely(not eth_is_int(r)))
+      return eth_exn(eth_type_error());
+    *kl = 0;
+    *kr = seqlen - 1;
+  }
+
+  if (*kl < 0)
+    *kl = seqlen + *kl;
+  if (*kr < 0)
+    *kr = seqlen + *kr;
+
+  if (eth_unlikely(*kl >= seqlen or *kr >= seqlen))
+    return eth_exn(Range_error);
+
+  return NULL;
+}
+
+static eth_t
+_index_vector(eth_t vec, eth_t idx)
+{
+  eth_t exn;
+  if (eth_likely(eth_is_num(idx)))
+  {
+    int k;
+    if ((exn = unpack_index(idx, eth_vec_len(vec), &k)))
+      return exn;
+    return eth_vec_get(vec, k);
+  }
+  else if (eth_is_range(idx))
+  {
+    int kl, kr;
+    if ((exn = unpack_range(idx, eth_vec_len(vec), &kl, &kr)))
+      return exn;
+
+    eth_t ret = eth_create_vector();
+    if (kl <= kr)
+    {
+      for (int i = kl; i <= kr; ++i)
+        eth_push_mut(ret, eth_vec_get(vec, i));
+    }
+    else
+    {
+      for (int i = kl; i >= kr; --i)
+        eth_push_mut(ret, eth_vec_get(vec, i));
+    }
+    return ret;
+  }
+  else
+    return eth_exn(eth_type_error());
+}
+
+static eth_t
+_index_string(eth_t str, eth_t idx)
+{
+  eth_t exn;
+  if (eth_likely(eth_is_num(idx)))
+  {
+    int k;
+    if ((exn = unpack_index(idx, eth_str_len(str), &k)))
+      return exn;
+    return eth_create_string2(eth_str_cstr(str) + k, 1);
+  }
+  else if (eth_is_range(idx))
+  {
+    int kl, kr;
+    if ((exn = unpack_range(idx, eth_str_len(str), &kl, &kr)))
+      return exn;
+
+    if (kl <= kr)
+      return eth_create_string2(eth_str_cstr(str) + kl, kr - kl + 1);
+    else
+    {
+      int n = kl - kr + 1;
+      char *buf = malloc(n + 1);
+      for (int i = 0; i < n; ++i)
+        buf[n - i - 1] = eth_str_cstr(str)[kr + i];
+      buf[n] = '\0';
+      return eth_create_string_from_ptr2(buf, n);
+    }
+  }
+  else
+    return eth_exn(eth_type_error());
+}
+
+static eth_t
+_index(void)
+{
+
+  eth_t seq = *eth_sp++;
+  eth_t idx = *eth_sp++;
+
+  eth_t ret;
+  if (eth_is_vec(seq))
+    ret = _index_vector(seq, idx);
+  else if (eth_is_str(seq))
+    ret = _index_string(seq, idx);
+  else
+    ret = eth_exn(eth_type_error());
+
+  eth_ref(ret);
+  eth_drop_2(seq, idx);
+  eth_dec(ret);
+  return ret;
+}
+
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                 module
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 /*
@@ -891,6 +1042,7 @@ _eth_init_builtins(void)
   eth_define(g_mod,    "vector?", eth_create_proc(  _vector_p, 1, NULL, NULL));
   // ---
   eth_define(g_mod,       "list", eth_create_proc(      _list, 1, NULL, NULL));
+  eth_define(g_mod,    "__index", eth_create_proc(     _index, 2, NULL, NULL));
   // ---
   eth_define(g_mod,       "dump", eth_create_proc(      _dump, 1, NULL, NULL));
   // ---
