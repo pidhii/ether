@@ -141,7 +141,7 @@ OPERATOR {OPCHR}+|mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|eq|not|lnot
    */
   cod_vec_push(primtoks, PIPE);
 
-  int newindent = yyleng - 2;
+  int newindent = yyleng - (yytext[yyleng-1] == '>' ? 2 : 1);
 
   /* Drop preceding indent-levels */
   int diff = curindent - newindent;
