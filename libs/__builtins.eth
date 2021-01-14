@@ -59,9 +59,9 @@ let pub curry f = fn x y -> f (x, y)
 let pub uncurry f = fn (x, y) -> f x y
 
 -- Sequences
-let pub index seq idx =
-  if let {__methods={index}} = seq then index seq idx
-  else __index seq idx
+--let pub index seq idx =
+  --if let {__methods={index}} = seq then index seq idx
+  --else __index seq idx
 
 -- Math
 let pub even? x = x mod 2 == 0

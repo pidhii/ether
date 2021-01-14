@@ -57,6 +57,8 @@
 -- * insert
 -- * find
 -- * find_opt
+-- * index
+-- * index_opt
 -- * maximum (no)
 -- * minimum (no)
 -- * partition
@@ -325,6 +327,18 @@ let rec pub find_opt p xs =
 
 let pub find p xs =
   if let Some x = find_opt p xs then x
+  else failure ()
+
+let pub index_opt p xs =
+  let rec loop i xs =
+    if let x::xs = xs then
+      if p x then Some i
+      else loop (i+1) xs
+    else false
+  loop 0 xs
+
+let pub index p xs =
+  if let Some i = index_opt p xs then i
   else failure ()
 
 --let rec pub maximum cmp xs =

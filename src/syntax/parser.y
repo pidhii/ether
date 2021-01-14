@@ -444,7 +444,8 @@ FnAtom
     eth_ast *range = eth_ast_cval(eth_get_builtin("__inclusive_range"));
     $$ = eth_ast_apply(range, p, 2);
   }
-  | '[' Expr '|' LcAux ']' {
+  | '[' Expr WITH LcAux ']' {
+  /*| '[' Expr '|' LcAux ']' {*/
     eth_ast_pattern *fnargs[] = { $4.in.pat };
     // ---
     eth_ast *fn;

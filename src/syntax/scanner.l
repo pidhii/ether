@@ -134,7 +134,7 @@ OPERATOR {OPCHR}+|mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|eq|not|lnot
 <COMMENT>.
 <COMMENT>\n
 
-<INDENT>^" "*"|>" {
+<INDENT>^" "*("|>"|"|") {
   /*
    * 1. Close all preceding blocks up to `|>`-indentation.
    * 2. Return to INITIAL-state.
@@ -176,7 +176,7 @@ OPERATOR {OPCHR}+|mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|eq|not|lnot
   PREV_STATE();
   return cod_vec_pop(primtoks);
 }
-"|>" return PIPE;
+"|"|"|>" return PIPE;
 
 
 <INDENT>^" "*/[^[:space:]] {
@@ -608,7 +608,6 @@ __deprecated { return DEPRECATED; }
 
 "@"     |
 "="     |
-"|"     |
 "_"     |
 "^"     |
 "."     |
