@@ -38,7 +38,7 @@ install (FILES ${VECTOR_SRC_DIR}/lib.eth DESTINATION ${VECTOR_DST_DIR})
 
 # JSON
 if (ENABLE_JSON)
-  pkg_check_modules (JSON REQUIRED json-c)
+  pkg_check_modules (JSON json-c)
   if (JSON_FOUND)
     set (JSON_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/json)
     set (JSON_DST_DIR lib/ether/json)
@@ -151,7 +151,7 @@ install (FILES ${CURSES_SRC_DIR}/lib.eth DESTINATION ${CURSES_DST_DIR})
 
 # Gtk
 if (ENABLE_GTK)
-  pkg_check_modules (GTK3 REQUIRED gtk+-3.0)
+  pkg_check_modules (GTK3 gtk+-3.0)
   if (GTK3_FOUND)
     set (GTK_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/gtk)
     set (GTK_DST_DIR lib/ether/gtk)
