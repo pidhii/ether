@@ -120,11 +120,11 @@ module Algo =
     let lena = String.len a
     let lenb = String.len b
     let mem = Vector.init (lena * lenb) (const false)
-    let getmem i j = Vector.get (i-1 + lena * (j-1))
+    let getmem i j mem = Vector.get mem (i-1 + lena * (j-1))
     let setmem i j x mem = Vector.insert mem (i-1 + lena * (j-1)) x
 
     -- Indicator function.
-    let ind i j = 0 if String.(get (i-1) a eq get (j-1) b) else 1
+    let ind i j = 0 if String.(get a (i-1) eq get b (j-1)) else 1
 
     -- Levenshtein distance function.
     let rec distance i j mem =
