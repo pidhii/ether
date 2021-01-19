@@ -58,6 +58,7 @@ if (ENABLE_JSON)
   if (FALSE)
     build_json_module("${JSON_INCLUDE_DIRS}" "${JSON_LIBRARY_DIRS}" "${JSON_LIBRARIES}")
   elseif (NOT "${ExternalProject_FOUND}" STREQUAL "NOTFOUND")
+    message (STATUS "Library json-c will be built manually")
     set (THIRD "${CMAKE_BINARY_DIR}/3rd")
     set (JSON_C_INSTALL "${THIRD}/json-c-install")
     ExternalProject_Add(json-c
@@ -67,12 +68,15 @@ if (ENABLE_JSON)
       GIT_PROGRESS TRUE
       CONFIGURE_COMMAND
         ${CMAKE_COMMAND} -DCMAKE_INSTALL_PREFIX=${JSON_C_INSTALL}
+                         -DCMAKE_INSTALL_LIBDIR=${JSON_C_INSTALL}/lib
                          -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
                          -S${THIRD}/src/json-c
                          -B${THIRD}/src/json-c-build
       BUILD_COMMAND make -C ${THIRD}/src/json-c-build install)
     add_library (json-c-lib STATIC IMPORTED GLOBAL)
     file (MAKE_DIRECTORY "${JSON_C_INSTALL}")
+    file (MAKE_DIRECTORY "${JSON_C_INSTALL}/lib")
+    file (MAKE_DIRECTORY "${JSON_C_INSTALL}/include")
     set_target_properties (json-c-lib
       PROPERTIES
         IMPORTED_LOCATION "${JSON_C_INSTALL}/lib/libjson-c.a"
