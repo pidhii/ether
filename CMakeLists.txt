@@ -3,6 +3,8 @@ project (ether VERSION 0.3.2)
 enable_language (C)
 
 include (CheckIncludeFile REQUIRED)
+include (ExternalProject OPTIONAL RESULT_VARIABLE ExternalProject_FOUND)
+
 find_package (BISON REQUIRED)
 find_package (FLEX REQUIRED)
 find_package (PkgConfig REQUIRED)
