@@ -37,40 +37,49 @@ install (TARGETS vector DESTINATION ${VECTOR_DST_DIR})
 install (FILES ${VECTOR_SRC_DIR}/lib.eth DESTINATION ${VECTOR_DST_DIR})
 
 # JSON
-function(build_json_module json_include_dirs json_library_dirs json_libraries dependencies)
+function(build_json_module include_dirs library_dirs libraries)
   set (JSON_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/json)
   set (JSON_DST_DIR lib/ether/json)
   add_library (json SHARED ${JSON_SRC_DIR}/lib.c)
-  if (NOT "${dependencies}" STREQUAL "")
-    add_dependencies (json ${dependencies})
-  endif ()
   set_target_properties (json
     PROPERTIES
     POSITION_INDEPENDENT_CODE ON
     PREFIX ""
     OUTPUT_NAME "json")
-  target_include_directories (json PRIVATE ${json_include_dirs})
-  target_link_directories (json PRIVATE ${json_library_dirs})
-  target_link_libraries (json PRIVATE ${json_libraries})
+  target_include_directories (json PRIVATE ${include_dirs})
+  target_link_directories (json PRIVATE ${library_dirs})
+  target_link_libraries (json PRIVATE ${libraries})
   install (TARGETS json DESTINATION ${JSON_DST_DIR})
 endfunction()
 # --
 if (ENABLE_JSON)
   pkg_check_modules (JSON json-c)
-  if (JSON_FOUND)
-    build_json_module("${JSON_INCLUDE_DIRS}" "${JSON_LIBRARY_DIRS}" "${JSON_LIBRARIES}" "")
+  #if (JSON_FOUND)
+  if (FALSE)
+    build_json_module("${JSON_INCLUDE_DIRS}" "${JSON_LIBRARY_DIRS}" "${JSON_LIBRARIES}")
   elseif (NOT "${ExternalProject_FOUND}" STREQUAL "NOTFOUND")
     set (THIRD "${CMAKE_BINARY_DIR}/3rd")
+    set (JSON_C_INSTALL "${THIRD}/json-c-install")
     ExternalProject_Add(json-c
       PREFIX "${THIRD}"
+      INSTALL_DIR "${JSON_C_INSTALL}"
       GIT_REPOSITORY "https://github.com/json-c/json-c.git"
       GIT_PROGRESS TRUE
-      CONFIGURE_COMMAND ${CMAKE_COMMAND} -DCMAKE_INSTALL_PREFIX=${THIRD} -S${THIRD}/src/json-c -B${THIRD}/src/json-c-build -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      CONFIGURE_COMMAND
+        ${CMAKE_COMMAND} -DCMAKE_INSTALL_PREFIX=${JSON_C_INSTALL}
+                         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+                         -S${THIRD}/src/json-c
+                         -B${THIRD}/src/json-c-build
       BUILD_COMMAND make -C ${THIRD}/src/json-c-build install)
-    file (GLOB JSON_LIBRARIES "${THIRD}/lib/*.a")
-    build_json_module("${THIRD}/include" "${THIRD}/lib" "${JSON_LIBRARIES}" "json-c")
+    add_library (json-c-lib STATIC IMPORTED GLOBAL)
+    file (MAKE_DIRECTORY "${JSON_C_INSTALL}")
+    set_target_properties (json-c-lib
+      PROPERTIES
+        IMPORTED_LOCATION "${JSON_C_INSTALL}/lib/libjson-c.a"
+        INTERFACE_INCLUDE_DIRECTORIES "${JSON_C_INSTALL}/include")
+    add_dependencies(json-c-lib json-c)
+    build_json_module("${JSON_C_INSTALL}/include" "${JSON_C_INSTALL}/lib" "json-c-lib")
   else ()
-
     message (WARNING "Can't build Json-module.")
   endif ()
 endif (ENABLE_JSON)
