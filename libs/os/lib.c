@@ -66,9 +66,9 @@ _getenv(void)
   eth_t name = eth_arg2(args, eth_string_type);
   const char *val = getenv(eth_str_cstr(name));
   if (val)
-    return eth_str(val);
+    eth_return(args, eth_str(val));
   else
-    return eth_failure();
+    eth_throw(args, eth_failure());
 }
 
 static eth_t
