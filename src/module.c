@@ -18,6 +18,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 
 ETH_MODULE("ether:module")
@@ -35,6 +36,9 @@ struct eth_module {
   eth_def *defs;
   eth_env *env;
   cod_vec(closure) clos;
+
+  eth_root *memroot;
+  char *mempath;
 };
 
 eth_module*
@@ -47,6 +51,8 @@ eth_create_module(const char *name, const eth_module *parent, const char *dir)
   mod->defscap = 0x10;
   mod->defs = malloc(sizeof(eth_def) * mod->defscap);
   mod->env = eth_create_empty_env();
+  mod->memroot = NULL;
+  mod->mempath = NULL;
   if (dir)
     eth_add_module_path(mod->env, dir);
   eth_set_env_parent(mod->env, mod);
@@ -57,6 +63,13 @@ eth_create_module(const char *name, const eth_module *parent, const char *dir)
 void
 eth_destroy_module(eth_module *mod)
 {
+  if (mod->mempath)
+  {
+    eth_debug("module '%s' was memorized, now forgeting it", mod->name);
+    eth_forget_path_module(mod->memroot, mod->mempath, mod);
+    free(mod->mempath);
+  }
+
   /*eth_debug("destroying module %s:", mod->name);*/
   free(mod->name);
   for (int i = 0; i < mod->ndefs; ++i)
@@ -102,6 +115,15 @@ eth_env*
 eth_get_env(const eth_module *mod)
 {
   return mod->env;
+}
+
+void
+_eth_mark_memorized_module(eth_module *mod, eth_root *root, const char *path)
+{
+  assert(mod->memroot == NULL);
+  assert(mod->mempath == NULL);
+  mod->memroot = root;
+  mod->mempath = strdup(path);
 }
 
 void

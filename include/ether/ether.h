@@ -146,29 +146,33 @@ eth_indent_log(void);
 void
 eth_dedent_log(void);
 
+#define eth_debug_enabled (eth_log_level <= ETH_LOG_DEBUG)
+#define eth_warnings_enabled (eth_log_level <= ETH_LOG_WARNING)
+#define eth_errors_enabled (eth_log_level <= ETH_LOG_ERROR)
+
 #define eth_debug(fmt, ...)                          \
   eth_log_aux(                                       \
       eth_log_level <= ETH_LOG_DEBUG,                \
       eth_this_module, __FILE__, __func__, __LINE__, \
-      "\e[7;1m", stderr, fmt, ##__VA_ARGS__)
+      "\e[7;1m", stderr, fmt, ##__VA_ARGS__, true)
 
 #define eth_warning(fmt, ...)                        \
   eth_log_aux(                                       \
       eth_log_level <= ETH_LOG_WARNING,              \
       eth_this_module, __FILE__, __func__, __LINE__, \
-      "\e[38;5;16;48;5;11;1m", stderr, fmt, ##__VA_ARGS__)
+      "\e[38;5;16;48;5;11;1m", stderr, fmt, ##__VA_ARGS__, true)
 
 #define eth_error(fmt, ...)                          \
   eth_log_aux(                                       \
       eth_log_level <= ETH_LOG_ERROR,                \
       eth_this_module, __FILE__, __func__, __LINE__, \
-      "\e[38;5;16;48;5;9;1m", stderr, fmt, ##__VA_ARGS__)
+      "\e[38;5;16;48;5;9;1m", stderr, fmt, ##__VA_ARGS__, true)
 
 #define eth_trace(fmt, ...)                          \
   eth_log_aux(                                       \
       true,                                          \
       eth_this_module, __FILE__, __func__, __LINE__, \
-      "\e[48;5;16;38;5;9;1m", stderr, fmt, ##__VA_ARGS__)
+      "\e[48;5;16;38;5;9;1m", stderr, fmt, ##__VA_ARGS__, true)
 
 #define eth_unimplemented()                             \
   do {                                                  \
@@ -1544,6 +1548,9 @@ eth_get_root_env(const eth_root *root);
 void
 eth_memorize_path_module(eth_root *root, const char *path,
     const eth_module *mod);
+
+void
+eth_forget_path_module(eth_root *root, const char *path, const eth_module *mod);
 
 /**
  * @brief Get memorized module located under given path.

@@ -105,7 +105,7 @@ pop_module(ir_builder *bldr)
 }
 
 static inline const eth_module*
-find_module(ir_builder *bldr, const char *name)
+find_visited_module(ir_builder *bldr, const char *name)
 {
   for (size_t i = 0; i < bldr->mods.len; ++i)
   {
@@ -114,7 +114,7 @@ find_module(ir_builder *bldr, const char *name)
   }
 
   if (bldr->parent)
-    return find_module(bldr->parent, name);
+    return find_visited_module(bldr->parent, name);
   else
     return NULL;
 }
@@ -189,8 +189,7 @@ get_env_parent_name(eth_env *env)
 static eth_module*
 require_module_aux(eth_root *root, eth_env *env, const char *name)
 {
-  eth_debug("require module '%s' from '%s'", name,
-      get_env_parent_name(env));
+  eth_debug("require module '%s' from '%s'", name, get_env_parent_name(env));
   eth_indent_log();
   eth_module *ret = eth_require_module(root, env, name);
   eth_dedent_log();
@@ -202,16 +201,16 @@ require_module_aux(eth_root *root, eth_env *env, const char *name)
 }
 
 static const eth_module*
-find_module_aux(ir_builder *bldr, const char *name)
+find_visited_module_aux(ir_builder *bldr, const char *name)
 {
-  eth_debug("check module '%s' in visited modules", name);
+  eth_debug("check module '%s' in visited modules... ", name, false);
   eth_indent_log();
-  const eth_module *ret = find_module(bldr, name);
+  const eth_module *ret = find_visited_module(bldr, name);
   eth_dedent_log();
-  if (ret)
-    eth_debug("module found \e[38;5;2;1m✓\e[0m");
-  else
-    eth_debug("module not found \e[38;5;1;1m✗\e[0m");
+  if (ret and eth_debug_enabled)
+    fprintf(stderr, "\e[38;5;2;1mfound\e[0m\n");
+  else if (eth_debug_enabled)
+    fprintf(stderr, "\e[38;5;1;1mnot found\e[0m\n");
   return ret;
 }
 
@@ -236,7 +235,7 @@ require_module(ir_builder *bldr, const char *name)
   const eth_module *topmod = NULL;
 
   /* Check modules already accessed by current builder. */
-  if ((topmod = find_module_aux(bldr, name)))
+  if ((topmod = find_visited_module_aux(bldr, topname)))
     goto found_old;
 
   /* Otherwize, search in modules from above. */
@@ -274,7 +273,7 @@ found_old:
   {
     /* resolve submodule (we already found the root) */
     const eth_module *mod =
-      require_module_aux(bldr->root, eth_get_env(topmod), name);
+      require_module_aux(bldr->root, eth_get_env(topmod), p + 1);
     if (not mod)
     {
       eth_warning("failed to resolve %s", name);
@@ -378,6 +377,8 @@ import_default(ir_builder *bldr, const eth_module *mod, const char *alias)
 static void
 import_unqualified(ir_builder *bldr, const eth_module *mod)
 {
+  eth_debug("import unqualified names from '%s'", eth_get_module_name(mod));
+
   // import vals
   int ndefs = eth_get_ndefs(mod);
   eth_def defs[ndefs];

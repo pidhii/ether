@@ -144,18 +144,44 @@ eth_add_exit_handle(eth_env *env, void (*cb)(void*), void *data)
 bool
 eth_resolve_path(eth_env *env, const char *path, char *fullpath)
 {
-  eth_debug("resolving path \"%s\"", path);
+  eth_debug("resolving (relative) path \"%s\": ", path);
+  eth_indent_log();
+
   if (path[0] == '/')
-    return realpath(path, fullpath);
+  {
+    eth_debug("realpath? \"%s\" -> ", path);
+    if (realpath(path, fullpath))
+    {
+      if (eth_debug_enabled)
+        fprintf(stderr, "\e[38;5;2;1myes\e[0m\n");
+      eth_dedent_log();
+      return true;
+    }
+    else
+    {
+      if (eth_debug_enabled)
+        fprintf(stderr, "\e[38;5;1;1mno\e[0m\n");
+      eth_dedent_log();
+      return false;
+    }
+  }
 
   char buf[4102];
   for (size_t i = 0; i < env->modpath.len; ++i)
   {
     sprintf(buf, "%s/%s", env->modpath.data[i], path);
-    eth_debug("[\"%s\"] check \"%s\"", path, buf);
+    eth_debug("realpath? \"%s\" -> ", buf, false);
     if (realpath(buf, fullpath))
+    {
+      if (eth_debug_enabled)
+        fprintf(stderr, "\e[38;5;2;1myes\e[0m\n");
+      eth_dedent_log();
       return true;
+    }
+    else if (eth_debug_enabled)
+      fprintf(stderr, "\e[38;5;1;1mno\e[0m\n");
   }
+  eth_dedent_log();
   return false;
 }
 
@@ -224,11 +250,19 @@ static bool
 load_from_ast(eth_root *root, eth_module *mod, eth_ast *ast,
     eth_t *retptr, eth_module *uservars)
 {
+  eth_debug("building module '%s'", eth_get_module_name(mod));
+  eth_indent_log();
+
+  eth_debug("building IR...");
+  eth_indent_log();
   eth_ir_defs defs;
   eth_ir *ir = eth_build_module_ir(ast, root, mod, &defs, uservars);
   if (ir == NULL)
     goto error;
+  eth_dedent_log();
 
+  eth_debug("building SSA...");
+  eth_indent_log();
   eth_ssa *ssa = eth_build_ssa(ir, &defs);
   eth_drop_ir(ir);
   if (ssa == NULL)
@@ -236,7 +270,10 @@ load_from_ast(eth_root *root, eth_module *mod, eth_ast *ast,
     eth_destroy_ir_defs(&defs);
     goto error;
   }
+  eth_dedent_log();
 
+  eth_debug("converting SSA to bytecode...");
+  eth_indent_log();
   eth_bytecode *bc = eth_build_bytecode(ssa);
   eth_drop_ssa(ssa);
   if (bc == NULL)
@@ -244,15 +281,21 @@ load_from_ast(eth_root *root, eth_module *mod, eth_ast *ast,
     eth_destroy_ir_defs(&defs);
     goto error;
   }
+  eth_dedent_log();
 
+  eth_debug("evaluating module...");
+  eth_indent_log();
   eth_t ret = eth_vm(bc);
+  eth_dedent_log();
+  eth_dedent_log();
+
   eth_ref(ret);
   eth_drop_bytecode(bc);
   if (ret->type == eth_exception_type)
   {
     eth_destroy_ir_defs(&defs);
-    eth_warning("failed to load module %s (~w)", eth_get_module_name(mod), ret);
     eth_unref(ret);
+    eth_warning("failed to load module %s (~w)", eth_get_module_name(mod), ret);
     return false;
   }
 
@@ -276,6 +319,8 @@ load_from_ast(eth_root *root, eth_module *mod, eth_ast *ast,
   return true;
 
 error:
+  eth_dedent_log();
+  eth_dedent_log();
   eth_warning("can't load module %s", eth_get_module_name(mod));
   return false;
 }
@@ -493,13 +538,13 @@ resolve_path_by_name(eth_env *env, const char *name, char *path)
   eth_indent_log();
 
   static char buf[4109]; // to suppress gcc warning
-  eth_debug("[%s] check \"%s\"", name, name);
+  /*eth_debug("check \"%s\"", name);*/
   if (eth_resolve_path(env, name, path))
   {
     mode_t mode = get_file_mode(path);
     if (S_ISREG(mode))
     {
-      eth_debug("[%s] found file \"%s\"", name, path);
+      eth_debug("found file \"%s\"", path);
       eth_dedent_log();
       eth_debug("found sources \e[38;5;2;1m✓\e[0m");
       return true;
@@ -507,51 +552,43 @@ resolve_path_by_name(eth_env *env, const char *name, char *path)
 
     if (S_ISDIR(mode))
     {
-      eth_debug("[%s] found directory \"%s\"", name, path);
+      eth_debug("found directory \"%s\"", path);
 
       char dir[PATH_MAX];
       strcpy(dir, path);
 
       sprintf(buf, "%s/__main__.eth", dir);
-      eth_debug("[%s] check \"%s\"", name, buf);
+      eth_debug("realpath? \"%s\" -> ", buf, false);
       if (realpath(buf, path))
-      {
-        eth_dedent_log();
-        eth_debug("found sources \e[38;5;2;1m✓\e[0m");
-        return true;
-      }
+        goto found;
+      if (eth_debug_enabled)
+        fprintf(stderr, "\e[38;5;1;1mno\e[0m\n");
 
       sprintf(buf, "%s/__main__.so", dir);
-      eth_debug("[%s] check \"%s\"", name, buf);
+      eth_debug("realpath? \"%s\" -> ", buf, false);
       if (realpath(buf, path))
-      {
-        eth_dedent_log();
-        eth_debug("found sources \e[38;5;2;1m✓\e[0m");
-        return true;
-      }
+        goto found;
+      if (eth_debug_enabled)
+        fprintf(stderr, "\e[38;5;1;1mno\e[0m\n");
 
       sprintf(buf, "%s/%s.eth", dir, name);
-      eth_debug("[%s] check \"%s\"", name, buf);
+      eth_debug("realpath? \"%s\" -> ", buf, false);
       if (realpath(buf, path))
-      {
-        eth_dedent_log();
-        eth_debug("found sources \e[38;5;2;1m✓\e[0m");
-        return true;
-      }
+        goto found;
+      if (eth_debug_enabled)
+        fprintf(stderr, "\e[38;5;1;1mno\e[0m\n");
 
       sprintf(buf, "%s/%s.so", dir, name);
-      eth_debug("[%s] check \"%s\"", name, buf);
+      eth_debug("realpath? \"%s\" -> ", buf, false);
       if (realpath(buf, path))
-      {
-        eth_dedent_log();
-        eth_debug("found sources \e[38;5;2;1m✓\e[0m");
-        return true;
-      }
+        goto found;
+      if (eth_debug_enabled)
+        fprintf(stderr, "\e[38;5;1;1mno\e[0m\n");
     }
   }
 
   sprintf(buf, "%s.eth", name);
-  eth_debug("[%s] check \"%s\"", name, buf);
+  eth_debug("check \"%s\"", buf);
   if (eth_resolve_path(env, buf, path))
   {
     eth_dedent_log();
@@ -560,7 +597,7 @@ resolve_path_by_name(eth_env *env, const char *name, char *path)
   }
 
   sprintf(buf, "%s.so", name);
-  eth_debug("[%s] check \"%s\"", name, buf);
+  eth_debug("check \"%s\"", buf);
   if (eth_resolve_path(env, buf, path))
   {
     eth_dedent_log();
@@ -570,6 +607,16 @@ resolve_path_by_name(eth_env *env, const char *name, char *path)
 
   eth_dedent_log();
   eth_debug("search failed \e[38;5;1;1m✗\e[0m", name);
+  return false;
+
+found:
+  if (eth_debug_enabled)
+    fprintf(stderr, "\e[38;5;2;1myes\e[0m\n");
+  eth_dedent_log();
+  return true;
+
+return_false:
+  eth_dedent_log();
   return false;
 }
 
@@ -674,6 +721,7 @@ load_module(eth_root *root, eth_env *env, const char *name)
   eth_module *mod;
   if ((mod = eth_get_memorized_module(root, path)))
   {
+    // XXX invalid read here
     eth_debug(
         "path \"%s\" is found in memory, will use corresponding module ('%s')",
         path, eth_get_module_name(mod));
@@ -702,18 +750,30 @@ load_module(eth_root *root, eth_env *env, const char *name)
   return mod;
 }
 
+static const char*
+get_env_parent_name(eth_env *env)
+{
+  eth_module *parent;
+  if ((parent = eth_get_env_parent(env)))
+    return eth_get_module_name(parent);
+  else
+    return "<no-parent>";
+}
+
 eth_module*
 eth_require_module(eth_root *root, eth_env *env, const char *name)
 {
   eth_module *mod;
-  char path[PATH_MAX];
-  char lowname[strlen(name) + 1];
 
   // search available modules
   bool e = false;
   mod = find_module_in_env(env, name, &e);
   if (e) return NULL;
-  if (mod) return mod;
+  if (mod)
+  {
+    eth_debug("found '%s' in '%s'", name, get_env_parent_name(env));
+    return mod;
+  }
   /*mod = find_module_in_env(root, name, ignoreready, &e);*/
   /*if (e) return NULL;*/
   /*if (mod) return mod;*/
@@ -752,11 +812,24 @@ void
 eth_memorize_path_module(eth_root *root, const char *path,
     const eth_module *mod)
 {
+  extern void
+  _eth_mark_memorized_module(eth_module *mod, eth_root *root, const char *path);
+
   if (not cod_hash_map_insert(root->pathmap,path,hash(path),(void*)mod,NULL))
   {
     eth_warning("module under \"%s\" is already in known", path);
     eth_warning("wont reassign it to module '%s'", eth_get_module_name(mod));
   }
+  else
+    _eth_mark_memorized_module((eth_module*)mod, root, path);
+}
+
+
+void
+eth_forget_path_module(eth_root *root, const char *path, const eth_module *mod)
+{
+  if (not cod_hash_map_erase(root->pathmap, path, hash(path), NULL))
+    eth_warning("no such module pair (%s, '%s')", path, eth_get_module_name(mod));
 }
 
 eth_module*

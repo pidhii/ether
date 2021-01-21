@@ -594,6 +594,17 @@ Expr
     free($4);
     LOC($$, @1);
   }
+  | USING CapIdent {
+    char *p = strrchr($2, '.');
+    if (p)
+    {
+      $$ = eth_ast_import($2, p+1, NULL, 0, dummy_ast());
+      free($2);
+      LOC($$, @1);
+    }
+    else
+      $$ = dummy_ast();
+  }
 
   | Expr IS OF NoComaPattern {
     $$ = eth_ast_match($4, $1, eth_ast_cval(eth_true), eth_ast_cval(eth_false));

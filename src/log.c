@@ -44,11 +44,11 @@ eth_log_aux(bool enable, const char *module, const char *file, const char *func,
   fflush(stdout);
   fflush(stderr);
 
-#ifdef ETH_DEBUG_MODE
-  fprintf(os, "[%s %s \e[0m] ", style, module);
-#else
+//#ifdef ETH_DEBUG_MODE
+  //fprintf(os, "[%s %s \e[0m] ", style, module);
+//#else
   fprintf(os, "[%s ether \e[0m] ", style);
-#endif
+//#endif
 
   for (int i = 0; i < g_indent; ++i)
   {
@@ -61,7 +61,8 @@ eth_log_aux(bool enable, const char *module, const char *file, const char *func,
   va_list arg;
   va_start(arg, fmt);
   eth_vfprintf(os, fmt, arg);
+  if (va_arg(arg, int))
+    putc('\n', os);
   va_end(arg);
 
-  putc('\n', os);
 }
