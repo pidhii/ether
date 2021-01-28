@@ -35,8 +35,8 @@ cod_hash_map *g_rectab;
 void
 _eth_init_record_types(void)
 {
-  g_tuptab = cod_hash_map_new();
-  g_rectab = cod_hash_map_new();
+  g_tuptab = cod_hash_map_new(0);
+  g_rectab = cod_hash_map_new(0);
 }
 
 void

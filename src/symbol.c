@@ -59,7 +59,7 @@ write_symbol(eth_type *type, eth_t x, FILE *stream)
 void
 _eth_init_symbol_type(void)
 {
-  g_symtab = cod_hash_map_new();
+  g_symtab = cod_hash_map_new(0);
 
   eth_symbol_type = eth_create_type("symbol");
   eth_symbol_type->write = write_symbol;

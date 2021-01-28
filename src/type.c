@@ -54,6 +54,7 @@ create_type(const char *name, int nfields)
   type->fields = NULL;
   type->clos = NULL;
   type->dtor = NULL;
+  type->methods = eth_create_methods();
   type->flag = 0;
   return type;
 }
@@ -93,6 +94,7 @@ eth_destroy_type(eth_type *type)
     free(type->fields);
   }
 
+  eth_destroy_methods(type->methods);
   free(type->name);
   free(type);
 }

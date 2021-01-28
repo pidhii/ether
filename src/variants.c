@@ -32,7 +32,7 @@ cod_hash_map *g_vartab;
 void
 _eth_init_variant_types(void)
 {
-  g_vartab = cod_hash_map_new();
+  g_vartab = cod_hash_map_new(0);
 }
 
 void

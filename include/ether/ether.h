@@ -364,6 +364,25 @@ eth_free_h6(void *ptr);
 
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
+//                              METHODS
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+typedef eth_t (*eth_method_cb)(eth_t self);
+typedef struct eth_methods eth_methods;
+
+eth_methods*
+eth_create_methods();
+
+void
+eth_destroy_methods(eth_methods *ms);
+
+bool
+eth_add_method(eth_methods *ms, eth_t sym, eth_method_cb cb);
+
+eth_method_cb
+eth_get_method(eth_methods *ms, eth_t sym);
+
+
+// ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                               TYPE
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 /** @defgroup Type Type
@@ -383,13 +402,6 @@ typedef struct eth_field eth_field;
 #define ETH_TFLAG_VARIANT (ETH_TFLAG_PLAIN | 1 << 3)
 /*#define ETH_TFLAG_OBJECT  (ETH_TFLAG_RECORD | 1 << 4)*/
 
-typedef eth_t (*eth_method_t)(void);
-
-struct eth_methods {
-  int nmethods;
-  eth_method_t methods[];
-};
-
 struct eth_type {
   char *name;
   void (*destroy)(eth_type *type, eth_t x);
@@ -397,6 +409,7 @@ struct eth_type {
   void (*write)(eth_type *type, eth_t x, FILE *out);
   void (*display)(eth_type *type, eth_t x, FILE *out);
   bool (*equal)(eth_type *type, eth_t x, eth_t y);
+  eth_methods *methods;
 
   uint8_t flag;
 

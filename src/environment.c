@@ -76,7 +76,7 @@ eth_create_empty_env(void)
   eth_env *env = malloc(sizeof(eth_env));
   cod_vec_init(env->modpath);
   cod_vec_init(env->exithndls);
-  env->mods = cod_hash_map_new();
+  env->mods = cod_hash_map_new(0);
   env->parent = NULL;
   return env;
 }
@@ -790,7 +790,7 @@ eth_create_root(eth_env *env)
 {
   eth_root *root = malloc(sizeof(eth_root));
   root->env = env;
-  root->pathmap = cod_hash_map_new();
+  root->pathmap = cod_hash_map_new(0);
   return root;
 }
 
