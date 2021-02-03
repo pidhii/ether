@@ -2,7 +2,8 @@ let options = [
   {name = "long-arg", val = "long-arg", has_arg = true},
   {name = "long-no-arg", val = "long-no-arg", has_arg = false},
   {name = "a", val = "short-arg", has_arg = true},
-  {name = "f", val = "short-no-arg", has_arg = false}
+  {name = "f", val = "short-no-arg", has_arg = false},
+  {name = ["help", "h"], val = "h", has_arg = false},
 ]
 
 let tests = [
@@ -54,6 +55,13 @@ let tests = [
   ("test-8", fn ->
     try CmdArg.get options cmd; false
     with e -> e eq Undefined_option),
+
+  ("test-9", fn ->
+    let cmd1 = ["-h"]
+    let kw1 = first $ CmdArg.get options cmd1
+    let cmd2 = ["--help"]
+    let kw2 = first $ CmdArg.get options cmd2
+    List.(assoc "h" kw1 eq true && assoc "h" kw2 eq true)),
 ]
 
 let (nok, nfail) = Test.run [(nil, tests)]

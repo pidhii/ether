@@ -1,17 +1,23 @@
+open List
 
 let get_options cfg os =
 
+  let cfg = cfg | flat_map $ optcfg ->
+    if pair? optcfg.name
+    then map (name -> {optcfg with name}) optcfg.name
+    else [optcfg]
+
   let get_rules opt =
-    try List.find (fn {name} -> name eq opt) cfg
+    try find (fn {name} -> name eq opt) cfg
     with Failure -> raise Undefined_option
 
   let rec loop os kws pos =
     if let o::os = os then
-      if o eq "--" then (kws, List.rev_append pos os)
+      if o eq "--" then (kws, rev_append pos os)
       else if String.match \^--/ o then handle_long_option o os kws pos
       else if String.match \^-/ o then handle_short_option o os kws pos
       else loop os kws (o :: pos)
-    else (kws, List.rev pos)
+    else (kws, rev pos)
 
   and handle_long_option o os kws pos =
     if let (brk, _) = String.find "=" o then
