@@ -5,6 +5,6 @@ libdir=${prefix}/lib
 Name: ether
 Description: Interpreter for Ether language
 URL: https://github.com/pidhii/ether
-Version: @PROJECT_VERSION@
+Version: @CMAKE_PROJECT_VERSION@
 Cflags: -I${includedir}
 Libs: -L${libdir} -lether -lpcre -lm -ldl

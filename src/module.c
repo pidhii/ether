@@ -28,15 +28,41 @@ typedef struct {
   void (*dtor)(void*);
 } closure;
 
-// TODO: use hash table
 struct eth_module {
+  /** \brief Module's name. */
   char *name;
+
+  /** \brief Parent module. */
   const eth_module *parent;
-  int ndefs, defscap;
-  eth_def *defs;
+
+  /** \brief Module's environment (the thing implementing submodules). */
   eth_env *env;
+
+  /** \brief Destructors to be called on deinitializatoin of a module. */
   cod_vec(closure) clos;
 
+  /** \name Public variables.
+   * \todo Use some dictionary.
+   * @{ */
+  int ndefs, defscap;
+  eth_def *defs;
+  /** @} */
+
+  /** \name Reference counting
+   * \brief Reference counting to handle dpendency-relations between modules.
+   * I.e., if module A imports B, then B must be kept alive, no matter what,
+   * untill A is deinitialized. The reason (initial one, at least) is that if B
+   * defines a new type, and A, e.g., defines a global variable of this type,
+   * then destructor of that type (so the type-object itself) must be aveilable
+   * during deinitialization of A. Thus deinitialization of modules must be done
+   * in some complicated order respecting dependency-trees, which is implicitly
+   * satisfied by reference ("dependency") counting. 
+   * @{ */
+  size_t rc;
+  cod_vec(eth_module*) deps;
+  /** @} */
+
+  // XXX: ugly workaround
   eth_root *memroot;
   char *mempath;
 };

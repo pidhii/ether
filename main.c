@@ -213,7 +213,7 @@ main(int argc, char **argv)
     }
   }
 
-  eth_debug("init");
+  eth_debug("[main] init");
   eth_init(&argc);
 
   eth_env *env = eth_create_env();
@@ -235,7 +235,7 @@ main(int argc, char **argv)
 
   if (input == stdin) // REPL
   {
-    eth_debug("REPL");
+    eth_debug("[main] REPL");
 
     eth_module *mod = extravars;
     const char *prompt = "> ";
@@ -401,28 +401,28 @@ main(int argc, char **argv)
   }
   else // Evaluate script
   {
-    eth_debug("parse input");
+    eth_debug("[main] parse input");
     eth_ast *ast;
     ast = eth_parse(input);
     fclose(input);
     if (ast)
     {
-      eth_debug("build IR");
+      eth_debug("[main] build IR");
       eth_ir *ir = eth_build_ir(ast, root, extravars);
       eth_drop_ast(ast);
       if (ir)
       {
-        eth_debug("build SSA");
+        eth_debug("[main] build SSA");
         eth_ssa *ssa = eth_build_ssa(ir, NULL);
         eth_drop_ir(ir);
         if (ssa)
         {
-          eth_debug("build bytecode");
+          eth_debug("[main] build bytecode");
           eth_bytecode *bc = eth_build_bytecode(ssa);
           eth_drop_ssa(ssa);
           if (bc)
           {
-            eth_debug("run VM");
+            eth_debug("[main] run VM");
 
             struct timespec t1, t2;
             clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t1);
@@ -461,7 +461,7 @@ main(int argc, char **argv)
             double t1sec = t1.tv_sec + t1.tv_nsec * 1e-9;
             double t2sec = t2.tv_sec + t2.tv_nsec * 1e-9;
             double dtsec = t2sec - t1sec;
-            eth_debug("evaluation time: %f [cpu sec.]", dtsec);
+            eth_debug("[main] evaluation time: %f [cpu sec.]", dtsec);
           }
           else
           {
@@ -493,7 +493,7 @@ main(int argc, char **argv)
   eth_destroy_module(extravars);
 
   cod_vec_destroy(L);
-  eth_debug("cleanup");
+  eth_debug("[main] cleanup");
   eth_cleanup();
 
   exit(err);
