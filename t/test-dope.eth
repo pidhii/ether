@@ -6,10 +6,14 @@ print "dope: {dope}"
 system "echo pwd: $PWD"
 let fail! =
   system "ether {dope} uninstall foo &>/dev/null"
+  system "rm -rf foo/.git &>/dev/null"
   exit 1
 
+system "cd foo && git init && git add . && git commit -m 'Test' && git tag '2.2.8'"
+
 system "dope install ./foo" == 0 || fail!
 system "dope uninstall foo" == 0 || fail!
 system "dope install ./foo" == 0 || fail!
 system "dope uninstall foo" == 0 || fail!
 
+system "rm -rf foo/.git &>/dev/null"
