@@ -1143,9 +1143,7 @@ _eth_init_builtins(void)
   eth_define(g_mod,    "regexp?", eth_create_proc(  _regexp_p, 1, NULL, NULL));
   eth_define(g_mod,    "vector?", eth_create_proc(  _vector_p, 1, NULL, NULL));
   // ---
-  eth_define(g_mod,     "__list", eth_create_proc(      _list, 1, NULL, NULL));
-  eth_define(g_mod,      "__len", eth_create_proc(       _len, 1, NULL, NULL));
-  eth_define(g_mod,      "__get", eth_create_proc(       _get, 2, NULL, NULL));
+  eth_define(g_mod,       "list", eth_create_proc(      _list, 1, NULL, NULL));
   eth_define(g_mod, "__rev_list", eth_create_proc(  _rev_list, 1, NULL, NULL));
   // ---
   eth_define(g_mod,       "dump", eth_create_proc(      _dump, 1, NULL, NULL));
