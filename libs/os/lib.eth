@@ -33,7 +33,7 @@ let pub getcwd = __getcwd
 let pub getenv = __getenv
 
 let pub realpath path =
-  if String.sub (0 .. 1) path eq "~/"
+  if String.sub path (0 .. 1) path eq "~/" or false
   then __realpath (getenv "HOME" ++ String.sub (1...) path)
   else __realpath path
 
