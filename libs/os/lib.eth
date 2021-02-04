@@ -31,6 +31,12 @@ See also man(3) access for complete documentation.
 let pub getcwd = __getcwd
 
 let pub getenv = __getenv
+let pub setenv x =
+  if let name, value, overwrite? = x then
+    __setenv name value overwrite?
+  else
+    let name = x
+    fn value -> __setenv name value true
 
 let pub realpath path =
   if String.sub path (0 .. 1) path eq "~/" or false

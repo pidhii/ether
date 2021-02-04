@@ -72,6 +72,30 @@ _getenv(void)
 }
 
 static eth_t
+_setenv(void)
+{
+  eth_args args = eth_start(3);
+  eth_t name = eth_arg2(args, eth_string_type);
+  eth_t value = eth_arg2(args, eth_string_type);
+  eth_t overwrite = eth_arg(args);
+  errno = 0;
+  if (setenv(eth_str_cstr(name), eth_str_cstr(value), overwrite != eth_false))
+    eth_throw(args, eth_system_error(errno));
+  eth_return(args, eth_nil);
+}
+
+static eth_t
+_unsetenv(void)
+{
+  eth_args args = eth_start(1);
+  eth_t name = eth_arg2(args, eth_string_type);
+  errno = 0;
+  if (unsetenv(eth_str_cstr(name)))
+    eth_throw(args, eth_system_error(errno));
+  eth_return(args, eth_nil);
+}
+
+static eth_t
 _getcwd(void)
 {
   eth_use_variant(System_error)
@@ -171,6 +195,8 @@ ether_module(eth_module *mod, eth_root *topenv)
   eth_define(mod, "__getcwd", eth_proc(_getcwd));
 
   eth_define(mod, "__getenv", eth_proc(_getenv, 1));
+  eth_define(mod, "__setenv", eth_proc(_setenv, 3));
+  eth_define(mod, "__unsetenv", eth_proc(_unsetenv, 1));
 
   eth_define(mod, "__realpath", eth_proc(_realpath, 1));
 
