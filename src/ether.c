@@ -33,7 +33,6 @@ eth_t *eth_sp, *eth_reg_sp;
 ssize_t eth_c_stack_size;
 char *eth_c_stack_start;
 
-
 const char*
 eth_get_prefix(void)
 {
@@ -43,28 +42,20 @@ eth_get_prefix(void)
 
   if (first)
   {
-    char *path = getenv("ETHER_PATH");
-    if (path)
+    FILE *in = popen("pkg-config ether --variable=prefix", "r");
+    if (in)
     {
-      sprintf(buf, path);
-    }
-    else
-    {
-      FILE *in = popen("pkg-config ether --variable=prefix", "r");
-      if (in)
+      char *line = NULL;
+      size_t n = 0;
+      getline(&line, &n, in);
+      if (pclose(in) == 0)
       {
-        char *line = NULL;
-        size_t n = 0;
-        getline(&line, &n, in);
-        if (pclose(in) == 0)
-        {
-          assert(n > 1);
-          line[n - 2] = 0; // remove newline
-          memcpy(buf, line, n);
-          prefix = buf;
-        }
-        free(line);
+        assert(n > 1);
+        line[n - 2] = 0; // remove newline
+        memcpy(buf, line, n);
+        prefix = buf;
       }
+      free(line);
     }
 
 #ifdef ETHER_PREFIX
@@ -79,6 +70,32 @@ eth_get_prefix(void)
   }
 
   return prefix;
+}
+
+const char*
+eth_get_module_path(void)
+{
+  static char buf[PATH_MAX];
+  static char *path;
+  static bool first = true;
+  if (first)
+  {
+    first = false;
+    char *envpath = getenv("ETHER_PATH");
+    if (envpath)
+    {
+      strcpy(buf, envpath);
+      path = buf;
+    }
+    else if (eth_get_prefix())
+    {
+      sprintf(buf, "%s/lib/ether", eth_get_prefix());
+      path = buf;
+    }
+    else
+      path = NULL;
+  }
+  return path;
 }
 
 #ifndef ETHER_VERSION

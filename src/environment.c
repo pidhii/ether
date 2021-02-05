@@ -86,12 +86,8 @@ eth_create_env(void)
 {
   eth_env *env = eth_create_empty_env();
   /*eth_add_module_path(env, ".");*/
-  if (eth_get_prefix())
-  {
-    char path[PATH_MAX];
-    sprintf(path, "%s/lib/ether", eth_get_prefix());
-    eth_add_module_path(env, path);
-  }
+  if (eth_get_module_path())
+    eth_add_module_path(env, eth_get_module_path());
   return env;
 }
 

@@ -1113,11 +1113,8 @@ _eth_init_builtins(void)
 
   eth_env *env = eth_create_empty_env();
   g_root = eth_create_root(env);
-  if (eth_get_prefix())
-  {
-    sprintf(buf, "%s/lib/ether", eth_get_prefix());
-    eth_add_module_path(env, buf);
-  }
+  if (eth_get_module_path())
+    eth_add_module_path(env, eth_get_module_path());
 
   g_mod = eth_create_module("Builtins", NULL, NULL);
 

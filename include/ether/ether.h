@@ -189,6 +189,9 @@ const char*
 eth_get_prefix(void);
 
 const char*
+eth_get_module_path(void);
+
+const char*
 eth_get_version(void);
 
 const char*
@@ -1419,8 +1422,7 @@ eth_create_empty_env(void);
  * It is equivalent to:
  * ```
  * eth_env *env = eth_create_empty_env();
- * sprintf(path, "%s/lib/ether", eth_get_prefix());
- * eth_add_module_path(env, path);
+ * eth_add_module_path(env, eth_get_module_path());
  * ```
  * However, when the *prefix* is not available, it will not yield an error, but
  * the corresponding path wont be added. Thus in this case this function is

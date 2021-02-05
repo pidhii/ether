@@ -128,6 +128,7 @@ main(int argc, char **argv)
     { "version", false, NULL, 'v' },
     { "prefix", false, NULL, 0x3FF },
     { "trace-limit", true, NULL, 0x4FF },
+    { "module-path", false, NULL, 0x5FF },
     { 0, 0, 0, 0 }
   };
   int opt;
@@ -170,6 +171,16 @@ main(int argc, char **argv)
         if (eth_get_prefix())
         {
           puts(eth_get_prefix());
+          exit(EXIT_SUCCESS);
+        }
+        else
+          exit(EXIT_FAILURE);
+        break;
+
+      case 0x5FF:
+        if (eth_get_module_path())
+        {
+          puts(eth_get_module_path());
           exit(EXIT_SUCCESS);
         }
         else
