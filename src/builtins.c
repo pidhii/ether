@@ -650,7 +650,7 @@ _load(void)
   sprintf(id, "load.%d", cnt++);
 
   eth_module *mod = eth_create_module(id, NULL, NULL);
-  eth_t ret;
+  eth_t ret = NULL;
   int ok = eth_load_module_from_script2(g_root, eth_get_root_env(g_root), mod,
       eth_str_cstr(path), &ret, envmod);
   eth_destroy_module(envmod);

@@ -290,8 +290,8 @@ load_from_ast(eth_root *root, eth_module *mod, eth_ast *ast,
   if (ret->type == eth_exception_type)
   {
     eth_destroy_ir_defs(&defs);
-    eth_unref(ret);
     eth_warning("failed to load module %s (~w)", eth_get_module_name(mod), ret);
+    eth_unref(ret);
     return false;
   }
 
@@ -364,14 +364,17 @@ eth_load_module_from_ast2(eth_root *root, eth_env *env, eth_module *mod,
   }
 
   int ok = load_from_ast(root, mod, ast, ret, uservars);
-  ent->flag |= MFLAG_READY;
-  eth_debug("entry for '%s' in '%s' is now READY", eth_get_module_name(mod),
-      parentname);
   if (not ok)
   {
     eth_remove_module(env, eth_get_module_name(mod));
     status = false;
     goto error;
+  }
+  else
+  {
+    ent->flag |= MFLAG_READY;
+    eth_debug("entry for '%s' in '%s' is now READY", eth_get_module_name(mod),
+        parentname);
   }
 
 error:
