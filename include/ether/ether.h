@@ -1914,7 +1914,8 @@ struct eth_ast {
     struct { eth_ast_pattern *pat; eth_ast *expr, *thenbr, *elsebr;
              eth_toplvl_flag toplvl; }
       match;
-    struct { char *module; eth_ast *body; char *alias; char **nams; int nnam; }
+    struct { char *module; eth_ast *body; char *alias; char **nams; int nnam;
+             bool ispub; }
       import;
     struct { char *name; eth_ast *body; } module;
     struct { eth_ast *lhs, *rhs; } scand, scor;
@@ -2003,8 +2004,14 @@ eth_ast_match(eth_ast_pattern *pat, eth_ast *expr, eth_ast *thenbr,
     eth_ast *elsebr);
 
 eth_ast* __attribute__((malloc))
-eth_ast_import(const char *module, const char *alias, char *const nams[],
+eth_ast_import_unqualified(bool pub, const char *module, eth_ast *body);
+
+eth_ast* __attribute__((malloc))
+eth_ast_import_idents(bool pub, const char *module, char *const nams[],
     int nnam, eth_ast *body);
+
+eth_ast* __attribute__((malloc))
+eth_ast_module_alias(const char *module, const char *alias, eth_ast *body);
 
 static void
 eth_set_import_expr(eth_ast *import, eth_ast *expr)
@@ -3016,9 +3023,17 @@ eth_vm(eth_bytecode *bc);
 eth_ast*
 eth_parse_repl(eth_scanner *scan);
 
-eth_t
-eth_eval(eth_root *root, eth_module *mod, eth_ast *ast);
+typedef struct {
+  eth_root *root;
+  eth_module *mod;
+  eth_module *locals;
+} eth_evaluator;
 
+eth_t
+eth_eval(eth_evaluator *evl, eth_ast *ast);
+
+eth_t
+eth_eval_body(eth_evaluator *evl, eth_ast *ast);
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                             API HELPER

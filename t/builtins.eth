@@ -14,7 +14,8 @@ let string_tests =
   [
     ("cat", fn -> cat ["a", "b", "c"] eq "abc"),
     ("join", fn -> join "," ["a", "b", "c"] eq "a,b,c"),
-    ("create", fn -> len (create 10) == 10),
+    ("malloc", fn -> len (malloc 10) == 10),
+    ("calloc", fn -> calloc 10 eq make 10 "\0"),
     ("make", fn -> make 10 "@" eq "@@@@@@@@@@" && make 2 "" eq "\0\0"),
 
     ("len", fn -> len "1234" == 4),
@@ -46,8 +47,8 @@ let string_tests =
     ),
     ("get", fn -> get "1234" 2 eq "3"),
 
-    ("cmp", fn -> cmp "asdf" "asdf" == 0),
-    ("casecmp", fn -> casecmp "asdf" "ASdF" == 0),
+    ("strcmp", fn -> strcmp "asdf" "asdf" == 0),
+    ("strcasecmp", fn -> strcasecmp "asdf" "ASdF" == 0),
 
     ("find", fn ->
       find "45" "123456" eq (3, 3+2) && find \[3-5]+/ "123456" eq (2, 2+3)),

@@ -214,7 +214,7 @@ _create_attr(int aflag, void *locpp)
 %nonassoc LARROW
 %nonassoc PUB BUILTIN DEPRECATED
 %nonassoc LIST_DDOT
-%nonassoc DO DONE
+%nonassoc DO
 %nonassoc CASE OF
 %nonassoc DEFINED
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -262,8 +262,10 @@ _create_attr(int aflag, void *locpp)
 %type<string> Ident
 %type<string> CapIdent
 %type<binds> Binds
+%type<binds> LoopArgs
 %type<bind> Bind
 %type<integer> Attribute
+%type<boolean> MaybePub
 %type<astvec> Args ArgsAux
 %type<patvec> FnArgs
 %type<string> Help MaybeHelp
@@ -314,7 +316,7 @@ FnAtom
   | '(' StmtSeq ')' { $$ = $2; }
   | FnAtom '!' { $$ = eth_ast_apply($1, NULL, 0); LOC($$, @$); }
   | CapIdent DOT_OPEN1 StmtSeq ')' {
-    $$ = eth_ast_import($1, "", NULL, 0, $3);
+    $$ = eth_ast_import_unqualified(false, $1, $3);
     LOC($$, @$);
     free($1);
   }
@@ -332,7 +334,7 @@ FnAtom
         $3.data, n);
     cod_vec_destroy($3);
     // --
-    $$ = eth_ast_import($1, "", NULL, 0, tuple);
+    $$ = eth_ast_import_unqualified(false, $1, tuple);
     LOC($$, @$);
     free($1);
   }
@@ -342,7 +344,7 @@ FnAtom
     cod_vec_destroy($3);
     LOC(acc, $3);
 
-    $$ = eth_ast_import($1, "", NULL, 0, acc);
+    $$ = eth_ast_import_unqualified(false, $1, acc);
     LOC($$, @1);
     free($1);
   }
@@ -354,7 +356,7 @@ FnAtom
     cod_vec_destroy($3.vals);
     LOC(acc, @$);
 
-    $$ = eth_ast_import($1, "", NULL, 0, acc);
+    $$ = eth_ast_import_unqualified(false, $1, acc);
     LOC($$, @1);
     free($1);
   }
@@ -365,7 +367,7 @@ FnAtom
     cod_vec_destroy($5.keys);
     LOC(acc, @$);
 
-    $$ = eth_ast_import($1, "", NULL, 0, acc);
+    $$ = eth_ast_import_unqualified(false, $1, acc);
     LOC($$, @1);
     free($1);
   }
@@ -581,15 +583,15 @@ Expr
     LOC($$, @$);
   }
 
-  | OPEN CapIdent MaybeImports {
-    if ($3.data) $$ = eth_ast_import($2, NULL, $3.data, $3.len, dummy_ast());
-    else $$ = eth_ast_import($2, "", NULL, 0, dummy_ast());
-    free($2);
-    if ($3.data) { cod_vec_iter($3, i, x, free(x)); cod_vec_destroy($3); }
-    LOC($$, @1);
+  | MaybePub OPEN CapIdent MaybeImports {
+    if ($4.data) $$ = eth_ast_import_idents($1, $3, $4.data, $4.len, dummy_ast());
+    else $$ = eth_ast_import_unqualified($1, $3, dummy_ast());
+    free($3);
+    if ($4.data) { cod_vec_iter($4, i, x, free(x)); cod_vec_destroy($4); }
+    LOC($$, @2);
   }
   | USING CapIdent AS CAPSYMBOL {
-    $$ = eth_ast_import($2, $4, NULL, 0, dummy_ast());
+    $$ = eth_ast_module_alias($2, $4, dummy_ast());
     free($2);
     free($4);
     LOC($$, @1);
@@ -598,7 +600,7 @@ Expr
     char *p = strrchr($2, '.');
     if (p)
     {
-      $$ = eth_ast_import($2, p+1, NULL, 0, dummy_ast());
+      $$ = eth_ast_module_alias($2, p+1, dummy_ast());
       free($2);
       LOC($$, @1);
     }
@@ -902,6 +904,18 @@ Stmt
     LOC($$, @$);
   }
 
+  | DO SYMBOL LoopArgs '=' StmtOrBlock {
+    eth_ast_pattern *ident = eth_ast_ident_pattern($2);
+    eth_ast *loop = eth_ast_fn_with_patterns($3.pats.data, $3.pats.len, $5);
+    eth_ast *runloop = eth_ast_apply(eth_ast_ident($2), $3.vals.data, $3.vals.len);
+    $$ = eth_ast_letrec(&ident, &loop, 1, runloop);
+    /*LOC($$, @$);*/
+
+    free($2);
+    cod_vec_destroy($3.pats);
+    cod_vec_destroy($3.vals);
+  }
+
   | TRY Stmt WITH Pattern RARROW StmtOrBlock {
     $$ = eth_ast_try($4, $2, $6, 1);
     LOC($$, @$);
@@ -1010,6 +1024,18 @@ FnArgs
   }
 ;
 
+LoopArgs
+  : {
+    cod_vec_init($$.pats);
+    cod_vec_init($$.vals);
+  }
+  | LoopArgs AtomicPattern ':' Atom {
+    $$ = $1;
+    cod_vec_push($$.pats, $2);
+    cod_vec_push($$.vals, $4);
+  }
+;
+
 Binds
   : Bind {
     cod_vec_init($$.pats);
@@ -1088,6 +1114,8 @@ Bind
     free($2);
   }
 ;
+
+MaybePub : { $$ = false; } | PUB { $$ = true; };
 
 Attribute
   : { $$ = 0; }

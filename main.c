@@ -262,6 +262,11 @@ main(int argc, char **argv)
     repl_defs = mod;
     repl_root = root;
 
+    eth_evaluator evl;
+    evl.root = root;
+    evl.mod = mod;
+    evl.locals = mod;
+
     // load previous history
     using_history();
     if (system("test -f ~/.ether_history") == 0)
@@ -391,7 +396,7 @@ main(int argc, char **argv)
           buf.len = 0;
 
           // evaluate expression
-          eth_t ret = eth_eval(root, mod, expr);
+          eth_t ret = eth_eval(&evl, expr);
           if (ret and ret != eth_nil)
           {
             eth_printf("~w\n", ret);

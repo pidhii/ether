@@ -3,7 +3,8 @@
 -- Constructors:
 -- * cat (C)
 -- * join
--- * create
+-- * malloc
+-- * calloc
 -- * make (C)
 --
 -- Miscelenious:
@@ -27,25 +28,38 @@
 -- * get
 --
 -- Comparison:
--- * cmp (C)
--- * casecmp (C)
+-- * strcmp (C)
+-- * strcasecmp (C)
 --
 -- Searching:
 -- * find
 --
 
-let pub create =
+let pub malloc =
 {.help|
-= String.create
+= String.malloc
 
 == DESCRIPTION:
 Create an uninitialized string of given length.
 
 == SYNOPSIS
 
-  create number? -> string?
+  malloc number? -> string?
 |.help}
-  __create
+  __malloc
+
+let pub calloc =
+{.help|
+= String.calloc
+
+== DESCRIPTION:
+Create a string of given length initialized with zeros.
+
+== SYNOPSIS
+
+  calloc number? -> string?
+|.help}
+  __calloc
 
 let pub make =
 {.help|
@@ -98,4 +112,13 @@ let pub find pat s =
     then (start, start + len pat)
     else false
   else type_error ()
+
+
+--module Prelude =
+  --let {pub * } = @(
+    --{
+      --cat, join, malloc, calloc, to_upper, to_lower, chr, ord, to_number,
+      --to_symbol, chomp, chop, trim_left, trim_right, trim, sub, strcmp,
+      --strcasecmp, match, split, rev_split, gsub,
+    --})
 

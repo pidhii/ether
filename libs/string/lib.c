@@ -23,7 +23,7 @@
 
 
 static eth_t
-_create(void)
+_malloc(void)
 {
   eth_t n = *eth_sp++;
   if (eth_unlikely(not eth_is_num(n)))
@@ -37,6 +37,23 @@ _create(void)
   eth_drop(n);
   return eth_create_string_from_ptr2(str, len);
 }
+
+static eth_t
+_calloc(void)
+{
+  eth_t n = *eth_sp++;
+  if (eth_unlikely(not eth_is_num(n)))
+  {
+    eth_drop(n);
+    return eth_exn(eth_type_error());
+  }
+  int len = eth_num_val(n);
+  char *str = calloc(len + 1, sizeof(char));
+  str[len] = '\0';
+  eth_drop(n);
+  return eth_create_string_from_ptr2(str, len);
+}
+
 
 static eth_t
 _make(void)
@@ -611,14 +628,15 @@ _to_symbol(void)
 int
 ether_module(eth_module *mod, eth_root *topenv)
 {
-  eth_define(mod, "__create", eth_create_proc(_create, 1, NULL, NULL));
+  eth_define(mod, "__malloc", eth_create_proc(_malloc, 1, NULL, NULL));
+  eth_define(mod, "__calloc", eth_create_proc(_calloc, 1, NULL, NULL));
   eth_define(mod, "__make", eth_create_proc(_make, 2, NULL, NULL));
 
   eth_define(mod, "len", eth_create_proc(_strlen, 1, NULL, NULL));
   eth_define(mod, "to_upper", eth_create_proc(_to_upper, 1, NULL, NULL));
   eth_define(mod, "to_lower", eth_create_proc(_to_lower, 1, NULL, NULL));
-  eth_define(mod, "cmp", eth_create_proc(_strcmp, 2, NULL, NULL));
-  eth_define(mod, "casecmp", eth_create_proc(_strcasecmp, 2, NULL, NULL));
+  eth_define(mod, "strcmp", eth_create_proc(_strcmp, 2, NULL, NULL));
+  eth_define(mod, "strcasecmp", eth_create_proc(_strcasecmp, 2, NULL, NULL));
   eth_define(mod, "__substr", eth_create_proc(_substr, 3, NULL, NULL));
   eth_define(mod, "__strstr_opt", eth_create_proc(_strstr_opt, 2, NULL, NULL));
   eth_define(mod, "cat", eth_create_proc(_cat, 1, NULL, NULL));

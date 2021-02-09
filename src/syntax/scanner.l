@@ -584,7 +584,6 @@ try    { return TRY; }
 with   { return WITH; }
 or     { return OR; }
 do     { return DO; }
-done   { return DONE; }
 case   { return CASE; }
 of     { return OF; }
 module { return MODULE; }

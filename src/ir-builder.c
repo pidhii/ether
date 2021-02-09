@@ -340,7 +340,7 @@ require_var(ir_builder *bldr, const char *ident, eth_var *ret)
   }
 }
 
-eth_var*
+static eth_var*
 find_var_deep(ir_builder *bldr, const char *ident)
 {
   eth_var *var = eth_find_var(bldr->vars->head, ident, NULL);
@@ -697,7 +697,7 @@ is_redefined(ir_builder *bldr, const char *ident)
     return true;
 }
 
-eth_ir_node*
+static eth_ir_node*
 constexpr_binop(eth_binop op, eth_t lhs, eth_t rhs, eth_location *loc, int *e)
 {
   eth_t ret = NULL;
@@ -791,8 +791,6 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         eth_warning("use of deprecated variable, '%s'", ast->ident.str);
         eth_print_location_opt(ast->loc, stderr, ETH_LOPT_FILE);
       }
-      if (var.vid == 80)
-        eth_warning("80!!!!");
       if (var.cval)
         return eth_ir_cval(var.cval);
       else
@@ -834,6 +832,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
     case ETH_AST_SEQ:
     {
       eth_ir_node *e1 = build(bldr, ast->seq.e1, e);
+      /*eth_ir_node *e1 = build_with_toplvl(bldr, ast->seq.e1, e, false);*/
       eth_ir_node *e2 = build(bldr, ast->seq.e2, e);
       return eth_ir_seq(e1, e2);
     }

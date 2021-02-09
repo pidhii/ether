@@ -201,15 +201,49 @@ _vector_p(void)
 static eth_t
 _regexp_eq(void)
 {
+  /*eth_use_symbol(Regexp_error)*/
+  /*eth_args args = eth_start(2);*/
+  /*eth_t str = eth_arg2(args, eth_string_type);*/
+  /*eth_t reg = eth_arg2(args, eth_regexp_type);*/
+  /*int n = eth_exec_regexp(reg, eth_str_cstr(str), eth_str_len(str), 0);*/
+  /*if (n == 0)*/
+    /*eth_throw(args, Regexp_error);*/
+  /*else*/
+    /*eth_return(args, n < 0 ? eth_false : eth_num(n));*/
+
   eth_use_symbol(Regexp_error)
+
   eth_args args = eth_start(2);
   eth_t str = eth_arg2(args, eth_string_type);
   eth_t reg = eth_arg2(args, eth_regexp_type);
   int n = eth_exec_regexp(reg, eth_str_cstr(str), eth_str_len(str), 0);
-  if (n == 0)
+  if (n < 0)
+    eth_return(args, eth_false);
+  else if (n == 0)
     eth_throw(args, Regexp_error);
+  else if (n == 1)
+    eth_return(args, eth_true);
   else
-    eth_return(args, n < 0 ? eth_false : eth_num(n));
+  {
+    eth_t buf[n-1];
+    const int *ovec = eth_ovector();
+    for (int cnt = 1; cnt < n; ++cnt)
+    {
+      int i = cnt * 2;
+      char *p = eth_str_cstr(str) + ovec[i];
+      int len = ovec[i+1] - ovec[i];
+      eth_t s = eth_create_string2(p, len);
+      buf[cnt-1] = s;
+    }
+
+    if (n == 2)
+      eth_return(args, buf[0]);
+    else
+    {
+      eth_t ret = eth_create_tuple_n(eth_tuple_type(n-1), buf);
+      eth_return(args, ret);
+    }
+  }
 }
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --

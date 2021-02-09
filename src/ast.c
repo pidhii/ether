@@ -541,14 +541,15 @@ eth_ast_match(eth_ast_pattern *pat, eth_ast *expr, eth_ast *thenbr,
   return ast;
 }
 
-eth_ast*
-eth_ast_import(const char *module, const char *alias, char *const nams[],
-    int nnam, eth_ast *body)
+static eth_ast*
+create_import(bool pub, const char *module, const char *alias,
+    char *const nams[], int nnam, eth_ast *body)
 {
   eth_ast *ast = create_ast_node(ETH_AST_IMPORT);
   ast->import.module = strdup(module);
   eth_ref_ast(ast->import.body = body);
   ast->import.alias = alias ? strdup(alias) : NULL;
+  ast->import.ispub = pub;
   if (nams)
   {
     ast->import.nams = malloc(sizeof(char*) * nnam);
@@ -560,6 +561,19 @@ eth_ast_import(const char *module, const char *alias, char *const nams[],
     ast->import.nams = NULL;
   return ast;
 }
+
+eth_ast*
+eth_ast_import_unqualified(bool pub, const char *module, eth_ast *body)
+{ return create_import(pub, module, "", NULL, 0, body); }
+
+eth_ast*
+eth_ast_import_idents(bool pub, const char *module, char *const nams[],
+    int nnam, eth_ast *body)
+{ return create_import(pub, module, NULL, nams, nnam, body); }
+
+eth_ast*
+eth_ast_module_alias(const char *module, const char *alias, eth_ast *body)
+{ return create_import(false, module, alias, NULL, 0, body); }
 
 eth_ast*
 eth_ast_module(const char *name, eth_ast *body)

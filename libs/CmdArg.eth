@@ -14,8 +14,8 @@ let get_options cfg os =
   let rec loop os kws pos =
     if let o::os = os then
       if o eq "--" then (kws, rev_append pos os)
-      else if String.match \^--/ o then handle_long_option o os kws pos
-      else if String.match \^-/ o then handle_short_option o os kws pos
+      else if o =~ \^--/ then handle_long_option o os kws pos
+      else if o =~ \^-/ then handle_short_option o os kws pos
       else loop os kws (o :: pos)
     else (kws, rev pos)
 
