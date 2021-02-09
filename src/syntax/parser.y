@@ -50,6 +50,10 @@ static eth_ast*
 dummy_ast()
 { return eth_ast_cval(eth_nil); }
 
+static bool
+is_dummy(const eth_ast *ast)
+{ return ast->tag == ETH_AST_CVAL && ast->cval.val == eth_nil; }
+
 static eth_attr*
 _create_attr(int aflag, void *locpp)
 {
@@ -527,12 +531,22 @@ StmtSeq
     switch ($1->tag)
     {
       case ETH_AST_LET:
-        $$ = $1;
-        eth_set_let_expr($1, $3);
+        if (is_dummy($1->letrec.body))
+        {
+          $$ = $1;
+          eth_set_let_expr($1, $3);
+        }
+        else
+          goto _default;
         break;
       case ETH_AST_LETREC:
-        $$ = $1;
-        eth_set_letrec_expr($1, $3);
+        if (is_dummy($1->letrec.body))
+        {
+          $$ = $1;
+          eth_set_letrec_expr($1, $3);
+        }
+        else
+          goto _default;
         break;
       case ETH_AST_IMPORT:
         $$ = $1;
@@ -543,6 +557,7 @@ StmtSeq
         eth_set_assert_body($1, $3);
         break;
       default:
+      _default:
         $$ = eth_ast_seq($1, $3); LOC($$, @$);
     }
   }
