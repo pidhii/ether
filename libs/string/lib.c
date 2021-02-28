@@ -461,6 +461,7 @@ _gsub(void)
   while (true)
   {
     int n = eth_exec_regexp(reg, p, pend - p, 0);
+    int ovec0 = ovec[0], ovec1 = ovec[1];
     if (n < 0)
     {
       fwrite(p, 1, pend - p, buf);
@@ -474,7 +475,7 @@ _gsub(void)
     }
     else
     {
-      if (ovec[0] == 0 && ovec[1] == 0)
+      if (ovec0 == 0 && ovec1 == 0)
       {
         fclose(buf);
         free(ptr);
@@ -482,9 +483,9 @@ _gsub(void)
       }
       else
       {
-        fwrite(p, 1, ovec[0], buf);
+        fwrite(p, 1, ovec0, buf);
         // --
-        eth_t x = eth_create_string2(p + ovec[0], ovec[1] - ovec[0]);
+        eth_t x = eth_create_string2(p + ovec0, ovec1 - ovec0);
         eth_reserve_stack(1);
         eth_sp[0] = x;
         eth_t r = eth_apply(f, 1);
@@ -504,7 +505,7 @@ _gsub(void)
         }
         fwrite(eth_str_cstr(r), 1, eth_str_len(r), buf);
         eth_drop(r);
-        p += ovec[1];
+        p += ovec1;
       }
     }
   }
