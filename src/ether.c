@@ -47,12 +47,12 @@ eth_get_prefix(void)
     {
       char *line = NULL;
       size_t n = 0;
-      getline(&line, &n, in);
+      ssize_t nrd = getline(&line, &n, in);
       if (pclose(in) == 0)
       {
-        assert(n > 1);
-        line[n - 2] = 0; // remove newline
-        memcpy(buf, line, n);
+        assert(nrd > 1);
+        line[nrd - 1] = 0; // remove newline
+        strcpy(buf, line);
         prefix = buf;
       }
       free(line);
