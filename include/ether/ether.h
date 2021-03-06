@@ -1917,7 +1917,7 @@ struct eth_ast {
     struct { char *module; eth_ast *body; char *alias; char **nams; int nnam;
              bool ispub; }
       import;
-    struct { char *name; eth_ast *body; } module;
+    struct { char *name; eth_ast *body, *next; } module;
     struct { eth_ast *lhs, *rhs; } scand, scor;
     struct { eth_ast *expr; char *field; } access;
     struct { eth_ast_pattern *pat; eth_ast *trybr, *catchbr; int likely;
@@ -2022,7 +2022,7 @@ eth_set_import_expr(eth_ast *import, eth_ast *expr)
 }
 
 eth_ast*
-eth_ast_module(const char *name, eth_ast *body);
+eth_ast_module(const char *name, eth_ast *body, eth_ast *next);
 
 eth_ast* __attribute__((malloc))
 eth_ast_and(eth_ast *lhs, eth_ast *rhs);
@@ -2358,10 +2358,20 @@ eth_pop_var(eth_var_list *lst, int n);
 eth_var*
 eth_find_var(eth_var *head, const char *ident, int *cnt);
 
+typedef enum {
+  ETH_IRDEF_VAR, /**< @brief Runtime variable. */
+  ETH_IRDEF_CVAL, /**< @brief Constant. */
+} eth_ir_def_tag;
+
 typedef struct {
-  char **idents;
-  int *varids;
-  eth_attr **attrs;
+  eth_ir_def_tag tag;
+  char *ident;
+  eth_attr *attr;
+  union { int varid; eth_t cval; };
+} eth_ir_def;
+
+typedef struct {
+  eth_ir_def *defs;
   int n;
 } eth_ir_defs;
 

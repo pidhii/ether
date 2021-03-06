@@ -498,15 +498,6 @@ Atom
   }
   | FmtString
   | RegExp
-  | MODULE CAPSYMBOL '=' Block {
-    $$ = eth_ast_module($2, $4);
-    LOC($$, @1);
-    free($2);
-  }
-  | MODULE '=' Block {
-    $$ = eth_ast_module(NULL, $3);
-    LOC($$, @1);
-  }
 ;
 
 Form
@@ -586,6 +577,25 @@ StmtSeq
     cod_vec_destroy($3.pats);
     cod_vec_destroy($3.vals);
     LOC($$, @$);
+  }
+
+  | MODULE CAPSYMBOL '=' Block {
+    $$ = eth_ast_module($2, $4, eth_ast_cval(eth_nil));
+    LOC($$, @1);
+    free($2);
+  }
+  | MODULE '=' Block {
+    $$ = eth_ast_module(NULL, $3, eth_ast_cval(eth_nil));
+    LOC($$, @1);
+  }
+  | MODULE CAPSYMBOL '=' Block KEEP_BLOCK StmtSeq {
+    $$ = eth_ast_module($2, $4, $6);
+    LOC($$, @1);
+    free($2);
+  }
+  | MODULE '=' Block KEEP_BLOCK StmtSeq {
+    $$ = eth_ast_module(NULL, $3, $5);
+    LOC($$, @1);
   }
 ;
 

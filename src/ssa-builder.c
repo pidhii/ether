@@ -2148,7 +2148,7 @@ eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
       int argvids[n + 1];
       argvids[0] = ret;
       for (int i = 0; i < n; ++i)
-        argvids[i+1] = bldr->vars[defs->varids[i]];
+        argvids[i+1] = bldr->vars[defs->defs[i].varid];
 
       eth_insn *insn = eth_insn_apply(modret, fnvid, argvids, n + 1);
       eth_write_insn(tlvltape, insn);

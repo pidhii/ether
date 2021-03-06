@@ -35,67 +35,114 @@
 -- * find
 --
 
+open Detail
+
+
+module Prelude =
+  let pub cat = __cat
+  let pub join sep xs =
+    if xs is nil then ""
+    else if let hd::[] = xs then hd
+    else if let hd::tl = xs then
+      List.fold_left (fn x y -> cat [x, sep, y]) hd tl
+    else invalid_argument ()
+  let pub to_upper = __to_upper
+  let pub to_lower = __to_lower
+  let pub chr = __chr
+  let pub ord = __ord
+  let pub to_number = __to_number
+  let pub to_symbol = __to_symbol
+  let pub chomp = __chomp
+  let pub chop = __chop
+  let pub trim_left = __trim_left
+  let pub trim_right = __trim_right
+  let pub trim s = trim_left $ trim_right s
+  let pub strcmp = __strcmp
+  let pub strcasecmp = __strcasecmp
+  let pub match = __match
+  let pub gsub = __gsub
+  let pub rev_split = __rev_split
+  let pub split re str = List.rev $ rev_split re str
+
+  let pub malloc =
+  {.help|
+= String.malloc
+== DESCRIPTION:
+Create an uninitialized string of given length.\n
+== SYNOPSIS\n
+  malloc number? -> string?
+  |.help}
+    __malloc
+
+  let pub calloc =
+  {.help|
+= String.calloc
+== DESCRIPTION:
+Create a string of given length initialized with zeros.
+== SYNOPSIS
+  calloc number? -> string?
+  |.help}
+    __calloc
+
+
+
+--------------------------------------------------------------------------------
 let pub malloc =
 {.help|
 = String.malloc
-
 == DESCRIPTION:
 Create an uninitialized string of given length.
-
 == SYNOPSIS
-
   malloc number? -> string?
 |.help}
   __malloc
 
+--------------------------------------------------------------------------------
 let pub calloc =
 {.help|
 = String.calloc
-
 == DESCRIPTION:
 Create a string of given length initialized with zeros.
-
 == SYNOPSIS
-
   calloc number? -> string?
 |.help}
   __calloc
 
+--------------------------------------------------------------------------------
 let pub make =
 {.help|
 = String.make
-
 == DESCRIPTION
 Create  a  string of given length filled with a first  character  of  supplied
 string. If it is of zero length, then the it is treated as 0-byte.
-
 == SYNOPSIS
-
   make number? string? -> string?
-
 |.help}
   __make
 
--- TODO: optimize
-let pub rev s =
-  list s |> List.rev |> cat
-
-let pub join sep xs =
-  if xs is nil then ""
-  else if let hd::[] = xs then hd
-  else if let hd::tl = xs then
-    List.fold_left (fn x y -> cat [x, sep, y]) hd tl
-  else invalid_argument ()
-
+let pub len = __len
+let pub to_upper = Prelude.to_upper
+let pub to_lower = Prelude.to_lower
+let pub strcmp = Prelude.strcmp
+let pub strcasecmp = Prelude.strcasecmp
+let pub cat = Prelude.cat
+let pub chomp = Prelude.chomp
+let pub chop = Prelude.chop
+let pub trim_left = Prelude.trim_left
+let pub trim_right = Prelude.trim_right
+let pub trim = Prelude.trim
+let pub chr = Prelude.chr
+let pub ord = Prelude.ord
+let pub to_number = Prelude.to_number
+let pub to_symbol = Prelude.to_symbol
+let pub rev s = list s |> List.rev |> cat -- TODO: optimize
+let pub join = Prelude.join
 let pub sub x s =
   if let l .. r = x then __substr s l (r - l + 1)
   else if let l... = x then __substr s l (len s - l)
   else if let ...r = x then __substr s 0 (r + 1)
   else invalid_argument ()
-
 let pub get s i = __substr s i 1
-
-let pub trim s = trim_left $ trim_right s
 
 --------------------------------------------------------------------------------
 --                                Regexp
@@ -103,8 +150,11 @@ let pub trim s = trim_left $ trim_right s
 -- * rev_split (C)
 -- * split
 -- * gsub
-let pub split re str = List.rev $ rev_split re str
 
+let pub match = Prelude.match
+let pub gsub = Prelude.gsub
+let pub rev_split = Prelude.rev_split
+let pub split = Prelude.split
 let pub find pat s =
   if regexp? pat then __find_regexp pat s
   else if string? pat then
@@ -112,13 +162,4 @@ let pub find pat s =
     then (start, start + len pat)
     else false
   else type_error ()
-
-
---module Prelude =
-  --let {pub * } = @(
-    --{
-      --cat, join, malloc, calloc, to_upper, to_lower, chr, ord, to_number,
-      --to_symbol, chomp, chop, trim_left, trim_right, trim, sub, strcmp,
-      --strcasecmp, match, split, rev_split, gsub,
-    --})
 

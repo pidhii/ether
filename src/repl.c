@@ -98,7 +98,7 @@ eth_eval(eth_evaluator *evl, eth_ast *ast)
       // get defs:
       int i = 0;
       for (eth_t it = eth_tup_get(ret, 1); it != eth_nil; it = eth_cdr(it), ++i)
-        eth_define_attr(evl->mod, defs.idents[i], eth_car(it), defs.attrs[i]);
+        eth_define_attr(evl->mod, defs.defs[i].ident, eth_car(it), defs.defs[i].attr);
       eth_destroy_ir_defs(&defs);
       eth_unref(ret);
 
@@ -150,6 +150,8 @@ eth_eval(eth_evaluator *evl, eth_ast *ast)
       //return eth_eval_body(evl, body->seq.e2);
     //}
 
+    //// TODO: reorganize handling of public variables (below is an ugly
+    //// workaround)
     //case ETH_AST_LET:
     //case ETH_AST_LETREC:
     //{
@@ -234,6 +236,10 @@ eth_eval(eth_evaluator *evl, eth_ast *ast)
       //body->let.body = letbody;
       //eth_unref_ast(dummybody);
       //return eth_eval_body(evl, body->let.body);
+    //}
+
+    //case ETH_AST_IMPORT:
+    //{
     //}
 
     //default:

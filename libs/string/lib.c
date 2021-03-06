@@ -629,32 +629,35 @@ _to_symbol(void)
 int
 ether_module(eth_module *mod, eth_root *topenv)
 {
-  eth_define(mod, "__malloc", eth_create_proc(_malloc, 1, NULL, NULL));
-  eth_define(mod, "__calloc", eth_create_proc(_calloc, 1, NULL, NULL));
-  eth_define(mod, "__make", eth_create_proc(_make, 2, NULL, NULL));
+  eth_module *detail = eth_create_module("Detail", mod, NULL);
+  eth_add_module(eth_get_env(mod), detail);
 
-  eth_define(mod, "len", eth_create_proc(_strlen, 1, NULL, NULL));
-  eth_define(mod, "to_upper", eth_create_proc(_to_upper, 1, NULL, NULL));
-  eth_define(mod, "to_lower", eth_create_proc(_to_lower, 1, NULL, NULL));
-  eth_define(mod, "strcmp", eth_create_proc(_strcmp, 2, NULL, NULL));
-  eth_define(mod, "strcasecmp", eth_create_proc(_strcasecmp, 2, NULL, NULL));
-  eth_define(mod, "__substr", eth_create_proc(_substr, 3, NULL, NULL));
-  eth_define(mod, "__strstr_opt", eth_create_proc(_strstr_opt, 2, NULL, NULL));
-  eth_define(mod, "cat", eth_create_proc(_cat, 1, NULL, NULL));
-  eth_define(mod, "chomp", eth_create_proc(_chomp, 1, NULL, NULL));
-  eth_define(mod, "chop", eth_create_proc(_chop, 1, NULL, NULL));
-  eth_define(mod, "trim_left", eth_create_proc(_trim_left, 1, NULL, NULL));
-  eth_define(mod, "trim_right", eth_create_proc(_trim_right, 1, NULL, NULL));
-  eth_define(mod, "chr", eth_create_proc(_chr, 1, NULL, NULL));
-  eth_define(mod, "ord", eth_create_proc(_ord, 1, NULL, NULL));
+  eth_define(detail, "__malloc", eth_create_proc(_malloc, 1, NULL, NULL));
+  eth_define(detail, "__calloc", eth_create_proc(_calloc, 1, NULL, NULL));
+  eth_define(detail, "__make", eth_create_proc(_make, 2, NULL, NULL));
+
+  eth_define(detail, "__len", eth_create_proc(_strlen, 1, NULL, NULL));
+  eth_define(detail, "__to_upper", eth_create_proc(_to_upper, 1, NULL, NULL));
+  eth_define(detail, "__to_lower", eth_create_proc(_to_lower, 1, NULL, NULL));
+  eth_define(detail, "__strcmp", eth_create_proc(_strcmp, 2, NULL, NULL));
+  eth_define(detail, "__strcasecmp", eth_create_proc(_strcasecmp, 2, NULL, NULL));
+  eth_define(detail, "__substr", eth_create_proc(_substr, 3, NULL, NULL));
+  eth_define(detail, "__strstr_opt", eth_create_proc(_strstr_opt, 2, NULL, NULL));
+  eth_define(detail, "__cat", eth_create_proc(_cat, 1, NULL, NULL));
+  eth_define(detail, "__chomp", eth_create_proc(_chomp, 1, NULL, NULL));
+  eth_define(detail, "__chop", eth_create_proc(_chop, 1, NULL, NULL));
+  eth_define(detail, "__trim_left", eth_create_proc(_trim_left, 1, NULL, NULL));
+  eth_define(detail, "__trim_right", eth_create_proc(_trim_right, 1, NULL, NULL));
+  eth_define(detail, "__chr", eth_create_proc(_chr, 1, NULL, NULL));
+  eth_define(detail, "__ord", eth_create_proc(_ord, 1, NULL, NULL));
   // --
-  eth_define(mod,  "to_number", eth_create_proc( _to_number, 1, NULL, NULL));
-  eth_define(mod,  "to_symbol", eth_create_proc( _to_symbol, 1, NULL, NULL));
+  eth_define(detail,  "__to_number", eth_create_proc( _to_number, 1, NULL, NULL));
+  eth_define(detail,  "__to_symbol", eth_create_proc( _to_symbol, 1, NULL, NULL));
   // --
-  eth_define(mod, "match", eth_create_proc(_match, 2, NULL, NULL));
-  eth_define(mod, "gsub", eth_create_proc(_gsub, 3, NULL, NULL));
-  eth_define(mod, "rev_split", eth_create_proc(_rev_split, 2, NULL, NULL));
-  eth_define(mod, "__find_regexp", eth_create_proc(_find_regexp, 2, NULL, NULL));
+  eth_define(detail, "__match", eth_create_proc(_match, 2, NULL, NULL));
+  eth_define(detail, "__gsub", eth_create_proc(_gsub, 3, NULL, NULL));
+  eth_define(detail, "__rev_split", eth_create_proc(_rev_split, 2, NULL, NULL));
+  eth_define(detail, "__find_regexp", eth_create_proc(_find_regexp, 2, NULL, NULL));
 
   int ret = 0;
   if (not eth_load_module_from_script2(topenv, NULL, mod, "lib.eth", NULL, mod))

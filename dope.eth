@@ -91,11 +91,10 @@ module Utl =
 
   let rec pub confirm? x =
     if let (prompt1, prompt2) = x then
-      let rec loop ans =
+      do loop ans: (input prompt1) =
         if ans =~ \[Yy](es)?/ then true
         else if ans =~ \[Nn]o?/ then false
         else loop (input prompt2)
-      loop (input prompt1)
     else
       confirm? (x, paint " try again (yes/no): ")
 
@@ -195,14 +194,13 @@ module Git =
         else raise Filter_out
       -- Sort versions.
       |> sort $ (_, a) (_, b) ->
-        let rec loop xs ys =
+        do loop xs:a ys:b =
           if let x :: xs' = xs then
             if let y :: ys' = ys then
               if x > y then true
               else x == y && loop xs' ys'
             else true
           else true
-        loop a b
       |> map first
 
   let pub head_commit url =

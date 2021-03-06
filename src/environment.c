@@ -298,7 +298,7 @@ load_from_ast(eth_root *root, eth_module *mod, eth_ast *ast,
   // get defs:
   int i = 0;
   for (eth_t it = eth_tup_get(ret, 1); it != eth_nil; it = eth_cdr(it), ++i)
-    eth_define_attr(mod, defs.idents[i], eth_car(it), defs.attrs[i]);
+    eth_define_attr(mod, defs.defs[i].ident, eth_car(it), defs.defs[i].attr);
   eth_destroy_ir_defs(&defs);
   // get return-value:
   if (retptr)

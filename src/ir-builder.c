@@ -38,9 +38,10 @@ typedef struct ir_builder {
   eth_var_list *vars;
   int capoffs;
   int nvars;
-  cod_vec(char*) defidents;
-  cod_vec(int  ) defvarids;
-  cod_vec(eth_attr*) defattrs;
+  cod_vec(eth_ir_def) defs;
+  //cod_vec(char*) defidents;
+  //cod_vec(int  ) defvarids;
+  //cod_vec(eth_attr*) defattrs;
   cod_vec(module_entry) mods;
   int immcnt;
   eth_module *gvars; // global pre-evaluated constants
@@ -59,9 +60,7 @@ create_ir_builder(ir_builder *parent)
   bldr->nvars = 0;
   bldr->immcnt = 0;
   bldr->gvars = eth_create_module(NULL, NULL, NULL);
-  cod_vec_init(bldr->defidents);
-  cod_vec_init(bldr->defvarids);
-  cod_vec_init(bldr->defattrs);
+  cod_vec_init(bldr->defs);
   cod_vec_init(bldr->mods);
 
   return bldr;
@@ -71,11 +70,13 @@ static void
 destroy_ir_builder(ir_builder *bldr)
 {
   eth_destroy_var_list(bldr->vars);
-  cod_vec_iter(bldr->defidents, i, x, free(x));
-  cod_vec_destroy(bldr->defidents);
-  cod_vec_destroy(bldr->defvarids);
-  cod_vec_iter(bldr->defattrs, i, x, eth_unref_attr(x));
-  cod_vec_destroy(bldr->defattrs);
+  cod_vec_iter(bldr->defs, i, x, {
+    if (x.tag == ETH_IRDEF_CVAL)
+      eth_unref(x.cval);
+    free(x.ident);
+    eth_unref_attr(x.attr);
+  });
+  cod_vec_destroy(bldr->defs);
   /*assert(bldr->mods.len == 0);*/
   while (bldr->mods.len > 0)
   { // MODULE will leve dangling modules
@@ -131,9 +132,13 @@ trace_pub_var(ir_builder *bldr, const char *ident, int varid, eth_attr *attr,
 {
   if (bldr->istoplvl)
   {
-    cod_vec_push(bldr->defidents, strdup(ident));
-    cod_vec_push(bldr->defvarids, varid);
-    cod_vec_push(bldr->defattrs, attr);
+    eth_ir_def def = {
+      .tag = ETH_IRDEF_VAR,
+      .ident = strdup(ident),
+      .attr = attr,
+      .varid = varid,
+    };
+    cod_vec_push(bldr->defs, def);
     eth_ref_attr(attr);
   }
   else
@@ -831,8 +836,8 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
 
     case ETH_AST_SEQ:
     {
-      eth_ir_node *e1 = build(bldr, ast->seq.e1, e);
-      /*eth_ir_node *e1 = build_with_toplvl(bldr, ast->seq.e1, e, false);*/
+      //eth_ir_node *e1 = build(bldr, ast->seq.e1, e);
+      eth_ir_node *e1 = build_with_toplvl(bldr, ast->seq.e1, e, false);
       eth_ir_node *e2 = build(bldr, ast->seq.e2, e);
       return eth_ir_seq(e1, e2);
     }
@@ -1134,7 +1139,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       { // import in current environment
         import_default(bldr, mod, NULL);
       }
-      return eth_ir_cval(modret);
+      return build(bldr, ast->module.next, e);
     }
 
     case ETH_AST_AND:
@@ -1402,16 +1407,10 @@ build_ir(eth_ast *ast, eth_root *root, eth_module *mod, eth_ir_defs *defs,
 
   if (defs)
   {
-    defs->idents = bldr->defidents.data;
-    defs->varids = bldr->defvarids.data;
-    defs->attrs = bldr->defattrs.data;
-    defs->n = bldr->defidents.len;
-    bldr->defidents.data = NULL;
-    bldr->defvarids.data = NULL;
-    bldr->defattrs.data = NULL;
-    cod_vec_destroy(bldr->defidents);
-    cod_vec_destroy(bldr->defvarids);
-    cod_vec_destroy(bldr->defattrs);
+    defs->defs = bldr->defs.data;
+    defs->n = bldr->defs.len;
+    bldr->defs.data = NULL;
+    bldr->defs.len = 0;
   }
 
   ret = eth_create_ir(body, bldr->nvars);
@@ -1437,11 +1436,9 @@ eth_destroy_ir_defs(eth_ir_defs *defs)
 {
   for (int i = 0; i < defs->n; ++i)
   {
-    free(defs->idents[i]);
-    eth_unref_attr(defs->attrs[i]);
+    free(defs->defs[i].ident);
+    eth_unref_attr(defs->defs[i].attr);
   }
-  free(defs->idents);
-  free(defs->varids);
-  free(defs->attrs);
+  free(defs->defs);
 }
 
