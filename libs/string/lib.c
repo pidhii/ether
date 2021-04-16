@@ -629,8 +629,8 @@ _to_symbol(void)
 int
 ether_module(eth_module *mod, eth_root *topenv)
 {
-  eth_module *detail = eth_create_module("Detail", mod, NULL);
-  eth_add_module(eth_get_env(mod), detail);
+  eth_module *detail = eth_create_module("string.detail", NULL);
+  eth_copy_module_path(eth_get_root_env(topenv), eth_get_env(detail));
 
   eth_define(detail, "__malloc", eth_create_proc(_malloc, 1, NULL, NULL));
   eth_define(detail, "__calloc", eth_create_proc(_calloc, 1, NULL, NULL));
@@ -659,9 +659,14 @@ ether_module(eth_module *mod, eth_root *topenv)
   eth_define(detail, "__rev_split", eth_create_proc(_rev_split, 2, NULL, NULL));
   eth_define(detail, "__find_regexp", eth_create_proc(_find_regexp, 2, NULL, NULL));
 
-  int ret = 0;
-  if (not eth_load_module_from_script2(topenv, NULL, mod, "lib.eth", NULL, mod))
-    ret = -1;
-  return ret;
+  eth_module *aux = eth_load_module_from_script2(topenv, "./lib.eth", NULL, detail);
+  eth_destroy_module(detail);
+  if (not aux)
+    return -1;
+
+  eth_copy_defs(aux, mod);
+  eth_destroy_module(aux);
+
+  return 0;
 }
 

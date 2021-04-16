@@ -39,12 +39,7 @@ typedef struct ir_builder {
   int capoffs;
   int nvars;
   cod_vec(eth_ir_def) defs;
-  //cod_vec(char*) defidents;
-  //cod_vec(int  ) defvarids;
-  //cod_vec(eth_attr*) defattrs;
-  cod_vec(module_entry) mods;
   int immcnt;
-  eth_module *gvars; // global pre-evaluated constants
 } ir_builder;
 
 static ir_builder*
@@ -59,9 +54,7 @@ create_ir_builder(ir_builder *parent)
   bldr->capoffs = 0;
   bldr->nvars = 0;
   bldr->immcnt = 0;
-  bldr->gvars = eth_create_module(NULL, NULL, NULL);
   cod_vec_init(bldr->defs);
-  cod_vec_init(bldr->mods);
 
   return bldr;
 }
@@ -77,48 +70,11 @@ destroy_ir_builder(ir_builder *bldr)
     eth_unref_attr(x.attr);
   });
   cod_vec_destroy(bldr->defs);
-  /*assert(bldr->mods.len == 0);*/
-  while (bldr->mods.len > 0)
-  { // MODULE will leve dangling modules
-    module_entry ent = cod_vec_pop(bldr->mods);
-    free(ent.name);
-  }
-  cod_vec_destroy(bldr->mods);
-  eth_destroy_module(bldr->gvars);
   free(bldr);
 }
 
 static eth_ir_node*
 build(ir_builder *bldr, eth_ast *ast, int *e);
-
-static inline void
-add_module(ir_builder *bldr, const char *name, const eth_module *mod)
-{
-  module_entry ent = { .name = strdup(name), .module = mod };
-  cod_vec_push(bldr->mods, ent);
-}
-
-static inline void
-pop_module(ir_builder *bldr)
-{
-  module_entry ent = cod_vec_pop(bldr->mods);
-  free(ent.name);
-}
-
-static inline const eth_module*
-find_visited_module(ir_builder *bldr, const char *name)
-{
-  for (size_t i = 0; i < bldr->mods.len; ++i)
-  {
-    if (strcmp(bldr->mods.data[i].name, name) == 0)
-      return bldr->mods.data[i].module;
-  }
-
-  if (bldr->parent)
-    return find_visited_module(bldr->parent, name);
-  else
-    return NULL;
-}
 
 static inline int
 new_vid(ir_builder *bldr)
@@ -149,142 +105,27 @@ trace_pub_var(ir_builder *bldr, const char *ident, int varid, eth_attr *attr,
   }
 }
 
-static bool
-resolve_var_path(ir_builder *bldr, const eth_module *mod, const char *path,
-    eth_def *ret)
+static inline void
+trace_pub_cval(ir_builder *bldr, const char *ident, eth_t cval, eth_attr *attr,
+    eth_location *loc, int *e)
 {
-  char *p;
-  if ((p = strchr(path, '.')))
+  if (bldr->istoplvl)
   {
-    int modnamelen = p - path;
-    char modname[modnamelen + 1];
-    memcpy(modname, path, modnamelen);
-    modname[modnamelen] = '\0';
-
-    eth_module *submod = eth_require_module(bldr->root, eth_get_env(mod), modname);
-    if (submod == NULL)
-    {
-      eth_warning("no submodule %s in %s", modname, eth_get_module_name(mod));
-      return false;
-    }
-
-    return resolve_var_path(bldr, submod, p + 1, ret);
-  }
-
-  eth_def *def = eth_find_def(mod, path);
-  if (def == NULL)
-  {
-    eth_warning("no '%s' in module %s", path, eth_get_module_name(mod));
-    return false;
-  }
-  *ret = *def;
-  return true;
-}
-
-static const char*
-get_env_parent_name(eth_env *env)
-{
-  eth_module *parent;
-  if ((parent = eth_get_env_parent(env)))
-    return eth_get_module_name(parent);
-  else
-    return "<no-parent>";
-}
-
-static eth_module*
-require_module_aux(eth_root *root, eth_env *env, const char *name)
-{
-  eth_debug("require module '%s' from '%s'", name, get_env_parent_name(env));
-  eth_indent_log();
-  eth_module *ret = eth_require_module(root, env, name);
-  eth_dedent_log();
-  if (ret)
-    eth_debug("module found \e[38;5;2;1m✓\e[0m");
-  else
-    eth_debug("module not found \e[38;5;1;1m✗\e[0m");
-  return ret;
-}
-
-static const eth_module*
-find_visited_module_aux(ir_builder *bldr, const char *name)
-{
-  eth_debug("check module '%s' in visited modules... ", name, false);
-  eth_indent_log();
-  const eth_module *ret = find_visited_module(bldr, name);
-  eth_dedent_log();
-  if (ret and eth_debug_enabled)
-    fprintf(stderr, "\e[38;5;2;1mfound\e[0m\n");
-  else if (eth_debug_enabled)
-    fprintf(stderr, "\e[38;5;1;1mnot found\e[0m\n");
-  return ret;
-}
-
-static const eth_module*
-require_module(ir_builder *bldr, const char *name)
-{
-  assert(bldr->root);
-
-  char *p;
-  char topname[256];
-  bool istop = true;
-  if ((p = strchr(name, '.')))
-  {
-    int len = p - name;
-    memcpy(topname, name, len);
-    topname[len] = '\0';
-    istop = false;
-  }
-  else
-    strcpy(topname, name);
-
-  const eth_module *topmod = NULL;
-
-  /* Check modules already accessed by current builder. */
-  if ((topmod = find_visited_module_aux(bldr, topname)))
-    goto found_old;
-
-  /* Otherwize, search in modules from above. */
-  for (const eth_module *m = bldr->mod; m; m = eth_get_module_parent(m))
-  {
-    if ((topmod = require_module_aux(bldr->root, eth_get_env(m), topname)))
-    {
-      eth_debug("found module '%s' in upper module '%s'", name,
-          eth_get_module_name(m));
-      goto found_new;
-    }
-  }
-
-  /* Otherwize, search in the top-level environment. */
-  if ((topmod =
-        require_module_aux(bldr->root, eth_get_root_env(bldr->root), topname)))
-    goto found_new;
-
-  if (not topmod)
-  {
-    eth_warning("failed to resolve %s", topname);
-    return NULL;
-  }
-
-found_new:
-  add_module(bldr, topname, topmod);
-
-found_old:
-  if (istop)
-  {
-    /* done */
-    return topmod;
+    eth_ir_def def = {
+      .tag = ETH_IRDEF_CVAL,
+      .ident = strdup(ident),
+      .attr = attr,
+      .cval = cval,
+    };
+    cod_vec_push(bldr->defs, def);
+    eth_ref(cval);
+    eth_ref_attr(attr);
   }
   else
   {
-    /* resolve submodule (we already found the root) */
-    const eth_module *mod =
-      require_module_aux(bldr->root, eth_get_env(topmod), p + 1);
-    if (not mod)
-    {
-      eth_warning("failed to resolve %s", name);
-      return NULL;
-    }
-    return mod;
+    eth_warning("can't have public variables outside top level-scope");
+    *e = 1;
+    eth_print_location(loc, stderr);
   }
 }
 
@@ -298,51 +139,26 @@ found_old:
 static bool
 require_var(ir_builder *bldr, const char *ident, eth_var *ret)
 {
-  char *p;
-  if ((p = strchr(ident, '.')))
+  eth_var *localvar = eth_find_var(bldr->vars->head, ident, NULL);
+  if (localvar)
   {
-    int modnamelen = p - ident;
-    char modname[modnamelen + 1];
-    memcpy(modname, ident, modnamelen);
-    modname[modnamelen] = '\0';
-
-    const eth_module *mod = require_module(bldr, modname);
-    if (mod == NULL)
-      return false;
-
-    eth_def def;
-    if (not resolve_var_path(bldr, mod, p + 1, &def))
-      return false;
-    ret->ident = def.ident;
-    ret->cval = def.val;
-    ret->attr = def.attr;
-    ret->vid = -1;
-    ret->next = NULL;
+    *ret = *localvar;
     return true;
   }
-  else
+  else if (bldr->parent)
   {
-    eth_var *localvar = eth_find_var(bldr->vars->head, ident, NULL);
-    if (localvar)
+    if (require_var(bldr->parent, ident, ret))
     {
-      *ret = *localvar;
+      // immidiately return constants (don't perform capture)
+      if (ret->cval)
+        return true;
+      int vid = new_vid(bldr);
+      bldr->capoffs += 1;
+      *ret = *eth_append_var(bldr->vars, eth_copy_var(ret, vid));
       return true;
     }
-    else if (bldr->parent)
-    {
-      if (require_var(bldr->parent, ident, ret))
-      {
-        // immidiately return constants (don't perform capture)
-        if (ret->cval)
-          return true;
-        int vid = new_vid(bldr);
-        bldr->capoffs += 1;
-        *ret = *eth_append_var(bldr->vars, eth_copy_var(ret, vid));
-        return true;
-      }
-    }
-    return false;
   }
+  return false;
 }
 
 static eth_var*
@@ -357,51 +173,17 @@ find_var_deep(ir_builder *bldr, const char *ident)
     return NULL;
 }
 
-static bool
-import_names(ir_builder *bldr, const eth_module *mod, char *const nams[], int n)
-{
-  for (int i = 0; i < n; ++i)
-  {
-    eth_def *def = eth_find_def(mod, nams[i]);
-    if (not def)
-    {
-      eth_warning("no '%s' in module %s", nams[i], eth_get_module_name(mod));
-      return false;
-    }
-    eth_prepend_var(bldr->vars, eth_const_var(def->ident, def->val, def->attr));
-  }
-  return true;
-}
-
 static void
-import_default(ir_builder *bldr, const eth_module *mod, const char *alias)
+import(ir_builder *bldr, const eth_module *mod)
 {
-  add_module(bldr, alias ? alias : eth_get_module_name(mod), mod);
-}
-
-static void
-import_unqualified(ir_builder *bldr, const eth_module *mod)
-{
-  eth_debug("import unqualified names from '%s'", eth_get_module_name(mod));
-
-  // import vals
   int ndefs = eth_get_ndefs(mod);
   eth_def defs[ndefs];
   eth_get_defs(mod, defs);
   for (int i = 0; i < ndefs; ++i)
   {
     eth_var_cfg varcfg = eth_const_var(defs[i].ident, defs[i].val, defs[i].attr);
-    varcfg.attr = defs[i].attr;
     eth_prepend_var(bldr->vars, varcfg);
   }
-
-  // import submodules
-  eth_env *modenv = eth_get_env(mod);
-  int nsubmods = eth_get_nmodules(modenv);
-  const eth_module *submods[nsubmods];
-  eth_get_modules(modenv, submods, nsubmods);
-  for (int i = 0; i < nsubmods; ++i)
-    add_module(bldr, eth_get_module_name(submods[i]), submods[i]);
 }
 
 static eth_ir_pattern*
@@ -510,18 +292,7 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
   abort();
 }
 
-static eth_ir_node*
-build_with_toplvl(ir_builder *bldr, eth_ast *ast, int *e, bool savetop)
-{
-  bool tlvl = bldr->istoplvl;
-  if (not savetop)
-    bldr->istoplvl = false;
-  eth_ir_node *ret = build(bldr, ast, e);
-  bldr->istoplvl = tlvl;
-  return ret;
-}
-
-static eth_ir_pattern*
+static bool
 build_record_star(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc,
     eth_ir_node *expr, int *e)
 {
@@ -543,14 +314,10 @@ build_record_star(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc,
   }
 
   int n = eth_record_size(record->type);
-  size_t ids[n];
-  eth_ir_pattern *idpats[n];
   for (int i = n - 1; i >= 0; --i)
   {
     const char *key = record->type->fields[i].name;
     eth_t val = eth_tup_get(record, i);
-
-    int varid = new_vid(bldr);
 
     // set up attribute
     eth_attr *attr = NULL;
@@ -559,22 +326,124 @@ build_record_star(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc,
       // handle PUB
       attr = pat->recordstar.attr;
       if (pat->recordstar.attr->flag & ETH_ATTR_PUB)
-        trace_pub_var(bldr, key, varid, attr, loc, e);
+        trace_pub_cval(bldr, key, val, attr, loc, e);
       /*else*/
       /*eth_drop_attr(attr);*/
     }
     eth_prepend_var(bldr->vars, eth_const_var(key, val, attr));
-    ids[i] = eth_get_symbol_id(eth_sym(key));
-    idpats[i] = eth_ir_ident_pattern(varid);
   }
 
-  int alias = new_vid(bldr);
   if (pat->recordstar.alias)
   {
+    eth_trace("alias {*} (%s)", pat->recordstar.alias);
     eth_prepend_var(bldr->vars,
         eth_const_var(pat->recordstar.alias, record, NULL));
   }
-  return eth_ir_record_pattern(alias, ids, idpats, n);
+
+  return true;
+}
+
+static bool
+build_pattern_constexpr(ir_builder *bldr, eth_ast_pattern *pat, eth_t expr,
+    eth_location *loc, int *e)
+{
+  switch (pat->tag)
+  {
+    case ETH_AST_PATTERN_DUMMY:
+      return true;
+
+    case ETH_AST_PATTERN_IDENT:
+    {
+      // set up attribute
+      eth_attr *attr = NULL;
+      if (pat->ident.attr)
+      {
+        // handle PUB
+        attr = pat->ident.attr;
+        if (pat->ident.attr->flag & ETH_ATTR_PUB)
+          trace_pub_cval(bldr, pat->ident.str, expr, attr, loc, e);
+      }
+
+      eth_prepend_var(bldr->vars, eth_const_var(pat->ident.str, expr, attr));
+      return true;
+    }
+
+    case ETH_AST_PATTERN_UNPACK:
+    {
+      eth_type *type = pat->unpack.type;
+      if (expr->type != type)
+        return false;
+
+      // aliasing:
+      if (pat->unpack.alias)
+        eth_prepend_var(bldr->vars, eth_const_var(pat->unpack.alias, expr, NULL));
+
+      int n = pat->unpack.n;
+      int offs[n];
+      eth_ir_pattern *pats[n];
+      for (int i = 0; i < n; ++i)
+      {
+        eth_field *fld = eth_get_field(type, pat->unpack.fields[i]);
+        eth_t val = *(eth_t*)((char*)expr + fld->offs);
+        if (not build_pattern_constexpr(bldr, pat->unpack.subpats[i], val, loc, e))
+          return false;
+      }
+      return true;
+    }
+
+    case ETH_AST_PATTERN_CONSTANT:
+      return eth_equal(expr, pat->constant.val);
+
+    case ETH_AST_PATTERN_RECORD:
+    {
+      if (not eth_is_record(expr->type))
+        return false;
+
+      // aliasing:
+      if (pat->record.alias)
+        eth_prepend_var(bldr->vars, eth_const_var(pat->record.alias, expr, NULL));
+
+      int n = pat->record.n;
+      //typedef struct { uintptr_t id; eth_ir_pattern *pat; } field;
+      //field fields[n];
+
+      for (int i = 0; i < n; ++i)
+      {
+        eth_field *fld = eth_get_field(expr->type, pat->record.fields[i]);
+        eth_t val = *(eth_t*)((char*)expr + fld->offs);
+        if (not build_pattern_constexpr(bldr, pat->record.subpats[i], val, loc, e))
+          return false;
+      }
+
+      return true;
+    }
+
+    case ETH_AST_PATTERN_RECORD_STAR:
+    {
+      eth_ir_node *ex = eth_ir_cval(expr);
+      eth_ref_ir_node(ex);
+      if (not build_record_star(bldr, pat, loc, ex, e))
+      {
+        eth_unref_ir_node(ex);
+        return false;
+      }
+      eth_unref_ir_node(ex);
+      return true;
+    }
+  }
+
+  eth_error("wtf");
+  abort();
+}
+static eth_ir_node*
+build_with_toplvl(ir_builder *bldr, eth_ast *ast, int *e, bool savetop)
+{
+  bool tlvl = bldr->istoplvl;
+  if (not savetop)
+    bldr->istoplvl = false;
+  eth_ir_node *ret = build(bldr, ast, e);
+  bldr->istoplvl = tlvl;
+  return ret;
 }
 
 // TODO: flag as likely
@@ -584,24 +453,40 @@ build_let(ir_builder *bldr, int idx, const eth_ast *ast,
 {
   if (idx < ast->let.n)
   {
-    if (ast->let.pats[idx]->tag == ETH_AST_PATTERN_RECORD_STAR)
+    //if (ast->let.pats[idx]->tag == ETH_AST_PATTERN_RECORD_STAR)
+    //{
+      //eth_ir_pattern *pat =
+        //build_record_star(bldr, ast->let.pats[idx], ast->loc, vals[idx], e);
+      //if (pat == NULL)
+      //{
+        //eth_drop_ir_node(vals[idx]);
+        //return eth_ir_seq(eth_ir_error(),
+            //build_let(bldr, idx + 1, ast, vals, nvars0, e));
+      //}
+      //[>eth_drop_ir_node(vals[idx]);<]
+      //eth_ir_node *thenbr = build_let(bldr, idx + 1, ast, vals, nvars0, e);
+      //eth_ir_node *elsebr = eth_ir_cval(eth_nil);
+      //eth_ir_node *ret = eth_ir_match(pat, vals[idx], thenbr, elsebr);
+      //eth_set_ir_location(ret, ast->loc);
+      //ret->match.toplvl =
+        //bldr->istoplvl ? ETH_TOPLVL_THEN : ETH_TOPLVL_NONE;
+      //return ret;
+    //}
+    if (vals[idx]->tag == ETH_IR_CVAL)
     {
-      eth_ir_pattern *pat =
-        build_record_star(bldr, ast->let.pats[idx], ast->loc, vals[idx], e);
-      if (pat == NULL)
+      bool ok = build_pattern_constexpr(bldr, ast->let.pats[idx],
+          vals[idx]->cval.val, ast->loc, e);
+      if (not ok)
       {
+        eth_warning("pattern in LET-expression won't match to `~w`",
+            vals[idx]->cval.val);
         eth_drop_ir_node(vals[idx]);
-        return eth_ir_seq(eth_ir_error(),
-            build_let(bldr, idx + 1, ast, vals, nvars0, e));
+        *e = 1;
+        eth_print_location(ast->loc, stderr);
+        return eth_ir_error();
       }
-      /*eth_drop_ir_node(vals[idx]);*/
-      eth_ir_node *thenbr = build_let(bldr, idx + 1, ast, vals, nvars0, e);
-      eth_ir_node *elsebr = eth_ir_cval(eth_nil);
-      eth_ir_node *ret = eth_ir_match(pat, vals[idx], thenbr, elsebr);
-      eth_set_ir_location(ret, ast->loc);
-      ret->match.toplvl =
-        bldr->istoplvl ? ETH_TOPLVL_THEN : ETH_TOPLVL_NONE;
-      return ret;
+      eth_drop_ir_node(vals[idx]);
+      return build_let(bldr, idx + 1, ast, vals, nvars0, e);
     }
     else
     {
@@ -1053,95 +938,6 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       return eth_ir_multimatch(tab, exprs);
     }
 
-    case ETH_AST_IMPORT:
-    {
-      int n1 = bldr->vars->len - bldr->capoffs;
-      int nm1 = bldr->mods.len;
-      bool ok = true;
-
-      const eth_module *mod = require_module(bldr, ast->import.module);
-      if (not mod)
-      {
-        *e = 1;
-        eth_error("can't import %s", ast->import.module);
-        eth_print_location(ast->loc, stderr);
-        return eth_ir_error();
-      }
-
-      if (ast->import.nams)
-        ok = import_names(bldr, mod, ast->import.nams, ast->import.nnam);
-      else if (ast->import.alias and ast->import.alias[0] == 0)
-      {
-        eth_copy_defs(mod, bldr->gvars);
-        import_unqualified(bldr, mod);
-      }
-      else
-        import_default(bldr, mod, ast->import.alias);
-
-      int nmods = bldr->mods.len - nm1;
-      int nvars = bldr->vars->len - bldr->capoffs - n1;
-      if (not ok) *e = 1;
-
-      eth_ir_node *body = build(bldr, ast->import.body, e);
-
-      eth_pop_var(bldr->vars, nvars);
-      while (nmods--) pop_module(bldr);
-      return body;
-    }
-
-    case ETH_AST_MODULE:
-    {
-      if (not bldr->istoplvl)
-      {
-        eth_error("can only create submodules within the top-level scope");
-        return eth_ir_error();
-      }
-
-      const char *name = ast->module.name;
-      bool isimmidiate = false;
-      char namebuf[256];
-      if (not ast->module.name)
-      {
-        isimmidiate = true;
-        sprintf(namebuf, "<imm%d>", bldr->immcnt++);
-        name = namebuf;
-      }
-
-      // create module
-      eth_module *mod = eth_create_module(ast->module.name, bldr->mod, NULL);
-      eth_env *env =
-        bldr->mod ? eth_get_env(bldr->mod) : eth_get_root_env(bldr->root);
-      if (bldr->mod)
-      {
-        eth_debug("create submodule %s.%s", eth_get_module_name(bldr->mod),
-            ast->module.name);
-      }
-      eth_indent_log();
-      eth_t modret;
-      if (not eth_load_module_from_ast2(bldr->root, env, mod, ast->module.body,
-            &modret, bldr->gvars))
-      {
-        eth_dedent_log();
-        eth_destroy_module(mod);
-        *e = 1;
-        eth_error("failed to create module");
-        eth_print_location(ast->loc, stderr);
-        return eth_ir_error();
-      }
-      eth_dedent_log();
-
-      if (isimmidiate)
-      {
-        import_unqualified(bldr, mod);
-        eth_copy_defs(mod, bldr->gvars);
-      }
-      else
-      { // import in current environment
-        import_default(bldr, mod, NULL);
-      }
-      return build(bldr, ast->module.next, e);
-    }
-
     case ETH_AST_AND:
     {
       if (is_redefined(bldr, "&&"))
@@ -1206,14 +1002,42 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
     {
       eth_ir_node *expr = build_with_toplvl(bldr, ast->access.expr, e, false);
       // --
-      size_t fid = eth_get_symbol_id(eth_sym(ast->access.field));
-      int tmpvar = new_vid(bldr);
-      eth_ir_pattern *tmp = eth_ir_ident_pattern(tmpvar);
-      eth_ir_pattern *pat = eth_ir_record_pattern(new_vid(bldr), &fid, &tmp, 1);
-      // --
-      eth_ir_node *exn = eth_ir_cval(eth_exn(eth_type_error()));
-      // --
-      return eth_ir_match(pat, expr, eth_ir_var(tmpvar), eth_ir_throw(exn));
+      if (expr->tag == ETH_IR_CVAL)
+      {
+        eth_t rec = expr->cval.val;
+        eth_t key = eth_sym(ast->access.field);
+        if (eth_unlikely(not eth_is_plain(rec->type)))
+        {
+          eth_warning("undefined field acess (not a plain type)");
+          *e = 1;
+          eth_print_location(ast->loc, stderr);
+          eth_drop_ir_node(expr);
+          return eth_ir_error();
+        }
+        int fieldid = eth_get_field_by_id(rec->type, eth_get_symbol_id(key));
+        if (fieldid == rec->type->nfields)
+        {
+          eth_warning("no field '~d' in ~w", key, rec);
+          *e = 1;
+          eth_print_location(ast->loc, stderr);
+          eth_drop_ir_node(expr);
+          return eth_ir_error();
+        }
+        //eth_trace("constexpr-access: ~w.~w", rec, key);
+        eth_drop_ir_node(expr);
+        return eth_ir_cval(eth_tup_get(rec, fieldid));
+      }
+      else
+      {
+        size_t fid = eth_get_symbol_id(eth_sym(ast->access.field));
+        int tmpvar = new_vid(bldr);
+        eth_ir_pattern *tmp = eth_ir_ident_pattern(tmpvar);
+        eth_ir_pattern *pat = eth_ir_record_pattern(new_vid(bldr), &fid, &tmp, 1);
+        // --
+        eth_ir_node *exn = eth_ir_cval(eth_exn(eth_type_error()));
+        // --
+        return eth_ir_match(pat, expr, eth_ir_var(tmpvar), eth_ir_throw(exn));
+      }
     }
 
     case ETH_AST_TRY:
@@ -1341,12 +1165,10 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       char name[256];
       sprintf(name, "<mac%d>", bldr->immcnt++);
 
-      eth_module *mod = eth_create_module(name, bldr->mod, NULL);
-      eth_env *env =
-        bldr->mod ? eth_get_env(bldr->mod) : eth_get_root_env(bldr->root);
+      eth_module *mod = eth_create_module(name, NULL);
+      eth_copy_module_path(eth_get_root_env(bldr->root), eth_get_env(mod));
       eth_t ret;
-      if (not eth_load_module_from_ast2(bldr->root, env, mod, ast->evmac.expr,
-            &ret, bldr->gvars))
+      if (not eth_load_module_from_ast(bldr->root, mod, ast->evmac.expr, &ret))
       {
         eth_error("failed to evaluate macros");
         eth_destroy_module(mod);
@@ -1365,8 +1187,13 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         return eth_ir_error();
       }
 
+      eth_destroy_module(mod);
+
       return eth_ir_cval(ret);
     }
+
+    default:
+      abort();
   }
 
   eth_error("undefined AST-node");
@@ -1387,14 +1214,11 @@ build_ir(eth_ast *ast, eth_root *root, eth_module *mod, eth_ir_defs *defs,
   bldr->mod = mod;
 
   // import builtins:
-  import_unqualified(bldr, eth_builtins());
+  import(bldr, eth_get_builtins(root));
 
   // add extra variables supplied by user
   if (uservars)
-  {
-    eth_copy_defs(uservars, bldr->gvars);
-    import_unqualified(bldr, uservars);
-  }
+    import(bldr, uservars);
 
   eth_ir_node *body = build(bldr, ast, &e);
   if (e)
@@ -1438,6 +1262,8 @@ eth_destroy_ir_defs(eth_ir_defs *defs)
   {
     free(defs->defs[i].ident);
     eth_unref_attr(defs->defs[i].attr);
+    if (defs->defs[i].tag == ETH_IRDEF_CVAL)
+      eth_unref(defs->defs[i].cval);
   }
   free(defs->defs);
 }

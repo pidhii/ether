@@ -78,6 +78,7 @@ let pub die msg =
   __print_to stderr msg
   exit 1
 
+let pub require = __require
 
 let pub create_env defs =
   { defs

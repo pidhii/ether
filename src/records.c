@@ -345,3 +345,35 @@ eth_create_record(eth_type *type, eth_t const data[])
     eth_ref(rec->data[i] = data[i]);
   return ETH(rec);
 }
+
+// TODO: cache produced records
+eth_t
+eth_record(char *const keys[], eth_t const vals[], int n)
+{
+  eth_t keysyms[n];
+  for (int i = 0; i < n; ++i)
+    keysyms[i] = eth_sym(keys[i]);
+
+  // Sort fields by IDs:
+  // - sort
+  int idxs[n];
+  for (int i = 0; i < n; idxs[i] = i, ++i);
+  int cmp(const void *p1, const void *p2)
+  {
+    int i1 = *(int*)p1, i2 = *(int*)p2;
+    return eth_get_symbol_id(keysyms[i1]) - eth_get_symbol_id(keysyms[i2]);
+  }
+  qsort(idxs, n, sizeof(int), cmp);
+  // - reorder keys
+  char *ordkeys[n];
+  eth_t ordvals[n];
+  for (int i = 0; i < n; ++i)
+  {
+    ordkeys[i] = keys[idxs[i]];
+    ordvals[i] = vals[idxs[i]];
+  }
+
+  eth_type *recordtype = eth_record_type(ordkeys, n);
+  return eth_create_record(recordtype, ordvals);
+}
+

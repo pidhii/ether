@@ -111,8 +111,9 @@ let pub range (from .. to) =
   loop to nil
 
 let pub linspace from to n =
+  let {fma} = @(require 'math')
   let dx = (to - from) / (n - 1)
-  unfold_left (i -> (i - 1, Math.fma dx i from) when i >= 0) (n - 1)
+  unfold_left (i -> (i - 1, fma dx i from) when i >= 0) (n - 1)
 
 
 let pub rev xs = rev_append xs nil
@@ -429,4 +430,6 @@ let rec pub transpose xs =
 
 
 let pub get l k = car $ drop k l
+
+let pub list = list -- not to hide the builtin by module name
 

@@ -41,13 +41,14 @@ extern eth_scanner_data*
 yyget_extra(eth_scanner *scan);
 
 eth_scanner*
-eth_create_scanner(FILE *stream)
+eth_create_scanner(eth_root *root, FILE *stream)
 {
   eth_scanner *scan;
   yylex_init(&scan);
   yyset_in(stream, scan);
 
   eth_scanner_data *data = malloc(sizeof(eth_scanner_data));
+  data->root = root;
   cod_vec_init(data->primtoks);
   data->commentcnt = 0;
   cod_vec_init(data->fmtbracecnt);
@@ -64,9 +65,9 @@ eth_create_scanner(FILE *stream)
 }
 
 eth_scanner*
-eth_create_repl_scanner(FILE *stream)
+eth_create_repl_scanner(eth_root *root, FILE *stream)
 {
-  eth_scanner *scan = eth_create_scanner(stream);
+  eth_scanner *scan = eth_create_scanner(root, stream);
   eth_get_scanner_data(scan)->isrepl = true;
   return scan;
 }

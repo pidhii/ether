@@ -185,35 +185,42 @@ _pipe2(void)
 int
 ether_module(eth_module *mod, eth_root *topenv)
 {
-  eth_define(mod, "__chdir", eth_proc(_chdir, 1));
+  eth_module *detail = eth_create_module("os.detail", NULL);
+  eth_copy_module_path(eth_get_root_env(topenv), eth_get_env(detail));
 
-  eth_define(mod, "f_ok", eth_num(F_OK));
-  eth_define(mod, "r_ok", eth_num(R_OK));
-  eth_define(mod, "w_ok", eth_num(W_OK));
-  eth_define(mod, "x_ok", eth_num(X_OK));
-  eth_define(mod, "__access", eth_proc(_access, 2));
-  eth_define(mod, "__getcwd", eth_proc(_getcwd));
+  eth_define(detail, "__chdir", eth_proc(_chdir, 1));
 
-  eth_define(mod, "__getenv", eth_proc(_getenv, 1));
-  eth_define(mod, "__setenv", eth_proc(_setenv, 3));
-  eth_define(mod, "__unsetenv", eth_proc(_unsetenv, 1));
+  eth_define(detail, "__f_ok", eth_num(F_OK));
+  eth_define(detail, "__r_ok", eth_num(R_OK));
+  eth_define(detail, "__w_ok", eth_num(W_OK));
+  eth_define(detail, "__x_ok", eth_num(X_OK));
+  eth_define(detail, "__access", eth_proc(_access, 2));
+  eth_define(detail, "__getcwd", eth_proc(_getcwd));
 
-  eth_define(mod, "__realpath", eth_proc(_realpath, 1));
+  eth_define(detail, "__getenv", eth_proc(_getenv, 1));
+  eth_define(detail, "__setenv", eth_proc(_setenv, 3));
+  eth_define(detail, "__unsetenv", eth_proc(_unsetenv, 1));
 
-  eth_define(mod, "__mkdtemp", eth_proc(_mkdtemp, 1));
+  eth_define(detail, "__realpath", eth_proc(_realpath, 1));
 
-  eth_define(mod, "__fork", eth_proc(_fork));
+  eth_define(detail, "__mkdtemp", eth_proc(_mkdtemp, 1));
 
-  eth_define(mod, "__pipe", eth_proc(_pipe));
-  eth_define(mod, "__pipe2", eth_proc(_pipe2, 1));
+  eth_define(detail, "__fork", eth_proc(_fork));
 
-  eth_define(mod, "o_cloexec", eth_num(O_CLOEXEC));
-  eth_define(mod, "o_direct", eth_num(O_DIRECT));
-  eth_define(mod, "o_nonblock", eth_num(O_NONBLOCK));
+  eth_define(detail, "__pipe", eth_proc(_pipe));
+  eth_define(detail, "__pipe2", eth_proc(_pipe2, 1));
 
+  eth_define(detail, "__o_cloexec", eth_num(O_CLOEXEC));
+  eth_define(detail, "__o_direct", eth_num(O_DIRECT));
+  eth_define(detail, "__o_nonblock", eth_num(O_NONBLOCK));
 
-  if (not eth_add_module_script(mod, "./lib.eth", topenv))
+  eth_module *aux = eth_load_module_from_script2(topenv, "./lib.eth", NULL, detail);
+  eth_destroy_module(detail);
+  if (not aux)
     return -1;
+
+  eth_copy_defs(aux, mod);
+  eth_destroy_module(aux);
 
   return 0;
 }

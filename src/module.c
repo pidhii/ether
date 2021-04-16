@@ -28,12 +28,14 @@ typedef struct {
   void (*dtor)(void*);
 } closure;
 
+typedef struct {
+  void (*cb)(void*);
+  void *data;
+} exit_handle;
+
 struct eth_module {
   /** \brief Module's name. */
   char *name;
-
-  /** \brief Parent module. */
-  const eth_module *parent;
 
   /** \brief Module's environment (the thing implementing submodules). */
   eth_env *env;
@@ -48,6 +50,8 @@ struct eth_module {
   eth_def *defs;
   /** @} */
 
+  cod_vec(exit_handle) exithndls;
+
   /** \name Reference counting
    * \brief Reference counting to handle dpendency-relations between modules.
    * I.e., if module A imports B, then B must be kept alive, no matter what,
@@ -56,10 +60,10 @@ struct eth_module {
    * then destructor of that type (so the type-object itself) must be aveilable
    * during deinitialization of A. Thus deinitialization of modules must be done
    * in some complicated order respecting dependency-trees, which is implicitly
-   * satisfied by reference ("dependency") counting. 
+   * satisfied by reference ("dependency") counting.
    * @{ */
-  size_t rc;
-  cod_vec(eth_module*) deps;
+  //size_t rc;
+  //cod_vec(eth_module*) deps;
   /** @} */
 
   // XXX: ugly workaround
@@ -68,11 +72,10 @@ struct eth_module {
 };
 
 eth_module*
-eth_create_module(const char *name, const eth_module *parent, const char *dir)
+eth_create_module(const char *name, const char *dir)
 {
   eth_module *mod = malloc(sizeof(eth_module));
   mod->name = name ? strdup(name) : strdup("<unnamed-module>");
-  mod->parent = parent;
   mod->ndefs = 0;
   mod->defscap = 0x10;
   mod->defs = malloc(sizeof(eth_def) * mod->defscap);
@@ -81,18 +84,32 @@ eth_create_module(const char *name, const eth_module *parent, const char *dir)
   mod->mempath = NULL;
   if (dir)
     eth_add_module_path(mod->env, dir);
-  eth_set_env_parent(mod->env, mod);
   cod_vec_init(mod->clos);
+  cod_vec_init(mod->exithndls);
   return mod;
 }
 
 void
+eth_add_exit_handle(eth_module *mod, void (*cb)(void*), void *data)
+{
+  exit_handle hndle = { .cb = cb, .data = data };
+  cod_vec_push(mod->exithndls, hndle);
+}
+
+
+void
 eth_destroy_module(eth_module *mod)
 {
+  cod_vec_iter(mod->exithndls, i, x,
+    eth_debug("exit handle: %p(%p)", x.cb, x.data);
+    x.cb(x.data)
+  );
+  cod_vec_destroy(mod->exithndls);
+
   if (mod->mempath)
   {
     eth_debug("module '%s' was memorized, now forgeting it", mod->name);
-    eth_forget_path_module(mod->memroot, mod->mempath, mod);
+    eth_forget_module(mod->memroot, mod->mempath);
     free(mod->mempath);
   }
 
@@ -116,12 +133,6 @@ const char*
 eth_get_module_name(const eth_module *mod)
 {
   return mod->name;
-}
-
-const eth_module*
-eth_get_module_parent(const eth_module *mod)
-{
-  return mod->parent;
 }
 
 int
@@ -204,3 +215,4 @@ eth_add_destructor(eth_module *mod, void *data, void (*dtor)(void*))
   closure c = { .data = data, .dtor = dtor };
   cod_vec_push(mod->clos, c);
 }
+

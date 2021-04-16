@@ -16,6 +16,8 @@
 #ifndef SCANNER_DATA
 #define SCANNER_DATA
 
+#include "ether/ether.h"
+
 #include <codeine/vec.h>
 
 #include <stdlib.h>
@@ -49,6 +51,7 @@ struct eth_scanner_data {
   cod_vec(int) statestack;
   int curstate;
   bool isrepl;
+  eth_root *root;
 };
 
 static inline void

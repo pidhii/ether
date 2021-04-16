@@ -1,21 +1,25 @@
 
-OS.chdir (List.get command_line 1)
-system "pwd"
+let {*} = @(require 'os')
+let {*} = @(require 'io')
+let {*} = @(require 'list')
+let {prelude={*}} as string = @(require 'string')
+
+chdir (get command_line 1)
 
 let test_mergesort! =
   let origlist = [1,9,4,5,7,6,8,2,3]
   let ret =
     origlist
-    |> List.map (format "%d")
-    |> String.join "\n"
-    |> x -> IO.shell {q|ether ./mergesort.eth <<<'{x}' | grep "Sorted list"|q}
-    |> String.match \\[.+\]/
+    |> map (format "%d")
+    |> join "\n"
+    |> x -> shell {q|ether ./mergesort.eth <<<'{x}' | grep "Sorted list"|q}
+    |> match \\[.+\]/
     |> car
 
   let correct =
-    List.sort (<) origlist
-    |> List.map (format "%d")
-    |> String.join ","
+    sort (<) origlist
+    |> map (format "%d")
+    |> join ","
     |> format "[%d]"
 
   assert ret eq correct
@@ -24,5 +28,8 @@ let test_basics! =
   assert system "ether ./basics.eth &>/dev/null" == 0
 
 test_basics!
+print "> 'test_basics` succeed"
+
 test_mergesort!
+print "> 'test_mergesort` succeed"
 

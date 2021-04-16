@@ -1,5 +1,8 @@
+
+let {*} = @(require 'os')
+
 let [_, dope, testDir] = command_line
-Os.chdir testDir
+chdir testDir
 
 system "echo ether: `which ether`"
 print "dope: {dope}"

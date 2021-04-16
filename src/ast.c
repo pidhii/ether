@@ -291,26 +291,6 @@ destroy_ast_node(eth_ast *ast)
       eth_unref_ast(ast->match.elsebr);
       break;
 
-    case ETH_AST_IMPORT:
-      free(ast->import.module);
-      if (ast->import.alias)
-        free(ast->import.alias);
-      if (ast->import.nams)
-      {
-        for (int i = 0; i < ast->import.nnam; ++i)
-          free(ast->import.nams[i]);
-        free(ast->import.nams);
-      }
-      eth_unref_ast(ast->import.body);
-      break;
-
-    case ETH_AST_MODULE:
-      if (ast->module.name)
-        free(ast->module.name);
-      eth_unref_ast(ast->module.body);
-      eth_unref_ast(ast->module.next);
-      break;
-
     case ETH_AST_AND:
     case ETH_AST_OR:
       eth_unref_ast(ast->scor.lhs);
@@ -539,50 +519,6 @@ eth_ast_match(eth_ast_pattern *pat, eth_ast *expr, eth_ast *thenbr,
   eth_ref_ast(ast->match.thenbr = thenbr);
   eth_ref_ast(ast->match.elsebr = elsebr);
   ast->match.toplvl = ETH_TOPLVL_NONE;
-  return ast;
-}
-
-static eth_ast*
-create_import(bool pub, const char *module, const char *alias,
-    char *const nams[], int nnam, eth_ast *body)
-{
-  eth_ast *ast = create_ast_node(ETH_AST_IMPORT);
-  ast->import.module = strdup(module);
-  eth_ref_ast(ast->import.body = body);
-  ast->import.alias = alias ? strdup(alias) : NULL;
-  ast->import.ispub = pub;
-  if (nams)
-  {
-    ast->import.nams = malloc(sizeof(char*) * nnam);
-    ast->import.nnam = nnam;
-    for (int i = 0; i < nnam; ++i)
-      ast->import.nams[i] = strdup(nams[i]);
-  }
-  else
-    ast->import.nams = NULL;
-  return ast;
-}
-
-eth_ast*
-eth_ast_import_unqualified(bool pub, const char *module, eth_ast *body)
-{ return create_import(pub, module, "", NULL, 0, body); }
-
-eth_ast*
-eth_ast_import_idents(bool pub, const char *module, char *const nams[],
-    int nnam, eth_ast *body)
-{ return create_import(pub, module, NULL, nams, nnam, body); }
-
-eth_ast*
-eth_ast_module_alias(const char *module, const char *alias, eth_ast *body)
-{ return create_import(false, module, alias, NULL, 0, body); }
-
-eth_ast*
-eth_ast_module(const char *name, eth_ast *body, eth_ast *next)
-{
-  eth_ast *ast = create_ast_node(ETH_AST_MODULE);
-  ast->module.name = name ? strdup(name) : NULL;
-  eth_ref_ast(ast->module.body = body);
-  eth_ref_ast(ast->module.next = next);
   return ast;
 }
 

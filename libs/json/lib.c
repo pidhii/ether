@@ -48,15 +48,15 @@ to_eth(struct json_object *json)
     case json_type_object:
     {
       int n = json_object_object_length(json);
-      eth_t buf[n];
+      char *keys[n];
+      eth_t vals[n];
       int i = 0;
       json_object_object_foreach(json, key, val) {
-        buf[i++] = eth_tup2(eth_str(key), to_eth(val));
+        keys[i] = key;
+        vals[i] = to_eth(val);
+        i++;
       }
-      eth_t acc = eth_nil;
-      for (int i = n - 1; i >= 0; --i)
-        acc = eth_cons(buf[i], acc);
-      return acc;
+      return eth_record(keys, vals, n);
     }
 
     case json_type_array:

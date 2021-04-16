@@ -1,15 +1,15 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -402,8 +402,10 @@ ether_module(eth_module *mod, eth_root *toplvl)
   eth_define(mod, "__seek", eth_proc(_seek, 3));
   eth_define(mod, "flush", eth_proc(_flush, 1));
 
-  if (not eth_add_module_script(mod, "./lib.eth", toplvl))
+  eth_module *aux = eth_load_module_from_script2(toplvl, "./lib.eth", NULL, mod);
+  if (not aux)
     return -1;
-
+  eth_copy_defs(aux, mod);
+  eth_destroy_module(aux);
   return 0;
 }

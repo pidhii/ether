@@ -42,6 +42,9 @@
 -- * shell
 --
 
+let list = @(require "list")
+let string = @(require "string")
+
 let pub read_line! = read_line_of stdin
 let pub read_line_opt! = try Some read_line!  with End_of_file -> false
 let pub read_line_of_opt file = try Some (read_line_of file) with End_of_file -> false
@@ -69,7 +72,7 @@ let pub shell cmd =
   let rec loop acc =
     if let Some data = read_of_opt pipe 0x100
     then loop (data :: acc)
-    else List.rev acc |> String.cat |> String.chomp
+    else list.rev acc |> string.cat |> string.chomp
   let out = loop []
   if close pipe == 0 then out
   else raise Failure

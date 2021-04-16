@@ -1,4 +1,6 @@
-open IO
+
+let {*} = @(require 'list')
+let {*} = @(require 'io')
 
 let test_sample =
   let do_test name thunk =
@@ -34,7 +36,7 @@ let pub run samples =
       printf "\x1b[1mTest %d\x1b[0m\n" title
     sumres res (test_sample tlist)
 
-  let (nok, nfail) as res = List.fold_left do_sample (0, 0) samples
+  let (nok, nfail) as res = fold_left do_sample (0, 0) samples
   print ""
   printf "\x1b[1mSummary\x1b[0m\n"
   printf "- succeed: \x1b[38;5;2;1m%d\x1b[0m\n" nok

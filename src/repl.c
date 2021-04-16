@@ -175,6 +175,7 @@ eth_eval(eth_evaluator *evl, eth_ast *ast)
 
       //// Now we will need to get ALL the variables of the LET-form, so:
       //// 1. set pub-qualifier for all variables.
+      //// XXX: must undo artificial pub-qualifiers
       //for (int i = 0; i < body->let.n; ++i)
         //set_pub(body->let.pats[i]);
       //// 2. build it and evaluate (still with dummy body)
@@ -219,14 +220,14 @@ eth_eval(eth_evaluator *evl, eth_ast *ast)
       //int ilocal = 0, ipub = 0;
       //for (eth_t it = eth_tup_get(ret, 1); it != eth_nil; it = eth_cdr(it))
       //{
-        //if (strcmp(localdefs.idents[ilocal], pubdefs.idents[ipub]) == 0)
+        //if (strcmp(localdefs.defs[ilocal].ident, pubdefs.defs[ipub].ident) == 0)
         //{
-          //eth_define_attr(evl->mod, pubdefs.idents[ipub], eth_car(it),
-              //pubdefs.attrs[ipub]);
+          //eth_define_attr(evl->mod, pubdefs.defs[ipub].ident, eth_car(it),
+              //pubdefs.defs[ipub].attr);
           //ipub++;
         //}
-        //eth_define_attr(evl->locals, localdefs.idents[ilocal], eth_car(it),
-            //localdefs.attrs[ilocal]);
+        //eth_define_attr(evl->locals, localdefs.defs[ilocal].ident, eth_car(it),
+            //localdefs.defs[ilocal].attr);
         //ilocal++;
       //}
       //eth_destroy_ir_defs(&pubdefs);
@@ -238,13 +239,9 @@ eth_eval(eth_evaluator *evl, eth_ast *ast)
       //return eth_eval_body(evl, body->let.body);
     //}
 
-    //case ETH_AST_IMPORT:
-    //{
-    //}
-
     //default:
     //{
-      //eth_ir *ir = eth_build_ir(ast, evl->root, evl->locals);
+      //eth_ir *ir = eth_build_ir(body, evl->root, evl->locals);
       //if (not ir)
         //return NULL;
 

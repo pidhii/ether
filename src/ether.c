@@ -211,17 +211,11 @@ eth_init(const int *argc)
 
   extern void _eth_init_vector_type(void);
   _eth_init_vector_type();
-
-  extern void _eth_init_builtins(void);
-  _eth_init_builtins();
 }
 
 void
 eth_cleanup(void)
 {
-  extern void _eth_cleanup_builtins(void);
-  _eth_cleanup_builtins();
-
   eth_destroy_type(eth_number_type);
   eth_destroy_type(eth_boolean_type);
   eth_destroy_type(eth_nil_type);

@@ -1,3 +1,6 @@
+
+let string = @(require "string")
+
 --------------------------------------------------------------------------------
 -- Functions:
 -- * chdir
@@ -7,6 +10,15 @@
 --
 -- Values:
 -- * f_ok, r_ok, w_ok, x_ok
+
+let pub f_ok = __f_ok
+let pub r_ok = __r_ok
+let pub w_ok = __w_ok
+let pub x_ok = __x_ok
+
+let pub o_cloexec = __o_cloexec
+let pub o_direct = __o_direct
+let pub o_nonblock = __o_nonblock
 
 let pub chdir = __chdir
 
@@ -39,8 +51,8 @@ let pub setenv x =
     fn value -> __setenv name value true
 
 let pub realpath path =
-  if String.sub path (0 .. 1) path eq "~/" or false
-  then __realpath (getenv "HOME" ++ String.sub (1...) path)
+  if string.sub path (0 .. 1) path eq "~/" or false
+  then __realpath (getenv "HOME" ++ string.sub (1...) path)
   else __realpath path
 
 let pub mkdtemp =

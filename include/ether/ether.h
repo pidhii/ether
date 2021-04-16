@@ -1134,6 +1134,9 @@ eth_record_size(const eth_type *type)
 eth_t __attribute__((malloc))
 eth_create_record(eth_type *type, eth_t const data[]);
 
+eth_t __attribute__((malloc))
+eth_record(char *const keys[], eth_t const vals[], int n);
+
 void
 eth_destroy_record_h1(eth_type *type, eth_t x);
 
@@ -1352,6 +1355,59 @@ eth_drop_attr(eth_attr *attr);
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                       MODULES AND ENVIRONMENT
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                                 Root
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+/** @name Root environment
+ * @{ */
+eth_root* __attribute__((malloc))
+eth_create_root(void);
+
+void
+eth_destroy_root(eth_root *root);
+
+eth_env*
+eth_get_root_env(eth_root *root);
+
+#define ETH_MFLAG_READY (1 << 0)
+
+typedef struct {
+  eth_module *mod;
+  void *dl;
+  int flag;
+} eth_module_entry;
+
+eth_module_entry*
+eth_memorize_module(eth_root *root, const char *path, eth_module *mod);
+
+void
+eth_forget_module(eth_root *root, const char *path);
+
+/**
+ * @brief Get memorized module located under given path.
+ *
+ * @param root Top level environment.
+ * @param path Full path to the module entry.
+ *
+ * @return Module instance or `NULL`.
+ */
+eth_module_entry*
+eth_get_memorized_module(const eth_root *root, const char *path);
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                            builtins
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+eth_module*
+eth_create_builtins(eth_root *root);
+
+eth_t
+eth_get_builtin(eth_root *root, const char *name);
+
+const eth_module*
+eth_get_builtins(const eth_root *root);
+
+/** @} Root environment */
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                              module
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 typedef struct {
@@ -1361,16 +1417,13 @@ typedef struct {
 } eth_def;
 
 eth_module* __attribute__((malloc))
-eth_create_module(const char *name, const eth_module *parent, const char *dir);
+eth_create_module(const char *name, const char *dir);
 
 void
 eth_destroy_module(eth_module *mod);
 
 const char*
 eth_get_module_name(const eth_module *mod);
-
-const eth_module*
-eth_get_module_parent(const eth_module *mod);
 
 int
 eth_get_ndefs(const eth_module *mod);
@@ -1396,14 +1449,23 @@ eth_find_def(const eth_module *mod, const char *ident);
 void
 eth_add_destructor(eth_module *mod, void *data, void (*dtor)(void*));
 
-// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-//                            builtins
-// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-const eth_module*
-eth_builtins(void);
-
-eth_t
-eth_get_builtin(const char *name);
+/**
+ * @brief Add a callback on module finalization.
+ *
+ * This callback will be invoked by the environment destuctor.
+ *
+ * Can be used to implement `atexit (3)` -like functions.
+ *
+ * A use case motivated this utility is to implement
+ * <a href="https://libuv.org/">libuv</a> which can now call start its main loop
+ * at finalization of the root environment.
+ *
+ * @param env Environment.
+ * @param cb Callback.
+ * @param data User data to be passed to the callback upon evaluation.
+ */
+void
+eth_add_exit_handle(eth_module *mod, void (*cb)(void*), void *data);
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                           environment
@@ -1436,40 +1498,14 @@ void
 eth_destroy_env(eth_env *env);
 
 /**
- * @brief Get the module owning an environment.
- * @return Module instance or `NULL` if *env* is owned by a module.
- */
-eth_module*
-eth_get_env_parent(eth_env *env);
-
-/** @brief Set parent module of the environment. */
-void
-eth_set_env_parent(eth_env *env, eth_module *mod);
-
-/**
  * @brief Add a directory to be searched during module query.
  * @return `true` on success, or `false` in case of invalid path.
  */
 bool
 eth_add_module_path(eth_env *env, const char *path);
 
-/**
- * @brief Add a callback on module finalization.
- *
- * This callback will be invoked by the environment destuctor.
- *
- * Can be used to implement `atexit (3)` -like functions.
- *
- * A use case motivated this utility is to implement
- * <a href="https://libuv.org/">libuv</a> which can now call start its main loop
- * at finalization of the root environment.
- *
- * @param env Environment.
- * @param cb Callback.
- * @param data User data to be passed to the callback upon evaluation.
- */
 void
-eth_add_exit_handle(eth_env *env, void (*cb)(void*), void *data);
+eth_copy_module_path(const eth_env *src, eth_env *dst);
 
 /**
  * @brief Search for a file or directory in a module directories list.
@@ -1492,92 +1528,36 @@ bool
 eth_resolve_path(eth_env *env, const char *path, char *fullpath);
 
 bool
-eth_add_module(eth_env *env, eth_module *mod);
+eth_resolve_modpath(eth_env *env, const char *path, char *fullpath);
 
-bool
-eth_remove_module(eth_env *env, const char *name);
-
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                         importing code
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 /** @brief Get module instance by name. */
 eth_module*
-eth_require_module(eth_root *root, eth_env *env, const char *name);
+eth_require_module(eth_root *root, eth_env *env, const char *modpath);
+
+bool
+eth_load_module_from_ast(eth_root *root, eth_module *mod, eth_ast *ast,
+    eth_t *ret);
+
+bool
+eth_load_module_from_ast2(eth_root *root, eth_module *mod, eth_ast *ast,
+    eth_t *ret, eth_module *uservars);
 
 /** @name Loading modules from scripts or shared libraries
  * @{ */
-bool
-eth_load_module_from_script(eth_root *root, eth_env *env, eth_module *mod,
-    const char *path, eth_t *ret);
-
-bool
-eth_load_module_from_ast(eth_root *root, eth_env *env, eth_module *mod,
-    eth_ast *ast, eth_t *ret);
-
-bool
-eth_load_module_from_script2(eth_root *root, eth_env *env, eth_module *mod,
-    const char *path, eth_t *ret, eth_module *uservars);
-
-bool
-eth_load_module_from_ast2(eth_root *root, eth_env *env, eth_module *mod,
-    eth_ast *ast, eth_t *ret, eth_module *uservars);
-
-bool
-eth_load_module_from_elf(eth_root *root, eth_env *env, eth_module *mod,
-    const char *path);
-
-static bool
-eth_add_module_script(eth_module *self, const char *path, eth_root *root)
-{ return eth_load_module_from_script2(root, NULL, self, path, NULL, self); }
-/** @} */
-
-/** @name Access list of modules
- * @{ */
-int
-eth_get_nmodules(const eth_env *env);
-
-void
-eth_get_modules(const eth_env *env, const eth_module *out[], int n);
-/** @} */
-
-/** @name Root environment
- * @{ */
-eth_root* __attribute__((malloc))
-eth_create_root(eth_env *env);
-
-void
-eth_destroy_root(eth_root *root);
-
-eth_env*
-eth_get_root_env(const eth_root *root);
-
-/**
- * @brief Memorize a path and the corresponding module not to load it twice.
- *
- * @param root Top level enironment.
- * @param path Full path to the module entry.
- * @param mod Module instance.
- *
- * @note If _path_ was already memorized earlier, new _mod_ will **NOT**
- *       override the one set previously.
- *
- * @see Use eth_get_memorized_module() to check if a path is already in use.
- */
-void
-eth_memorize_path_module(eth_root *root, const char *path,
-    const eth_module *mod);
-
-void
-eth_forget_path_module(eth_root *root, const char *path, const eth_module *mod);
-
-/**
- * @brief Get memorized module located under given path.
- *
- * @param root Top level environment.
- * @param path Full path to the module entry.
- *
- * @return Module instance or `NULL`.
- */
 eth_module*
-eth_get_memorized_module(const eth_root *root, const char *path);
-/** @} Root environment */
+eth_load_module_from_script(eth_root *root, const char *path, eth_t *ret);
+
+eth_module*
+eth_load_module_from_script2(eth_root *root, const char *path, eth_t *ret,
+    eth_module *uservars);
+
+eth_module*
+eth_load_module_from_elf(eth_root *root, const char *path);
+/** @} */
+
 /** @} Env */
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
@@ -1864,8 +1844,6 @@ typedef enum {
   ETH_AST_UNOP,
   ETH_AST_FN,
   ETH_AST_MATCH,
-  ETH_AST_IMPORT,
-  ETH_AST_MODULE,
   ETH_AST_AND,
   ETH_AST_OR,
   ETH_AST_ACCESS,
@@ -1914,10 +1892,6 @@ struct eth_ast {
     struct { eth_ast_pattern *pat; eth_ast *expr, *thenbr, *elsebr;
              eth_toplvl_flag toplvl; }
       match;
-    struct { char *module; eth_ast *body; char *alias; char **nams; int nnam;
-             bool ispub; }
-      import;
-    struct { char *name; eth_ast *body, *next; } module;
     struct { eth_ast *lhs, *rhs; } scand, scor;
     struct { eth_ast *expr; char *field; } access;
     struct { eth_ast_pattern *pat; eth_ast *trybr, *catchbr; int likely;
@@ -2004,27 +1978,6 @@ eth_ast_match(eth_ast_pattern *pat, eth_ast *expr, eth_ast *thenbr,
     eth_ast *elsebr);
 
 eth_ast* __attribute__((malloc))
-eth_ast_import_unqualified(bool pub, const char *module, eth_ast *body);
-
-eth_ast* __attribute__((malloc))
-eth_ast_import_idents(bool pub, const char *module, char *const nams[],
-    int nnam, eth_ast *body);
-
-eth_ast* __attribute__((malloc))
-eth_ast_module_alias(const char *module, const char *alias, eth_ast *body);
-
-static void
-eth_set_import_expr(eth_ast *import, eth_ast *expr)
-{
-  eth_ref_ast(expr);
-  eth_unref_ast(import->import.body);
-  import->import.body = expr;
-}
-
-eth_ast*
-eth_ast_module(const char *name, eth_ast *body, eth_ast *next);
-
-eth_ast* __attribute__((malloc))
 eth_ast_and(eth_ast *lhs, eth_ast *rhs);
 
 eth_ast* __attribute__((malloc))
@@ -2072,10 +2025,10 @@ typedef struct eth_scanner eth_scanner;
 typedef struct eth_scanner_data eth_scanner_data;
 
 eth_scanner* __attribute__((malloc))
-eth_create_scanner(FILE *stream);
+eth_create_scanner(eth_root *root, FILE *stream);
 
 eth_scanner* __attribute__((malloc))
-eth_create_repl_scanner(FILE *stream);
+eth_create_repl_scanner(eth_root *root, FILE *stream);
 
 bool
 eth_is_repl_scanner(eth_scanner *scan);
@@ -2090,7 +2043,7 @@ eth_scanner_data*
 eth_get_scanner_data(eth_scanner *scan);
 
 eth_ast* __attribute__((malloc))
-eth_parse(FILE *stream);
+eth_parse(eth_root *root, FILE *stream);
 
 /** @} AST */
 

@@ -27,13 +27,6 @@
 ETH_MODULE("ether:builtins")
 
 
-static
-eth_root *g_root;
-
-static
-eth_module *g_mod;
-
-
 static eth_t
 _strcat(void)
 {
@@ -645,11 +638,17 @@ __exit(void)
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                  load
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//*
 static eth_t
 _load(void)
 {
   static int cnt = 1;
   eth_use_tuple_as(tup2, 2);
+
+  eth_root *thisroot = eth_this->proc.data;
+
+  char id[42];
+  sprintf(id, "load.%d", cnt++);
 
   eth_t path = *eth_sp++;
   eth_t env = *eth_sp++;
@@ -659,7 +658,7 @@ _load(void)
     return eth_exn(eth_type_error());
   }
 
-  eth_module *envmod = eth_create_module(NULL, NULL, NULL);
+  eth_module *envmod = eth_create_module(NULL, NULL);
   for (eth_t it = env; eth_is_pair(it); it = eth_cdr(it))
   {
     eth_t def = eth_car(it);
@@ -680,14 +679,29 @@ _load(void)
     eth_define(envmod, eth_str_cstr(key), val);
   }
 
-  char id[42];
-  sprintf(id, "load.%d", cnt++);
+  FILE *fs = fopen(eth_str_cstr(path), "r");
+  if (fs == NULL)
+  {
+    eth_drop_2(path, env);
+    eth_destroy_module(envmod);
+    return eth_exn(eth_system_error(ENOENT));
+  }
 
-  eth_module *mod = eth_create_module(id, NULL, NULL);
-  eth_t ret = NULL;
-  int ok = eth_load_module_from_script2(g_root, eth_get_root_env(g_root), mod,
-      eth_str_cstr(path), &ret, envmod);
+  eth_ast *ast = eth_parse(thisroot, fs);
+  fclose(fs);
+  if (not ast)
+  {
+    eth_drop_2(path, env);
+    eth_destroy_module(envmod);
+    return eth_exn(eth_failure());
+  }
+
+  eth_module *mod = eth_create_module(id, NULL);
+  eth_t ret;
+  int ok = eth_load_module_from_ast2(thisroot, mod, ast, &ret, envmod);
   eth_destroy_module(envmod);
+  eth_drop_ast(ast);
+
   if (not ok)
   {
     eth_drop_2(path, env);
@@ -704,23 +718,26 @@ _load(void)
 
   ret = eth_tup2(ret, acc);
   eth_drop_2(path, env);
-  eth_remove_module(eth_get_root_env(g_root), id);
   eth_destroy_module(mod);
   return ret;
 }
+// */
 
+//*
 static eth_t
 _load_stream(void)
 {
   static int cnt = 1;
   eth_use_tuple_as(tup2, 2);
 
+  eth_root *thisroot = eth_this->proc.data;
+
   eth_t file = *eth_sp++;
   eth_t env = *eth_sp++;
   if (eth_unlikely(not eth_is_file(file)))
     goto error_1;
 
-  eth_module *envmod = eth_create_module(NULL, NULL, NULL);
+  eth_module *envmod = eth_create_module(NULL, NULL);
   for (eth_t it = env; eth_is_pair(it); it = eth_cdr(it))
   {
     eth_t def = eth_car(it);
@@ -738,14 +755,13 @@ _load_stream(void)
   char id[42];
   sprintf(id, "load.%d", cnt++);
 
-  eth_ast *ast = eth_parse(eth_get_file_stream(file));
+  eth_ast *ast = eth_parse(thisroot, eth_get_file_stream(file));
   if (not ast)
     goto error_3;
 
-  eth_module *mod = eth_create_module(id, NULL, NULL);
+  eth_module *mod = eth_create_module(id, NULL);
   eth_t ret;
-  int ok = eth_load_module_from_ast2(g_root, eth_get_root_env(g_root), mod, ast,
-      &ret, envmod);
+  int ok = eth_load_module_from_ast2(thisroot, mod, ast, &ret, envmod);
   eth_destroy_module(envmod);
   eth_drop_ast(ast);
   if (not ok)
@@ -761,7 +777,6 @@ _load_stream(void)
 
     ret = eth_tup2(ret, acc);
     eth_drop_2(file, env);
-    eth_remove_module(eth_get_root_env(g_root), id);
     eth_destroy_module(mod);
     return ret;
   }
@@ -785,6 +800,45 @@ error_4:
   eth_destroy_module(mod);
   return eth_exn(eth_failure());
 }
+// */
+
+static eth_t
+_require(void)
+{
+  eth_root *thisroot = eth_this->proc.data;
+
+  eth_t modpath = *eth_sp++;
+  if (eth_unlikely(not eth_is_str(modpath)))
+  {
+    eth_drop(modpath);
+    return eth_exn(eth_type_error());
+  }
+
+  eth_module *mod = eth_require_module(thisroot, eth_get_root_env(thisroot),
+      eth_str_cstr(modpath));
+
+  if (not mod)
+  {
+    eth_drop(modpath);
+    return eth_exn(eth_failure());
+  }
+
+  int ndefs = eth_get_ndefs(mod);
+  eth_def defs[ndefs];
+  eth_get_defs(mod, defs);
+  char *keys[ndefs];
+  eth_t vals[ndefs];
+  for (int i = 0; i < ndefs; ++i)
+  {
+    keys[i] = defs[i].ident;
+    vals[i] = defs[i].val;
+  }
+  eth_t ret = eth_record(keys, vals, ndefs);
+
+  eth_drop(modpath);
+  return ret;
+}
+// */
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                  lazy
@@ -1140,110 +1194,92 @@ _rev_list(void)
 /*
  * NOTE: IR-builder will use builtins ...while loading builtins.
  */
-void
-_eth_init_builtins(void)
+eth_module*
+eth_create_builtins(eth_root *root)
 {
   char buf[PATH_MAX];
 
-  eth_env *env = eth_create_empty_env();
-  g_root = eth_create_root(env);
+  eth_module *mod = eth_create_module("builtins", NULL);
   if (eth_get_module_path())
-    eth_add_module_path(env, eth_get_module_path());
+    eth_add_module_path(eth_get_env(mod), eth_get_module_path());
 
-  g_mod = eth_create_module("Builtins", NULL, NULL);
+  extern void _eth_set_builtins(eth_root*, eth_module*);
+  _eth_set_builtins(root, mod);
 
-#if not defined(ETHER_DISABLE_BUILTINS)
   eth_debug("loading builtins");
 
   eth_attr *attr = eth_create_attr(ETH_ATTR_BUILTIN);
 
-  eth_define_attr(g_mod,    "&&", eth_create_proc(_and, 2, NULL, NULL), attr);
-  eth_define_attr(g_mod,    "||", eth_create_proc( _or, 2, NULL, NULL), attr);
+  eth_define_attr(mod,    "&&", eth_create_proc(_and, 2, NULL, NULL), attr);
+  eth_define_attr(mod,    "||", eth_create_proc( _or, 2, NULL, NULL), attr);
   // TODO: `++` should be an instaruction
-  eth_define(g_mod,         "++", eth_create_proc(    _strcat, 2, NULL, NULL));
+  eth_define(mod,         "++", eth_create_proc(    _strcat, 2, NULL, NULL));
   // ---
-  eth_define(g_mod,      "pair?", eth_create_proc(    _pair_p, 1, NULL, NULL));
-  eth_define(g_mod,    "symbol?", eth_create_proc(  _symbol_p, 1, NULL, NULL));
-  eth_define(g_mod,    "number?", eth_create_proc(  _number_p, 1, NULL, NULL));
-  eth_define(g_mod,    "string?", eth_create_proc(  _string_p, 1, NULL, NULL));
-  eth_define(g_mod,   "boolean?", eth_create_proc( _boolean_p, 1, NULL, NULL));
-  eth_define(g_mod,  "function?", eth_create_proc(_function_p, 1, NULL, NULL));
-  eth_define(g_mod,     "tuple?", eth_create_proc(   _tuple_p, 1, NULL, NULL));
-  eth_define(g_mod,    "record?", eth_create_proc(  _record_p, 1, NULL, NULL));
-  eth_define(g_mod,      "file?", eth_create_proc(    _file_p, 1, NULL, NULL));
-  eth_define(g_mod,    "regexp?", eth_create_proc(  _regexp_p, 1, NULL, NULL));
-  eth_define(g_mod,    "vector?", eth_create_proc(  _vector_p, 1, NULL, NULL));
+  eth_define(mod,      "pair?", eth_create_proc(    _pair_p, 1, NULL, NULL));
+  eth_define(mod,    "symbol?", eth_create_proc(  _symbol_p, 1, NULL, NULL));
+  eth_define(mod,    "number?", eth_create_proc(  _number_p, 1, NULL, NULL));
+  eth_define(mod,    "string?", eth_create_proc(  _string_p, 1, NULL, NULL));
+  eth_define(mod,   "boolean?", eth_create_proc( _boolean_p, 1, NULL, NULL));
+  eth_define(mod,  "function?", eth_create_proc(_function_p, 1, NULL, NULL));
+  eth_define(mod,     "tuple?", eth_create_proc(   _tuple_p, 1, NULL, NULL));
+  eth_define(mod,    "record?", eth_create_proc(  _record_p, 1, NULL, NULL));
+  eth_define(mod,      "file?", eth_create_proc(    _file_p, 1, NULL, NULL));
+  eth_define(mod,    "regexp?", eth_create_proc(  _regexp_p, 1, NULL, NULL));
+  eth_define(mod,    "vector?", eth_create_proc(  _vector_p, 1, NULL, NULL));
   // ---
-  eth_define(g_mod,       "list", eth_create_proc(      _list, 1, NULL, NULL));
-  eth_define(g_mod, "__rev_list", eth_create_proc(  _rev_list, 1, NULL, NULL));
+  eth_define(mod,       "list", eth_create_proc(      _list, 1, NULL, NULL));
+  eth_define(mod, "__rev_list", eth_create_proc(  _rev_list, 1, NULL, NULL));
   // ---
-  eth_define(g_mod,       "dump", eth_create_proc(      _dump, 1, NULL, NULL));
+  eth_define(mod,       "dump", eth_create_proc(      _dump, 1, NULL, NULL));
   // ---
-  eth_define(g_mod,         "=~", eth_create_proc( _regexp_eq, 2, NULL, NULL));
+  eth_define(mod,         "=~", eth_create_proc( _regexp_eq, 2, NULL, NULL));
   // ---
-  eth_define(g_mod, "__inclusive_range", eth_create_proc(_inclusive_range, 2, NULL, NULL));
-  eth_define(g_mod, "__List_map", eth_create_proc(_map, 2, NULL, NULL));
-  eth_define(g_mod, "__List_filter_map", eth_create_proc(_filter_map, 2, NULL, NULL));
+  eth_define(mod, "__inclusive_range", eth_create_proc(_inclusive_range, 2, NULL, NULL));
+  eth_define(mod, "__List_map", eth_create_proc(_map, 2, NULL, NULL));
+  eth_define(mod, "__List_filter_map", eth_create_proc(_filter_map, 2, NULL, NULL));
   // ---
-  eth_define(g_mod,      "stdin", eth_stdin);
-  eth_define(g_mod,     "stdout", eth_stdout);
-  eth_define(g_mod,     "stderr", eth_stderr);
-  eth_define(g_mod,     "__open", eth_create_proc(      _open, 2, NULL, NULL));
-  eth_define(g_mod,    "__popen", eth_create_proc(     _popen, 2, NULL, NULL));
-  eth_define(g_mod, "__open_string", eth_create_proc(_open_string, 1, NULL, NULL));
-  eth_define(g_mod,      "close", eth_create_proc(     _close, 1, NULL, NULL));
-  eth_define(g_mod,      "input", eth_create_proc(     _input, 1, NULL, NULL));
-  eth_define(g_mod, "__print_to", eth_create_proc(  _print_to, 2, NULL, NULL));
+  eth_define(mod,      "stdin", eth_stdin);
+  eth_define(mod,     "stdout", eth_stdout);
+  eth_define(mod,     "stderr", eth_stderr);
+  eth_define(mod,     "__open", eth_create_proc(      _open, 2, NULL, NULL));
+  eth_define(mod,    "__popen", eth_create_proc(     _popen, 2, NULL, NULL));
+  eth_define(mod, "__open_string", eth_create_proc(_open_string, 1, NULL, NULL));
+  eth_define(mod,      "close", eth_create_proc(     _close, 1, NULL, NULL));
+  eth_define(mod,      "input", eth_create_proc(     _input, 1, NULL, NULL));
+  eth_define(mod, "__print_to", eth_create_proc(  _print_to, 2, NULL, NULL));
   // ---
-  eth_define(g_mod,   "__system", eth_create_proc(    _system, 1, NULL, NULL));
+  eth_define(mod,   "__system", eth_create_proc(    _system, 1, NULL, NULL));
   // ---
-  eth_define(g_mod,     "format", eth_create_proc(    _format, 1, NULL, NULL));
+  eth_define(mod,     "format", eth_create_proc(    _format, 1, NULL, NULL));
   // ---
-  eth_define(g_mod,      "raise", eth_create_proc(     _raise, 1, NULL, NULL));
-  eth_define(g_mod,       "exit", eth_create_proc(     __exit, 1, NULL, NULL));
+  eth_define(mod,      "raise", eth_create_proc(     _raise, 1, NULL, NULL));
+  eth_define(mod,       "exit", eth_create_proc(     __exit, 1, NULL, NULL));
   // ---
-  eth_define(g_mod, "__load", eth_create_proc(_load, 2, NULL, NULL));
-  eth_define(g_mod, "__load_stream", eth_create_proc(_load_stream, 2, NULL, NULL));
+  eth_define(mod, "__load", eth_create_proc(_load, 2, root, NULL));
+  eth_define(mod, "__load_stream", eth_create_proc(_load_stream, 2, root, NULL));
+  eth_define(mod, "__require", eth_create_proc(_require, 1, root, NULL));
   // ---
-  eth_define(g_mod, "__Lazy_create", eth_create_proc(_Lazy_create, 1, NULL, NULL));
+  eth_define(mod, "__Lazy_create", eth_create_proc(_Lazy_create, 1, NULL, NULL));
 
 
-  if (not eth_resolve_path(env, "__builtins.eth", buf))
+  if (not eth_resolve_path(eth_get_env(mod), "__builtins.eth", buf))
   {
-    eth_error("can't find builtins");
-    abort();
-  }
-  eth_debug("- loading \"%s\"", buf);
-  if (not eth_load_module_from_script(g_root, env, g_mod, buf, NULL))
-  {
-    eth_error("failed to load builtins");
-    abort();
-  }
-  eth_debug("builtins were succesfully loaded");
-#else
-  eth_add_module(env, g_mod); // to prevent memory leak
-#endif
-}
-
-void
-_eth_cleanup_builtins(void)
-{
-  eth_destroy_root(g_root);
-}
-
-const eth_module*
-eth_builtins(void)
-{
-  return g_mod;
-}
-
-eth_t
-eth_get_builtin(const char *name)
-{
-  eth_def *def = eth_find_def(g_mod, name);
-  if (def)
-    return def->val;
-  else
+    eth_warning("can't find builtins");
+    eth_destroy_module(mod);
     return NULL;
+  }
+
+  eth_debug("- loading \"%s\"", buf);
+  eth_module *auxmod = eth_load_module_from_script(root, buf, NULL);
+  if (not auxmod)
+  {
+    eth_warning("failed to load builtins");
+    eth_destroy_module(mod);
+    return NULL;
+  }
+  eth_copy_defs(auxmod, mod);
+  eth_destroy_module(auxmod);
+
+  return mod;
 }
 

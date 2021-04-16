@@ -1,4 +1,8 @@
 
+let list = @(require "list")
+let string = @(require "string")
+let io = @(require "io")
+
 -- Split a list on two halves using slow/fast iterators approach.
 --
 -- Note that the left part is returned in reversed order, however it does not
@@ -33,10 +37,10 @@ let merge xs ys =
         else loop xs  ys' (y :: acc)
       else
         -- No more ys left, append all remaining xs to the result
-        List.rev_append acc xs
+        list.rev_append acc xs
     else
       -- No more xs left, append all remaining ys to the result
-      List.rev_append acc ys
+      list.rev_append acc ys
 
   loop xs ys nil
 
@@ -65,7 +69,7 @@ let read_list file =
   -- we return in case of End_of_file exception. We only need it to be NOT the
   -- `Some _`-variant.
   let read_line_opt file =
-    try Some (IO.read_line_of file)
+    try Some (io.read_line_of file)
     with End_of_file -> ()
 
   -- And here is the actual loop to read the list
@@ -73,7 +77,7 @@ let read_list file =
     if let Some x = read_line_opt file then
       -- Note the `$`: this is an application operator from Haskell. The whole
       -- role of `$` is to have the lowest precedence of all operators
-      loop $ String.(to_number $ chomp x) :: acc
+      loop $ (string.to_number $ string.chomp x) :: acc
     else acc
   loop nil
 

@@ -2148,7 +2148,22 @@ eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
       int argvids[n + 1];
       argvids[0] = ret;
       for (int i = 0; i < n; ++i)
-        argvids[i+1] = bldr->vars[defs->defs[i].varid];
+      {
+        switch (defs->defs[i].tag)
+        {
+          case ETH_IRDEF_VAR:
+            argvids[i+1] = bldr->vars[defs->defs[i].varid];
+            break;
+
+          case ETH_IRDEF_CVAL:
+          {
+            int vid = new_val(bldr, RC_RULES_DISABLE);
+            eth_write_insn(tlvltape, eth_insn_cval(vid, defs->defs[i].cval));
+            argvids[i+1] = vid;
+            break;
+          }
+        }
+      }
 
       eth_insn *insn = eth_insn_apply(modret, fnvid, argvids, n + 1);
       eth_write_insn(tlvltape, insn);

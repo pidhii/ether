@@ -70,6 +70,8 @@ _create_attr(int aflag, void *locpp)
     if (g_filename)                               \
       eth_set_ast_location(ast, location(&locp)); \
   } while (0)
+
+#define SCANROOT (eth_get_scanner_data(yyscanner)->root)
 %}
 
 %code requires {
@@ -86,11 +88,6 @@ _create_attr(int aflag, void *locpp)
     cod_vec(eth_ast_pattern*) pats;
     cod_vec(eth_ast*) vals;
   } binds_t;
-
-  typedef struct {
-    bool rec;
-    binds_t binds;
-  } module_elt;
 }
 
 %union {
@@ -121,7 +118,6 @@ _create_attr(int aflag, void *locpp)
   } lc_aux;
 
   cod_vec(eth_ast*) astvec;
-  cod_vec(char*) strvec;
   cod_vec(char) charvec;
   eth_ast_pattern *pattern;
   cod_vec(eth_ast_pattern*) patvec;
@@ -172,14 +168,6 @@ _create_attr(int aflag, void *locpp)
 } <astvec>
 
 %destructor {
-  if ($$.data)
-  {
-    cod_vec_iter($$, i, x, free(x));
-    cod_vec_destroy($$);
-  }
-} <strvec>
-
-%destructor {
   cod_vec_destroy($$);
 } <charvec>
 
@@ -213,7 +201,7 @@ _create_attr(int aflag, void *locpp)
 %token<integer> END_REGEXP
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %nonassoc IN FN IFLET WHENLET
-%nonassoc OPEN USING AS UNQUALIFIED MODULE
+%nonassoc AS
 %nonassoc DOT_OPEN1 DOT_OPEN2 DOT_OPEN3
 %nonassoc LARROW
 %nonassoc PUB BUILTIN DEPRECATED
@@ -264,12 +252,10 @@ _create_attr(int aflag, void *locpp)
 %type<ast> Stmt StmtSeq
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %type<string> Ident
-%type<string> CapIdent
 %type<binds> Binds
 %type<binds> LoopArgs
 %type<bind> Bind
 %type<integer> Attribute
-%type<boolean> MaybePub
 %type<astvec> Args ArgsAux
 %type<patvec> FnArgs
 %type<string> Help MaybeHelp
@@ -278,7 +264,6 @@ _create_attr(int aflag, void *locpp)
 %type<ast> RegExp
 %type<charvec> StringAux
 %type<pattern> AtomicPattern FormPattern NoComaPattern Pattern
-%type<strvec> MaybeImports ImportList
 %type<boolean> MaybeComa
 %type<astvec> List
 %type<patvec> PatternList
@@ -319,62 +304,6 @@ FnAtom
   : Ident { $$ = eth_ast_ident($1); free($1); LOC($$, @$); }
   | '(' StmtSeq ')' { $$ = $2; }
   | FnAtom '!' { $$ = eth_ast_apply($1, NULL, 0); LOC($$, @$); }
-  | CapIdent DOT_OPEN1 StmtSeq ')' {
-    $$ = eth_ast_import_unqualified(false, $1, $3);
-    LOC($$, @$);
-    free($1);
-  }
-  | CapIdent DOT_OPEN1 List ',' StmtSeq ')' {
-    cod_vec_push($3, $5);
-    int n = $3.len;
-    char fieldsbuf[n][22];
-    char *fields[n];
-    for (int i = 0; i < n; ++i)
-    {
-      fields[i] = fieldsbuf[i];
-      sprintf(fields[i], "_%d", i+1);
-    }
-    eth_ast *tuple = eth_ast_make_record(eth_tuple_type(n), fields,
-        $3.data, n);
-    cod_vec_destroy($3);
-    // --
-    $$ = eth_ast_import_unqualified(false, $1, tuple);
-    LOC($$, @$);
-    free($1);
-  }
-  | CapIdent DOT_OPEN2 List MaybeComa ']' {
-    eth_ast *acc = eth_ast_cval(eth_nil);
-    cod_vec_riter($3, i, x, acc = eth_ast_binop(ETH_CONS, x, acc));
-    cod_vec_destroy($3);
-    LOC(acc, $3);
-
-    $$ = eth_ast_import_unqualified(false, $1, acc);
-    LOC($$, @1);
-    free($1);
-  }
-  | CapIdent DOT_OPEN3 Record MaybeComa '}' {
-    eth_type *type = eth_record_type($3.keys.data, $3.keys.len);
-    eth_ast *acc = eth_ast_make_record(type, $3.keys.data, $3.vals.data, $3.keys.len);
-    cod_vec_iter($3.keys, i, x, free(x));
-    cod_vec_destroy($3.keys);
-    cod_vec_destroy($3.vals);
-    LOC(acc, @$);
-
-    $$ = eth_ast_import_unqualified(false, $1, acc);
-    LOC($$, @1);
-    free($1);
-  }
-  | CapIdent DOT_OPEN3 Stmt WITH Record MaybeComa '}' {
-    eth_ast *acc = eth_ast_update($3, $5.vals.data, $5.keys.data, $5.vals.len);
-    cod_vec_destroy($5.vals);
-    cod_vec_iter($5.keys, i, x, free(x));
-    cod_vec_destroy($5.keys);
-    LOC(acc, @$);
-
-    $$ = eth_ast_import_unqualified(false, $1, acc);
-    LOC($$, @1);
-    free($1);
-  }
 
   | '('')' { $$ = eth_ast_cval(eth_nil); LOC($$, @$); }
   /*| '(' Expr DDOT Expr ')' { char *fields[] = { "l", "r" }; eth_ast *vals[] = { $2, $4 }; $$ = eth_ast_make_record(eth_rangelr_type, fields, vals, 2); }*/
@@ -447,7 +376,7 @@ FnAtom
 
   | '[' Expr DDOT Expr ']' %prec LIST_DDOT {
     eth_ast *p[2] = { $2, $4 };
-    eth_ast *range = eth_ast_cval(eth_get_builtin("__inclusive_range"));
+    eth_ast *range = eth_ast_cval(eth_get_builtin(SCANROOT, "__inclusive_range"));
     $$ = eth_ast_apply(range, p, 2);
   }
   | '[' Expr WITH LcAux ']' {
@@ -458,12 +387,12 @@ FnAtom
     if ($4.pred)
     {
       eth_ast *filterout = eth_ast_cval(eth_sym("Filter_out"));
-      eth_ast *raise = eth_ast_cval(eth_get_builtin("raise"));
+      eth_ast *raise = eth_ast_cval(eth_get_builtin(SCANROOT, "raise"));
       eth_ast *elsebr = eth_ast_apply(raise, &filterout, 1);
       eth_ast *body = eth_ast_if($4.pred, $2, elsebr);
       fn = eth_ast_fn_with_patterns(fnargs, 1, body);
       // ---
-      eth_t mapfn = eth_get_builtin("__List_filter_map");
+      eth_t mapfn = eth_get_builtin(SCANROOT, "__List_filter_map");
       assert(mapfn);
       eth_ast *map = eth_ast_cval(mapfn);
       // ---
@@ -474,7 +403,7 @@ FnAtom
     {
       fn = eth_ast_fn_with_patterns(fnargs, 1, $2);
       // ---
-      eth_t mapfn = eth_get_builtin("__List_map");
+      eth_t mapfn = eth_get_builtin(SCANROOT, "__List_map");
       assert(mapfn);
       eth_ast *map = eth_ast_cval(mapfn);
       // ---
@@ -539,10 +468,6 @@ StmtSeq
         else
           goto _default;
         break;
-      case ETH_AST_IMPORT:
-        $$ = $1;
-        eth_set_import_expr($1, $3);
-        break;
       case ETH_AST_ASSERT:
         $$ = $1;
         eth_set_assert_body($1, $3);
@@ -578,25 +503,6 @@ StmtSeq
     cod_vec_destroy($3.vals);
     LOC($$, @$);
   }
-
-  | MODULE CAPSYMBOL '=' Block {
-    $$ = eth_ast_module($2, $4, eth_ast_cval(eth_nil));
-    LOC($$, @1);
-    free($2);
-  }
-  | MODULE '=' Block {
-    $$ = eth_ast_module(NULL, $3, eth_ast_cval(eth_nil));
-    LOC($$, @1);
-  }
-  | MODULE CAPSYMBOL '=' Block KEEP_BLOCK StmtSeq {
-    $$ = eth_ast_module($2, $4, $6);
-    LOC($$, @1);
-    free($2);
-  }
-  | MODULE '=' Block KEEP_BLOCK StmtSeq {
-    $$ = eth_ast_module(NULL, $3, $5);
-    LOC($$, @1);
-  }
 ;
 
 Expr
@@ -606,31 +512,6 @@ Expr
     $$ = eth_ast_defined($2);
     free($2);
     LOC($$, @$);
-  }
-
-  | MaybePub OPEN CapIdent MaybeImports {
-    if ($4.data) $$ = eth_ast_import_idents($1, $3, $4.data, $4.len, dummy_ast());
-    else $$ = eth_ast_import_unqualified($1, $3, dummy_ast());
-    free($3);
-    if ($4.data) { cod_vec_iter($4, i, x, free(x)); cod_vec_destroy($4); }
-    LOC($$, @2);
-  }
-  | USING CapIdent AS CAPSYMBOL {
-    $$ = eth_ast_module_alias($2, $4, dummy_ast());
-    free($2);
-    free($4);
-    LOC($$, @1);
-  }
-  | USING CapIdent {
-    char *p = strrchr($2, '.');
-    if (p)
-    {
-      $$ = eth_ast_module_alias($2, p+1, dummy_ast());
-      free($2);
-      LOC($$, @1);
-    }
-    else
-      $$ = dummy_ast();
   }
 
   | Expr IS OF NoComaPattern {
@@ -951,13 +832,13 @@ Stmt
   }
 
   | LAZY Stmt {
-    eth_t lazy = eth_get_builtin("__Lazy_create");
+    eth_t lazy = eth_get_builtin(SCANROOT, "__Lazy_create");
     assert(lazy);
     eth_ast *thunk = eth_ast_fn(NULL, 0, $2);
     $$ = eth_ast_apply(eth_ast_cval(lazy), &thunk, 1);
   }
   | LAZY Block {
-    eth_t lazy = eth_get_builtin("__Lazy_create");
+    eth_t lazy = eth_get_builtin(SCANROOT, "__Lazy_create");
     assert(lazy);
     eth_ast *thunk = eth_ast_fn(NULL, 0, $2);
     $$ = eth_ast_apply(eth_ast_cval(lazy), &thunk, 1);
@@ -981,21 +862,6 @@ Stmt
 Ident
   : SYMBOL
   | CAPSYMBOL '.' Ident {
-    int len1 = strlen($1);
-    int len2 = strlen($3);
-    $$ = malloc(len1 + 1 + len2 + 1);
-    memcpy($$, $1, len1);
-    $$[len1] = '.';
-    memcpy($$ + len1 + 1, $3, len2);
-    $$[len1 + 1 + len2] = 0;
-    free($1);
-    free($3);
-  }
-;
-
-CapIdent
-  : CAPSYMBOL
-  | CAPSYMBOL '.' CapIdent {
     int len1 = strlen($1);
     int len2 = strlen($3);
     $$ = malloc(len1 + 1 + len2 + 1);
@@ -1140,8 +1006,6 @@ Bind
   }
 ;
 
-MaybePub : { $$ = false; } | PUB { $$ = true; };
-
 Attribute
   : { $$ = 0; }
   | Attribute PUB        { $$ = $1 | ETH_ATTR_PUB;        }
@@ -1155,7 +1019,7 @@ String
 
 FmtString
   : '"' FmtStringAux '"' {
-    eth_ast *fmt = eth_ast_cval(eth_get_builtin("__fmt"));
+    eth_ast *fmt = eth_ast_cval(eth_get_builtin(SCANROOT, "__fmt"));
     eth_ast *p[1] = { $2 };
     $$ = eth_ast_apply(fmt, p, 1);
   }
@@ -1402,22 +1266,6 @@ RecordPattern
   }
 ;
 
-MaybeImports
-  : { $$.data = NULL; }
-  | '(' ImportList ')' { $$ = $2; }
-;
-
-ImportList
-  : Ident {
-    cod_vec_init($$);
-    cod_vec_push($$, $1);
-  }
-  | ImportList ',' Ident {
-    $$ = $1;
-    cod_vec_push($$, $3);
-  }
-;
-
 List
   : StmtSeq {
     cod_vec_init($$);
@@ -1504,9 +1352,9 @@ filename(FILE *fp)
 }
 
 eth_ast*
-eth_parse(FILE *stream)
+eth_parse(eth_root *root, FILE *stream)
 {
-  eth_scanner *scan = eth_create_scanner(stream);
+  eth_scanner *scan = eth_create_scanner(root, stream);
 
   g_result = NULL;
   g_iserror = false;

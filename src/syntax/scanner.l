@@ -577,8 +577,6 @@ then   { return THEN; }
 else   { return ELSE; }
 when   { return WHEN; }
 unless { return UNLESS; }
-open   { return OPEN; }
-using  { return USING; }
 as     { return AS; }
 try    { return TRY; }
 with   { return WITH; }
@@ -586,7 +584,6 @@ or     { return OR; }
 do     { return DO; }
 case   { return CASE; }
 of     { return OF; }
-module { return MODULE; }
 lazy   { return LAZY; }
 assert { return ASSERT; }
 

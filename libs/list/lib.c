@@ -1,15 +1,15 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -327,7 +327,11 @@ ether_module(eth_module *mod, eth_root *topenv)
   eth_define(mod, "__fold_zip", eth_create_proc(_fold_zip, 3, NULL, NULL));
   eth_define(mod, "__rev_filter_map", eth_create_proc(_rev_filter_map, 2, NULL, NULL));
 
-  if (not eth_load_module_from_script2(topenv, NULL, mod, "lib.eth", NULL, mod))
+  eth_module *ethmod = eth_load_module_from_script2(topenv, "lib.eth", NULL, mod);
+  if (not ethmod)
     return -1;
+  eth_copy_defs(ethmod, mod);
+  eth_destroy_module(ethmod);
+
   return 0;
 }

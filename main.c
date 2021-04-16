@@ -227,9 +227,8 @@ main(int argc, char **argv)
   eth_debug("[main] init");
   eth_init(&argc);
 
-  eth_env *env = eth_create_env();
-  eth_root *root = eth_create_root(env);
-  cod_vec_iter(L, i, path, eth_add_module_path(env, path));
+  eth_root *root = eth_create_root();
+  cod_vec_iter(L, i, path, eth_add_module_path(eth_get_root_env(root), path));
   // --
   const char *modpath;
   if (filepath)
@@ -240,7 +239,7 @@ main(int argc, char **argv)
   }
   else
     modpath = ".";
-  eth_module *extravars = eth_create_module("<main>", NULL, modpath);
+  eth_module *extravars = eth_create_module("<main>", modpath);
   eth_define(extravars, "command_line", argv_to_list(argc, argv, optind));
   eth_define(extravars, "__main", eth_true);
 
@@ -348,7 +347,7 @@ main(int argc, char **argv)
         }
         if (mod)
         {
-          if (not (try_help(mod) or (ident==orig and try_help(eth_builtins()))))
+          if (not (try_help(mod) or (ident==orig and try_help(eth_get_builtins(repl_root)))))
             eth_warning("no such identifier");
         }
         free(line);
@@ -378,7 +377,7 @@ main(int argc, char **argv)
 
         // parse input-buffer
         FILE *bufstream = fmemopen(buf.data, buf.len, "r");
-        eth_scanner *scan = eth_create_repl_scanner(bufstream);
+        eth_scanner *scan = eth_create_repl_scanner(root, bufstream);
         eth_ast *expr = eth_parse_repl(scan);
         eth_destroy_scanner(scan);
         fclose(bufstream);
@@ -397,9 +396,12 @@ main(int argc, char **argv)
 
           // evaluate expression
           eth_t ret = eth_eval(&evl, expr);
-          if (ret and ret != eth_nil)
+          if (ret)
           {
-            eth_printf("~w\n", ret);
+            if (eth_is_exn(ret))
+              eth_printf("\e[38;5;1;1mexception:\e[0m (~w)\n", eth_what(ret));
+            else if (ret != eth_nil)
+              eth_printf("~w\n", ret);
             eth_drop(ret);
           }
           eth_drop_ast(expr);
@@ -419,7 +421,7 @@ main(int argc, char **argv)
   {
     eth_debug("[main] parse input");
     eth_ast *ast;
-    ast = eth_parse(input);
+    ast = eth_parse(root, input);
     fclose(input);
     if (ast)
     {
@@ -598,21 +600,21 @@ static const eth_module*
 resolve_ident(const char** ident)
 {
   const eth_module *mod = repl_defs;
-  char *p;
-  if ((p = strrchr(*ident, '.')))
-  {
-    int modnamelen = p - *ident;
-    char modname[modnamelen + 1];
-    memcpy(modname, *ident, modnamelen);
-    modname[modnamelen] = '\0';
-    mod = eth_require_module(repl_root, eth_get_root_env(repl_root), modname);
-    if (mod == NULL)
-    {
-      eth_warning("no module '%s'", modname);
-      return NULL;
-    }
-    *ident = p + 1;
-  }
+  //char *p;
+  //if ((p = strrchr(*ident, '.')))
+  //{
+    //int modnamelen = p - *ident;
+    //char modname[modnamelen + 1];
+    //memcpy(modname, *ident, modnamelen);
+    //modname[modnamelen] = '\0';
+    //mod = eth_require_module(repl_root, modname);
+    //if (mod == NULL)
+    //{
+      //eth_warning("no module '%s'", modname);
+      //return NULL;
+    //}
+    //*ident = p + 1;
+  //}
   return mod;
 }
 
@@ -621,7 +623,7 @@ completion_generator(const char *text, int state)
 {
   static cod_vec(char*) matches;
   static size_t idx;
-  static char prefix[PATH_MAX];
+  static char prefix[PATH_MAX] = "";
 
   // - - - - - - - - - -
   // Ignore empty input
@@ -646,9 +648,9 @@ completion_generator(const char *text, int state)
     // resolve module
     const char *ident = text;
     const eth_module *mod = resolve_ident(&ident);
-    if (mod == NULL)
-      return NULL;
-    strncpy(prefix, text, ident - text);
+    //if (mod == NULL)
+      //return NULL;
+    //strncpy(prefix, text, ident - text);
 
     // - - - - - - -
     // Get matches
@@ -674,7 +676,7 @@ completion_generator(const char *text, int state)
     // also check builtins (if no module prefix specified)
     if (strcmp(prefix, "") == 0)
     {
-      mod = eth_builtins();
+      mod = eth_get_builtins(repl_root);
       int ndefs = eth_get_ndefs(mod);
       eth_def defs[ndefs];
       eth_get_defs(mod, defs);
@@ -686,20 +688,6 @@ completion_generator(const char *text, int state)
             continue;
           cod_vec_push(matches, strdup(defs[i].ident));
         }
-      }
-    }
-    // check submodules
-    int nsubmod = eth_get_nmodules(eth_get_env(mod));
-    const eth_module *submods[nsubmod];
-    eth_get_modules(eth_get_env(mod), submods, nsubmod);
-    for (int i = 0; i < nsubmod; ++i)
-    {
-      const char *modname = eth_get_module_name(submods[i]);
-      if (strncmp(modname, ident, identlen) == 0)
-      {
-        char *path = malloc(strlen(prefix) + strlen(modname) + 2);
-        sprintf(path, "%s%s", prefix, modname);
-        cod_vec_push(matches, path);
       }
     }
 

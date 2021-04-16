@@ -1,6 +1,6 @@
 
 let math_tests =
-  open Math
+  let {*} = @(require 'math')
   [
     ("even?", fn -> even? 0 && even? 2 && not even? 3),
     ("odd?", fn -> not odd? 0 && odd? 1 && not odd? 2 && odd? 3),
@@ -10,7 +10,8 @@ let math_tests =
   ]
 
 let string_tests =
-  open String
+  let {*} = @(require 'string')
+  let list = @(require 'list')
   [
     ("cat", fn -> cat ["a", "b", "c"] eq "abc"),
     ("join", fn -> join "," ["a", "b", "c"] eq "a,b,c"),
@@ -24,7 +25,7 @@ let string_tests =
     ("chr", fn -> chr 0x61 eq "a"),
     ("ord", fn -> ord "a" eq 0x61),
     ("to_number", fn ->
-      List.all? (x -> x == 42) [
+      list.all? (x -> x == 42) [
         to_number "42",
         to_number " 42 ",
         to_number "0x2A"
@@ -39,7 +40,7 @@ let string_tests =
 
     ("sub", fn ->
       let str = "Hello World!"
-      List.all? id [
+      list.all? id [
         sub (6...) str eq "World!",
         sub (...4) str eq "Hello",
         sub (4..6) str eq "o W"
@@ -63,7 +64,7 @@ let regexp_tests = [
 ]
 
 let list_tests =
-  open List
+  let {*} = @(require 'list')
   [ ("[..]", fn -> [1..10] eq [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
   , ("[.|.,.]", fn -> [x with x <- [1..10], even? x] eq [2, 4, 6, 8, 10])
   , ("fold_map", fn -> fold_map (fn z x -> (x + z, x)) 0 [1..3] eq [1, 3, 5])
@@ -138,19 +139,21 @@ let list_tests =
   ]
 
 let vector_tests =
-  let v = Vector.of_list [1, 2, 3]
-  [ ("of_list", fn -> Vector.(get v 0, get v 1, get v 2) eq (1, 2, 3))
-  , ("back", fn -> Vector.back v eq 3)
-  , ("front", fn -> Vector.front v eq 1)
-  , ("push", fn -> Vector.back (Vector.push v 42) eq 42 && Vector.back v eq 3)
+  let vector = @(require 'vector')
+  let v = vector.of_list [1, 2, 3]
+  [ ("of_list", fn -> let {get} = vector in (get v 0, get v 1, get v 2) eq (1, 2, 3))
+  , ("back", fn -> vector.back v eq 3)
+  , ("front", fn -> vector.front v eq 1)
+  , ("push", fn -> vector.back (vector.push v 42) eq 42 && vector.back v eq 3)
   ]
 
 let io_tests =
+  let io = @(require 'io')
   [
     ("open_string_in", fn ->
       let str = "1 + 1"
       let stream = open_string_in str
-      IO.read_line_of stream eq str),
+      io.read_line_of stream eq str),
   ]
 
 let load_tests =
@@ -167,7 +170,7 @@ let sumres (nok, nfail) (nok', nfail') =
 let res = (0, 0)
 
 let (nok, nfail) =
-  Test.run
+  @(require 'test').run
     [ ("math", math_tests)
     , ("string", string_tests)
     , ("regexp", regexp_tests)
