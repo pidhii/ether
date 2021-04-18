@@ -145,19 +145,22 @@ let fuzzy_cmp a b =
 let default_db_path = module_path ++ "/__db.eth"
 
 let load_db_from path =
-  { db = (first $ load path) if exist? path else []
-  , path
-  , get_module_opt = {db} name ->
-      find_opt ({name = name'} -> strcasecmp name name' == 0) db
-  , remove = fn ({db} as self) name ->
-      {self with
-        db = remove ({name = name'} -> strcasecmp name' name == 0) db
-      }
-  , add = fn ({db} as self) entry ->
-      {self with db = entry :: db}
-  , update = {db, path} ->
+  let ref = @(require 'ref')
+  let modlist = ref.strong (first $ load path if exist? path else [])
+  { get_modlist = fn _ -> ref.get modlist
+  , get_path = fn _ -> path
+  , get_module_opt = fn _ name ->
+      ref.get modlist
+      | find_opt ({name = name'} -> strcasecmp name name' == 0)
+  , remove = fn _ name ->
+      ref.get modlist
+      | remove ({name = name'} -> strcasecmp name' name == 0)
+      | ref.set modlist
+  , add = fn _ entry ->
+      ref.set $ entry :: ref.get modlist
+  , update = fn _ ->
       let dbfile = open_out path
-      write_to dbfile (format "%w\n" db)
+      write_to dbfile (format "%w\n" $ ref.get modlist)
   }
 
 ---------------------------------[ Git-API ]------------------------------------
@@ -250,18 +253,15 @@ let empty_db_entry = {
   version = nil,
 }
 
-let uninstall name =
-  let db = load_db_from default_db_path
-
+let uninstall {db, name} =
   if let Some {install_dir} = db:get_module_opt name then
     -- Remove module directory
     info "uninstalling module '{name}'"
     unlink install_dir
     -- Update registry
     info "updating registry"
-    let db = db:remove name
+    db:remove name
     db:update
-    db
   else
     error "no such module"
     raise Failure
@@ -270,18 +270,14 @@ let build_and_install {conf, modentry, db, dir, args, owerwrite} =
   let {name, files, main, build, post_install} = conf
 
   -- Check if module name is unique
-  let db =
-    if db:get_module_opt name then
-      if owerwrite then
-        info "module already present"
-        let db = uninstall name
-        info "old version of '{name}' was removed"
-        db
-      else
-        error "module already present"
-        raise Failure
+  when db:get_module_opt name then
+    if owerwrite then
+      info "module already present"
+      uninstall {db, name}
+      info "old version of '{name}' was removed"
     else
-      db
+      error "module already present"
+      raise Failure
 
   -- Build (if build-hook is speciefied)
   when let Some build = build then do_in dir $ fn ->
@@ -310,12 +306,9 @@ let build_and_install {conf, modentry, db, dir, args, owerwrite} =
     post_install!
 
   {
-    db,
-    modentry = {
-      modentry with name,
-      date = utc_date! or "<undefined>",
-      install_dir = realpath moddir or "<undefined>",
-    }
+    modentry with name,
+    date = utc_date! or "<undefined>",
+    install_dir = realpath moddir or "<undefined>",
   }
 
 let fetch {repo_url, version} =
@@ -361,7 +354,7 @@ let check_update {name, local_version, repo_url} =
 
 
 let list_modules! =
-  let { db } = load_db_from default_db_path
+  let db = (load_db_from default_db_path):get_modlist
   if db is [] then
     info "no installed modules"
   else
@@ -568,13 +561,14 @@ let commands =
 
             -- Install
             let db = load_db_from default_db_path
-            let {db, modentry} = install {
+            let modentry = install {
               db, repo_url, version, args = modargs, owerwrite = true
             }
 
             -- Update registry
             info "updating registry"
-            (db:add modentry):update
+            db:add modentry
+            db:update
 
           else -- let url :: modargs = agrs
             error "missing module-directory path"
@@ -594,13 +588,13 @@ let commands =
           die "unimplemented"
         else
           let [modname] = args
-          uninstall modname
+          uninstall {modname, db = load_db_from default_db_path}
     },
     {
       keys = ['check-updates'],
       handle = command_line ->
         require_network!
-        let { db } = load_db_from default_db_path
+        let db = (load_db_from default_db_path):get_modlist
         let cnt =
           fold_left (cnt { name, version = local_version, repository = repo_url } ->
             write_to stdout $ paint " checking \e[1m{name}\e[22m ... "
@@ -623,7 +617,7 @@ let commands =
           die "unimplemented"
         else if args eq [] then
           -- Update all modules.
-          (load_db_from default_db_path).db |> iter $ {
+          (load_db_from default_db_path):get_modlist |> iter $ {
             name, version = local_version, repository = repo_url
           } ->
             write_to stdout $ paint " checking \e[1m{name}\e[22m ... "
@@ -634,12 +628,14 @@ let commands =
               write_to stdout "\e[2K\r"; info info_mesg
               -- Install
               let db = load_db_from default_db_path
-              let {db, modentry} = install {
+              let modentry = install {
                 db, repo_url, version = new_version, args = [], owerwrite = true
               }
               -- Update registry
               info "updating registry"
-              ((db:remove name):add modentry):update
+              db:remove name
+              db:add modentry
+              db:update
             else write_to stdout "\e[2K\r"
         else
           let name::args = args
@@ -650,7 +646,7 @@ let commands =
             } then
               -- Install
               let db = load_db_from default_db_path
-              let {db, modentry} = install {
+              let modentry = install {
                 db, args,
                 repo_url = repository,
                 version = new_version,
@@ -658,7 +654,9 @@ let commands =
               }
               -- Update registry
               info "updating registry"
-              db:(remove name):(add modentry):update
+              db:remove name
+              db:add modentry
+              db:update
             else
               info "already using the latest version of '{name}'"
           else

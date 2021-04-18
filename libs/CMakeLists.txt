@@ -2,16 +2,16 @@
 file (GLOB STD_LIBS ${CMAKE_SOURCE_DIR}/libs/*.eth)
 install (FILES ${STD_LIBS} DESTINATION lib/ether)
 
-## Ref
-#set (REF_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/ref)
-#set (REF_DST_DIR lib/ether/ref)
-#add_library (ref SHARED ${REF_SRC_DIR}/lib.c)
-#set_target_properties (ref
-  #PROPERTIES
-    #POSITION_INDEPENDENT_CODE ON
-    #PREFIX ""
-    #OUTPUT_NAME "ref")
-#install (TARGETS ref DESTINATION ${REF_DST_DIR})
+# Ref
+set (REF_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/ref)
+set (REF_DST_DIR lib/ether/ref)
+add_library (ref SHARED ${REF_SRC_DIR}/lib.c)
+set_target_properties (ref
+  PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    PREFIX ""
+    OUTPUT_NAME "ref")
+install (TARGETS ref DESTINATION ${REF_DST_DIR})
 
 # Math
 set (MATH_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/math)

@@ -229,7 +229,6 @@ eth_cleanup(void)
   eth_destroy_type(eth_ranger_type);
   eth_destroy_type(eth_regexp_type);
   eth_destroy_type(eth_strong_ref_type);
-  eth_destroy_type(eth_weak_ref_type);
   eth_destroy_type(eth_vector_type);
 
   extern void _eth_cleanup_strings(void);

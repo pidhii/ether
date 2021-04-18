@@ -1250,8 +1250,7 @@ eth_is_ranger(eth_t x)
 //                                 ref
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 extern
-eth_type *eth_strong_ref_type,
-         *eth_weak_ref_type;
+eth_type *eth_strong_ref_type;
 
 struct eth_mut_ref {
   eth_header header;
@@ -1268,17 +1267,8 @@ eth_set_strong_ref(eth_t ref, eth_t x)
   ETH_REF(ref)->val = x;
 }
 
-static inline void
-eth_set_weak_ref(eth_t ref, eth_t x)
-{
-  ETH_REF(ref)->val = x;
-}
-
 eth_t
 eth_create_strong_ref(eth_t init);
-
-eth_t
-eth_create_weak_ref(eth_t init);
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                               vector
