@@ -1314,6 +1314,7 @@ typedef enum {
   ETH_ATTR_BUILTIN    = (1 << 0),
   ETH_ATTR_PUB        = (1 << 1),
   ETH_ATTR_DEPRECATED = (1 << 2),
+  ETH_ATTR_MUT        = (1 << 3),
 } eth_attr_t;
 
 typedef struct {
@@ -1844,6 +1845,7 @@ typedef enum {
   ETH_AST_DEFINED,
   ETH_AST_EVMAC,
   ETH_AST_MULTIMATCH,
+  ETH_AST_ASSIGN,
 } eth_ast_tag;
 
 typedef enum {
@@ -1893,6 +1895,7 @@ struct eth_ast {
     struct { char *ident; } defined;
     struct { eth_match_table *table; eth_ast **exprs; } multimatch;
     struct { eth_ast *expr; } evmac;
+    struct { char *ident; eth_ast *val; } assign;
   };
   eth_location *loc;
 };
@@ -2005,6 +2008,9 @@ eth_ast_evmac(eth_ast *expr);
 
 eth_ast*
 eth_ast_multimatch(eth_match_table *table, eth_ast *const exprs[]);
+
+eth_ast*
+eth_ast_assign(const char *ident, eth_ast *val);
 
 eth_ast_pattern*
 eth_ast_to_pattern(eth_ast *ast);

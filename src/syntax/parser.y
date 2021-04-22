@@ -204,7 +204,7 @@ _create_attr(int aflag, void *locpp)
 %nonassoc AS
 %nonassoc DOT_OPEN1 DOT_OPEN2 DOT_OPEN3
 %nonassoc LARROW
-%nonassoc PUB BUILTIN DEPRECATED
+%nonassoc PUB MUT BUILTIN DEPRECATED
 %nonassoc LIST_DDOT
 %nonassoc DO
 %nonassoc CASE OF
@@ -220,6 +220,7 @@ _create_attr(int aflag, void *locpp)
 %right OR
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 // level 0:
+%nonassoc ASSIGN
 %left PIPE
 %right '$'
 // level 1:
@@ -759,6 +760,10 @@ Expr
   /*| Expr PIPE START_BLOCK Stmt END_BLOCK { if ($4->tag == ETH_AST_APPLY) { $$ = $4; eth_ast_append_arg($$, $1); } else $$ = eth_ast_apply($4, &$1, 1); LOC($$, @$); }*/
 
   /*| Expr PIPE Expr { if ($3->tag == ETH_AST_APPLY) { $$ = $3; eth_ast_append_arg($$, $1); } else $$ = eth_ast_apply($3, &$1, 1); LOC($$, @$); }*/
+
+  | SYMBOL ASSIGN Expr { $$ = eth_ast_assign($1, $3); free($1); LOC($$, @$); }
+  | SYMBOL ASSIGN KEEP_BLOCK Expr { $$ = eth_ast_assign($1, $4); free($1); LOC($$, @$); }
+  | SYMBOL ASSIGN START_BLOCK Expr END_BLOCK { $$ = eth_ast_assign($1, $4); free($1); LOC($$, @$); }
 ;
 
 Stmt
@@ -954,6 +959,14 @@ Bind
   : Pattern '=' MaybeHelp StmtOrBlock {
     $$.pat = $1;
     $$.val = $4;
+    if ($1->tag == ETH_AST_PATTERN_IDENT &&
+        $1->ident.attr &&
+        $1->ident.attr->flag & ETH_ATTR_MUT)
+    {
+      eth_t mkref = eth_get_builtin(SCANROOT, "__create_ref");
+      eth_ast *p[] = { $$.val };
+      $$.val = eth_ast_apply(eth_ast_cval(mkref), p, 1);
+    }
     if ($3)
     {
       if ($1->tag == ETH_AST_PATTERN_IDENT)
@@ -1009,6 +1022,7 @@ Bind
 Attribute
   : { $$ = 0; }
   | Attribute PUB        { $$ = $1 | ETH_ATTR_PUB;        }
+  | Attribute MUT        { $$ = $1 | ETH_ATTR_MUT;        }
   | Attribute BUILTIN    { $$ = $1 | ETH_ATTR_BUILTIN;    }
   | Attribute DEPRECATED { $$ = $1 | ETH_ATTR_DEPRECATED; }
 ;

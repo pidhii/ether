@@ -681,10 +681,21 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         eth_warning("use of deprecated variable, '%s'", ast->ident.str);
         eth_print_location_opt(ast->loc, stderr, ETH_LOPT_FILE);
       }
+
       if (var.cval)
+      {
         return eth_ir_cval(var.cval);
+      }
+      else if (var.attr && var.attr->flag & ETH_ATTR_MUT)
+      {
+        eth_t deref = eth_get_builtin(bldr->root, "__dereference");
+        eth_ir_node *args[] = { eth_ir_var(var.vid) };
+        return eth_ir_apply(eth_ir_cval(deref), args, 1);
+      }
       else
+      {
         return eth_ir_var(var.vid);
+      }
     }
 
     case ETH_AST_APPLY:
@@ -1192,8 +1203,38 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       return eth_ir_cval(ret);
     }
 
-    default:
-      abort();
+    case ETH_AST_ASSIGN:
+    {
+      eth_var var;
+      if (not require_var(bldr, ast->ident.str, &var))
+      {
+        eth_warning("undefined variable, '%s'", ast->ident.str);
+        *e = 1;
+        eth_print_location(ast->loc, stderr);
+        return eth_ir_error();
+      }
+      if (not (var.attr and var.attr->flag & ETH_ATTR_MUT))
+      {
+        eth_warning("trying to assign non-mutable variable");
+        *e = 1;
+        eth_print_location_opt(ast->loc, stderr, ETH_LOPT_FILE);
+        return eth_ir_error();
+      }
+      if (var.attr && var.attr->flag & ETH_ATTR_DEPRECATED)
+      {
+        eth_warning("use of deprecated variable, '%s'", ast->ident.str);
+        eth_print_location_opt(ast->loc, stderr, ETH_LOPT_FILE);
+      }
+
+      eth_t assgn = eth_get_builtin(bldr->root, "__assign");
+      eth_ir_node *args[] = {
+        eth_ir_var(var.vid),
+        build_with_toplvl(bldr, ast->assign.val, e, false),
+      };
+      eth_ir_node *ret = eth_ir_apply(eth_ir_cval(assgn), args, 2);
+      eth_set_ir_location(ret, ast->loc);
+      return ret;
+    }
   }
 
   eth_error("undefined AST-node");

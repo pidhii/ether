@@ -145,22 +145,17 @@ let fuzzy_cmp a b =
 let default_db_path = module_path ++ "/__db.eth"
 
 let load_db_from path =
-  let ref = @(require 'ref')
-  let modlist = ref.strong (first $ load path if exist? path else [])
-  { get_modlist = fn _ -> ref.get modlist
+  let mut modlist = first $ load path if exist? path else []
+  { get_modlist = fn _ -> modlist
   , get_path = fn _ -> path
   , get_module_opt = fn _ name ->
-      ref.get modlist
-      | find_opt ({name = name'} -> strcasecmp name name' == 0)
+      find_opt ({name = name'} -> strcasecmp name name' == 0) modlist
   , remove = fn _ name ->
-      ref.get modlist
-      | remove ({name = name'} -> strcasecmp name' name == 0)
-      | ref.set modlist
-  , add = fn _ entry ->
-      ref.set $ entry :: ref.get modlist
+      modlist := remove ({name = name'} -> strcasecmp name' name == 0) modlist
+  , add = fn _ entry -> modlist := entry :: modlist
   , update = fn _ ->
       let dbfile = open_out path
-      write_to dbfile (format "%w\n" $ ref.get modlist)
+      write_to dbfile (format "%w\n" modlist)
   }
 
 ---------------------------------[ Git-API ]------------------------------------
@@ -253,14 +248,15 @@ let empty_db_entry = {
   version = nil,
 }
 
-let uninstall {db, name} =
-  if let Some {install_dir} = db:get_module_opt name then
+let uninstall {db, modname} =
+  print 'asdf'
+  if let Some {install_dir} = db:get_module_opt modname then
     -- Remove module directory
-    info "uninstalling module '{name}'"
+    info "uninstalling module '{modname}'"
     unlink install_dir
     -- Update registry
     info "updating registry"
-    db:remove name
+    db:remove modname
     db:update
   else
     error "no such module"
@@ -361,7 +357,8 @@ let list_modules! =
     let f isfirst modentry =
       print "" unless isfirst
       let { name } = modentry
-      info "module \e[1m{name}\e[21m:"
+      --info "module \e[1m{name}\e[21m:"
+      info "module \e[1m{name}:"
       list modentry
       |> filter $ (k, _) -> k not eq "name"
       |> iter $ (k, v) ->
@@ -593,7 +590,6 @@ let commands =
     {
       keys = ['check-updates'],
       handle = command_line ->
-        require_network!
         let db = (load_db_from default_db_path):get_modlist
         let cnt =
           fold_left (cnt { name, version = local_version, repository = repo_url } ->

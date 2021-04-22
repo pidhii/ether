@@ -1187,6 +1187,43 @@ _rev_list(void)
   return ret;
 }
 
+static eth_t
+_create_ref(void)
+{
+  eth_t x = *eth_sp++;
+  eth_t ref = eth_create_strong_ref(x);
+  return ref;
+}
+
+static eth_t
+_dereference(void)
+{
+  eth_t x = *eth_sp++;
+  if (eth_unlikely(x->type != eth_strong_ref_type))
+  {
+    eth_drop(x);
+    return eth_exn(eth_type_error());
+  }
+  eth_t ret = eth_ref_get(x);
+  eth_ref(ret);
+  eth_drop(x);
+  eth_dec(ret);
+  return ret;
+}
+
+static eth_t
+_assign(void)
+{
+  eth_args args = eth_start(2);
+  eth_t ref = eth_arg(args);
+  eth_t x = eth_arg(args);
+  if (ref->type == eth_strong_ref_type)
+    eth_set_strong_ref(ref, x);
+  else
+    eth_throw(args, eth_exn(eth_type_error()));
+  eth_return(args, eth_nil);
+}
+
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                 module
@@ -1260,6 +1297,10 @@ eth_create_builtins(eth_root *root)
   eth_define(mod, "__require", eth_create_proc(_require, 1, root, NULL));
   // ---
   eth_define(mod, "__Lazy_create", eth_create_proc(_Lazy_create, 1, NULL, NULL));
+  // ---
+  eth_define(mod, "__create_ref", eth_create_proc(_create_ref, 1, NULL, NULL));
+  eth_define(mod, "__dereference", eth_create_proc(_dereference, 1, NULL, NULL));
+  eth_define(mod, "__assign", eth_create_proc(_assign, 2, NULL, NULL));
 
 
   if (not eth_resolve_path(eth_get_env(mod), "__builtins.eth", buf))

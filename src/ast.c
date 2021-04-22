@@ -348,6 +348,11 @@ destroy_ast_node(eth_ast *ast)
       free(ast->multimatch.exprs);
       eth_destroy_match_table(ast->multimatch.table);
       break;
+
+    case ETH_AST_ASSIGN:
+      free(ast->assign.ident);
+      eth_unref_ast(ast->assign.val);
+      break;
   }
 
   if (ast->loc)
@@ -679,6 +684,15 @@ eth_ast_multimatch(eth_match_table *table, eth_ast *const exprs[])
   ast->multimatch.exprs = malloc(sizeof(eth_ast*) * table->w);
   for (int i = 0; i < table->w; ++i)
     eth_ref_ast(ast->multimatch.exprs[i] = exprs[i]);
+  return ast;
+}
+
+eth_ast*
+eth_ast_assign(const char *ident, eth_ast *val)
+{
+  eth_ast *ast = create_ast_node(ETH_AST_ASSIGN);
+  ast->assign.ident = strdup(ident);
+  eth_ref_ast(ast->assign.val = val);
   return ast;
 }
 

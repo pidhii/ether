@@ -594,6 +594,7 @@ true  { yylval->constant = eth_true;  return CONST; }
 false { yylval->constant = eth_false; return CONST; }
 
 pub          { return PUB; }
+mut          { return MUT; }
 __builtin    { return BUILTIN; }
 __deprecated { return DEPRECATED; }
 
@@ -643,6 +644,7 @@ lnot    { return LNOT; }
 "++"    { return PPLUS; }
 ".."    { return DDOT; }
 "..."   { return DDDOT; }
+":="   { return ASSIGN; }
 
 "("({OPERATOR}|","+)")"     {
   char *buf = malloc(yyleng - 2 + 1);

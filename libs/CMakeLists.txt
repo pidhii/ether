@@ -179,26 +179,3 @@ install (FILES ${OS_SRC_DIR}/lib.eth DESTINATION ${OS_DST_DIR})
 #install (TARGETS curses DESTINATION ${CURSES_DST_DIR})
 #install (FILES ${CURSES_SRC_DIR}/lib.eth DESTINATION ${CURSES_DST_DIR})
 
-## Gtk
-#if (ENABLE_GTK)
-  #pkg_check_modules (GTK3 gtk+-3.0)
-  #if (GTK3_FOUND)
-    #set (GTK_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/gtk)
-    #set (GTK_DST_DIR lib/ether/gtk)
-    #add_library (gtk SHARED ${GTK_SRC_DIR}/lib.c)
-    #set_target_properties (gtk
-      #PROPERTIES
-        #POSITION_INDEPENDENT_CODE ON
-        #PREFIX ""
-        #OUTPUT_NAME "gtk")
-    ##pkg_check_modules (GOBJECT2 REQUIRED gobject-2.0)
-    #target_include_directories (gtk PRIVATE ${GTK3_INCLUDE_DIRS})
-    #target_link_directories (gtk PRIVATE ${GTK3_LIBRARY_DIRS})
-    #target_link_libraries (gtk PRIVATE ${GTK3_LIBRARIES})
-    #install (TARGETS gtk DESTINATION ${GTK_DST_DIR})
-    #install (FILES ${GTK_SRC_DIR}/lib.eth DESTINATION ${GTK_DST_DIR})
-  #else (GTK3_FOUND)
-    #message (WARNING "Can't build Gtk-module.")
-  #endif (GTK3_FOUND)
-#endif (ENABLE_GTK)
-
