@@ -624,10 +624,10 @@ constexpr_binop(eth_binop op, eth_t lhs, eth_t rhs, eth_location *loc, int *e)
         case ETH_ASHL: ret = eth_num((intmax_t)x << (intmax_t)y); break;
         case ETH_ASHR: ret = eth_num((intmax_t)x >> (intmax_t)y); break;
         // ---
-        case ETH_LT: ret = eth_boolean(x < y); break;
-        case ETH_LE: ret = eth_boolean(x <= y); break;
-        case ETH_GT: ret = eth_boolean(x > y); break;
-        case ETH_GE: ret = eth_boolean(x >= y); break;
+        case ETH_LT: ret = x < y ? eth_num(y) : eth_false; break;
+        case ETH_LE: ret = x <= y ? eth_num(y) : eth_false; break;
+        case ETH_GT: ret = x > y ? eth_num(y) : eth_false; break;
+        case ETH_GE: ret = x >= y ? eth_num(y) : eth_false; break;
         case ETH_EQ: ret = eth_boolean(x == y); break;
         case ETH_NE: ret = eth_boolean(x != y); break;
         // ---

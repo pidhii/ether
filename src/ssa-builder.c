@@ -1159,7 +1159,15 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
           bldr->vinfo[ret]->creatloc = insn;
           break;
 
-        case ETH_LT ... ETH_NE:
+        case ETH_LT ... ETH_GE:
+          ret = new_val(bldr, RC_RULES_DISABLE);
+          insn = eth_insn_binop(ir->binop.op, ret, lhs, rhs);
+
+          testnum = true;
+          bldr->vinfo[ret]->creatloc = insn;
+          break;
+
+        case ETH_EQ ... ETH_NE:
           ret = new_val(bldr, RC_RULES_DISABLE);
           insn = eth_insn_binop(ir->binop.op, ret, lhs, rhs);
 

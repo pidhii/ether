@@ -228,7 +228,7 @@ _create_attr(int aflag, void *locpp)
 // level 2:
 %right OPAND
 // level 3:
-%nonassoc '<' LE '>' GE EQ NE IS ISNOT EQUAL NOTEQUAL DDOT DDDOT EQ_TILD
+%left '<' LE '>' GE EQ NE IS ISNOT EQUAL NOTEQUAL DDOT DDDOT EQ_TILD
 // level 4:
 %right CONS PPLUS
 // level 5:

@@ -334,12 +334,22 @@ eth_vm(eth_bytecode *bc)
         r[ip->binop.out] = eth_boolean(op);                   \
         FAST_DISPATCH_NEXT();                                 \
       }
-      ARITHM_CMP_BINOP(LT, lhs < rhs)
-      ARITHM_CMP_BINOP(LE, lhs <= rhs)
-      ARITHM_CMP_BINOP(GT, lhs > rhs)
-      ARITHM_CMP_BINOP(GE, lhs >= rhs)
       ARITHM_CMP_BINOP(EQ, lhs == rhs)
       ARITHM_CMP_BINOP(NE, lhs != rhs)
+
+#define ARITHM_CMP_BINOP2(opc, op)                            \
+      OP(opc)                                                 \
+      {                                                       \
+        eth_number_t lhs = ETH_NUMBER(r[ip->binop.lhs])->val; \
+        eth_t rhsval = r[ip->binop.rhs];                      \
+        eth_number_t rhs = ETH_NUMBER(rhsval)->val;           \
+        r[ip->binop.out] = op ? rhsval : eth_false;           \
+        FAST_DISPATCH_NEXT();                                 \
+      }
+      ARITHM_CMP_BINOP2(LT, lhs < rhs)
+      ARITHM_CMP_BINOP2(LE, lhs <= rhs)
+      ARITHM_CMP_BINOP2(GT, lhs > rhs)
+      ARITHM_CMP_BINOP2(GE, lhs >= rhs)
 
       OP(IS)
       {
