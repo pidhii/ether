@@ -1086,7 +1086,7 @@ StringAux
 
 FmtStringAux
   /* To distinguish FmtString from simple String */
-  : StringAux START_FORMAT Stmt END_FORMAT StringAux {
+  : StringAux START_FORMAT Expr END_FORMAT StringAux {
     eth_ast *tmp;
 
     cod_vec_push($1, 0);
@@ -1100,7 +1100,7 @@ FmtStringAux
     tmp = eth_ast_cval(eth_create_string_from_ptr2($5.data, $5.len - 1));
     $$ = eth_ast_binop(ETH_CONS, tmp, $$);
   }
-  | FmtStringAux START_FORMAT Stmt END_FORMAT StringAux {
+  | FmtStringAux START_FORMAT Expr END_FORMAT StringAux {
     eth_ast *tmp;
 
     $$ = $1;

@@ -372,7 +372,7 @@ let basename path =
 
 let help! =
   print "\e[1mUSAGE:\e[0m"
-  print "  {basename $ car command_line} COMMAND [OPTIONS]"
+  print "  {basename (car command_line)} COMMAND [OPTIONS]"
   print ""
   print "\e[1mCOMMANDS:\e[0m"
   print "  help      h                Show this message."
@@ -387,7 +387,7 @@ let help! =
 
 let help_help! =
   print "\e[1mUSAGE:\e[0m"
-  print "  {basename $ car command_line} help [OPTIONS]"
+  print "  {basename (car command_line)} help [OPTIONS]"
   print ""
   print "\e[1mOPTIONS:\e[0m"
   print "  --help   -h             Show this message."
@@ -446,7 +446,7 @@ be available via the \`command_line\`-variable; and  the root directory -- via t
 
 let install_help! =
   print "\e[1mUSAGE:\e[0m"
-  print "  {basename $ car command_line} install [OPTIONS] [<command_line> ...]"
+  print "  {basename (car command_line)} install [OPTIONS] [<command_line> ...]"
   print ""
   print "\e[1mOPTIONS:\e[0m"
   print "  --help   -h             Show this message."
@@ -674,7 +674,7 @@ let main! =
       possible_commands
       |> rev_map $ str -> (str, fuzzy_cmp str cmd)
       |> sort $ (_, a) (_, b) -> a < b
-    info "did you mean '\e[1m{first $ car cands}\e[22m'?"
+    info "did you mean '\e[1m{first (car cands)}\e[22m'?"
 
     info "see `{basename dopepath} help` for avaliable commands"
     exit 1

@@ -1224,6 +1224,45 @@ _assign(void)
   eth_return(args, eth_nil);
 }
 
+static eth_t
+_shell(void)
+{
+  eth_args args = eth_start(1);
+  eth_t cmd = eth_arg2(args, eth_string_type);
+  FILE *input = popen(eth_str_cstr(cmd), "r");
+  int totsize = 0;
+  cod_vec(void*) parts;
+  cod_vec_init(parts);
+  while (true)
+  {
+    void *buf = malloc(256 + sizeof(int));
+    char *str = buf;
+
+    int nrd = fread(str, 1, 256, input);
+    if (nrd < 256 && ferror(input))
+    {
+      free(buf);
+      goto error;
+    }
+    *(int*)(buf+256) = nrd;
+    totsize += nrd;
+    cod_vec_push(parts, buf);
+  }
+
+  if (parts.len == 1)
+  {
+    void *buf = parts.data[0];
+    int size = *(int*)(buf+256);
+    eth_t ret = eth_create_string_from_ptr2(buf+sizeof(int), size);
+  }
+
+error:
+  pclose(input);
+  cod_vec_iter(parts, i, x, free(x));
+  cod_vec_destroy(parts);
+  eth_return(args, eth_system_error(0));
+}
+
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                 module

@@ -258,7 +258,11 @@ if[ \t\n]+let   { ENTER_STATE(IGNORE_INDENT); return IFLET; }
 when[ \t\n]+let { ENTER_STATE(IGNORE_INDENT); return WHENLET; }
 fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
 
-<IGNORE_INDENT>"="  { PREV_STATE(); return '='; }
+<IGNORE_INDENT>"="  {
+  if (cod_vec_last(statestack) != IGNORE_INDENT)
+    PREV_STATE();
+  return '=';
+}
 <IGNORE_INDENT>"->" { PREV_STATE(); return RARROW; }
 
  /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
