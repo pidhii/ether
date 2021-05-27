@@ -400,6 +400,18 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
   cod_vec_push(primtoks, yytext[yyleng-1]);
 
   /* Drop all gained indentation levels. */
+  if (indlvlstack.len <= 0)
+  {
+    eth_error("indentation failure");
+    const char *path = filename(eth_get_scanner_input(yyscanner));
+    if (path)
+    {
+      eth_location *loc = eth_create_location(yylloc->first_line,
+          yylloc->first_column, yylloc->last_line, yylloc->last_column, path);
+      eth_print_location(loc, stderr);
+    }
+    abort();
+  }
   assert(indlvlstack.len > 0);
   int nindwas = cod_vec_pop(indlvlstack);
   int nindnow = indentstack.len;
