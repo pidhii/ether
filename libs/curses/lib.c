@@ -1,15 +1,15 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -54,7 +54,7 @@ static void
 destroy_window(eth_type *type, eth_t x)
 {
   window *win = (void*)x;
-  if (win->cwin != stdscr)
+  if (win->dodel)
     delwin(win->cwin);
   free(win);
 }
@@ -76,6 +76,7 @@ _initscr(void)
 {
   initscr();
   g_stdscr = create_window(stdscr);
+  ((window*)g_stdscr)->dodel = false;
   eth_ref(g_stdscr);
   return g_stdscr;
 }
@@ -93,6 +94,84 @@ static eth_t
 _isendwin(void)
 {
   return eth_boolean(isendwin());
+}
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+static eth_t
+_start_color(void)
+{
+  if (start_color() == ERR)
+    return curses_exn();
+  return eth_nil;
+}
+
+static eth_t
+_has_colors(void)
+{
+  return eth_boolean(has_colors());
+}
+
+static eth_t
+_wattron(void)
+{
+  eth_args args = eth_start(2);
+  eth_t win = eth_arg2(args, window_type);
+  eth_t attr = eth_arg2(args, eth_number_type);
+  unsigned int a = eth_num_val(attr);
+  int err = wattron(((window*)win)->cwin, a);
+  if (err == ERR)
+    eth_return(args, curses_exn());
+  eth_return(args, eth_nil);
+}
+
+static eth_t
+_wattroff(void)
+{
+  eth_args args = eth_start(2);
+  eth_t win = eth_arg2(args, window_type);
+  eth_t attr = eth_arg2(args, eth_number_type);
+  unsigned int a = eth_num_val(attr);
+  int err = wattroff(((window*)win)->cwin, a);
+  if (err == ERR)
+    eth_return(args, curses_exn());
+  eth_return(args, eth_nil);
+}
+
+static eth_t
+_COLOR_PAIR(void)
+{
+  eth_args args = eth_start(1);
+  eth_t pair = eth_arg2(args, eth_number_type);
+  unsigned int p = eth_num_val(pair);
+  eth_return(args, eth_num(COLOR_PAIR(p)));
+}
+
+static eth_t
+_init_color(void)
+{
+  eth_args args = eth_start(4);
+  eth_t id = eth_arg2(args, eth_number_type);
+  eth_t r = eth_arg2(args, eth_number_type);
+  eth_t g = eth_arg2(args, eth_number_type);
+  eth_t b = eth_arg2(args, eth_number_type);
+  int err = init_color(eth_num_val(id), eth_num_val(r), eth_num_val(g), eth_num_val(b));
+  if (err == ERR)
+    eth_return(args, curses_exn());
+  eth_return(args, eth_nil);
+}
+
+
+static eth_t
+_init_pair(void)
+{
+  eth_args args = eth_start(3);
+  eth_t id = eth_arg2(args, eth_number_type);
+  eth_t fg = eth_arg2(args, eth_number_type);
+  eth_t bg = eth_arg2(args, eth_number_type);
+  int err = init_pair(eth_num_val(id), eth_num_val(fg), eth_num_val(bg));
+  if (err == ERR)
+    eth_return(args, curses_exn());
+  eth_return(args, eth_nil);
 }
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -495,6 +574,14 @@ ether_module(eth_module *mod, eth_root *topenv)
   eth_define(mod, "endwin", eth_create_proc(_endwin, 0, NULL, NULL));
   eth_define(mod, "isendwin", eth_create_proc(_isendwin, 0, NULL, NULL));
 
+  eth_define(mod, "start_color", eth_create_proc(_start_color, 0, NULL, NULL));
+  eth_define(mod, "has_colors", eth_create_proc(_has_colors, 0, NULL, NULL));
+  eth_define(mod, "wattron", eth_create_proc(_wattron, 2, NULL, NULL));
+  eth_define(mod, "wattroff", eth_create_proc(_wattroff, 2, NULL, NULL));
+  eth_define(mod, "COLOR_PAIR", eth_create_proc(_COLOR_PAIR, 1, NULL, NULL));
+  eth_define(mod, "init_color", eth_create_proc(_init_color, 4, NULL, NULL));
+  eth_define(mod, "init_pair", eth_create_proc(_init_pair, 3, NULL, NULL));
+
   eth_define(mod, "getxy", eth_create_proc(_getxy, 1, NULL, NULL));
   eth_define(mod, "getparxy", eth_create_proc(_getparxy, 1, NULL, NULL));
   eth_define(mod, "getbegxy", eth_create_proc(_getbegxy, 1, NULL, NULL));
@@ -628,10 +715,39 @@ ether_module(eth_module *mod, eth_root *topenv)
   eth_define(mod, "key_undo", eth_num(KEY_UNDO));
   eth_define(mod, "key_mouse", eth_num(KEY_MOUSE));
   eth_define(mod, "key_resize", eth_num(KEY_RESIZE));
-  eth_define(mod, "key_event", eth_num(KEY_EVENT));
+  /*eth_define(mod, "key_event", eth_num(KEY_EVENT));*/
   eth_define(mod, "key_max", eth_num(KEY_MAX));
 
-  if (not eth_load_module_from_script2(topenv, NULL, mod, "./lib.eth", NULL, mod))
+  eth_define(mod, "COLOR_BLACK", eth_num(COLOR_BLACK));
+  eth_define(mod, "COLOR_RED", eth_num(COLOR_RED));
+  eth_define(mod, "COLOR_GREEN", eth_num(COLOR_GREEN));
+  eth_define(mod, "COLOR_YELLOW", eth_num(COLOR_YELLOW));
+  eth_define(mod, "COLOR_BLUE", eth_num(COLOR_BLUE));
+  eth_define(mod, "COLOR_MAGENTA", eth_num(COLOR_MAGENTA));
+  eth_define(mod, "COLOR_CYAN", eth_num(COLOR_CYAN));
+  eth_define(mod, "COLOR_WHITE", eth_num(COLOR_WHITE));
+
+  eth_define(mod, "A_NORMAL", eth_num(A_NORMAL));
+  eth_define(mod, "A_STANDOUT", eth_num(A_STANDOUT));
+  eth_define(mod, "A_UNDERLINE", eth_num(A_UNDERLINE));
+  eth_define(mod, "A_REVERSE", eth_num(A_REVERSE));
+  eth_define(mod, "A_BLINK", eth_num(A_BLINK));
+  eth_define(mod, "A_DIM", eth_num(A_DIM));
+  eth_define(mod, "A_BOLD", eth_num(A_BOLD));
+
+  eth_define(mod, "A_PROTECT", eth_num(A_PROTECT));
+  eth_define(mod, "A_INVIS", eth_num(A_INVIS));
+  eth_define(mod, "A_ALTCHARSET", eth_num(A_ALTCHARSET));
+  eth_define(mod, "A_ITALIC", eth_num(A_ITALIC));
+  eth_define(mod, "A_CHARTEXT", eth_num(A_CHARTEXT));
+  eth_define(mod, "A_COLOR", eth_num(A_COLOR));
+
+
+  eth_module *ethmod = eth_load_module_from_script2(topenv, "./lib.eth", NULL, mod);
+  if (not ethmod)
     return -1;
+  eth_copy_defs(ethmod, mod);
+  eth_destroy_module(ethmod);
+
   return 0;
 }

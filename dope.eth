@@ -28,39 +28,39 @@ let module_path =
   let pipe = open_pipe_in "ether --prefix"
   let prefix = read_line_of pipe |> chomp
   if close pipe /= 0
-  then raise Failed_to_resolve_prefix
+  then raise `failed_to_resolve_prefix
   else prefix ++ "/lib/ether"
 
 -- Checks whether a file exists in the file system
 let exist? path =
   try access path f_ok
-  with System_error ENOENT -> false
+  with `system_error `ENOENT -> false
 
 let mkdir path =
   unless system "mkdir -vp '{path}'" == 0
-  then raise System_error
+  then raise `system_error
 
 let copy src dst =
   unless system "cp -rv '{src}' '{dst}'" == 0
-  then raise System_error
+  then raise `system_error
 
 let create_symlink src dst =
   unless system "ln -vs '{src}' '{dst}'" == 0
-  then raise System_error
+  then raise `system_error
 
 let unlink path =
   unless system "rm -rfv '{path}'" == 0
-  then raise System_error
+  then raise `system_error
 
 let unlink_quite path =
   unless system "rm -rf '{path}'" == 0
-  then raise System_error
+  then raise `system_error
 
 let utc_date! =
   let pipe = open_pipe_in "date -u +'%x %X'"
   let line = read_line_of pipe
   if close pipe /= 0
-  then raise System_error
+  then raise `system_error
   else chomp line
 
 let elf? path = read_of (open_in path) 4 eq "\x7fELF"
@@ -91,7 +91,7 @@ let do_in_tempdir thunk =
 
 let rec confirm? x =
   if let (prompt1, prompt2) = x then
-    do loop ans: (input prompt1) =
+    do loop ans:(input prompt1) =
       if ans =~ \[Yy](es)?/ then true
       else if ans =~ \[Nn]o?/ then false
       else loop (input prompt2)
@@ -104,7 +104,7 @@ let check_network! =
 let require_network! =
   unless check_network! then
     error "no network connection"
-    raise Failure
+    raise `failure
 
 
 --------------------------------[ Algorithms ]-----------------------------------
@@ -145,7 +145,7 @@ let fuzzy_cmp a b =
 let default_db_path = module_path ++ "/__db.eth"
 
 let load_db_from path =
-  let mut modlist = first $ load path if exist? path else []
+  let mut modlist = first (load path) if exist? path else []
   { get_modlist = fn _ -> modlist
   , get_path = fn _ -> path
   , get_module_opt = fn _ name ->
@@ -177,7 +177,7 @@ let git =
       |> rev_filter_map $ tag ->
         if let _ :: version = match \([0-9]+)\.([0-9]+)\.([0-9]+)/ tag then
           (tag, map to_number version)
-        else raise Filter_out
+        else raise `filter_out
       -- Sort versions.
       |> sort $ (_, a) (_, b) ->
         do loop xs:a ys:b =
@@ -198,18 +198,18 @@ let git =
   let clone {url, dir, version} =
     require_network! unless exist? url
     unless system "git clone --progress '{url}' '{dir}'" == 0
-    then raise $ GitFailure "git clone failed"
+    then raise $ `git_failure "git clone failed"
     let dir = realpath dir
 
     let checkout what =
       unless system "cd {dir}; git checkout {what}" == 0
-      then raise $ GitFailure "checkout failed"
+      then raise $ `git_failure "checkout failed"
 
-    if let Commit commit = version then
+    if let `commit commit = version then
       unless shell "cd {dir}; git rev-parse HEAD" eq commit
       then checkout commit
     else
-      let Tag tag = version
+      let `tag tag = version
       unless shell "cd {dir}; git describe --tags" eq tag
       then checkout tag
 
@@ -232,7 +232,7 @@ let load_config dir args =
       env:load (dir ++ "/install.eth")
     with _ ->
       error "failed to load install-script"
-      raise Failure
+      raise `failure
   { name = assoc "name" conf
   , files = assoc "files" conf or []
   , main = assoc "main" conf
@@ -250,7 +250,7 @@ let empty_db_entry = {
 
 let uninstall {db, modname} =
   print 'asdf'
-  if let Some {install_dir} = db:get_module_opt modname then
+  if let `some {install_dir} = db:get_module_opt modname then
     -- Remove module directory
     info "uninstalling module '{modname}'"
     unlink install_dir
@@ -260,7 +260,7 @@ let uninstall {db, modname} =
     db:update
   else
     error "no such module"
-    raise Failure
+    raise `failure
 
 let build_and_install {conf, modentry, db, dir, args, owerwrite} =
   let {name, files, main, build, post_install} = conf
@@ -273,10 +273,10 @@ let build_and_install {conf, modentry, db, dir, args, owerwrite} =
       info "old version of '{name}' was removed"
     else
       error "module already present"
-      raise Failure
+      raise `failure
 
   -- Build (if build-hook is speciefied)
-  when let Some build = build then do_in dir $ fn ->
+  when let `some build = build then do_in dir $ fn ->
     info "building module {name}"
     build!
 
@@ -297,7 +297,7 @@ let build_and_install {conf, modentry, db, dir, args, owerwrite} =
   unless exist? mainpath then
     create_symlink (moddir ++ "/" ++ main) mainpath
 
-  when let Some post_install = post_install then do_in dir $ fn ->
+  when let `some post_install = post_install then do_in dir $ fn ->
     info "running post-install hooks"
     post_install!
 
@@ -310,7 +310,7 @@ let build_and_install {conf, modentry, db, dir, args, owerwrite} =
 let fetch {repo_url, version} =
   let repo_dir = "repo_dir"
   try git.clone {url = repo_url, dir = repo_dir, version}
-  with GitFailure what -> fatal_error what
+  with `git_failure what -> fatal_error what
   repo_dir
 
 -- Clone repository to a temporary directory. There we will build it and
@@ -329,21 +329,21 @@ let check_update {name, local_version, repo_url} =
   require_network! unless exist? repo_url
   let remote_versions = git.list_versions repo_url
   if remote_versions is not [] then
-    if let Tag local_version_tag = local_version then
+    if let `tag local_version_tag = local_version then
       when local_version_tag not eq car remote_versions then
-        { new_version = Tag (car remote_versions)
+        { new_version = `tag (car remote_versions)
         , info_mesg =
             "new version of \e[1m{name}\e[22m is available: {car remote_versions}"
         }
     else
-      { new_version = Tag (car remote_versions)
+      { new_version = `tag (car remote_versions)
       , info_mesg = "release of \e[1m{name}\e[22m is now avaialble"
       }
   else -- remote_versions is []
-    let Commit local_commit = local_version
+    let `commit local_commit = local_version
     let remote_head = git.head_commit repo_url
     when local_commit not eq remote_head then
-      { new_version = Commit remote_head
+      { new_version = `commit remote_head
       , info_mesg = "new commit of \e[1m{name}\e[22m is available: {remote_head}"
       }
 
@@ -546,7 +546,7 @@ let commands =
                 -- if user accepts it.
                 info "module does not have any releases"
                 if confirm? (paint " install from the latest commit (yes/no): ")
-                then Commit (git.head_commit repo_url)
+                then `commit (git.head_commit repo_url)
                 else info "exiting then"; exit 0
               else
                 -- Will use latest version. Check if current commit corresponds to
@@ -554,7 +554,7 @@ let commands =
                 info "available versions of the module: {versions}"
                 let latest = car versions
                 info "latest: {latest}"
-                Tag latest
+                `tag latest
 
             -- Install
             let db = load_db_from default_db_path
@@ -636,7 +636,7 @@ let commands =
         else
           let name::args = args
           let db = load_db_from default_db_path
-          if let Some {repository, version} = db:get_module_opt name then
+          if let `some {repository, version} = db:get_module_opt name then
             if let {new_version} = check_update {
               name, local_version = version, repo_url = repository
             } then
@@ -664,7 +664,7 @@ let find_command_opt name =
   find_opt ({ keys } -> member? name keys) commands
 
 let main! =
-  if let Some { handle } = find_command_opt cmd then
+  if let `some { handle } = find_command_opt cmd then
     handle command_line
   else
     error "undefined command: '{cmd}'"
@@ -679,5 +679,6 @@ let main! =
     info "see `{basename dopepath} help` for avaliable commands"
     exit 1
 
-try main! with _ -> exit 1
+--try main! with _ -> exit 1
+main!
 

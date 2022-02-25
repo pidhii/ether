@@ -26,14 +26,14 @@
 static eth_t
 _chdir(void)
 {
-  eth_use_variant(System_error)
+  eth_use_variant(system_error)
 
   eth_args args = eth_start(1);
   eth_t path = eth_arg2(args, eth_string_type);
   if (chdir(eth_str_cstr(path)))
   {
     eth_t err = eth_sym(eth_errno_to_str(errno));
-    eth_throw(args, System_error(err));
+    eth_throw(args, system_error(err));
   }
   eth_return(args, eth_nil);
 }
@@ -41,7 +41,7 @@ _chdir(void)
 static eth_t
 _access(void)
 {
-  eth_use_variant(System_error)
+  eth_use_variant(system_error)
 
   eth_args args = eth_start(2);
   eth_t path = eth_arg2(args, eth_string_type);
@@ -53,7 +53,7 @@ _access(void)
     else
     {
       eth_t err = eth_sym(eth_errno_to_str(errno));
-      eth_throw(args, System_error(err));
+      eth_throw(args, system_error(err));
     }
   }
   eth_return(args, eth_true);
@@ -98,13 +98,13 @@ _unsetenv(void)
 static eth_t
 _getcwd(void)
 {
-  eth_use_variant(System_error)
+  eth_use_variant(system_error)
 
   char buf[PATH_MAX];
   if (not getcwd(buf, PATH_MAX))
   {
     eth_t err = eth_sym(eth_errno_to_str(errno));
-    return eth_exn(System_error(err));
+    return eth_exn(system_error(err));
   }
   return eth_str(buf);
 }
@@ -112,7 +112,7 @@ _getcwd(void)
 static eth_t
 _realpath(void)
 {
-  eth_use_variant(System_error)
+  eth_use_variant(system_error)
 
   eth_args args = eth_start(1);
   eth_t path = eth_arg2(args, eth_string_type);
@@ -145,12 +145,12 @@ _fork(void)
 static eth_t
 _pipe(void)
 {
-  eth_use_variant(System_error);
+  eth_use_variant(system_error);
 
   int fildes[2];
   if (pipe(fildes) < 0)
   {
-    return eth_exn(System_error(eth_str(eth_errno_to_str(errno))));
+    return eth_exn(system_error(eth_str(eth_errno_to_str(errno))));
   }
   else
   {
@@ -163,7 +163,7 @@ _pipe(void)
 static eth_t
 _pipe2(void)
 {
-  eth_use_variant(System_error);
+  eth_use_variant(system_error);
 
   eth_args args = eth_start(1);
   eth_t flags = eth_arg2(args, eth_number_type);
@@ -171,7 +171,7 @@ _pipe2(void)
   int fildes[2];
   if (pipe2(fildes, eth_num_val(flags)) < 0)
   {
-    eth_throw(args, System_error(eth_str(eth_errno_to_str(errno))));
+    eth_throw(args, system_error(eth_str(eth_errno_to_str(errno))));
   }
   else
   {

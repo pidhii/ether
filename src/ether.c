@@ -302,28 +302,28 @@ eth_unop_name(eth_unop op)
 eth_t
 eth_system_error(int err)
 {
-  eth_use_variant(System_error)
-  return System_error(eth_sym(eth_errno_to_str(err)));
+  eth_use_variant(system_error)
+  return system_error(eth_sym(eth_errno_to_str(err)));
 }
 
 eth_t
 eth_type_error(void)
 {
-  eth_use_symbol(Type_error)
-  return Type_error;
+  eth_use_symbol(type_error)
+  return type_error;
 }
 
 eth_t
 eth_invalid_argument(void)
 {
-  eth_use_symbol(Invalid_argument)
-  return Invalid_argument;
+  eth_use_symbol(invalid_argument)
+  return invalid_argument;
 }
 
 eth_t
 eth_failure(void)
 {
-  eth_use_symbol(Failure)
-  return Failure;
+  eth_use_symbol(failure)
+  return failure;
 }
 

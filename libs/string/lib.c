@@ -1,15 +1,15 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -199,7 +199,7 @@ _substr(void)
   size_t at = eth_num_val(start);
   size_t n = eth_num_val(len);
   if (at + n > slen)
-    eth_throw(args, eth_sym("Out_of_range"));
+    eth_throw(args, eth_sym("out_of_range"));
   eth_unref(start);
   eth_unref(len);
   eth_dec(str);
@@ -259,7 +259,7 @@ _cat(void)
 static eth_t
 _strstr_opt(void)
 {
-  eth_use_variant(Some)
+  eth_use_variant(some)
   eth_t x = *eth_sp++;
   eth_ref(x);
   eth_t y = *eth_sp++;
@@ -271,7 +271,7 @@ _strstr_opt(void)
     return eth_exn(eth_type_error());
   }
   char *p = strstr(eth_str_cstr(x), eth_str_cstr(y));
-  eth_t ret = p ? Some(eth_num(p - eth_str_cstr(x))) : eth_false;
+  eth_t ret = p ? some(eth_num(p - eth_str_cstr(x))) : eth_false;
   eth_unref(x);
   eth_unref(y);
   return ret;
@@ -415,7 +415,7 @@ _ord(void)
 static eth_t
 _match(void)
 {
-  eth_use_symbol(Regexp_error)
+  eth_use_symbol(regexp_error)
 
   eth_args args = eth_start(2);
   eth_t reg = eth_arg2(args, eth_regexp_type);
@@ -424,7 +424,7 @@ _match(void)
   if (n < 0)
     eth_return(args, eth_false);
   else if (n == 0)
-    eth_throw(args, Regexp_error);
+    eth_throw(args, regexp_error);
   else
   {
     eth_t acc = eth_nil;
@@ -444,7 +444,7 @@ _match(void)
 static eth_t
 _gsub(void)
 {
-  eth_use_symbol(Regexp_error)
+  eth_use_symbol(regexp_error)
 
   eth_args args = eth_start(3);
   eth_t reg = eth_arg2(args, eth_regexp_type);
@@ -471,7 +471,7 @@ _gsub(void)
     {
       fclose(buf);
       free(ptr);
-      eth_throw(args, Regexp_error);
+      eth_throw(args, regexp_error);
     }
     else
     {
@@ -518,7 +518,7 @@ _gsub(void)
 static eth_t
 _rev_split(void)
 {
-  eth_use_symbol(Regexp_error)
+  eth_use_symbol(regexp_error)
 
   eth_args args = eth_start(2);
   eth_t reg = eth_arg2(args, eth_regexp_type);
@@ -539,7 +539,7 @@ _rev_split(void)
     else if (n == 0)
     {
       eth_drop(acc);
-      eth_throw(args, Regexp_error);
+      eth_throw(args, regexp_error);
     }
     else
     {
@@ -560,15 +560,15 @@ _rev_split(void)
 static eth_t
 _find_regexp(void)
 {
-  eth_use_variant(Some)
-  eth_use_symbol(Regexp_error)
+  eth_use_variant(some)
+  eth_use_symbol(regexp_error)
   eth_args args = eth_start(2);
   eth_t re = eth_arg2(args, eth_regexp_type);
   eth_t str = eth_arg2(args, eth_string_type);
   const char *p = eth_str_cstr(str);
   int n = eth_exec_regexp(re, p, eth_str_len(str), 0);
   if (n == 0)
-    eth_throw(args, Regexp_error);
+    eth_throw(args, regexp_error);
   else if (n < 0)
     eth_return(args, eth_false);
   else

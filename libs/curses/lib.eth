@@ -1,21 +1,23 @@
 
-let pub erase! = werase stdscr! in
-let pub clear! = wclear stdscr! in
-let pub clrtobot! = wclrtobot stdscr! in
-let pub clrtoeol! = wclrtoeol stdscr! in
+let pub erase! = werase stdscr!
+let pub clear! = wclear stdscr!
+let pub clrtobot! = wclrtobot stdscr!
+let pub clrtoeol! = wclrtoeol stdscr!
 
-let pub getnstr n = wgetnstr stdscr! n in
-let pub mvgetnstr pos n = mvwgetnstr stdscr! pos n in
+let pub attron attr = wattron stdscr! attr
+let pub attroff attr = wattroff stdscr! attr
 
-let pub mvaddstr pos str = mvwaddstr stdscr! pos str in
-let pub addstr str = waddstr stdscr! str in
+let pub getnstr n = wgetnstr stdscr! n
+let pub mvgetnstr pos n = mvwgetnstr stdscr! pos n
 
-let pub border sides corners = wborder stdscr! sides corners in
-let pub box win sides = wborder win sides (0, 0, 0, 0) in
+let pub mvaddstr pos str = mvwaddstr stdscr! pos str
+let pub addstr str = waddstr stdscr! str
 
-let pub getch! = wgetch stdscr! in
-let pub mvgetch pos = mvwgetch stdscr! pos in
+let pub border sides corners = wborder stdscr! sides corners
+let pub box win sides = wborder win sides (0, 0, 0, 0)
 
-let pub refresh! = wrefresh stdscr! in
+let pub getch! = wgetch stdscr!
+let pub mvgetch pos = mvwgetch stdscr! pos
 
-nil
+let pub refresh! = wrefresh stdscr!
+

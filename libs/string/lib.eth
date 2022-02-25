@@ -116,7 +116,7 @@ let pub get s i = __substr s i 1
 let pub find pat s =
   if regexp? pat then __find_regexp pat s
   else if string? pat then
-    if let Some start = __strstr_opt s pat
+    if let `some start = __strstr_opt s pat
     then (start, start + len pat)
     else false
   else type_error ()

@@ -41,6 +41,9 @@ let pub __builtin (not) x = not x
 let pub ($) f x = f x
 let pub (|>) x f = f x
 
+
+let pub new c = c.ctor c.template
+
 -- Pairs
 let pub car (x::_) = x
 let pub cdr (_::x) = x
@@ -99,6 +102,42 @@ let pub __fmt l =
     else acc
   loop l ""
 
+
+let pub record = lazy
+  let {strcmp} = require 'string'
+  let {sort, mapi, map} = require 'list'
+  fn pairs ->
+    -- sort pairs
+    let pairs =
+      pairs
+      |> mapi (curry id)
+      |> sort $ (i, (a, _)) (j, (b, _)) ->
+          let cmp = strcmp a b
+          if cmp < 0 then true
+          else if cmp == 0 then i < j
+          else false
+      |> map second
+      
+    -- remove duplicate keys (leave the latest one) and construct a record
+    do loop l:pairs acc:[] =
+      if let x :: xs = l then
+        if acc is [] then
+          -- accumulate first kv-pair
+          loop xs [x]
+        else if first x eq first (car acc) then
+          -- replace previous kv-pair with the current one (collision of keys)
+          loop xs (x :: cdr acc)
+        else
+          -- accumulate kv-pair
+          loop xs (x :: acc)
+      else
+        __record acc
+
+
+let pub __merge_class_templates = lazy
+  let {append} = require 'list'
+  fn base child -> record (append (list base) (list child))
+
 --------------------------------------------------------------------------------
 --                                   IO
 --
@@ -133,7 +172,7 @@ let pub system = __system
 --------------------------------------------------------------------------------
 --                                Errors
 --
-let pub failure () = raise Failure
-let pub invalid_argument () = raise Invalid_argument
-let pub type_error () = raise Type_error
+let pub failure () = raise `failure
+let pub invalid_argument () = raise `invalid_argument
+let pub type_error () = raise `type_error
 

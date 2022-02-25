@@ -295,6 +295,7 @@ eth_ir_if(eth_ir_node *cond, eth_ir_node *thenbr, eth_ir_node *elsebr)
   eth_ref_ir_node(node->iff.thenbr = thenbr);
   eth_ref_ir_node(node->iff.elsebr = elsebr);
   node->iff.toplvl = ETH_TOPLVL_NONE;
+  node->iff.likely = 0;
   return node;
 }
 

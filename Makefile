@@ -11,7 +11,6 @@ all:
 	@mkdir -p Debug/build
 	@$(CMAKE) -D CMAKE_BUILD_TYPE=Debug \
 				    -D CMAKE_INSTALL_PREFIX=`pwd`/Debug/install \
-				    -D ENABLE_GTK=NO \
 				    -D ENABLE_ARB=NO \
 				    -B Debug/build \
 				    -S .
@@ -20,7 +19,7 @@ all:
 	@mkdir -p Release/build
 	@$(CMAKE) -D CMAKE_BUILD_TYPE=Release \
 				    -D CMAKE_INSTALL_PREFIX=`pwd`/Release/install \
-				    -D ENABLE_GTK=NO \
+				    -D BUILD_SHARED_LIBRARY=ON \
 				    -D ENABLE_ARB=NO \
 				    -B Release/build \
 				    -S .
@@ -31,7 +30,6 @@ Release:
 	@$(CMAKE) -D CMAKE_BUILD_TYPE=Release \
 				    -D CMAKE_INSTALL_PREFIX=`pwd`/Release/install \
 				    -D BUILD_SHARED_LIBRARY=ON \
-				    -D ENABLE_GTK=NO \
 				    -D ENABLE_ARB=NO \
 				    -B Release/build \
 				    -S .
@@ -41,7 +39,6 @@ Debug:
 	@mkdir -p Debug/build
 	@$(CMAKE) -D CMAKE_BUILD_TYPE=Debug \
 				    -D CMAKE_INSTALL_PREFIX=`pwd`/Debug/install \
-				    -D ENABLE_GTK=NO \
 				    -D ENABLE_ARB=NO \
 				    -B Debug/build \
 				    -S .

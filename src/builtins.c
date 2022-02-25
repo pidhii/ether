@@ -204,7 +204,7 @@ _regexp_eq(void)
   /*else*/
     /*eth_return(args, n < 0 ? eth_false : eth_num(n));*/
 
-  eth_use_symbol(Regexp_error)
+  eth_use_symbol(regexp_error)
 
   eth_args args = eth_start(2);
   eth_t str = eth_arg2(args, eth_string_type);
@@ -213,7 +213,7 @@ _regexp_eq(void)
   if (n < 0)
     eth_return(args, eth_false);
   else if (n == 0)
-    eth_throw(args, Regexp_error);
+    eth_throw(args, regexp_error);
   else if (n == 1)
     eth_return(args, eth_true);
   else
@@ -275,7 +275,7 @@ _inclusive_range(void)
 static eth_t
 _map(void)
 {
-  eth_use_symbol(Improper_list)
+  eth_use_symbol(improper_list)
 
   eth_args args = eth_start(2);
   const eth_t f = eth_arg2(args, eth_function_type);
@@ -298,7 +298,7 @@ _map(void)
   if (eth_unlikely(it != eth_nil))
   {
     eth_drop(acc);
-    eth_throw(args, Improper_list);
+    eth_throw(args, improper_list);
   }
 
   eth_t ret = eth_reverse(acc);
@@ -309,8 +309,8 @@ _map(void)
 static eth_t
 _filter_map(void)
 {
-  eth_use_symbol(Filter_out)
-  eth_use_symbol(Improper_list)
+  eth_use_symbol(filter_out)
+  eth_use_symbol(improper_list)
 
   eth_args args = eth_start(2);
   const eth_t f = eth_arg2(args, eth_function_type);
@@ -323,7 +323,7 @@ _filter_map(void)
     eth_reserve_stack(1);
     eth_sp[0] = eth_car(it);
     const eth_t v = eth_apply(f, 1);
-    if (eth_is_exn(v) && eth_what(v) == Filter_out)
+    if (eth_is_exn(v) && eth_what(v) == filter_out)
       eth_drop(v);
     else
       acc = eth_cons(v, acc);
@@ -331,7 +331,7 @@ _filter_map(void)
   if (eth_unlikely(it != eth_nil))
   {
     eth_drop(acc);
-    eth_throw(args, Improper_list);
+    eth_throw(args, improper_list);
   }
 
   eth_t ret = eth_reverse(acc);
@@ -345,7 +345,7 @@ _filter_map(void)
 static eth_t
 _open(void)
 {
-  eth_use_variant(System_error);
+  eth_use_variant(system_error);
 
   eth_args args = eth_start(2);
   eth_t path = eth_arg2(args, eth_string_type);
@@ -559,7 +559,7 @@ destroy_format_data(format_data *data)
 static eth_t
 _format_aux(void)
 {
-  eth_use_symbol(Format_error);
+  eth_use_symbol(format_error);
 
   format_data *data = eth_this->proc.data;
   char *fmt = ETH_STRING(data->fmt)->cstr;
@@ -578,7 +578,7 @@ _format_aux(void)
   if (not ok)
   {
     free(ptr);
-    return eth_exn(Format_error);
+    return eth_exn(format_error);
   }
   else
     return eth_create_string_from_ptr2(ptr, size);
@@ -598,7 +598,7 @@ _format(void)
   if (n < 0)
   {
     eth_drop(fmt);
-    return eth_exn(eth_sym("Format_error"));
+    return eth_exn(eth_sym("format_error"));
   }
 
   if (n == 0)
@@ -980,7 +980,7 @@ _len(void)
 static eth_t
 unpack_index(eth_t idx, int seqlen, int *k)
 {
-  eth_use_symbol(Range_error)
+  eth_use_symbol(range_error)
 
   if (eth_unlikely(not eth_is_int(idx)))
     return eth_exn(eth_type_error());
@@ -990,7 +990,7 @@ unpack_index(eth_t idx, int seqlen, int *k)
     *k = seqlen - *k;
 
   if (eth_unlikely(*k >= seqlen))
-    return eth_exn(Range_error);
+    return eth_exn(range_error);
 
   return NULL;
 }
@@ -998,7 +998,7 @@ unpack_index(eth_t idx, int seqlen, int *k)
 static eth_t
 unpack_range(eth_t idx, int seqlen, int *kl, int *kr)
 {
-  eth_use_symbol(Range_error);
+  eth_use_symbol(range_error);
   if (eth_is_rangelr(idx))
   {
     eth_t l = ETH_RANGELR(idx)->l;
@@ -1031,7 +1031,7 @@ unpack_range(eth_t idx, int seqlen, int *kl, int *kr)
     *kr = seqlen + *kr;
 
   if (eth_unlikely(*kl >= seqlen or *kr >= seqlen))
-    return eth_exn(Range_error);
+    return eth_exn(range_error);
 
   return NULL;
 }
@@ -1263,6 +1263,52 @@ error:
   eth_return(args, eth_system_error(0));
 }
 
+static eth_t
+_record(void)
+{
+  eth_use_tuple_as(tup2, 2);
+
+  eth_t list = *eth_sp++;
+
+  bool isproper;
+  int n = eth_length(list, &isproper);
+  if (not isproper)
+  {
+    eth_drop(list);
+    return eth_exn(eth_invalid_argument());
+  }
+
+  // extract key/value pairs
+  char *keys[n];
+  eth_t vals[n];
+  int i = 0;
+  for (eth_t it = list; it != eth_nil; it = eth_cdr(it), ++i)
+  {
+    eth_t x = eth_car(it);
+    if (eth_unlikely(x->type != tup2))
+    {
+      eth_drop(list);
+      return eth_exn(eth_invalid_argument());
+    }
+
+    eth_t key = eth_tup_get(x, 0);
+    eth_t val = eth_tup_get(x, 1);
+    if (eth_unlikely(not eth_is_str(key)))
+    {
+      eth_drop(list);
+      return eth_exn(eth_invalid_argument());
+    }
+
+    keys[i] = (char*)eth_sym_cstr(key);
+    vals[i] = val;
+  }
+
+  // remove duplicates (given two equal keys use the latest one)
+
+  eth_t ret = eth_record(keys, vals, n);
+  eth_drop(list);
+  return ret;
+}
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                 module
@@ -1305,6 +1351,7 @@ eth_create_builtins(eth_root *root)
   // ---
   eth_define(mod,       "list", eth_create_proc(      _list, 1, NULL, NULL));
   eth_define(mod, "__rev_list", eth_create_proc(  _rev_list, 1, NULL, NULL));
+  eth_define(mod,   "__record", eth_create_proc(    _record, 1, NULL, NULL));
   // ---
   eth_define(mod,       "dump", eth_create_proc(      _dump, 1, NULL, NULL));
   // ---

@@ -53,7 +53,7 @@ static void
 write_variant(eth_type *type, eth_t x, FILE *file)
 {
   char *tag = type->clos;
-  eth_fprintf(file, "%s ~w", tag, eth_var_val(x));
+  eth_fprintf(file, "`%s ~w", tag, eth_var_val(x));
 }
 
 static bool
@@ -65,8 +65,6 @@ variant_equal(eth_type *type, eth_t x, eth_t y)
 eth_type*
 eth_variant_type(const char *tag)
 {
-  assert(isupper(tag[0]));
-
   size_t len = strlen(tag);
   eth_hash_t hash = cod_halfsiphash(eth_get_siphash_key(), (void*)tag, len);
 

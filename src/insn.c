@@ -125,6 +125,7 @@ create_insn(eth_insn_tag tag)
   insn->next = NULL;
   insn->prev = NULL;
   insn->flag = 0;
+  insn->comment = NULL;
   return insn;
 }
 
@@ -202,6 +203,9 @@ eth_destroy_insn(eth_insn *insn)
     default:
       break;
   }
+
+  if (insn->comment)
+    free(insn->comment);
 
   free(insn);
 }
@@ -508,7 +512,7 @@ eth_insn_mkrcrd(int out, int const vids[], eth_type *type)
   return insn;
 }
 
-void
+static void
 dump_ssa(int ident, const eth_insn *insn, FILE *stream)
 {
   if (insn == NULL) return;
@@ -594,7 +598,11 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
       break;
 
     case ETH_INSN_REF:
-      fprintf(stream, "ref %%%d;\n", insn->var.vid);
+      fprintf(stream, "ref %%%d;", insn->var.vid);
+      if (insn->comment)
+        fprintf(stream, " # %s\n", insn->comment);
+      else
+        fprintf(stream, "\n");
       break;
 
     case ETH_INSN_DEC:
@@ -723,3 +731,12 @@ eth_dump_ssa(const eth_insn *head, FILE *stream)
 {
   dump_ssa(0, head, stream);
 }
+
+void
+eth_set_insn_comment(eth_insn *insn, const char *comment)
+{
+  if (insn->comment)
+    free(insn->comment);
+  insn->comment = strdup(comment);
+}
+

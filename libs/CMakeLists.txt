@@ -166,16 +166,16 @@ set_target_properties (os
 install (TARGETS os DESTINATION ${OS_DST_DIR})
 install (FILES ${OS_SRC_DIR}/lib.eth DESTINATION ${OS_DST_DIR})
 
-## curses
-#set (CURSES_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/curses)
-#set (CURSES_DST_DIR lib/ether/curses)
-#add_library (curses SHARED ${CURSES_SRC_DIR}/lib.c)
-#set_target_properties (curses
-  #PROPERTIES
-    #POSITION_INDEPENDENT_CODE ON
-    #PREFIX ""
-    #OUTPUT_NAME "curses")
-#target_link_libraries (curses -lcurses)
-#install (TARGETS curses DESTINATION ${CURSES_DST_DIR})
-#install (FILES ${CURSES_SRC_DIR}/lib.eth DESTINATION ${CURSES_DST_DIR})
+# curses
+set (CURSES_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/curses)
+set (CURSES_DST_DIR lib/ether/curses)
+add_library (curses SHARED ${CURSES_SRC_DIR}/lib.c)
+set_target_properties (curses
+  PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    PREFIX ""
+    OUTPUT_NAME "curses")
+target_link_libraries (curses -lcurses)
+install (TARGETS curses DESTINATION ${CURSES_DST_DIR})
+install (FILES ${CURSES_SRC_DIR}/lib.eth DESTINATION ${CURSES_DST_DIR})
 

@@ -53,7 +53,7 @@ static void
 write_symbol(eth_type *type, eth_t x, FILE *stream)
 {
   symbol *sym = (void*)x;
-  fputs(sym->str, stream);
+  fprintf(stream, "`%s", sym->str);
 }
 
 void

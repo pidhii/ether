@@ -29,13 +29,9 @@ let rec factorial2 x acc =
 print (factorial2 1000000 1)
 
 
--- Symbols
-print Symbols_begin_with_UpperCase_character
-
-
 -- Exception handling
 try factorial 1000000
-with Stack_overflow -> print "Stack overflow"
+with `stack_overflow -> print "Stack overflow"
 
 
 -- Currying
@@ -67,7 +63,7 @@ print (map (x -> x^2) [1, 2, 3])
 
 
 -- Tuples
-let (a, b) = (A, B)
+let (a, b) = (`a, `b)
 print (a, b)
 
 
@@ -77,8 +73,8 @@ print login
 
 
 -- Variants (tagged wrapper-types)
-let safe_div x y = Some (x / y) if y /= 0 else false
-let Some x = safe_div 1 2
+let safe_div x y = `some (x / y) if y /= 0 else false
+let `some x = safe_div 1 2
 print x
 
 

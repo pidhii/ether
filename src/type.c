@@ -37,8 +37,8 @@ default_display(eth_type *type, eth_t x, FILE *stream)
 static eth_t
 cast_error(eth_type* type, eth_t x)
 {
-  eth_use_symbol(Cast_error);
-  return eth_exn(Cast_error);
+  eth_use_symbol(cast_error);
+  return eth_exn(cast_error);
 }
 
 static eth_type*
@@ -66,8 +66,8 @@ eth_create_type(const char *name)
 }
 
 eth_type*
-eth_create_struct_type(const char *name, char *const fields[],
-    ptrdiff_t const offs[], int n)
+eth_create_struct_type(const char *name, char *const *fields,
+    ptrdiff_t const *offs, int n)
 {
   eth_type *type = create_type(name, n);
   type->fields = malloc(sizeof(eth_field) * n);

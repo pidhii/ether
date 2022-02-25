@@ -331,7 +331,6 @@ destroy_ast_node(eth_ast *ast)
 
     case ETH_AST_ASSERT:
       eth_unref_ast(ast->assert.expr);
-      eth_unref_ast(ast->assert.body);
       break;
 
     case ETH_AST_DEFINED:
@@ -353,6 +352,31 @@ destroy_ast_node(eth_ast *ast)
       free(ast->assign.ident);
       eth_unref_ast(ast->assign.val);
       break;
+
+    case ETH_AST_CLASS:
+      for (int i = 0; i < ast->clas.npars; ++i)
+        eth_unref_ast_pattern(ast->clas.pars[i]);
+      for (int i = 0; i < ast->clas.ninherits; ++i)
+      {
+        free(ast->clas.inherits[i].classname);
+        for (int j = 0; j < ast->clas.inherits[i].nargs; ++j)
+          eth_unref_ast(ast->clas.inherits[i].args[j]);
+        free(ast->clas.inherits[i].args);
+      }
+      for (int i = 0; i < ast->clas.nvals; ++i)
+      {
+        free(ast->clas.vals[i].name);
+        eth_unref_ast(ast->clas.vals[i].init);
+      }
+      for (int i = 0; i < ast->clas.nmethods; ++i)
+      {
+        free(ast->clas.methods[i].name);
+        eth_unref_ast(ast->clas.methods[i].fn);
+      }
+      free(ast->clas.pars);
+      free(ast->clas.inherits);
+      free(ast->clas.vals);
+      free(ast->clas.methods);
   }
 
   if (ast->loc)
@@ -616,11 +640,10 @@ eth_ast_update(eth_ast *src, eth_ast *const vals[], char *const fields[], int n)
 }
 
 eth_ast*
-eth_ast_assert(eth_ast *expr, eth_ast *body)
+eth_ast_assert(eth_ast *expr)
 {
   eth_ast *ast = create_ast_node(ETH_AST_ASSERT);
   eth_ref_ast(ast->assert.expr = expr);
-  eth_ref_ast(ast->assert.body = body);
   return ast;
 }
 
@@ -696,6 +719,36 @@ eth_ast_assign(const char *ident, eth_ast *val)
   return ast;
 }
 
+eth_ast*
+eth_ast_class(eth_ast_pattern *const pars[], int npars,
+    eth_class_inherit *inherits, int ninherits, eth_class_val *vals,
+    int nvals, eth_class_method *methods, int nmethods)
+{
+  eth_ast *ast = create_ast_node(ETH_AST_CLASS);
+  ast->clas.pars = malloc(sizeof(eth_ast_pattern*) * npars);
+  for (int i = 0; i < npars; ++i)
+    eth_ref_ast_pattern(ast->clas.pars[i] = pars[i]);
+  ast->clas.npars = npars;
+  ast->clas.inherits = malloc(sizeof(eth_class_inherit) * ninherits);
+  for (int i = 0; i < ninherits; ++i)
+  {
+    ast->clas.inherits[i] = inherits[i];
+    for (int j = 0; j < inherits[i].nargs; ++j)
+      eth_ref_ast(ast->clas.inherits[i].args[j]);
+  }
+  ast->clas.ninherits = ninherits;
+  ast->clas.vals = malloc(sizeof(eth_class_val) * nvals);
+  memcpy(ast->clas.vals, vals, sizeof(eth_class_val) * nvals);
+  ast->clas.nvals = nvals;
+  ast->clas.methods = malloc(sizeof(eth_class_method) * nmethods);
+  memcpy(ast->clas.methods, methods, sizeof(eth_class_method) * nmethods);
+  ast->clas.nmethods = nmethods;
+  for (int i = 0; i < nvals; ++i)
+    eth_ref_ast(ast->clas.vals[i].init);
+  for (int i = 0; i < nmethods; ++i)
+    eth_ref_ast(ast->clas.methods[i].fn);
+  return ast;
+}
 
 static eth_ast_pattern*
 ast_to_pattern(eth_ast *ast, bool *e)

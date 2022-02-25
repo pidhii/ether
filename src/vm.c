@@ -37,7 +37,7 @@ eth_vm(eth_bytecode *bc)
     for (int i = 0; i < nargs; ++i)
       eth_unref(eth_sp[i]);
     eth_pop_stack(nargs);
-    return eth_exn(eth_sym("Stack_overflow"));
+    return eth_exn(eth_sym("stack_overflow"));
   }
 
   eth_t *restrict r = alloca(nreg * sizeof(eth_t));
@@ -165,7 +165,7 @@ eth_vm(eth_bytecode *bc)
         if (eth_unlikely(fn->type != eth_function_type))
         {
           while (nstack--) eth_drop(*eth_sp++);
-          r[ip->apply.out] = eth_exn(eth_sym("Apply_error"));
+          r[ip->apply.out] = eth_exn(eth_sym("apply_error"));
           nstack = 0;
           FAST_DISPATCH_NEXT();
         }
@@ -181,7 +181,7 @@ eth_vm(eth_bytecode *bc)
         if (eth_unlikely(fn->type != eth_function_type))
         {
           while (nstack--) eth_drop(*eth_sp++);
-          r[ip->apply.out] = eth_exn(eth_sym("Apply_error"));
+          r[ip->apply.out] = eth_exn(eth_sym("apply_error"));
           nstack = 0;
           FAST_DISPATCH_NEXT();
         }

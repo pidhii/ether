@@ -121,6 +121,9 @@ OPERATOR {OPCHR}+|mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|eq|not|lnot
     REJECT;
 }
 
+<INITIAL,INDENT,IGNORE_INDENT>"--[""[" {
+  ENTER_STATE(COMMENT);
+}
 <INITIAL,INDENT,IGNORE_INDENT>[[:space:]]*"--[[" {
   ENTER_STATE(COMMENT);
 }
@@ -252,6 +255,8 @@ OPERATOR {OPCHR}+|mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|eq|not|lnot
   * Porbably have to intoduce CATCH keyword to have TRY-CATCH (and then hande
   * the CATCH here).
   */
+class           { ENTER_STATE(IGNORE_INDENT); return CLASS; }
+method          { ENTER_STATE(IGNORE_INDENT); return METHOD; }
 let             { ENTER_STATE(IGNORE_INDENT); return LET; }
 and             { ENTER_STATE(IGNORE_INDENT); return AND; }
 if[ \t\n]+let   { ENTER_STATE(IGNORE_INDENT); return IFLET; }
@@ -580,6 +585,8 @@ if     { return IF; }
 then   { return THEN; }
 else   { return ELSE; }
 when   { return WHEN; }
+object { return OBJECT; }
+inherit { return INHERIT; }
 unless { return UNLESS; }
 as     { return AS; }
 try    { return TRY; }
@@ -663,13 +670,13 @@ lnot    { return LNOT; }
   return USROP;
 }
 
-[_a-z][_a-zA-Z0-9]*['?]? {
+[_a-zA-Z][_a-zA-Z0-9]*['?]? {
   yylval->string = strdup(yytext);
   return SYMBOL;
 }
 
-[A-Z][_a-zA-Z0-9]* {
-  yylval->string = strdup(yytext);
+`[_a-zA-Z0-9]* {
+  yylval->string = strdup(yytext+1);
   return CAPSYMBOL;
 }
 

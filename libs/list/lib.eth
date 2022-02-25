@@ -322,24 +322,24 @@ let rec pub insert cmp x ys =
 
 let rec pub find_opt p xs =
   if let x::xs = xs then
-    if p x then Some x
+    if p x then `some x
     else find_opt p xs
   else false
 
 let pub find p xs =
-  if let Some x = find_opt p xs then x
+  if let `some x = find_opt p xs then x
   else failure ()
 
 let pub index_opt p xs =
   let rec loop i xs =
     if let x::xs = xs then
-      if p x then Some i
+      if p x then `some i
       else loop (i+1) xs
     else false
   loop 0 xs
 
 let pub index p xs =
-  if let Some i = index_opt p xs then i
+  if let `some i = index_opt p xs then i
   else failure ()
 
 --let rec pub maximum cmp xs =
@@ -395,34 +395,34 @@ let rec pub sort cmp xs =
 let rec pub assoc_opt x l =
   if let kv::l = l then
     if let (k, v) = kv then
-      if k eq x then Some v
+      if k eq x then `some v
       else assoc_opt x l
     else invalid_argument ()
   else false
 
 let pub assoc k l =
-  if let Some v = assoc_opt k l then v
+  if let `some v = assoc_opt k l then v
   else failure ()
 
 let rec pub assq_opt x l =
   if let kv::l = l then
     if let (k, v) = kv then
-      if k is x then Some v
+      if k is x then `some v
       else assq_opt x l
     else invalid_argument ()
   else false
 
 let pub assq k l =
-  if let Some v = assq_opt k l then v
+  if let `some v = assq_opt k l then v
   else failure ()
 
 
 let rec pub transpose xs =
   if let xs :: xss = xs then
     if let x :: xs = xs then
-      let f l = if let hd::_ = l then hd else raise Filter_out
+      let f l = if let hd::_ = l then hd else raise `filter_out
       let head = x :: filter_map f xss
-      let f l = if let _::tl = l then tl else raise Filter_out
+      let f l = if let _::tl = l then tl else raise `filter_out
       let tail = transpose (xs :: filter_map f xss)
       head :: tail
     else transpose xss

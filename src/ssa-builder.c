@@ -1060,6 +1060,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
 
       eth_insn *insn = eth_insn_if(ret, cond, thentape->head, elsetape->head);
       insn->iff.toplvl = ir->iff.toplvl;
+      insn->iff.likely = ir->iff.likely;
       eth_destroy_ssa_tape(thentape);
       eth_destroy_ssa_tape(elsetape);
 
@@ -1340,6 +1341,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
 
     case ETH_IR_UPDATE:
     {
+      eth_use_symbol(update_error);
       int n = ir->update.n;
       int vids[n];
       int src = build(bldr, tape, ir->update.src, false, e);
@@ -1348,7 +1350,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
       int out = new_val(bldr, RC_RULES_PHI);
       eth_ssa_tape *errtape = eth_create_ssa_tape();
       int exnvid = new_val(bldr, RC_RULES_DISABLE);
-      eth_t exn = eth_exn(eth_type_error());
+      eth_t exn = eth_exn(update_error);
       eth_write_insn(errtape, eth_insn_cval(exnvid, exn));
       write_throw(bldr, errtape, exnvid, ir->loc);
       eth_insn *insn = eth_insn_if_update(out, src, vids, ir->update.ids, n,
@@ -1889,9 +1891,16 @@ static void
 insert_rc_default(kill_info *kinfo, eth_insn *begin, int vid)
 {
   if (kill_value_T(kinfo, begin, vid))
-    eth_insert_insn_after(begin, eth_insn_ref(vid));
+  {
+    eth_insn *insn = eth_insn_ref(vid);
+    eth_insert_insn_after(begin, insn);
+    eth_set_insn_comment(insn,
+        "inserted by ssa-builder:insert_rc_default (kill_value_T() -> true)");
+  }
   else
+  {
     eth_insert_insn_after(begin, eth_insn_drop(vid));
+  }
 }
 
 static eth_insn*
@@ -1924,14 +1933,16 @@ insert_rc_phi(kill_info *kinfo, eth_insn *begin, int vid)
     // TODO: should remove that MOV at all
     eth_insn *mov;
     mov = find_mov(br1, vid);
-    if (not kill_value_T(kinfo, mov->next, vid))
+    // XXX: im not sure if mov==NULL is OK
+    if (mov and not kill_value_T(kinfo, mov->next, vid))
     {
       eth_insn *unref = eth_insn_unref(vid);
       eth_insert_insn_after(mov, unref);
       add_killer(kinfo, vid, unref);
     }
     mov = find_mov(br2, vid);
-    if (not kill_value_T(kinfo, mov->next, vid))
+    // XXX: im not sure if mov==NULL is OK
+    if (mov and not kill_value_T(kinfo, mov->next, vid))
     {
       eth_insn *unref = eth_insn_unref(vid);
       eth_insert_insn_after(mov, unref);
@@ -1993,7 +2004,11 @@ handle_movs(ssa_builder *bldr, kill_info *kinfo)
       }
 
       if (doref)
-        eth_insert_insn_before(mov, eth_insn_ref(vid));
+      {
+        eth_insn *insn = eth_insn_ref(vid);
+        eth_insert_insn_before(mov, insn);
+        eth_set_insn_comment(insn, "inserted by ssa-builder:handle_movs");
+      }
     }
   }
 }

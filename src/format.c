@@ -17,6 +17,7 @@
 
 #include <assert.h>
 #include <string.h>
+#include <stdlib.h>
 
 int
 eth_study_format(const char *fmt)
@@ -78,6 +79,7 @@ eth_format(FILE *out, const char *fmt, eth_t args[], int n)
 
           default:
             assert(!"wtf");
+            abort();
         }
         break;
 

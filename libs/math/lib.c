@@ -1,15 +1,15 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -190,6 +190,22 @@ _frexp(void)
   return eth_create_tuple_2(integ, eth_num(exp));
 }
 
+UNARY(_log, GNAME(log))
+
+static eth_t
+_nanp(void)
+{
+  eth_t x = *eth_sp++;
+  if (eth_unlikely(not eth_is_num(x)))
+  {
+    eth_drop(x);
+    return eth_exn(eth_type_error());
+  }
+  eth_number_t xval = eth_num_val(x);
+  eth_drop(x);
+  return eth_boolean(isnan(xval));
+}
+
 int
 ether_module(eth_module *mod)
 {
@@ -227,6 +243,9 @@ ether_module(eth_module *mod)
   eth_define(mod, "copysing", eth_create_proc(_copysign, 2, NULL, NULL));
   eth_define(mod, "frexp", eth_create_proc(_frexp, 1, NULL, NULL));
 
+  eth_define(mod, "log", eth_create_proc(_log, 1, NULL, NULL));
+
+  eth_define(mod, "nan?", eth_create_proc(_nanp, 1, NULL, NULL));
 
   return 0;
 }

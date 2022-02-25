@@ -58,7 +58,7 @@ _rev_append(void)
 static eth_t
 _rev_map(void)
 {
-  eth_use_symbol(Improper_list)
+  eth_use_symbol(improper_list)
 
   eth_args args = eth_start(2);
   const eth_t f = eth_arg2(args, eth_function_type);
@@ -81,7 +81,7 @@ _rev_map(void)
   if (eth_unlikely(it != eth_nil))
   {
     eth_drop(acc);
-    eth_throw(args, Improper_list);
+    eth_throw(args, improper_list);
   }
 
   eth_return(args, acc);
@@ -90,7 +90,7 @@ _rev_map(void)
 static eth_t
 _rev_mapi(void)
 {
-  eth_use_symbol(Improper_list)
+  eth_use_symbol(improper_list)
 
   eth_args args = eth_start(2);
   const eth_t f = eth_arg2(args, eth_function_type);
@@ -115,7 +115,7 @@ _rev_mapi(void)
   if (eth_unlikely(it != eth_nil))
   {
     eth_drop(acc);
-    eth_throw(args, Improper_list);
+    eth_throw(args, improper_list);
   }
 
   eth_return(args, acc);
@@ -124,7 +124,7 @@ _rev_mapi(void)
 static eth_t
 _rev_map2(void)
 {
-  eth_use_symbol(Improper_list)
+  eth_use_symbol(improper_list)
 
   eth_args args = eth_start(3);
   const eth_t f = eth_arg2(args, eth_function_type);
@@ -151,7 +151,7 @@ _rev_map2(void)
                    not eth_is_pair(it2) and it2 != eth_nil))
   {
     eth_drop(acc);
-    eth_throw(args, Improper_list);
+    eth_throw(args, improper_list);
   }
 
   eth_return(args, acc);
@@ -160,7 +160,7 @@ _rev_map2(void)
 static eth_t
 _rev_zip(void)
 {
-  eth_use_symbol(Improper_list);
+  eth_use_symbol(improper_list);
 
   eth_args args = eth_start(2);
   const eth_t f = eth_arg2(args, eth_function_type);
@@ -208,7 +208,7 @@ _rev_zip(void)
         if (eth_unlikely(it[i] != eth_nil))
         {
           eth_drop(acc);
-          eth_throw(args, Improper_list);
+          eth_throw(args, improper_list);
         }
         goto end_loop;
       }
@@ -221,7 +221,7 @@ _rev_zip(void)
 static eth_t
 _fold_zip(void)
 {
-  eth_use_symbol(Improper_list);
+  eth_use_symbol(improper_list);
 
   eth_args args = eth_start(3);
   const eth_t f = eth_arg2(args, eth_function_type);
@@ -266,7 +266,7 @@ _fold_zip(void)
         if (eth_unlikely(it[i] != eth_nil))
         {
           eth_drop(acc);
-          eth_throw(args, Improper_list);
+          eth_throw(args, improper_list);
         }
         goto end_loop;
       }
@@ -279,8 +279,8 @@ _fold_zip(void)
 static eth_t
 _rev_filter_map(void)
 {
-  eth_use_symbol(Filter_out)
-  eth_use_symbol(Improper_list)
+  eth_use_symbol(filter_out)
+  eth_use_symbol(improper_list)
 
   eth_args args = eth_start(2);
   const eth_t f = eth_arg2(args, eth_function_type);
@@ -295,7 +295,7 @@ _rev_filter_map(void)
     const eth_t v = eth_apply(f, 1);
     if (eth_is_exn(v))
     {
-      if (eth_what(v) == Filter_out)
+      if (eth_what(v) == filter_out)
         eth_drop(v);
       else
       {
@@ -309,7 +309,7 @@ _rev_filter_map(void)
   if (eth_unlikely(it != eth_nil))
   {
     eth_drop(acc);
-    eth_throw(args, Improper_list);
+    eth_throw(args, improper_list);
   }
 
   eth_return(args, acc);

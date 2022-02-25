@@ -1011,6 +1011,8 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
      */
     case ETH_AST_ACCESS:
     {
+      eth_use_symbol(access_error);
+
       eth_ir_node *expr = build_with_toplvl(bldr, ast->access.expr, e, false);
       // --
       if (expr->tag == ETH_IR_CVAL)
@@ -1034,7 +1036,6 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
           eth_drop_ir_node(expr);
           return eth_ir_error();
         }
-        //eth_trace("constexpr-access: ~w.~w", rec, key);
         eth_drop_ir_node(expr);
         return eth_ir_cval(eth_tup_get(rec, fieldid));
       }
@@ -1045,9 +1046,14 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         eth_ir_pattern *tmp = eth_ir_ident_pattern(tmpvar);
         eth_ir_pattern *pat = eth_ir_record_pattern(new_vid(bldr), &fid, &tmp, 1);
         // --
-        eth_ir_node *exn = eth_ir_cval(eth_exn(eth_type_error()));
+        eth_ir_node *exn = eth_ir_cval(eth_exn(access_error));
+        eth_set_ir_location(exn, ast->loc);
         // --
-        return eth_ir_match(pat, expr, eth_ir_var(tmpvar), eth_ir_throw(exn));
+        eth_ir_node *throw = eth_ir_throw(exn);
+        eth_set_ir_location(throw, ast->loc);
+        eth_ir_node *ret = eth_ir_match(pat, expr, eth_ir_var(tmpvar), throw);
+        eth_set_ir_location(ret, ast->loc);
+        return ret;
       }
     }
 
@@ -1157,13 +1163,28 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       return eth_ir_update(src,  irvals, ids, n);
     }
 
+    /*-----------*
+     * Assertion *
+     *-----------*
+     *
+     * Build as
+     *
+     *   IF <expr>
+     *   THEN NIL
+     *   ELSE THROW Assertion_failed
+     */
     case ETH_AST_ASSERT:
     {
-      eth_use_symbol(Assertion_failed);
+      eth_use_symbol(assertion_failed);
       eth_ir_node *expr = build_with_toplvl(bldr, ast->assert.expr, e, false);
-      eth_ir_node *okbr = build_with_toplvl(bldr, ast->assert.body, e, false);
-      eth_ir_node *errbr = eth_ir_throw(eth_ir_cval(eth_exn(Assertion_failed)));
-      return eth_ir_if(expr, okbr, errbr);
+      eth_ir_node *okbr = eth_ir_cval(eth_nil);
+      eth_ir_node *errbr = eth_ir_throw(eth_ir_cval(eth_exn(assertion_failed)));
+      eth_ir_node *node = eth_ir_if(expr, okbr, errbr);
+      node->iff.likely = 1;
+      eth_set_ir_location(okbr, ast->loc);
+      eth_set_ir_location(errbr, ast->loc);
+      eth_set_ir_location(node, ast->loc);
+      return node;
     }
 
     case ETH_AST_DEFINED:
@@ -1233,6 +1254,89 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       };
       eth_ir_node *ret = eth_ir_apply(eth_ir_cval(assgn), args, 2);
       eth_set_ir_location(ret, ast->loc);
+      return ret;
+    }
+
+    case ETH_AST_CLASS:
+    {
+      // template record filled with NILs (to be initialized by ctor)
+      int ntempfields = ast->clas.nvals + ast->clas.nmethods;
+      char *tempfieldnames[ntempfields];
+      eth_ast *tempfieldvals[ntempfields];
+      eth_ast *nil = eth_ast_cval(eth_nil);
+      for (int i = 0; i < ast->clas.nvals; ++i)
+      {
+        tempfieldnames[i] = ast->clas.vals[i].name;
+        tempfieldvals[i] = nil;
+      }
+      for (int i = 0; i < ast->clas.nmethods; ++i)
+      {
+        tempfieldnames[i+ast->clas.nvals] = ast->clas.methods[i].name;
+        tempfieldvals[i+ast->clas.nvals] = ast->clas.methods[i].fn;
+      }
+      eth_type *temptype = eth_record_type(tempfieldnames, ntempfields);
+      eth_ast *temprecord = eth_ast_make_record(temptype, tempfieldnames,
+          tempfieldvals, ntempfields);
+      eth_ast *merger =
+        eth_ast_cval(eth_get_builtin(bldr->root, "__merge_class_templates"));
+      assert(merger != NULL);
+      for (int i = ast->clas.ninherits-1; i >= 0; --i)
+      {
+        eth_ast *parent = eth_ast_ident(ast->clas.inherits[i].classname);
+        eth_ast *partemprecord = eth_ast_access(parent, "template");
+        eth_set_ast_location(partemprecord, ast->loc);
+        eth_ast *args[2] = { partemprecord, temprecord };
+        temprecord = eth_ast_apply(merger, args, 2);
+      }
+      eth_drop_ast(merger);
+      eth_drop_ast(nil);
+
+      // CTOR
+      int nctorpars = ast->clas.npars + 1;
+      eth_ast_pattern *ctorpars[nctorpars];
+      ctorpars[0] = eth_ast_ident_pattern("self");
+      for (int i = 0; i < ast->clas.npars; ++i)
+        ctorpars[i+1] = ast->clas.pars[i];
+      eth_ast *self = eth_ast_ident("self");
+      for (int i = 0; i < ast->clas.ninherits; ++i)
+      {
+        eth_ast *parent = eth_ast_ident(ast->clas.inherits[i].classname);
+        eth_ast *parctor = eth_ast_access(parent, "ctor");
+        // TODO: check if number of arguments to parent CTOR is sufficient
+        eth_ast *args[ast->clas.inherits[i].nargs+1];
+        args[0] = self;
+        for (int j = 0; j < ast->clas.inherits[i].nargs; ++j)
+          args[j+1] = ast->clas.inherits[i].args[j];
+        self = eth_ast_apply(parctor, args, ast->clas.inherits[i].nargs+1);
+      }
+      eth_ast *ctorbody;
+      if (ast->clas.nvals > 0)
+      {
+        char *valnames[ast->clas.nvals];
+        eth_ast *valvals[ast->clas.nvals];
+        for (int i = 0; i < ast->clas.nvals; ++i)
+        {
+          valnames[i] = ast->clas.vals[i].name;
+          valvals[i] = ast->clas.vals[i].init;
+        }
+        ctorbody = eth_ast_update(self, valvals, valnames,
+            ast->clas.nvals);
+      }
+      else
+        ctorbody = self;
+      eth_ast *ctor = eth_ast_fn_with_patterns(ctorpars, nctorpars, ctorbody);
+      eth_drop_ast_pattern(ctorpars[0]);
+
+      // class specification
+      int nclassspecfields = 2;
+      char *classspecfields[2] = { "template", "ctor" };
+      eth_ast *classspecvals[2] = { temprecord, ctor };
+      eth_type *classspectype = eth_record_type(classspecfields, 2);
+      eth_ast *classspec = eth_ast_make_record(classspectype, classspecfields,
+          classspecvals, 2);
+
+      eth_ir_node *ret = build_with_toplvl(bldr, classspec, e, false);
+      eth_drop_ast(classspec);
       return ret;
     }
   }

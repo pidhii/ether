@@ -43,7 +43,7 @@ _read_line_of(void)
     if (feof(eth_get_file_stream(file)))
     {
       eth_drop(file);
-      return eth_exn(eth_sym("End_of_file"));
+      return eth_exn(eth_sym("end_of_file"));
     }
     else
     {
@@ -93,7 +93,7 @@ _read_of(void)
     {
       eth_unref(file);
       eth_unref(n);
-      return eth_exn(eth_sym("End_of_file"));
+      return eth_exn(eth_sym("end_of_file"));
     }
     else if (ferror(stream))
     {
@@ -204,7 +204,7 @@ _read_file(void)
     if (feof(stream))
     {
       eth_drop(file);
-      return eth_exn(eth_sym("End_of_file"));
+      return eth_exn(eth_sym("end_of_file"));
     }
     else if (ferror(stream))
     {
@@ -270,7 +270,7 @@ _printf(void)
 
   int n = eth_study_format(eth_str_cstr(fmt));
   if (n < 0)
-    eth_throw(args, eth_sym("Format_error"));
+    eth_throw(args, eth_sym("format_error"));
 
   if (n == 0)
   {
@@ -328,7 +328,7 @@ _tell(void)
       case EBADF:
         eth_return(args, eth_exn(eth_invalid_argument()));
       default:
-        eth_return(args, eth_exn(eth_sym("System_error")));
+        eth_return(args, eth_exn(eth_sym("system_error")));
     }
   }
   eth_return(args, eth_num(pos));
@@ -352,7 +352,7 @@ _seek(void)
       case EBADF:
         eth_return(args, eth_exn(eth_invalid_argument()));
       default:
-        eth_return(args, eth_exn(eth_sym("System_error")));
+        eth_return(args, eth_exn(eth_sym("system_error")));
     }
   }
   eth_return(args, eth_nil);

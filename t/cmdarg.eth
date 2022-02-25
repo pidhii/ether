@@ -37,27 +37,27 @@ let tests = [
   let cmd = ["--long-arg"]
   ("test-4", fn ->
     try cmdarg.get options cmd; false
-    with e -> e eq Missing_argument),
+    with e -> e eq `missing_argument),
 
   let cmd = ["-a"]
   ("test-5", fn ->
     try cmdarg.get options cmd; false
-    with e -> e eq Missing_argument),
+    with e -> e eq `missing_argument),
 
   let cmd = ["--long-no-arg=x"]
   ("test-6", fn ->
     try cmdarg.get options cmd; false
-    with e -> e eq Unexpected_argument),
+    with e -> e eq `unexpected_argument),
 
   let cmd = ["-fx"]
   ("test-7", fn ->
     try cmdarg.get options cmd; false
-    with e -> e eq Unexpected_argument),
+    with e -> e eq `unexpected_argument),
 
   let cmd = ["-o"]
   ("test-8", fn ->
     try cmdarg.get options cmd; false
-    with e -> e eq Undefined_option),
+    with e -> e eq `undefined_option),
 
   ("test-9", fn ->
     let cmd1 = ["-h"]

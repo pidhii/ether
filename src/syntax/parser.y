@@ -121,6 +121,12 @@ _create_attr(int aflag, void *locpp)
   cod_vec(char) charvec;
   eth_ast_pattern *pattern;
   cod_vec(eth_ast_pattern*) patvec;
+
+  struct {
+    cod_vec(eth_class_inherit) inherits;
+    cod_vec(eth_class_val) vals;
+    cod_vec(eth_class_method) methods;
+  } clas;
 }
 
 %destructor {
@@ -216,7 +222,7 @@ _create_attr(int aflag, void *locpp)
 %left LAZY
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %right TERNARY
-%nonassoc IF THEN ELSE WHEN UNLESS TRY WITH
+%nonassoc IF THEN ELSE WHEN UNLESS TRY WITH CLASS OBJECT METHOD INHERIT
 %right OR
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 // level 0:
@@ -257,7 +263,7 @@ _create_attr(int aflag, void *locpp)
 %type<binds> LoopArgs
 %type<bind> Bind
 %type<integer> Attribute
-%type<astvec> Args ArgsAux
+%type<astvec> Args ArgsAux MaybeArgs
 %type<patvec> FnArgs
 %type<string> Help MaybeHelp
 %type<charvec> String
@@ -274,6 +280,9 @@ _create_attr(int aflag, void *locpp)
 %type<lc_aux> LcAux
 %type<ast> Block
 %type<ast> StmtOrBlock
+%type<clas> ClassBody
+%type<clas> ClassAux
+%type<ast> Class
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %start Entry
 
@@ -357,10 +366,12 @@ FnAtom
 
   | FnAtom '.' SYMBOL {
     $$ = eth_ast_access($1, $3);
+    LOC($$, @$);
     free($3);
   }
   | FnAtom ':' SYMBOL {
     eth_ast *access = eth_ast_access($1, $3);
+    LOC(access, @$);
     $$ = eth_ast_apply(access, &$1, 1);
     LOC($$, @$);
     free($3);
@@ -387,7 +398,7 @@ FnAtom
     eth_ast *fn;
     if ($4.pred)
     {
-      eth_ast *filterout = eth_ast_cval(eth_sym("Filter_out"));
+      eth_ast *filterout = eth_ast_cval(eth_sym("filter_out"));
       eth_ast *raise = eth_ast_cval(eth_get_builtin(SCANROOT, "raise"));
       eth_ast *elsebr = eth_ast_apply(raise, &filterout, 1);
       eth_ast *body = eth_ast_if($4.pred, $2, elsebr);
@@ -469,10 +480,6 @@ StmtSeq
         else
           goto _default;
         break;
-      case ETH_AST_ASSERT:
-        $$ = $1;
-        eth_set_assert_body($1, $3);
-        break;
       default:
       _default:
         $$ = eth_ast_seq($1, $3); LOC($$, @$);
@@ -533,7 +540,7 @@ Expr
     LOC($$, @$);
   }
 
-  | ASSERT Expr { $$ = eth_ast_assert($2, dummy_ast()); }
+  | ASSERT Expr { $$ = eth_ast_assert($2); }
 
   /*| SYMBOL RARROW Expr { $$ = eth_ast_fn(&$1, 1, $3); free($1); LOC($$, @$); }*/
   | Form RARROW Expr {
@@ -769,6 +776,8 @@ Expr
 Stmt
   : Expr
 
+  | Class
+
   | IF Stmt MaybeKeepBlock THEN Stmt ELSE StmtOrBlock {
     $$ = eth_ast_if($2, $5, $7);
     LOC($$, @$);
@@ -896,6 +905,12 @@ Args
     cod_vec_destroy($3);
   }
 ;
+
+MaybeArgs
+  : { cod_vec_init($$); }
+  | Args
+;
+
 
 ArgsAux
   : Atom {
@@ -1340,6 +1355,139 @@ LcAux
     $$.pred = $5;
   }
 ;
+
+Class: CLASS Attribute SYMBOL FnArgs '=' ClassBody {
+  eth_ast_pattern *pat = eth_ast_ident_pattern($3);
+  eth_set_ident_attr(pat, create_attr($2, @3));
+
+  eth_ast *class = eth_ast_class($4.data, $4.len, $6.inherits.data,
+      $6.inherits.len, $6.vals.data, $6.vals.len, $6.methods.data,
+      $6.methods.len);
+  LOC(class, @$);
+
+  $$ = eth_ast_let(&pat, &class, 1, dummy_ast());
+
+  free($3);
+  cod_vec_destroy($4);
+  cod_vec_destroy($6.inherits);
+  cod_vec_destroy($6.vals);
+  cod_vec_destroy($6.methods);
+};
+
+ClassBody: START_BLOCK ClassAux END_BLOCK { $$ = $2; };
+
+ClassAux
+  : INHERIT SYMBOL MaybeArgs {
+    cod_vec_init($$.inherits);
+    cod_vec_init($$.vals);
+    cod_vec_init($$.methods);
+
+    eth_class_inherit inherit;
+    inherit.classname = strdup($2);
+    inherit.args = $3.data;
+    inherit.nargs = $3.len;
+    cod_vec_push($$.inherits, inherit);
+
+    free($2);
+  }
+  | ClassAux KEEP_BLOCK INHERIT SYMBOL MaybeArgs {
+    $$ = $1;
+
+    eth_class_inherit inherit;
+    inherit.classname = strdup($4);
+    inherit.args = $5.data;
+    inherit.nargs = $5.len;
+    cod_vec_push($$.inherits, inherit);
+
+    free($4);
+  }
+  | LET SYMBOL '=' StmtOrBlock {
+    cod_vec_init($$.inherits);
+    cod_vec_init($$.vals);
+    cod_vec_init($$.methods);
+
+    eth_class_val val;
+    val.name = strdup($2);
+    val.init = $4;
+    cod_vec_push($$.vals, val);
+    free($2);
+  }
+  | ClassAux KEEP_BLOCK LET SYMBOL '=' StmtOrBlock {
+    $$ = $1;
+    eth_class_val val;
+    val.name = strdup($4);
+    val.init = $6;
+    cod_vec_push($$.vals, val);
+    free($4);
+  }
+  | METHOD SYMBOL FnArgs AtomicPattern '=' StmtOrBlock {
+    cod_vec_init($$.inherits);
+    cod_vec_init($$.vals);
+    cod_vec_init($$.methods);
+
+    // prepend "self" and append last parameter
+    cod_vec_insert($3, eth_ast_ident_pattern("self"), 0);
+    cod_vec_push($3, $4);
+
+    // construct method function
+    eth_ast *fn = eth_ast_fn_with_patterns($3.data, $3.len, $6);
+
+    eth_class_method method;
+    method.name = strdup($2);
+    method.fn = fn;
+    cod_vec_push($$.methods, method);
+
+    free($2);
+    cod_vec_destroy($3);
+  }
+  | METHOD SYMBOL '=' StmtOrBlock {
+    cod_vec_init($$.inherits);
+    cod_vec_init($$.vals);
+    cod_vec_init($$.methods);
+
+    // construct method function
+    eth_ast_pattern *self = eth_ast_ident_pattern("self");
+    eth_ast *fn = eth_ast_fn_with_patterns(&self, 1, $4);
+
+    eth_class_method method;
+    method.name = strdup($2);
+    method.fn = fn;
+    cod_vec_push($$.methods, method);
+
+    free($2);
+  }
+  | ClassAux KEEP_BLOCK METHOD SYMBOL FnArgs AtomicPattern '=' StmtOrBlock {
+    $$ = $1;
+
+    // prepend "self" and append last parameter
+    cod_vec_insert($5, eth_ast_ident_pattern("self"), 0);
+    cod_vec_push($5, $6);
+
+    // construct method function
+    eth_ast *fn = eth_ast_fn_with_patterns($5.data, $5.len, $8);
+
+    eth_class_method method;
+    method.name = strdup($4);
+    method.fn = fn;
+    cod_vec_push($$.methods, method);
+
+    free($4);
+    cod_vec_destroy($5);
+  }
+  | ClassAux KEEP_BLOCK METHOD SYMBOL '=' StmtOrBlock {
+    $$ = $1;
+
+    // construct method function
+    eth_ast_pattern *self = eth_ast_ident_pattern("self");
+    eth_ast *fn = eth_ast_fn_with_patterns(&self, 1, $6);
+
+    eth_class_method method;
+    method.name = strdup($4);
+    method.fn = fn;
+    cod_vec_push($$.methods, method);
+
+    free($4);
+  }
 
 MaybeComa
   : { $$ = false; }

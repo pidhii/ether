@@ -9,6 +9,13 @@ find_package (BISON REQUIRED)
 find_package (FLEX REQUIRED)
 find_package (PkgConfig REQUIRED)
 
+string(REPLACE "." ";" BISON_VERSION_LIST ${BISON_VERSION})
+list(GET BISON_VERSION_LIST 0 BISON_VERSION_MAJOR)
+list(GET BISON_VERSION_LIST 1 BISON_VERSION_MINOR)
+list(GET BISON_VERSION_LIST 2 BISON_VERSION_PATCH)
+#if (${BISON_VERSION_MAJOR} LESS "3" OR ${BISON_VERSION_MINOR} LESS "7")
+  #message(SEND_ERROR "
+
 ################################################################################
 #                                  OPTIONS
 #
@@ -17,7 +24,6 @@ option (BUILD_SHARED_LIBRARY "Build shared library \"ether.so\"" OFF)
 option (BUILD_STATIC_LIBRARY "Build static library \"ether.a\"" ON)
 # -------------------------------- Modules ------------------------------------
 option (ENABLE_ARB "Build an Arb-module" YES)
-option (ENABLE_GTK "Build a Gtk-module" YES)
 option (ENABLE_JSON "Build a Json-module" YES)
 # ------------------------------ Dev-Options -----------------------------------
 option (DISABLE_BUILTINS "Disable all builtins" OFF)
@@ -26,7 +32,7 @@ option (DISABLE_BUILTINS "Disable all builtins" OFF)
 ################################################################################
 #                                   FLAGS
 #
-set (WARNING_FLAGS "-Wall -Werror -Wextra -Wno-unused -Wno-error=cpp")
+set (WARNING_FLAGS "-Wall -Werror -Wextra -Wno-unused -Wno-error=cpp -Wno-vla-parameter -Wno-maybe-uninitialized")
 # ------------------------------ Common Flags ----------------------------------
 set (CMAKE_C_STANDARD 99)
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${WARNING_FLAGS} -rdynamic")
@@ -51,7 +57,7 @@ set_source_files_properties(${CMAKE_SOURCE_DIR}/src/vm.c
 # ------------------------------- Debug Flags ----------------------------------
 set (CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Og -ggdb -DETH_DEBUG_MODE")
 # ------------------------------ Release Flags ---------------------------------
-set (CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -Ofast -flto")
+set (CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2 -march=native -flto")
 
 
 ################################################################################

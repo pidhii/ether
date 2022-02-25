@@ -434,8 +434,8 @@ eth_type* __attribute__((malloc))
 eth_create_type(const char *name);
 
 eth_type* __attribute__((malloc))
-eth_create_struct_type(const char *name, char *const fields[],
-    ptrdiff_t const offs[], int n);
+eth_create_struct_type(const char *name, char *const *fields,
+    ptrdiff_t const *offs, int n);
 
 static inline bool
 eth_is_plain(eth_type *type)
@@ -1159,6 +1159,21 @@ void
 eth_destroy_record_hn(eth_type *type, eth_t x);
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                               objects
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+/*
+ * Syntax `class ... = object ... end` creates an object of type "class" (call
+ * it class-specification).  Syntax `new ...` takes a class-specification as
+ * an argument and creates an instance of this class (call it class-instance).
+ *
+ * A class-instance is implemented as a record containing all the fields and a
+ * reference to the class-specification (field `__class`).
+ *
+ * Methods are stored in the class-specification and invoked via operator `#`.
+ *
+ */
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                 file
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 extern
@@ -1846,6 +1861,7 @@ typedef enum {
   ETH_AST_EVMAC,
   ETH_AST_MULTIMATCH,
   ETH_AST_ASSIGN,
+  ETH_AST_CLASS,
 } eth_ast_tag;
 
 typedef enum {
@@ -1866,6 +1882,22 @@ eth_create_match_table(eth_ast_pattern **const tab[], eth_ast *const exprs[],
 
 void
 eth_destroy_match_table(eth_match_table *table);
+
+typedef struct {
+  char *name;
+  eth_ast *init;
+} eth_class_val;
+
+typedef struct {
+  char *name;
+  eth_ast *fn;
+} eth_class_method;
+
+typedef struct {
+  char *classname;
+  eth_ast **args;
+  int nargs;
+} eth_class_inherit;
 
 struct eth_ast {
   eth_ast_tag tag;
@@ -1891,11 +1923,14 @@ struct eth_ast {
       try;
     struct { eth_type *type; char **fields; eth_ast **vals; int n; } mkrcrd;
     struct { eth_ast *src, **vals; char **fields; int n; } update;
-    struct { eth_ast *expr, *body; } assert;
+    struct { eth_ast *expr; } assert;
     struct { char *ident; } defined;
     struct { eth_match_table *table; eth_ast **exprs; } multimatch;
     struct { eth_ast *expr; } evmac;
     struct { char *ident; eth_ast *val; } assign;
+    struct { eth_ast_pattern **pars; int npars; eth_class_inherit *inherits;
+      int ninherits; eth_class_val *vals; int nvals;
+      eth_class_method *methods; int nmethods; } clas;
   };
   eth_location *loc;
 };
@@ -1990,15 +2025,7 @@ eth_ast*
 eth_ast_update(eth_ast *src, eth_ast *const vals[], char *const fields[], int n);
 
 eth_ast*
-eth_ast_assert(eth_ast *expr, eth_ast *body);
-
-static void
-eth_set_assert_body(eth_ast *asrt, eth_ast *body)
-{
-  eth_ref_ast(body);
-  eth_unref_ast(asrt->assert.body);
-  asrt->assert.body = body;
-}
+eth_ast_assert(eth_ast *expr);
 
 eth_ast*
 eth_ast_defined(const char *ident);
@@ -2011,6 +2038,11 @@ eth_ast_multimatch(eth_match_table *table, eth_ast *const exprs[]);
 
 eth_ast*
 eth_ast_assign(const char *ident, eth_ast *val);
+
+eth_ast*
+eth_ast_class(eth_ast_pattern *const pars[], int npars,
+    eth_class_inherit *inherits, int ninherits, eth_class_val *vals,
+    int nvals, eth_class_method *methods, int nmethods);
 
 eth_ast_pattern*
 eth_ast_to_pattern(eth_ast *ast);
@@ -2119,7 +2151,7 @@ struct eth_ir_node {
     struct { eth_t val; } cval;
     struct { int vid; } var;
     struct { eth_ir_node *fn, **args; int nargs; } apply;
-    struct { eth_ir_node *cond, *thenbr, *elsebr; eth_toplvl_flag toplvl; } iff;
+    struct { eth_ir_node *cond, *thenbr, *elsebr; eth_toplvl_flag toplvl; int likely; } iff;
     struct { int exnvar; eth_ir_node *trybr, *catchbr; int likely; } try;
     struct { eth_ir_node *e1, *e2; } seq;
     struct { eth_binop op; eth_ir_node *lhs, *rhs; } binop;
@@ -2620,6 +2652,7 @@ struct eth_insn {
   eth_insn_tag tag;
   int out;
   int flag;
+  char *comment;
   union {
     struct { eth_t val; } cval;
     struct { int vid; } var;
@@ -2748,6 +2781,9 @@ eth_insn_getexn(int out);
 
 eth_insn* __attribute__((malloc))
 eth_insn_mkrcrd(int out, int const vids[], eth_type *type);
+
+void
+eth_set_insn_comment(eth_insn *insn, const char *comment);
 
 /** @} SsaInsn */
 /** -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -
