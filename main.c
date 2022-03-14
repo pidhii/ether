@@ -56,6 +56,9 @@ eth_root *repl_root;
 static const eth_module*
 resolve_ident(const char** ident);
 
+static eth_t
+resolve_ident2(const eth_module *root, const char *ident);
+
 static char**
 completer(const char *text, int start, int end);
 
@@ -618,6 +621,44 @@ resolve_ident(const char** ident)
   return mod;
 }
 
+static eth_t
+resolve_ident2(const eth_module *root, const char *ident)
+{
+  char *p;
+  if ((p = strchr(ident, '.')))
+  {
+    int prefixlen = p - ident;
+    char prefix[prefixlen + 1];
+    memcpy(prefix, ident, prefixlen);
+    prefix[prefixlen] = '\0';
+    ident += prefixlen + 1;
+    eth_def *basedef = eth_find_def(root, prefix);
+    if (basedef == NULL)
+      return NULL;
+
+    eth_t base = basedef->val;
+    if (not eth_is_record(base->type))
+      return NULL;
+
+    while ((p = strchr(ident, '.')))
+    {
+      int prefixlen = p - ident;
+      char prefix[prefixlen + 1];
+      memcpy(prefix, ident, prefixlen);
+      prefix[prefixlen] = '\0';
+      ident += prefixlen + 1;
+      eth_field* fld = eth_get_field(base->type, prefix);
+      if (fld == NULL)
+        return NULL;
+      base = *(eth_t*)((char*)base + fld->offs);
+    }
+
+    return base;
+  }
+
+  return NULL;
+}
+
 static char*
 completion_generator(const char *text, int state)
 {
@@ -646,51 +687,71 @@ completion_generator(const char *text, int state)
       cod_vec_init(matches);
 
     // resolve module
-    const char *ident = text;
-    const eth_module *mod = resolve_ident(&ident);
-    //if (mod == NULL)
-      //return NULL;
-    //strncpy(prefix, text, ident - text);
-
-    // - - - - - - -
-    // Get matches
-    // - - - - - - -
-    int identlen = strlen(ident);
-    // check selected module
-    int ndefs = eth_get_ndefs(mod);
-    eth_def defs[ndefs];
-    eth_get_defs(mod, defs);
-    // wether we are matching some builtin value
-    bool checkpriv = strncmp(ident, "__", 2) == 0;
-    for (int i = 0; i < ndefs; ++i)
+    if (strchr(text, '.'))
     {
-      if (strncmp(defs[i].ident, ident, identlen) == 0)
+      eth_t base = resolve_ident2(repl_defs, text);
+      if (base == NULL)
+        return NULL;
+
+      const char *ident = strrchr(text, '.') + 1;
+
+      int identlen = strlen(ident);
+      int prefixlen = strlen(text) - strlen(ident);
+      memcpy(prefix, text, prefixlen);
+      prefix[prefixlen] = '\0';
+
+      bool checkpriv = strncmp(ident, "__", 2) == 0;
+      for (int i = 0; i < base->type->nfields; ++i)
       {
-        if (strncmp(defs[i].ident, "__", 2) == 0 and not checkpriv)
-          continue;
-        char *ident = malloc(strlen(prefix) + strlen(defs[i].ident) + 2);
-        sprintf(ident, "%s%s", prefix, defs[i].ident);
-        cod_vec_push(matches, ident);
+        if (strncmp(base->type->fields[i].name, ident, identlen) == 0)
+        {
+          if (strncmp(base->type->fields[i].name, "__", 2) == 0 and not checkpriv)
+            continue;
+          char *match = malloc(prefixlen + strlen(base->type->fields[i].name) + 1);
+          sprintf(match, "%s%s", prefix, base->type->fields[i].name);
+          cod_vec_push(matches, match);
+        }
       }
     }
-    // also check builtins (if no module prefix specified)
-    if (strcmp(prefix, "") == 0)
+    else
     {
-      mod = eth_get_builtins(repl_root);
-      int ndefs = eth_get_ndefs(mod);
+      const char *ident = text;
+      int identlen = strlen(ident);
+
+      int ndefs = eth_get_ndefs(repl_defs);
       eth_def defs[ndefs];
-      eth_get_defs(mod, defs);
+      eth_get_defs(repl_defs, defs);
+      // wether we are matching some builtin value
+      bool checkpriv = strncmp(ident, "__", 2) == 0;
       for (int i = 0; i < ndefs; ++i)
       {
         if (strncmp(defs[i].ident, ident, identlen) == 0)
         {
           if (strncmp(defs[i].ident, "__", 2) == 0 and not checkpriv)
             continue;
-          cod_vec_push(matches, strdup(defs[i].ident));
+          char *ident = malloc(strlen(prefix) + strlen(defs[i].ident) + 2);
+          sprintf(ident, "%s", defs[i].ident);
+          cod_vec_push(matches, ident);
+        }
+      }
+
+      // also check builtins
+      {
+        const eth_module *mod = eth_get_builtins(repl_root);
+        int ndefs = eth_get_ndefs(mod);
+        eth_def defs[ndefs];
+        eth_get_defs(mod, defs);
+        for (int i = 0; i < ndefs; ++i)
+        {
+          if (strncmp(defs[i].ident, ident, identlen) == 0)
+          {
+            if (strncmp(defs[i].ident, "__", 2) == 0 and not checkpriv)
+              continue;
+            cod_vec_push(matches, strdup(defs[i].ident));
+          }
         }
       }
     }
-
     // reset index
     idx = 0;
   }
