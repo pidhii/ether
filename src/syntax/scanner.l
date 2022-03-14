@@ -579,6 +579,8 @@ inf                                 |
 }
 
 
+open   { return OPEN; }
+import { return IMPORT; }
 rec    { return REC; }
 in     { return IN; }
 if     { return IF; }

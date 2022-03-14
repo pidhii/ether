@@ -215,6 +215,7 @@ _create_attr(int aflag, void *locpp)
 %nonassoc DO
 %nonassoc CASE OF
 %nonassoc DEFINED
+%nonassoc OPEN IMPORT
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %right RARROW
 %right ';' ',' START_BLOCK END_BLOCK KEEP_BLOCK
@@ -871,6 +872,45 @@ Stmt
   | Expr '$' Stmt { if ($1->tag == ETH_AST_APPLY) { $$ = $1; eth_ast_append_arg($$, $3); } else $$ = eth_ast_apply($1, &$3, 1); LOC($$, @$); }
   /*| Expr '$' StmtOrBlock { if ($1->tag == ETH_AST_APPLY) { $$ = $1; eth_ast_append_arg($$, $3); } else $$ = eth_ast_apply($1, &$3, 1); LOC($$, @$); }*/
   /*| Expr '$' KEEP_BLOCK Stmt { if ($1->tag == ETH_AST_APPLY) { $$ = $1; eth_ast_append_arg($$, $4); } else $$ = eth_ast_apply($1, &$4, 1); LOC($$, @$); }*/
+
+  | Attribute OPEN Expr {
+    eth_ast *rhs;
+    if ($3->tag == ETH_AST_CVAL and $3->cval.val->type == eth_string_type)
+    {
+      eth_ast *require = eth_ast_cval(eth_get_builtin(SCANROOT, "__require"));
+      rhs = eth_ast_evmac(eth_ast_apply(require, &$3, 1));
+    }
+    else
+      rhs = $3;
+    eth_ast_pattern *lhs = eth_ast_record_star_pattern();
+    eth_ref_attr(lhs->recordstar.attr = eth_create_attr($1));
+    $$ = eth_ast_let(&lhs, &rhs, 1, eth_ast_cval(eth_nil));
+  }
+
+  | Attribute IMPORT String {
+    cod_vec_push($3, 0);
+    eth_ast *require = eth_ast_cval(eth_get_builtin(SCANROOT, "__require"));
+    eth_ast_pattern *lhs = eth_ast_ident_pattern($3.data);
+    eth_ref_attr(lhs->ident.attr = eth_create_attr($1));
+    eth_ast *arg = eth_ast_cval(eth_create_string_from_ptr2($3.data, $3.len - 1));
+    eth_ast *rhs = eth_ast_evmac(eth_ast_apply(require, &arg, 1));
+    $3.data = NULL;
+    $$ = eth_ast_let(&lhs, &rhs, 1, eth_ast_cval(eth_nil));
+  }
+  | Attribute IMPORT Expr AS SYMBOL {
+    eth_ast *rhs;
+    if ($3->tag == ETH_AST_CVAL and $3->cval.val->type == eth_string_type)
+    {
+      eth_ast *require = eth_ast_cval(eth_get_builtin(SCANROOT, "__require"));
+      rhs = eth_ast_evmac(eth_ast_apply(require, &$3, 1));
+    }
+    else
+      rhs = $3;
+    eth_ast_pattern *lhs = eth_ast_ident_pattern($5);
+    eth_ref_attr(lhs->ident.attr = eth_create_attr($1));
+    free($5);
+    $$ = eth_ast_let(&lhs, &rhs, 1, eth_ast_cval(eth_nil));
+  }
 ;
 
 Ident

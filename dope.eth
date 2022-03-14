@@ -1,12 +1,13 @@
 #!/bin/env ether
 
-let {*} = @(require 'list')
-let {prelude={*}} as string = @(require 'string')
-let {*} = @(require 'io')
-let {*} = @(require 'os')
-let vector = @(require 'vector')
-let json = @(require 'json')
-let cmdarg = @(require 'cmdarg')
+open 'list'
+import 'string'
+open string.prelude
+open 'io'
+open 'os'
+import 'vector'
+import 'json'
+import 'cmdarg'
 
 -------------------------[ Log and text formatting ]----------------------------
 let paint text =
@@ -449,6 +450,7 @@ let install_help! =
   print "  {basename (car command_line)} install [OPTIONS] [<command_line> ...]"
   print ""
   print "\e[1mOPTIONS:\e[0m"
+  print "  --latest                Install the latest commit ignoring release versions."
   print "  --help   -h             Show this message."
 
 
@@ -489,8 +491,8 @@ let commands =
       handle = command_line ->
         let options =
           [
-            { name = "help", val = "help", has_arg = false },
-            { name = "h", val = "help", has_arg = false }
+            { name = ["h", "help"], val = "help", has_arg = false },
+            { name = "latest", val = "latest", has_arg = false },
           ]
         let opts, args = cmdarg.get options command_line
 
@@ -540,21 +542,24 @@ let commands =
             -- available will install the latest version. Otherwize, use latest
             -- commit in the repository.
             let version =
-              let versions = git.list_versions repo_url or []
-              if versions is [] then
-                -- No releases available. Try to install from the latest commit
-                -- if user accepts it.
-                info "module does not have any releases"
-                if confirm? (paint " install from the latest commit (yes/no): ")
-                then `commit (git.head_commit repo_url)
-                else info "exiting then"; exit 0
+              if assoc_opt "latest" opts then
+                `commit (git.head_commit repo_url)
               else
-                -- Will use latest version. Check if current commit corresponds to
-                -- the latest version, if not - checkout desired commit.
-                info "available versions of the module: {versions}"
-                let latest = car versions
-                info "latest: {latest}"
-                `tag latest
+                let versions = git.list_versions repo_url or []
+                if versions is [] then
+                  -- No releases available. Try to install from the latest commit
+                  -- if user accepts it.
+                  info "module does not have any releases"
+                  if confirm? (paint " install from the latest commit (yes/no): ")
+                  then `commit (git.head_commit repo_url)
+                  else info "exiting then"; exit 0
+                else
+                  -- Will use latest version. Check if current commit corresponds to
+                  -- the latest version, if not - checkout desired commit.
+                  info "available versions of the module: {versions}"
+                  let latest_tag = car versions
+                  info "latest: {latest_tag}"
+                  `tag latest_tag
 
             -- Install
             let db = load_db_from default_db_path
