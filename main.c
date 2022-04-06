@@ -132,6 +132,7 @@ main(int argc, char **argv)
     { "prefix", false, NULL, 0x3FF },
     { "trace-limit", true, NULL, 0x4FF },
     { "module-path", false, NULL, 0x5FF },
+    { "batch-mode", false, NULL, 'b' },
     { 0, 0, 0, 0 }
   };
   int opt;
@@ -139,8 +140,9 @@ main(int argc, char **argv)
   cod_vec_init(L);
   int tracelimh = 3;
   int tracelimt = 1;
+  bool batchmode = false;
   /*opterr = 0;*/
-  while ((opt = getopt_long(argc, argv, "+hv:L:", longopts, NULL)) > 0)
+  while ((opt = getopt_long(argc, argv, "+hv:L:b", longopts, NULL)) > 0)
   {
     switch (opt)
     {
@@ -153,6 +155,10 @@ main(int argc, char **argv)
 
       case 'L':
         cod_vec_push(L, optarg);
+        break;
+
+      case 'b':
+        batchmode = true;
         break;
 
       case 0x2FF:
@@ -246,7 +252,7 @@ main(int argc, char **argv)
   eth_define(extravars, "command_line", argv_to_list(argc, argv, optind));
   eth_define(extravars, "__main", eth_true);
 
-  if (input == stdin) // REPL
+  if (input == stdin and not batchmode) // REPL
   {
     eth_debug("[main] REPL");
 
@@ -542,6 +548,8 @@ help_and_exit(char *argv0)
   puts("  --trace-limit      <value>  Specify depth of the trace to display. Formats for <value> are:");
   puts("                                <head>,<tail> - specify both head- and tail-length;");
   puts("                                <head>        - specify only head-length while tail-length is set to 1.");
+  puts("  --module-path               Print module-path in use and exit.");
+  puts("  --batch-mode   -b           Execute code from standard input without entering REPL mode.");
   exit(EXIT_SUCCESS);
 }
 
@@ -780,3 +788,4 @@ repl_help(FILE *out)
   fprintf(out, "  '.complete-empty'     display all available identifiers when completing empty word\n");
   fprintf(out, "  '.no-complete-empty'  disable effect of the previous command\n");
 }
+
