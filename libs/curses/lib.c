@@ -96,6 +96,15 @@ _isendwin(void)
   return eth_boolean(isendwin());
 }
 
+static eth_t
+_curs_set(void)
+{
+  eth_t x = *eth_sp++;
+  int ret = curs_set(x != eth_false);
+  eth_drop(x);
+  return eth_num(ret);
+}
+
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 static eth_t
 _start_color(void)
@@ -573,6 +582,7 @@ ether_module(eth_module *mod, eth_root *topenv)
   eth_define(mod, "initscr", eth_create_proc(_initscr, 0, NULL, NULL));
   eth_define(mod, "endwin", eth_create_proc(_endwin, 0, NULL, NULL));
   eth_define(mod, "isendwin", eth_create_proc(_isendwin, 0, NULL, NULL));
+  eth_define(mod, "curs_set", eth_create_proc(_curs_set, 1, NULL, NULL));
 
   eth_define(mod, "start_color", eth_create_proc(_start_color, 0, NULL, NULL));
   eth_define(mod, "has_colors", eth_create_proc(_has_colors, 0, NULL, NULL));
