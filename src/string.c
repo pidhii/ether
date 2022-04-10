@@ -52,7 +52,7 @@ write_string(eth_type *type, eth_t x, FILE *out)
         case '\r': fputs("\\r", out); break;
         case '\t': fputs("\\t", out); break;
         case '\v': fputs("\\v", out); break;
-        default: fprintf(out, "\\%#hhx", p[i]);
+        default: fprintf(out, "\\x%hhx", p[i]);
       }
     }
   }
