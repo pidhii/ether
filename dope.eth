@@ -250,7 +250,6 @@ let empty_db_entry = {
 }
 
 let uninstall {db, modname} =
-  print 'asdf'
   if let `some {install_dir} = db:get_module_opt modname then
     -- Remove module directory
     info "uninstalling module '{modname}'"
@@ -684,6 +683,5 @@ let main! =
     info "see `{basename dopepath} help` for avaliable commands"
     exit 1
 
---try main! with _ -> exit 1
-main!
+try main! with _ -> exit 1
 

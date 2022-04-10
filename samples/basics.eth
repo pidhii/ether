@@ -1,4 +1,27 @@
 
+-- Define a variable
+let my_variable = 666
+
+
+-- Lists
+print ([1, 2, 3] eq 1 :: 2 :: 3 :: []) --> true
+
+
+-- Equality operators
+print (1 == 1) --> true
+print (1 /= 2) --> true
+print ("string" eq "string") --> true
+print ("string" not eq "different string") --> true
+print ([1, [2], 3] eq [1, [2], 3]) --> true
+print (true is true) --> true
+print (true is not false) --> true
+
+
+-- Numeric comaprison operators (<, >, <=, >=) can be chained together
+let other_variable = 228
+print (123 < other_variable < my_variable is not false) --> true
+
+
 -- Simple function
 let square x = x * x
 print (square 2)
@@ -40,15 +63,6 @@ let increment = add 1
 print (increment 3)
 
 
--- Lists
-print ([1, 2, 3] eq 1 :: 2 :: 3 :: [])
-
-
--- Pattern matching
-let x :: xs = [1, 2, 3]
-print (x, xs)
-
-
 -- Higher order functions
 let rec map f xs =
   if let x :: xs' = xs then
@@ -58,24 +72,31 @@ let rec map f xs =
 print (map increment [1, 2, 3])
 
 
--- Closures
+-- Closures/lambda functions
 print (map (x -> x^2) [1, 2, 3])
 
 
--- Tuples
-let (a, b) = (`a, `b)
-print (a, b)
-
-
--- Records
-let { login } = { name = "Jill", login = "Mikle Jackson" }
-print login
+-- Pattern matching
+let x :: xs = [1, 2, 3]
+print (x, xs)
 
 
 -- Variants (tagged wrapper-types)
 let safe_div x y = `some (x / y) if y /= 0 else false
 let `some x = safe_div 1 2
 print x
+
+
+-- Tuples
+let (a, b) = (`a, `b)
+print (a, b) --> `a     `b
+
+
+-- Records (a.k.a. structs)
+let info = { name = "Jill", login = "Mikle Jackson" }
+let { login } = info
+print login --> Mikle Jackson
+print (info.login eq login) --> true
 
 
 -- FizzBuzz
