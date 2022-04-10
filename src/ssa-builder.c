@@ -1161,7 +1161,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
           break;
 
         case ETH_LT ... ETH_GE:
-          ret = new_val(bldr, RC_RULES_DISABLE);
+          ret = new_val(bldr, RC_RULES_DEFAULT);
           insn = eth_insn_binop(ir->binop.op, ret, lhs, rhs);
 
           testnum = true;
