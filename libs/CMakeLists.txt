@@ -179,3 +179,15 @@ target_link_libraries (curses -lcurses)
 install (TARGETS curses DESTINATION ${CURSES_DST_DIR})
 install (FILES ${CURSES_SRC_DIR}/lib.eth DESTINATION ${CURSES_DST_DIR})
 
+# ctype
+set (CTYPE_SRC_DIR ${CMAKE_SOURCE_DIR}/libs/ctype)
+set (CTYPE_DST_DIR lib/ether/ctype)
+add_library (ctype SHARED ${CTYPE_SRC_DIR}/lib.c)
+set_target_properties (ctype
+  PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    PREFIX ""
+    OUTPUT_NAME "ctype")
+install (TARGETS ctype DESTINATION ${CTYPE_DST_DIR})
+  install (FILES ${CTYPE_SRC_DIR}/lib.eth DESTINATION ${CTYPE_DST_DIR})
+

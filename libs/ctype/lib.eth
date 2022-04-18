@@ -1,0 +1,19 @@
+import 'string'
+open string.prelude
+
+let adjust_arg x = ord x if string? x else x
+
+let pub isalnum x = __isalnum (adjust_arg x)
+let pub isalpha x = __isalpha (adjust_arg x)
+let pub iscntrl x = __iscntrl (adjust_arg x)
+let pub isdigit x = __isdigit (adjust_arg x)
+let pub isgraph x = __isgraph (adjust_arg x)
+let pub islower x = __islower (adjust_arg x)
+let pub isprint x = __isprint (adjust_arg x)
+let pub ispunct x = __ispunct (adjust_arg x)
+let pub isspace x = __isspace (adjust_arg x)
+let pub isupper x = __isupper (adjust_arg x)
+let pub isxdigit x = __isxdigit (adjust_arg x)
+let pub isascii x = __isascii (adjust_arg x)
+let pub isblank x = __isblank (adjust_arg x)
+
