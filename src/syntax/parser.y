@@ -283,7 +283,7 @@ _create_attr(int aflag, void *locpp)
 %type<ast> StmtOrBlock
 %type<clas> ClassBody
 %type<clas> ClassAux
-%type<ast> Class
+%type<ast> Class Object
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %start Entry
 
@@ -778,6 +778,7 @@ Stmt
   : Expr
 
   | Class
+  | Object
 
   | IF Stmt MaybeKeepBlock THEN Stmt ELSE StmtOrBlock {
     $$ = eth_ast_if($2, $5, $7);
@@ -1412,6 +1413,26 @@ Class: CLASS Attribute SYMBOL FnArgs '=' ClassBody {
   cod_vec_destroy($6.inherits);
   cod_vec_destroy($6.vals);
   cod_vec_destroy($6.methods);
+};
+
+// TODO: optimise in case there is no inheritance
+Object: OBJECT ClassBody {
+  eth_ast_pattern *pat = eth_ast_ident_pattern("<anonymous-class>");
+
+  eth_ast *class = eth_ast_class(NULL, 0, $2.inherits.data,
+      $2.inherits.len, $2.vals.data, $2.vals.len, $2.methods.data,
+      $2.methods.len);
+  LOC(class, @$);
+
+  eth_ast *new_fn = eth_ast_cval(eth_get_builtin(SCANROOT, "new"));
+  eth_ast *p[1] = {eth_ast_ident("<anonymous-class>")};
+  eth_ast *apply_new = eth_ast_apply(new_fn, p, 1);
+
+  $$ = eth_ast_let(&pat, &class, 1, apply_new);
+
+  cod_vec_destroy($2.inherits);
+  cod_vec_destroy($2.vals);
+  cod_vec_destroy($2.methods);
 };
 
 ClassBody: START_BLOCK ClassAux END_BLOCK { $$ = $2; };
