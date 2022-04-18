@@ -539,6 +539,28 @@ _system(void)
 
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                                  random
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+static eth_t
+_rand(void)
+{ return eth_num(rand()); }
+
+static eth_t
+_srand(void)
+{
+  eth_t s = *eth_sp++;
+  if (eth_unlikely(not eth_is_num(s)))
+  {
+    eth_drop(s);
+    return eth_exn(eth_invalid_argument());
+  }
+  srand(eth_num_val(s));
+  eth_drop(s);
+  return eth_nil;
+}
+
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                  format
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 typedef struct {
@@ -1372,6 +1394,9 @@ eth_create_builtins(eth_root *root)
   eth_define(mod, "__print_to", eth_create_proc(  _print_to, 2, NULL, NULL));
   // ---
   eth_define(mod,   "__system", eth_create_proc(    _system, 1, NULL, NULL));
+  // ---
+  eth_define(mod,     "__rand", eth_create_proc(      _rand, 0, NULL, NULL));
+  eth_define(mod,    "__srand", eth_create_proc(     _srand, 1, NULL, NULL));
   // ---
   eth_define(mod,     "format", eth_create_proc(    _format, 1, NULL, NULL));
   // ---

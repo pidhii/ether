@@ -162,12 +162,18 @@ let pub open_pipe_in cmd = __popen cmd "r"
 let pub open_pipe_out cmd = __popen cmd "w"
 let pub open_string_in = __open_string
 
-let pub print = __print_to stdout
-let pub eprint = __print_to stderr
+let pub print_to = __print_to
+let pub print = print_to stdout
+let pub eprint = print_to stderr
 
 --------------------------------------------------------------------------------
 --                                System
 let pub system = __system
+
+--------------------------------------------------------------------------------
+--                                Random
+let pub rand = __rand
+let pub srand = __srand
 
 --------------------------------------------------------------------------------
 --                                Errors
