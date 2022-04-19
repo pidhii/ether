@@ -3,7 +3,11 @@
   <img src="./ether-logo.1280x640.png">
 </p>
 
+!!! **IMPORTANT** !!! <br>
+Documentation of the language on my [wiki](https://github.com/pidhii/ether/wiki) is outdated.
+I hope to update it. But developement is still quite rapid so I dont know if it would make sence. <br>
 
+# [Contents](#contents)
 - [Examples](#examples)
 - [Build and installation](#build-and-installation)
 - [Running in interactive mode](#repl)
@@ -13,33 +17,42 @@
 - [FAQ](#faq)
 
 # [Check-list](#check-list)
+General:
 - [x] REPL
+- [x] Packet manager (*dope*)
+
+Features:
 - [x] Pattern matching
 - [x] Closures
 - [x] Variant-types
 - [x] Lightweight record-types
-- [ ] *Objects?*
-  - [ ] *fields?*
-  - [ ] *methods*
-  - [ ] *inheritance*
+- [ ] Persistent tables *...some more flexible dictionary-like thing*
+- [x] Classes *...for the sake of inheritance*
+  - [x] Named classes
+  - [x] Objects of unnamed classes
 - [x] Tuples
-- [ ] Persistent tables
 - [x] Persistent vectors
 - [x] Regular expressions
-- [ ] Macros
-- [ ] User-defined operators
+- [ ] Macros <br> *I want it to be something derived from Lisp.* 
+- [x] User-defined operators
   - [x] redefinition of builtin operators
-  - [x] definition of new operators
+  - [x] allow definition of new operators
   - [ ] precedence for user-defined operators
-- [ ] Named arguments
+- [ ] Named arguments <br> *Can try to exploit records as reading multiple values is quite efficient with them.*
 - [x] Exceptions
 - [x] Modules
-- [ ] `match` like in Caml
-- [ ] `do`*-natation for monads?*
 - [ ] Coroutines
+- [ ] Multiple return-values (like in Lua)
+- [ ] Ability to enter REPL at break-points (for debug)
+- [ ] Type constrains *...whatever it means.* <br> *Need a tool to check signatures (arity + return-value) of functions.* <br> *Easy to implement via language itself but it should have some dedicated syntax + care about performance.*  
+
+Syntax:
+- [x] simplyfied syntax for loops
+- [ ] `match` like in Caml
+- [ ] *"*`do`*-natation" for monads?*
+
+###
 - [ ] Fuck Python, I'm the queen
-
-
 
 # [Optimization](#optimizations)
 - [x] Smart reference counting
@@ -159,10 +172,7 @@ let g:NERDCustomDelimiters = {
 
 
 # [Where to get help](#where-to-get-help)
-Enter [REPL](#repl) and try:
-```
-.help [<module-path>.]<variable>
-```
+This world is cruel.
 
 
 
