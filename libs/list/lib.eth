@@ -194,13 +194,13 @@ See _scan_left_ for intermediate results.
 
 
 let pub fold_left2 f z xs ys =
-  let rec loop xs acc =
-    if let x::xs = xs then
-      if let y::ys = ys then
-        loop xs (f acc x y)
+  let rec loop xs ys acc =
+    if let x :: xs = xs then
+      if let y :: ys = ys then
+        loop xs ys (f acc x y)
       else acc
     else acc
-  loop xs z
+  loop xs ys z
 
 
 let rec pub fold_right f z xs =
