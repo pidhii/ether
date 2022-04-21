@@ -288,6 +288,24 @@ main(int argc, char **argv)
     repl_help(stdout);
     printf("\n");
 
+    char stdmodpath[PATH_MAX];
+    if (eth_resolve_path(eth_get_root_env(evl.root), "std.eth", stdmodpath))
+    {
+      eth_debug("loading 'std' (from \"%s\")", stdmodpath);
+      eth_module *stdmod =
+        eth_load_module_from_script(repl_root, stdmodpath, NULL);
+      if (stdmod)
+      {
+        eth_copy_defs(stdmod, repl_defs);
+        eth_destroy_module(stdmod);
+        eth_debug("successfully loaded 'std'");
+      }
+      else
+        eth_warning("failed to load std-library");
+    }
+    else
+      eth_warning("can't find std-library");
+
     while (true)
     {
       // read a line from the input
