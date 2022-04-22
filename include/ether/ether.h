@@ -2533,8 +2533,8 @@ typedef struct {
  * @param tree Tree to be evaluated on successfull match to the \ref type.
  */
 void
-eth_init_mtree_case(int n; eth_mtree_case *c, const eth_type *type,
-    const int offs[n], const int ssavids[n], int n, eth_mtree *tree);
+eth_init_mtree_case(eth_mtree_case *c, const eth_type *type, const int offs[],
+    const int ssavids[], int n, eth_mtree *tree);
 
 /**
  * @brief Deallocate resources asquired by an eth_mtree_case..
@@ -2594,12 +2594,12 @@ eth_mtree*
 eth_create_leaf(eth_insn *body);
 
 eth_mtree*
-eth_create_switch(int ncases; int ssavid, const eth_mtree_case cases[ncases],
-    int ncases, eth_mtree *dflt);
+eth_create_switch(int ssavid, const eth_mtree_case cases[], int ncases,
+    eth_mtree *dflt);
 
 eth_mtree*
-eth_create_cswitch(int ncases; int ssavid, const eth_mtree_ccase cases[ncases],
-    int ncases, eth_mtree *dflt);
+eth_create_cswitch(int ssavid, const eth_mtree_ccase cases[], int ncases,
+    eth_mtree *dflt);
 
 void
 eth_destroy_mtree(eth_mtree *t);

@@ -289,7 +289,7 @@ main(int argc, char **argv)
     printf("\n");
 
     char stdmodpath[PATH_MAX];
-    if (eth_resolve_path(eth_get_root_env(evl.root), "std.eth", stdmodpath))
+    if (eth_resolve_path(eth_get_root_env(repl_root), "std.eth", stdmodpath))
     {
       eth_debug("loading 'std' (from \"%s\")", stdmodpath);
       eth_module *stdmod =

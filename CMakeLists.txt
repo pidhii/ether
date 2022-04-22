@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.15)
 project (ether VERSION 0.4.0)
-enable_language (C)
+enable_language (C CXX)
 
 include (CheckIncludeFile REQUIRED)
 include (ExternalProject OPTIONAL RESULT_VARIABLE ExternalProject_FOUND)
@@ -22,6 +22,8 @@ list(GET BISON_VERSION_LIST 2 BISON_VERSION_PATCH)
 # ------------------------------- Libraries ------------------------------------
 option (BUILD_SHARED_LIBRARY "Build shared library \"ether.so\"" OFF)
 option (BUILD_STATIC_LIBRARY "Build static library \"ether.a\"" ON)
+option (BUILD_CPPAPI_SHARED_LIBRARY "Build shared library \"ether.so\"" ON)
+option (BUILD_CPPAPI_STATIC_LIBRARY "Build static library \"ether.a\"" ON)
 # -------------------------------- Modules ------------------------------------
 option (ENABLE_ARB "Build an Arb-module" YES)
 option (ENABLE_JSON "Build a Json-module" YES)
@@ -75,6 +77,7 @@ include_directories (${CMAKE_SOURCE_DIR}/src)
 file (GLOB ETHER_SRC
   ${CMAKE_SOURCE_DIR}/src/*.c
   ${CMAKE_SOURCE_DIR}/codeine/src/*.c)
+file (GLOB ETHER_CPPAPI_SRC ${CMAKE_SOURCE_DIR}/src/c++/*.cpp)
 set (SYNTAX_DIR ${CMAKE_SOURCE_DIR}/src/syntax)
 BISON_TARGET (parser ${SYNTAX_DIR}/parser.y ${CMAKE_BINARY_DIR}/parser.c)
 FLEX_TARGET (scanner ${SYNTAX_DIR}/scanner.l ${CMAKE_BINARY_DIR}/scanner.c)
@@ -85,6 +88,8 @@ ADD_FLEX_BISON_DEPENDENCY (scanner parser)
 set (SYNTAX_SRC ${BISON_parser_OUTPUTS} ${FLEX_scanner_OUTPUTS})
 add_library (ether_obj OBJECT ${ETHER_SRC} ${SYNTAX_SRC})
 target_include_directories (ether_obj PRIVATE ${CMAKE_BINARY_DIR})
+
+add_library (ether_c++_obj OBJECT ${ETHER_CPPAPI_SRC})
 
 # install headers:
 install (DIRECTORY ${ETHER_INCLUDE_DIR} DESTINATION ".")
@@ -104,8 +109,25 @@ endif (BUILD_SHARED_LIBRARY)
 if (BUILD_STATIC_LIBRARY)
   add_library (ether_a STATIC $<TARGET_OBJECTS:ether_obj>)
   set_target_properties (ether_a PROPERTIES OUTPUT_NAME "ether")
-    install (TARGETS ether_a DESTINATION "lib")
+  install (TARGETS ether_a DESTINATION "lib")
 endif (BUILD_STATIC_LIBRARY)
+
+# shared C++ API library:
+if (BUILD_CPPAPI_SHARED_LIBRARY)
+  add_library (ether++_so SHARED ${ETHER_CPPAPI_SRC})
+  set_target_properties (ether++_so
+    PROPERTIES
+      POSITION_INDEPENDENT_CODE ON
+      OUTPUT_NAME "ether++")
+  install (TARGETS ether++_so DESTINATION "lib")
+endif (BUILD_CPPAPI_SHARED_LIBRARY)
+
+# static C++ API library:
+if (BUILD_CPPAPI_STATIC_LIBRARY)
+  add_library (ether++_a STATIC $<TARGET_OBJECTS:ether_c++_obj>)
+  set_target_properties (ether++_a PROPERTIES OUTPUT_NAME "ether++")
+  install (TARGETS ether++_a DESTINATION "lib")
+endif (BUILD_CPPAPI_STATIC_LIBRARY)
 
 # executable:
 add_executable (ether ${CMAKE_SOURCE_DIR}/main.c $<TARGET_OBJECTS:ether_obj>)

@@ -19,8 +19,8 @@
 #include <string.h>
 
 void
-eth_init_mtree_case(int n; eth_mtree_case *c, const eth_type *type, const int offs[n],
-    const int ssavids[n], int n, eth_mtree *tree)
+eth_init_mtree_case(eth_mtree_case *c, const eth_type *type, const int offs[],
+    const int ssavids[], int n, eth_mtree *tree)
 {
   c->type = type;
   c->offs = malloc(sizeof(int) * n);
@@ -71,8 +71,8 @@ eth_create_leaf(eth_insn *body)
 }
 
 eth_mtree*
-eth_create_switch(int ncases; int ssavid, const eth_mtree_case cases[ncases],
-    int ncases, eth_mtree *dflt)
+eth_create_switch(int ssavid, const eth_mtree_case cases[], int ncases,
+    eth_mtree *dflt)
 {
   eth_mtree *t = malloc(sizeof(eth_mtree));
   t->tag = ETH_MTREE_SWITCH;
@@ -85,8 +85,8 @@ eth_create_switch(int ncases; int ssavid, const eth_mtree_case cases[ncases],
 }
 
 eth_mtree*
-eth_create_cswitch(int ncases; int ssavid, const eth_mtree_ccase cases[ncases],
-    int ncases, eth_mtree *dflt)
+eth_create_cswitch(int ssavid, const eth_mtree_ccase cases[], int ncases,
+    eth_mtree *dflt)
 {
   eth_mtree *t = malloc(sizeof(eth_mtree));
   t->tag = ETH_MTREE_CSWITCH;
