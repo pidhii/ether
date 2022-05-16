@@ -48,7 +48,7 @@ function(build_json_module include_dirs library_dirs libraries)
     OUTPUT_NAME "json")
   target_include_directories (json PRIVATE ${include_dirs})
   target_link_directories (json PRIVATE ${library_dirs})
-  target_link_libraries (json PRIVATE ${libraries})
+  target_link_libraries (json PRIVATE ${libraries} -lbsd)
   install (TARGETS json DESTINATION ${JSON_DST_DIR})
 endfunction()
 # --
@@ -69,6 +69,8 @@ if (ENABLE_JSON)
         ${CMAKE_COMMAND} -DCMAKE_INSTALL_PREFIX=${JSON_C_INSTALL}
                          -DCMAKE_INSTALL_LIBDIR=${JSON_C_INSTALL}/lib
                          -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+                         -DBUILD_TESTING=0
+                         -DHAVE_ARC4RANDOM=0
                          -S${THIRD}/src/json-c
                          -B${THIRD}/src/json-c-build
       BUILD_COMMAND make -C ${THIRD}/src/json-c-build install)
