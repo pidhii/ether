@@ -366,6 +366,7 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
 
   cod_vec_push(primtoks, ',');
   /* Drop all gained indentation levels. */
+  assert(indlvlstack.len > 0);
   int nindwas = cod_vec_last(indlvlstack);
   int nindnow = indentstack.len;
   int n = nindnow - nindwas;

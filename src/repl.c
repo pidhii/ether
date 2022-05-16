@@ -18,6 +18,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+eth_env*
+eth_get_evaluator_env(eth_evaluator *evl)
+{
+  return eth_get_root_env(evl->root);
+}
+
 static void
 set_pub(eth_ast_pattern *pat)
 {
@@ -65,7 +71,7 @@ eth_eval(eth_evaluator *evl, eth_ast *ast)
 
       eth_ir_defs defs;
       eth_ir *ir =
-        eth_build_module_ir(ast, evl->root, evl->mod, &defs, evl->locals);
+        eth_build_module_ir(ast, evl->root, evl->mod, &defs, evl->mod);
       if (not ir)
         return NULL;
 
@@ -107,7 +113,7 @@ eth_eval(eth_evaluator *evl, eth_ast *ast)
 
     default:
     {
-      eth_ir *ir = eth_build_ir(ast, evl->root, evl->locals);
+      eth_ir *ir = eth_build_ir(ast, evl->root, evl->mod);
       if (not ir)
         return NULL;
 
@@ -129,138 +135,4 @@ eth_eval(eth_evaluator *evl, eth_ast *ast)
     }
   }
 }
-
-//static eth_t
-//eval_expr(eth_evaluator *evl, eth_ast *expr)
-//{
-//}
-
-//eth_t
-//eth_eval_body(eth_evaluator *evl, eth_ast *body)
-//{
-  //switch (body->tag)
-  //{
-    //case ETH_AST_SEQ:
-    //{
-      //eth_t lhs = eval_expr(evl, body->seq.e1);
-      //if (eth_is_exn(lhs))
-        //return lhs;
-      //eth_drop(lhs);
-
-      //return eth_eval_body(evl, body->seq.e2);
-    //}
-
-    //// TODO: reorganize handling of public variables (below is an ugly
-    //// workaround)
-    //case ETH_AST_LET:
-    //case ETH_AST_LETREC:
-    //{
-      //// Extract public identifiers:
-      //// 1. replace body of the LET-form with dummy
-      //eth_ast *letbody = body->let.body;
-      //eth_ast *dummybody = eth_ast_cval(eth_nil);
-      //eth_ref_ast(dummybody);
-      //// 2. build it and get public identifiers
-      //body->let.body = dummybody;
-      //eth_ir_defs pubdefs;
-      //eth_ir *ir =
-        //eth_build_module_ir(body, evl->root, evl->mod, &pubdefs, evl->locals);
-      //if (not ir)
-      //{
-        //body->let.body = letbody;
-        //eth_unref_ast(dummybody);
-        //return NULL;
-      //}
-      //eth_drop_ir(ir); // we only did it to fill `pubdefs`
-
-      //// Now we will need to get ALL the variables of the LET-form, so:
-      //// 1. set pub-qualifier for all variables.
-      //// XXX: must undo artificial pub-qualifiers
-      //for (int i = 0; i < body->let.n; ++i)
-        //set_pub(body->let.pats[i]);
-      //// 2. build it and evaluate (still with dummy body)
-      //eth_ir_defs localdefs;
-      //ir =
-        //eth_build_module_ir(body, evl->root, evl->mod, &localdefs, evl->locals);
-      //if (not ir)
-      //{
-        //eth_destroy_ir_defs(&pubdefs);
-        //return NULL;
-      //}
-      //eth_ssa *ssa = eth_build_ssa(ir, &localdefs);
-      //eth_drop_ir(ir);
-      //if (not ssa)
-      //{
-        //eth_destroy_ir_defs(&pubdefs);
-        //eth_destroy_ir_defs(&localdefs);
-        //return NULL;
-      //}
-
-      //eth_bytecode *bc = eth_build_bytecode(ssa);
-      //eth_drop_ssa(ssa);
-      //if (not bc)
-      //{
-        //eth_destroy_ir_defs(&pubdefs);
-        //eth_destroy_ir_defs(&localdefs);
-        //return NULL;
-      //}
-
-      //eth_t ret = eth_vm(bc);
-      //eth_ref(ret);
-      //eth_drop_bytecode(bc);
-      //if (ret->type == eth_exception_type)
-      //{
-        //eth_destroy_ir_defs(&pubdefs);
-        //eth_destroy_ir_defs(&localdefs);
-        //eth_unref(ret);
-        //return NULL;
-      //}
-
-      //// get defs:
-      //int ilocal = 0, ipub = 0;
-      //for (eth_t it = eth_tup_get(ret, 1); it != eth_nil; it = eth_cdr(it))
-      //{
-        //if (strcmp(localdefs.defs[ilocal].ident, pubdefs.defs[ipub].ident) == 0)
-        //{
-          //eth_define_attr(evl->mod, pubdefs.defs[ipub].ident, eth_car(it),
-              //pubdefs.defs[ipub].attr);
-          //ipub++;
-        //}
-        //eth_define_attr(evl->locals, localdefs.defs[ilocal].ident, eth_car(it),
-            //localdefs.defs[ilocal].attr);
-        //ilocal++;
-      //}
-      //eth_destroy_ir_defs(&pubdefs);
-      //eth_destroy_ir_defs(&localdefs);
-      //eth_unref(ret);
-
-      //body->let.body = letbody;
-      //eth_unref_ast(dummybody);
-      //return eth_eval_body(evl, body->let.body);
-    //}
-
-    //default:
-    //{
-      //eth_ir *ir = eth_build_ir(body, evl->root, evl->locals);
-      //if (not ir)
-        //return NULL;
-
-      //eth_ssa *ssa = eth_build_ssa(ir, NULL);
-      //eth_drop_ir(ir);
-      //if (not ssa)
-        //return NULL;
-
-      //eth_bytecode *bc = eth_build_bytecode(ssa);
-      //eth_drop_ssa(ssa);
-      //if (not bc)
-        //return NULL;
-
-      //eth_t ret = eth_vm(bc);
-      //eth_ref(ret);
-      //eth_drop_bytecode(bc);
-      //eth_dec(ret);
-      //return ret;
-    //}
-  //}
-//}
 

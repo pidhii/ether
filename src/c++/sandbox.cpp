@@ -1,4 +1,4 @@
-#include "ether/ether.hpp"
+#include "ether/sandbox.hpp"
 
 #include <cstdio>
 #include <cstring>
@@ -42,8 +42,6 @@ eth::sandbox::eval(const std::string &str)
   eth_evaluator evl;
   evl.root = m_root;
   evl.mod = m_module;
-  evl.locals = m_module;
-
 
   char buf[str.size() + 1];
   strcpy(buf, str.c_str());
@@ -77,4 +75,22 @@ eth::sandbox::operator [] (const std::string &var_name) const
 void
 eth::sandbox::define(const std::string &var_name, const value &val)
 { eth_define(m_module, var_name.c_str(), val.ptr()); }
+
+eth::value
+eth::sandbox::source(const std::string &path)
+{
+  const std::string fullpath = resolve_path(path);
+  if (fullpath.empty())
+    throw runtime_exn {"no such file"};
+
+  eth_t ret;
+  eth_module *script =
+    eth_load_module_from_script2(m_root, fullpath.c_str(), &ret, m_module);
+  if (not script)
+    throw runtime_exn {"load-failure"};
+
+  eth_copy_defs(script, m_module);
+  eth_destroy_module(script);
+  return value {ret};
+}
 

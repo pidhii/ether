@@ -273,7 +273,6 @@ main(int argc, char **argv)
     eth_evaluator evl;
     evl.root = root;
     evl.mod = mod;
-    evl.locals = mod;
 
     // load previous history
     using_history();

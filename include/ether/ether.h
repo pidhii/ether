@@ -501,7 +501,12 @@ eth_equal(eth_t x, eth_t y);
 #define ETH_RC_MAX UINT32_MAX
 struct eth_header {
   eth_type *type;
+#if defined(ETH_OBJECT_FLAGS)
+  uint8_t flags:4;
+  eth_dword_t rc:60;
+#else
   eth_dword_t rc;
+#endif
 };
 #define ETH(x) ((eth_t)(x))
 
@@ -525,23 +530,23 @@ eth_delete(eth_t x)
   eth_force_delete(x);
 }
 
-static inline void
+static inline void __attribute__((hot))
 eth_ref(eth_t x)
 {
 #if defined(ETH_DEBUG_MODE)
-  if (x->rc >= UINT32_MAX)
+  if (x->rc >= ETH_RC_MAX)
     fprintf(stderr, "FATAL ERROR: overflow of reference count\n");
 #endif
   x->rc += 1;
 }
 
-static inline eth_word_t
+static inline eth_word_t __attribute__((hot))
 eth_dec(eth_t x)
 {
   return x->rc -= 1;
 }
 
-static inline void
+static inline void __attribute__((hot))
 eth_unref(eth_t x)
 {
   if (--x->rc == 0)
@@ -913,26 +918,6 @@ typedef struct {
 } eth_pair;
 #define ETH_PAIR(x) ((eth_pair*)(x))
 
-static inline eth_t __attribute__((malloc))
-eth_cons_noref(eth_t car, eth_t cdr)
-{
-  eth_pair *pair = (eth_pair*)eth_alloc_h2();
-  eth_init_header(pair, eth_pair_type);
-  pair->car = car;
-  pair->cdr = cdr;
-  return ETH(pair);
-}
-
-static inline eth_t __attribute__((malloc))
-eth_cons(eth_t car, eth_t cdr)
-{
-  eth_pair *pair = (eth_pair*)eth_alloc_h2();
-  eth_init_header(pair, eth_pair_type);
-  eth_ref(pair->car = car);
-  eth_ref(pair->cdr = cdr);
-  return ETH(pair);
-}
-
 static inline eth_t __attribute__((pure))
 eth_car(eth_t x)
 {
@@ -943,6 +928,38 @@ static inline eth_t __attribute__((pure))
 eth_cdr(eth_t x)
 {
   return ETH_PAIR(x)->cdr;
+}
+
+static inline eth_t
+eth_set_car(eth_t p, eth_t x)
+{
+  return ETH_PAIR(p)->car = x;
+}
+
+static inline eth_t
+eth_set_cdr(eth_t p, eth_t x)
+{
+  return ETH_PAIR(p)->cdr = x;
+}
+
+static inline eth_t __attribute__((malloc))
+eth_cons_noref(eth_t car, eth_t cdr)
+{
+  eth_pair *pair = (eth_pair*)eth_alloc_h2();
+  eth_init_header(pair, eth_pair_type);
+  eth_set_car(ETH(pair), car);
+  eth_set_cdr(ETH(pair), cdr);
+  return ETH(pair);
+}
+
+static inline eth_t __attribute__((malloc))
+eth_cons(eth_t car, eth_t cdr)
+{
+  eth_pair *pair = (eth_pair*)eth_alloc_h2();
+  eth_init_header(pair, eth_pair_type);
+  eth_ref(eth_set_car(ETH(pair), car));
+  eth_ref(eth_set_cdr(ETH(pair), cdr));
+  return ETH(pair);
 }
 
 static inline size_t __attribute__((pure))
@@ -1018,6 +1035,18 @@ eth_variant_type(const char *tag);
 
 eth_t
 eth_create_variant(eth_type *type, eth_t val);
+
+static inline const char* __attribute__((pure))
+eth_get_variant_tag(eth_t x)
+{
+  return (const char*)x->type->clos;
+}
+
+static inline eth_t __attribute__((pure))
+eth_get_variant_value(eth_t x)
+{
+  return ETH_VARIANT(x)->val;
+}
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                         records & tuples
@@ -3021,14 +3050,13 @@ eth_parse_repl(eth_scanner *scan);
 typedef struct {
   eth_root *root;
   eth_module *mod;
-  eth_module *locals;
 } eth_evaluator;
 
 eth_t
 eth_eval(eth_evaluator *evl, eth_ast *ast);
 
-eth_t
-eth_eval_body(eth_evaluator *evl, eth_ast *ast);
+eth_env*
+eth_get_evaluator_env(eth_evaluator *evl);
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                             API HELPER

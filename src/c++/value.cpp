@@ -3,6 +3,7 @@
 #include <cstring>
 #include <cstdio>
 #include <ostream>
+#include <sstream>
 
 
 eth::value
@@ -16,15 +17,26 @@ eth::value::operator [] (size_t i) const
 }
 
 eth::value
-eth::value::operator [] (const std::string &field) const
+eth::value::operator [] (const char *field) const
 {
   if (not is_record())
     throw type_exn {"not a record"};
 
   const int idx = eth_get_field_by_id(m_ptr->type,
-      eth_get_symbol_id(eth_sym(field.c_str())));
+      eth_get_symbol_id(eth_sym(field)));
   if (idx == m_ptr->type->nfields)
-    throw logic_exn {"no such field"};
+  {
+    std::ostringstream what;
+    what << "no such field: '" << field << "' in {";
+    for (int i = 0; i < m_ptr->type->nfields; ++i)
+    {
+      if (i > 0)
+        what << ", ";
+      what << m_ptr->type->fields[i].name;
+    }
+    what << "}";
+    throw logic_exn {what.str()};
+  }
   return value {eth_tup_get(m_ptr, idx)};
 }
 

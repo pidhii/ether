@@ -43,13 +43,6 @@ if (DISABLE_BUILTINS)
   set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DETHER_DISABLE_BUILTINS=1")
 endif (DISABLE_BUILTINS)
 # --
-string (TOUPPER "${CMAKE_BUILD_TYPE}" BLDTYPE)
-add_definitions (
-  -DETHER_VERSION="${CMAKE_PROJECT_VERSION}"
-  -DETHER_BUILD="${CMAKE_BUILD_TYPE}"
-  -DETHER_BUILD_FLAGS="${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_${BLDTYPE}}"
-)
-# --
 if (CMAKE_INSTALL_PREFIX)
   add_definitions (-DETHER_PREFIX="${CMAKE_INSTALL_PREFIX}")
 endif (CMAKE_INSTALL_PREFIX)
@@ -60,7 +53,13 @@ set_source_files_properties(${CMAKE_SOURCE_DIR}/src/vm.c
 set (CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Og -ggdb -DETH_DEBUG_MODE")
 # ------------------------------ Release Flags ---------------------------------
 set (CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2 -march=native -flto")
-
+# --
+string (TOUPPER "${CMAKE_BUILD_TYPE}" BLDTYPE)
+add_definitions (
+  -DETHER_VERSION="${CMAKE_PROJECT_VERSION}"
+  -DETHER_BUILD="${CMAKE_BUILD_TYPE}"
+  -DETHER_BUILD_FLAGS="${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_${BLDTYPE}}"
+)
 
 ################################################################################
 #                                  HEADERS

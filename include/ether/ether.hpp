@@ -8,6 +8,7 @@
 #include <tuple>
 #include <array>
 #include <type_traits>
+#include <vector>
 
 namespace eth {
 
@@ -54,9 +55,19 @@ class value {
   value(const value &other): m_ptr {other.m_ptr} { eth_ref(m_ptr); }
   value(value &&other): m_ptr {other.m_ptr} { other.m_ptr = nullptr; }
 
-  value(number_t x): m_ptr {eth_create_number(x)} { }
-  value(const char* x): m_ptr {eth_create_string(x)} {}
-  value(const std::string &x): m_ptr {eth_create_string2(x.c_str(),x.size())} {}
+  value(): value(eth_nil) { }
+  value(const char* x): value(eth_create_string(x)) {}
+  value(const std::string &x): value(eth_create_string2(x.c_str(),x.size())) {}
+  value(number_t x) : value(eth_create_number(x)) { }
+
+  template <typename T>
+  value(typename std::enable_if<std::is_arithmetic<T>::value, T>::type x)
+  : value(eth_create_number(x))
+  { }
+
+  static value
+  boolean(bool x)
+  { return value {eth_boolean(x)}; }
 
   value&
   operator = (const value &other)
@@ -101,9 +112,27 @@ class value {
   bool is_pair() const noexcept { return eth_is_pair(m_ptr); }
   bool is_symbol() const noexcept { return m_ptr->type == eth_symbol_type; }
   bool is_function() const noexcept { return m_ptr->type == eth_function_type; }
+  bool is_boolean() const noexcept { return m_ptr->type == eth_boolean_type; }
+  bool is_variant() const noexcept { return eth_is_variant(m_ptr->type); }
+
+  bool is_nil() const noexcept { return m_ptr == eth_nil; }
+  bool is_true() const noexcept { return m_ptr == eth_true; }
+  bool is_false() const noexcept { return m_ptr == eth_false; }
+
+  explicit
+  operator bool () const noexcept
+  { return m_ptr != eth_false; }
+
+  operator number_t () const
+  { return num(); }
+
+  operator std::string () const
+  { return {str()}; }
 
   value operator [] (size_t i) const;
-  value operator [] (const std::string &field) const;
+  value operator [] (int i) const { return (*this)[size_t(i)]; }
+  value operator [] (const std::string &field) const { return (*this)[field.c_str()]; }
+  value operator [] (const char *field) const;
 
   template <typename ...Args>
   value
@@ -138,6 +167,42 @@ class value {
       throw type_exn {"not a number"};
   }
 
+  value
+  car() const
+  {
+    if (eth_likely(is_pair()))
+      return value {eth_car(m_ptr)};
+    else
+      throw type_exn {"not a pair"};
+  }
+
+  value
+  cdr() const
+  {
+    if (eth_likely(is_pair()))
+      return value {eth_cdr(m_ptr)};
+    else
+      throw type_exn {"not a pair"};
+  }
+
+  value
+  tag() const
+  {
+    if (eth_likely(is_variant()))
+      return value {eth_get_variant_tag(m_ptr)};
+    else
+      throw type_exn {"not a pair"};
+  }
+
+  value
+  val() const
+  {
+    if (eth_likely(is_variant()))
+      return value {eth_get_variant_value(m_ptr)};
+    else
+      throw type_exn {"not a pair"};
+  }
+
   private:
   operator eth_t () const noexcept
   { return m_ptr; }
@@ -145,41 +210,76 @@ class value {
   eth_t m_ptr;
 }; // class eth::value
 
-class sandbox {
-  public:
-  sandbox();
-  sandbox(const std::string &pathroot);
-  sandbox(const sandbox &other) = delete;
-  sandbox(sandbox &&other) = delete;
+inline value
+cons(const value &car, const value &cdr)
+{ return value {eth_cons(car.ptr(), cdr.ptr())}; }
 
-  sandbox& operator = (const sandbox &other) = delete;
-  sandbox& operator = (sandbox &&other) = delete;
+template <typename Container>
+value
+rev_list(const Container &c)
+{
+  eth_t acc = eth_nil;
+  for (auto it = c.rbegin(); it != c.rend(); ++it)
+    acc = eth_cons(it->ptr(), acc);
+  return value {acc};
+}
 
-  ~sandbox();
+template <typename Iterator>
+value
+rev_list(Iterator begin, Iterator end)
+{
+  eth_t acc = eth_nil;
+  for (auto it = begin; it != end; ++it)
+    acc = eth_cons(it->ptr(), acc);
+  return value {acc};
+}
 
-  std::string
-  resolve_path(const std::string &path);
 
-  void
-  add_module_path(const std::string &path);
+inline value
+nil()
+{ return value {eth_nil}; }
 
-  value
-  eval(const std::string &str);
+inline value
+boolean(bool x)
+{ return value {eth_boolean(x)}; }
 
-  value
-  operator () (const std::string &str)
-  { return eval(str); }
+inline value
+tuple(const value &a, const value &b)
+{ return value {eth_tup2(a.ptr(), b.ptr())}; }
 
-  value
-  operator [] (const std::string &var_name) const;
+inline value
+tuple(const value &a, const value &b, const value &c)
+{ return value {eth_tup3(a.ptr(), b.ptr(), c.ptr())}; }
 
-  void
-  define(const std::string &var_name, const value &val);
+inline value
+tuple(const value &a, const value &b, const value &c, const value &d)
+{ return value {eth_tup4(a.ptr(), b.ptr(), c.ptr(), d.ptr())}; }
 
-  private:
-  eth_root *m_root;
-  eth_module *m_module;
-}; // class eth::sandbox
+inline value
+variant(const char *tag, const eth::value &val)
+{
+  eth_type *type = eth_variant_type(tag);
+  return value {eth_create_variant(type, val.ptr())};
+}
+
+inline value
+variant(const std::string &tag, const eth::value &val)
+{ return variant(tag.c_str(), val); }
+
+static value
+record(std::initializer_list<std::pair<std::string, eth::value>> pairs)
+{
+  std::vector<const char*> keys;
+  std::vector<eth_t> vals;
+  for (const auto &pair : pairs)
+  {
+    keys.push_back(pair.first.c_str());
+    vals.emplace_back(pair.second.ptr());
+  }
+  return value {eth_record(
+      const_cast<char* const*>(keys.data()), vals.data(), keys.size()
+  )};
+}
 
 } // namespace eth
 
@@ -192,5 +292,17 @@ operator << (std::ostream &os, const eth::detail::format_proxy::display &v);
 inline std::ostream&
 operator << (std::ostream &os, const eth::value &v)
 { return os << v.d(); }
+
+inline eth::value
+operator "" _eth(unsigned long long int x)
+{ return eth::value {eth_create_number(x)}; }
+
+inline eth::value
+operator "" _eth(long double x)
+{ return eth::value {eth_create_number(x)}; }
+
+inline eth::value
+operator "" _eth(const char *str, size_t len)
+{ return eth::value {eth_create_string2(str, len)}; }
 
 #endif

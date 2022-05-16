@@ -29,17 +29,19 @@ def add(x, y): return x + y
 def iseven(x): return x % 2 == 0
 def isodd(x): return x % 2 != 0
 
-n = 10000
+
+n = 5000000
 
 def job_user():
-    return foldl(add, 0, myfilter(isodd, mymap(lambda x: x + 1, myrange(0, n))))
+    return foldl(add, 0, myfilter(iseven, mymap(lambda x: x + 1, myrange(0, n))))
 
 def job_native():
-    return foldl(add, 0, [x + 1 for x in range(0, n) if iseven(x)])
+    return foldl(add, 0, [x + 1 for x in range(0, n) if isodd(x)])
 
 job = job_user
 # job = job_native
 
 print(job())
-for _ in range(700):
+for _ in range(1):
     job()
+

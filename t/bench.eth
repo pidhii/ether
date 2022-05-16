@@ -15,19 +15,6 @@ let revMap f xs =
 
 let map f xs = reverse $ revMap f xs
 
-let rec map' f xs =
-  if let x::xs = xs then
-    f x :: map' f xs
-  else nil
-
---let revFilterMap f xs =
-  --let rec loop xs acc =
-    --if let x::xs = xs then
-      --loop xs $ try (f x :: acc) with FilterOut -> acc
-    --else acc
-  --loop xs nil
-
---let filterMap f xs = reverse $ revFilterMap f xs
 let revFilter f xs =
   let rec loop xs acc =
     if let x::xs = xs then
@@ -37,31 +24,16 @@ let revFilter f xs =
 
 let filter f xs = reverse $ revFilter f xs
 
-let rec filter' f xs =
-  if let x::xs = xs then
-    if f x then
-      x :: filter' f xs
-    else filter' f xs
-  else nil
-
-let foldLeft f acc xs =
-  let rec loop xs acc =
-    if let x::xs = xs then
-      loop xs (f acc x)
-    else acc
-  loop xs acc
+let rec foldLeft f z xs =
+  if let x :: xs = xs then
+    foldLeft f (f z x) xs
+  else z
 
 let range from to =
   let rec loop i acc =
     if i < from then acc
     else loop (i - 1) (i :: acc)
   loop (to - 1) nil
---let range from to = [from .. to - 1]
-
---let rec even x =
-  --x == 0 || odd (x - 1)
---and odd x =
-  --x /= 0 && even (x - 1)
 
 let even x = x mod 2 == 0
 let odd  x = x mod 2 /= 0
@@ -70,53 +42,30 @@ let rec doTimes n thunk =
   if n == 0 then nil
   else (thunk nil; doTimes (n - 1) thunk)
 
-let n = 10000
 
-let job1l _ =
-  List.(fold_left (+) 0 $ filter odd $ map (x -> x + 1) $ [0..n-1])
+let n = 5_000_000
 
-let job1 _ =
-  foldLeft (+) 0 $ filter odd $ map (fn x -> x + 1) $ range 0 n
+let job_user_nobrain =
+  fn _ ->
+    range 0 n | map (x -> x + 1) | filter even? | foldLeft (+) 0
 
-let job1' _ =
-  foldLeft (+) 0 $ filter' odd $ map' (fn x -> x + 1) $ range 0 n
+let job_user_smart =
+  fn _ ->
+    range 0 n | revMap (x -> x + 1) | revFilter even? | foldLeft (+) 0
 
-let job2 _ =
-  foldLeft (+) 0 $ revFilter odd $ revMap (fn x -> x + 1) $ range 0 n
+let job_native =
+  open 'list'
+  fn _ ->
+    fold_left (+) 0 [x + 1 with x <- [0 .. n-1], odd? x]
+    --[0..n-1]
+    --|> rev_filter_map (x -> x + 1 if odd? x else raise `filter_out)
+    --|> fold_left (+) 0
 
-let job2l _ =
-  List.(fold_left (+) 0 $ rev_filter odd $ rev_map (x -> x + 1) [0..n-1])
 
-
---let job3 _ =
-  --range 0 n
-  --|> filterMap (fn x -> if odd x then x + 1 else raise FilterOut)
-  --|> foldLeft (+) 0
-
---let job4 _ =
-  --range 0 n
-  --|> revFilterMap (fn x -> if odd x then x + 1 else raise FilterOut)
-  --|> foldLeft (+) 0
-
-let job_iter _ =
-  Iter.(fold_left (+) 0 $ filter odd $ map (fn x -> x + 1) $ range 0 n)
-
-let job_seq _ =
-  Seq.(fold_left (+) 0 $ filter odd $ map (fn x -> x + 1) $ range 0 n)
-
-let l = [0 .. n-1]
-let job_native _ =
-  --List.fold_left (+) 0 [x + 1 | x <- l, even? x]
-  List.fold_left (+) 0 [x + 1 | x <- [0 .. n-1], even? x]
-
-let job = job1l
---let job = job1
---let job = job1'
-let job = job2
-let job = job2l
---let job = job_iter
---let job = job_seq
+--let job = job_user_nobrain
+let job = job_user_smart
 --let job = job_native
+
 print $ job ()
-doTimes 700 job
+doTimes 1 job
 
