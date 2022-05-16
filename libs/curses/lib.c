@@ -748,7 +748,9 @@ ether_module(eth_module *mod, eth_root *topenv)
   eth_define(mod, "A_PROTECT", eth_num(A_PROTECT));
   eth_define(mod, "A_INVIS", eth_num(A_INVIS));
   eth_define(mod, "A_ALTCHARSET", eth_num(A_ALTCHARSET));
+#if defined(A_ITALIC)
   eth_define(mod, "A_ITALIC", eth_num(A_ITALIC));
+#endif
   eth_define(mod, "A_CHARTEXT", eth_num(A_CHARTEXT));
   eth_define(mod, "A_COLOR", eth_num(A_COLOR));
 
