@@ -3,6 +3,7 @@ project (ether VERSION 0.4.2)
 enable_language (C CXX)
 
 include (CheckIncludeFile REQUIRED)
+include (CheckCCompilerFlag)
 include (ExternalProject OPTIONAL RESULT_VARIABLE ExternalProject_FOUND)
 
 find_package (BISON REQUIRED)
@@ -34,7 +35,7 @@ option (DISABLE_BUILTINS "Disable all builtins" OFF)
 ################################################################################
 #                                   FLAGS
 #
-set (WARNING_FLAGS "-Wall -Werror -Wextra -Wno-unused -Wno-error=cpp -Wno-vla-parameter -Wno-maybe-uninitialized")
+set (WARNING_FLAGS "-Wall -Werror -Wextra -Wno-unused -Wno-error=cpp -Wno-maybe-uninitialized")
 # ------------------------------ Common Flags ----------------------------------
 set (CMAKE_C_STANDARD 99)
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${WARNING_FLAGS} -rdynamic")
