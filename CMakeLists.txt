@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.15)
-project (ether VERSION 0.4.0)
+project (ether VERSION 0.4.2)
 enable_language (C CXX)
 
 include (CheckIncludeFile REQUIRED)
