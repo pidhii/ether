@@ -1,4 +1,7 @@
 --------------------------------------------------------------------------------
+-- Misc:
+-- * fopen
+--
 -- Input:
 -- * read_of (C)
 -- * read
@@ -44,6 +47,8 @@
 
 let list = @(require "list")
 let string = @(require "string")
+
+let pub fopen = __open
 
 let pub read_line! = read_line_of stdin
 let pub read_line_opt! = try `some read_line!  with `end_of_file -> false
