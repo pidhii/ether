@@ -848,13 +848,13 @@ Stmt
   }
 
   | LAZY Stmt {
-    eth_t lazy = eth_get_builtin(SCANROOT, "__Lazy_create");
+    eth_t lazy = eth_get_builtin(SCANROOT, "__make_lazy");
     assert(lazy);
     eth_ast *thunk = eth_ast_fn(NULL, 0, $2);
     $$ = eth_ast_apply(eth_ast_cval(lazy), &thunk, 1);
   }
   | LAZY Block {
-    eth_t lazy = eth_get_builtin(SCANROOT, "__Lazy_create");
+    eth_t lazy = eth_get_builtin(SCANROOT, "__make_lazy");
     assert(lazy);
     eth_ast *thunk = eth_ast_fn(NULL, 0, $2);
     $$ = eth_ast_apply(eth_ast_cval(lazy), &thunk, 1);

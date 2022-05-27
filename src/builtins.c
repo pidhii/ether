@@ -889,7 +889,7 @@ _lazy_eval(void)
 }
 
 static eth_t
-_Lazy_create(void)
+_make_lazy(void)
 {
   eth_t thunk = *eth_sp++;
   if (eth_unlikely(not eth_is_fn(thunk)))
@@ -1407,7 +1407,7 @@ eth_create_builtins(eth_root *root)
   eth_define(mod, "__load_stream", eth_create_proc(_load_stream, 2, root, NULL));
   eth_define(mod, "__require", eth_create_proc(_require, 1, root, NULL));
   // ---
-  eth_define(mod, "__Lazy_create", eth_create_proc(_Lazy_create, 1, NULL, NULL));
+  eth_define(mod, "__make_lazy", eth_create_proc(_make_lazy, 1, NULL, NULL));
   // ---
   eth_define(mod, "__create_ref", eth_create_proc(_create_ref, 1, NULL, NULL));
   eth_define(mod, "__dereference", eth_create_proc(_dereference, 1, NULL, NULL));
