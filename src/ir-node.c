@@ -366,6 +366,7 @@ eth_ir_match(eth_ir_pattern *pat, eth_ir_node *expr, eth_ir_node *thenbr,
   eth_ref_ir_node(node->match.thenbr = thenbr);
   eth_ref_ir_node(node->match.elsebr = elsebr);
   node->match.toplvl = ETH_TOPLVL_NONE;
+  node->match.likely = 0;
   return node;
 }
 

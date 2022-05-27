@@ -233,6 +233,7 @@ set_type(ssa_builder *bldr, int vid, eth_type *type)
   bldr->vinfo[vid]->type = type;
 }
 
+// XXX: use this!!
 static void
 set_field(ssa_builder *bldr, int vid, size_t fid, int fldvid)
 {
@@ -1268,8 +1269,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
       int cond = build(bldr, tape, ir->match.expr, false, e);
 
       if (ir->match.pat->tag == ETH_PATTERN_IDENT)
-        // optimize trivial identifier-match
-      {
+      { // optimize trivial identifier-match
         eth_ssa_pattern *pat = build_pattern(bldr, ir->match.pat, cond, false, e);
         eth_destroy_ssa_pattern(pat);
         return build(bldr, tape, ir->match.thenbr, istc, e);
@@ -1307,6 +1307,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
         eth_insn *insn = eth_insn_if_match(ret, cond, pat, thentape->head,
             elsetape->head);
         insn->iff.toplvl = ir->match.toplvl;
+        insn->iff.likely = ir->match.likely;
         eth_destroy_ssa_tape(thentape);
         eth_destroy_ssa_tape(elsetape);
 

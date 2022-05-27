@@ -92,7 +92,7 @@ typedef struct {
   cod_vec(deff_block) deff; /* Deffered blocks. */
   cod_vec(catch_jmp) cchjmps;
   int *catches;
-  int *vmap; // Map of the SSA-values to registers. */
+  int *vmap; /* Map of the SSA-values to registers. */
   int regcnt;
   int entrypoint;
 } bc_builder;
@@ -559,6 +559,7 @@ MAKE_UNOP(lnot, LNOT)
 typedef cod_vec(int) int_vec;
 
 // TODO: optimize (first unpacks, then idents)
+// XXX: all jumps written here must be 'jze's
 static void
 build_pattern(bc_builder *bldr, eth_ssa_pattern *pat, int expr, int_vec *jmps)
 {
@@ -782,12 +783,39 @@ if_match:
         }
         else
         {
-          // TODO: handle likely/unlikely
-          build(bldr, ip->iff.thenbr);
-          int sepidx = write_jmp(bldr, -1);
-          build(bldr, ip->iff.elsebr);
-          cod_vec_iter(jmps, i, x, bldr->arr[x].jze.offs = sepidx - x + 1);
-          bldr->arr[sepidx].jmp.offs = bldr->len - sepidx;
+          if (ip->iff.likely > 0)
+          {
+            build(bldr, ip->iff.thenbr);
+            cod_vec_iter(jmps, i, x,
+              cod_vec_push(bldr->deff, ((deff_block) {
+                  .jmppos = x,
+                  .retpos = bldr->len,
+                  .code = ip->iff.elsebr,
+              }));
+            );
+          }
+          else if (ip->iff.likely < 0)
+          {
+            build(bldr, ip->iff.elsebr);
+            cod_vec_iter(jmps, i, x,
+              // change JZEs to JNZs
+              assert(bldr->arr[x].opc == ETH_OPC_JZE);
+              bldr->arr[x].opc = ETH_OPC_JNZ;
+              cod_vec_push(bldr->deff, ((deff_block) {
+                  .jmppos = x,
+                  .retpos = bldr->len,
+                  .code = ip->iff.thenbr,
+              }));
+            );
+          }
+          else
+          {
+            build(bldr, ip->iff.thenbr);
+            int sepidx = write_jmp(bldr, -1);
+            build(bldr, ip->iff.elsebr);
+            cod_vec_iter(jmps, i, x, bldr->arr[x].jze.offs = sepidx - x + 1);
+            bldr->arr[sepidx].jmp.offs = bldr->len - sepidx;
+          }
         }
         goto end_if;
 

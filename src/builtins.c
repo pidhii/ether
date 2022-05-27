@@ -1356,7 +1356,7 @@ eth_create_builtins(eth_root *root)
 
   eth_define_attr(mod,    "&&", eth_create_proc(_and, 2, NULL, NULL), attr);
   eth_define_attr(mod,    "||", eth_create_proc( _or, 2, NULL, NULL), attr);
-  // TODO: `++` should be an instaruction
+  // TODO: `++` should be an instruction
   eth_define(mod,         "++", eth_create_proc(    _strcat, 2, NULL, NULL));
   // ---
   eth_define(mod,      "pair?", eth_create_proc(    _pair_p, 1, NULL, NULL));

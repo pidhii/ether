@@ -2180,14 +2180,16 @@ struct eth_ir_node {
     struct { eth_t val; } cval;
     struct { int vid; } var;
     struct { eth_ir_node *fn, **args; int nargs; } apply;
-    struct { eth_ir_node *cond, *thenbr, *elsebr; eth_toplvl_flag toplvl; int likely; } iff;
+    struct { eth_ir_node *cond, *thenbr, *elsebr; eth_toplvl_flag toplvl;
+             int likely; }
+      iff;
     struct { int exnvar; eth_ir_node *trybr, *catchbr; int likely; } try;
     struct { eth_ir_node *e1, *e2; } seq;
     struct { eth_binop op; eth_ir_node *lhs, *rhs; } binop;
     struct { eth_unop op; eth_ir_node *expr; } unop;
     struct { int arity, *caps, *capvars, ncap; eth_ast *ast; eth_ir *body; } fn;
     struct { eth_ir_pattern *pat; eth_ir_node *expr, *thenbr, *elsebr;
-             eth_toplvl_flag toplvl; }
+             eth_toplvl_flag toplvl; int likely; }
       match;
     struct { int *vars, n; eth_ir_node *body; } startfix;
     struct { int *vars, n; eth_ir_node *body; } endfix;
@@ -2972,6 +2974,7 @@ struct eth_bc_insn {
 
     struct { uint64_t out, vid; } dup;
 
+    // XXX: dont change any of jnz, jze, jmp: identical layout is mandatory
     struct { ptrdiff_t offs; } jnz, jze, jmp;
     struct { uint64_t *vids, n; ptrdiff_t offs; } loop;
 

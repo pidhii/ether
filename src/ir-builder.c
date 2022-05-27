@@ -335,7 +335,7 @@ build_record_star(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc,
 
   if (pat->recordstar.alias)
   {
-    eth_trace("alias {*} (%s)", pat->recordstar.alias);
+    /*eth_trace("alias {*} (%s)", pat->recordstar.alias);*/
     eth_prepend_var(bldr->vars,
         eth_const_var(pat->recordstar.alias, record, NULL));
   }
@@ -404,9 +404,6 @@ build_pattern_constexpr(ir_builder *bldr, eth_ast_pattern *pat, eth_t expr,
         eth_prepend_var(bldr->vars, eth_const_var(pat->record.alias, expr, NULL));
 
       int n = pat->record.n;
-      //typedef struct { uintptr_t id; eth_ir_pattern *pat; } field;
-      //field fields[n];
-
       for (int i = 0; i < n; ++i)
       {
         eth_field *fld = eth_get_field(expr->type, pat->record.fields[i]);
@@ -435,6 +432,7 @@ build_pattern_constexpr(ir_builder *bldr, eth_ast_pattern *pat, eth_t expr,
   eth_error("wtf");
   abort();
 }
+
 static eth_ir_node*
 build_with_toplvl(ir_builder *bldr, eth_ast *ast, int *e, bool savetop)
 {
@@ -446,39 +444,19 @@ build_with_toplvl(ir_builder *bldr, eth_ast *ast, int *e, bool savetop)
   return ret;
 }
 
-// TODO: flag as likely
 static eth_ir_node*
 build_let(ir_builder *bldr, int idx, const eth_ast *ast,
     eth_ir_node *const vals[], int nvars0, int *e)
 {
   if (idx < ast->let.n)
   {
-    //if (ast->let.pats[idx]->tag == ETH_AST_PATTERN_RECORD_STAR)
-    //{
-      //eth_ir_pattern *pat =
-        //build_record_star(bldr, ast->let.pats[idx], ast->loc, vals[idx], e);
-      //if (pat == NULL)
-      //{
-        //eth_drop_ir_node(vals[idx]);
-        //return eth_ir_seq(eth_ir_error(),
-            //build_let(bldr, idx + 1, ast, vals, nvars0, e));
-      //}
-      //[>eth_drop_ir_node(vals[idx]);<]
-      //eth_ir_node *thenbr = build_let(bldr, idx + 1, ast, vals, nvars0, e);
-      //eth_ir_node *elsebr = eth_ir_cval(eth_nil);
-      //eth_ir_node *ret = eth_ir_match(pat, vals[idx], thenbr, elsebr);
-      //eth_set_ir_location(ret, ast->loc);
-      //ret->match.toplvl =
-        //bldr->istoplvl ? ETH_TOPLVL_THEN : ETH_TOPLVL_NONE;
-      //return ret;
-    //}
     if (vals[idx]->tag == ETH_IR_CVAL)
     {
       bool ok = build_pattern_constexpr(bldr, ast->let.pats[idx],
           vals[idx]->cval.val, ast->loc, e);
       if (not ok)
       {
-        eth_warning("pattern in LET-expression won't match to `~w`",
+        eth_warning("pattern in LET-expression wount match to `~w`",
             vals[idx]->cval.val);
         eth_drop_ir_node(vals[idx]);
         *e = 1;
@@ -500,8 +478,8 @@ build_let(ir_builder *bldr, int idx, const eth_ast *ast,
 
       eth_ir_node *ret = eth_ir_match(pat, vals[idx], thenbr, elsebr);
       eth_set_ir_location(ret, ast->loc);
-      ret->match.toplvl =
-        bldr->istoplvl ? ETH_TOPLVL_THEN : ETH_TOPLVL_NONE;
+      ret->match.toplvl = bldr->istoplvl ? ETH_TOPLVL_THEN : ETH_TOPLVL_NONE;
+      ret->match.likely = 1;
       return ret;
     }
   }
@@ -514,7 +492,6 @@ build_let(ir_builder *bldr, int idx, const eth_ast *ast,
   }
 }
 
-// TODO: flag as likely
 static eth_ir_node*
 build_letrec(ir_builder *bldr, int idx, eth_ast *ast, int nvars0, int nvars,
     eth_ir_pattern *const pats[], int *e)
@@ -533,6 +510,7 @@ build_letrec(ir_builder *bldr, int idx, eth_ast *ast, int nvars0, int nvars,
     eth_ir_node *ret = eth_ir_match(pats[idx], expr, thenbr, elsebr);
     eth_set_ir_location(ret, ast->loc);
     ret->match.toplvl = ETH_TOPLVL_THEN;
+    ret->match.likely = 1;
     return ret;
   }
   else
@@ -732,7 +710,6 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
 
     case ETH_AST_SEQ:
     {
-      //eth_ir_node *e1 = build(bldr, ast->seq.e1, e);
       eth_ir_node *e1 = build_with_toplvl(bldr, ast->seq.e1, e, false);
       eth_ir_node *e2 = build(bldr, ast->seq.e2, e);
       return eth_ir_seq(e1, e2);
@@ -759,7 +736,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       {
         if (ast->letrec.vals[i]->tag != ETH_AST_FN)
         {
-          eth_warning("Only closures allowed in recursive scope");
+          eth_error("Only closures allowed in recursive scope");
           eth_print_location(ast->loc, stderr);
           *e = true;
           return eth_ir_error();
@@ -873,8 +850,8 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
           eth_t exn = eth_exn(eth_type_error());
           throw = eth_ir_throw(eth_ir_cval(exn));
         }
-        // TODO: mark as likely
         body_acc = eth_ir_match(pats[i], eth_ir_var(args[i]), body_acc, throw);
+        body_acc->match.likely = 1;
       }
       eth_ir *body = eth_create_ir(body_acc, fnbldr->nvars);
 
@@ -898,6 +875,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       return eth_ir_fn(ast->fn.arity, caps, capvars, ncap, body, ast);
     }
 
+    // TODO: handle constexprs
     case ETH_AST_MATCH:
     {
       eth_ir_node *expr = build_with_toplvl(bldr, ast->match.expr, e, false);
@@ -1008,6 +986,8 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
      *   MATCH <expr> WTIH { <field> = *tmp* }
      *   THEN *tmp*
      *   ELSE THROW Type_error
+     *
+     * TODO: remove this AST-node; this conversion should be done in parser
      */
     case ETH_AST_ACCESS:
     {
@@ -1172,6 +1152,8 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
      *   IF <expr>
      *   THEN NIL
      *   ELSE THROW Assertion_failed
+     *
+     * TODO: remove this AST-node; this conversion should be done in parser
      */
     case ETH_AST_ASSERT:
     {
@@ -1236,7 +1218,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       }
       if (not (var.attr and var.attr->flag & ETH_ATTR_MUT))
       {
-        eth_warning("trying to assign non-mutable variable");
+        eth_warning("trying to assign a non-mutable variable");
         *e = 1;
         eth_print_location_opt(ast->loc, stderr, ETH_LOPT_FILE);
         return eth_ir_error();
@@ -1257,6 +1239,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       return ret;
     }
 
+    // XXX: i dont like this, i think classes are redundant in this language
     case ETH_AST_CLASS:
     {
       // template record filled with NILs (to be initialized by ctor)
