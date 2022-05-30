@@ -1890,6 +1890,7 @@ typedef enum {
   ETH_AST_EVMAC,
   ETH_AST_MULTIMATCH,
   ETH_AST_ASSIGN,
+  ETH_AST_RETURN,
   ETH_AST_CLASS,
 } eth_ast_tag;
 
@@ -1960,6 +1961,7 @@ struct eth_ast {
     struct { eth_ast_pattern **pars; int npars; eth_class_inherit *inherits;
       int ninherits; eth_class_val *vals; int nvals;
       eth_class_method *methods; int nmethods; } clas;
+    struct { eth_ast *expr; } retrn;
   };
   eth_location *loc;
 };
@@ -2069,6 +2071,9 @@ eth_ast*
 eth_ast_assign(const char *ident, eth_ast *val);
 
 eth_ast*
+eth_ast_return(eth_ast *expr);
+
+eth_ast*
 eth_ast_class(eth_ast_pattern *const pars[], int npars,
     eth_class_inherit *inherits, int ninherits, eth_class_val *vals,
     int nvals, eth_class_method *methods, int nmethods);
@@ -2158,6 +2163,7 @@ typedef enum {
   ETH_IR_MKRCRD,
   ETH_IR_UPDATE,
   ETH_IR_THROW,
+  ETH_IR_RETURN,
 } eth_ir_tag;
 
 typedef struct {
@@ -2196,6 +2202,7 @@ struct eth_ir_node {
     struct { eth_type *type; eth_ir_node **fields; } mkrcrd;
     struct { eth_ir_node *src, **fields; size_t *ids; int n; } update;
     struct { eth_ir_node *exn; } throw;
+    struct { eth_ir_node *expr; } retrn;
     struct { eth_ir_match_table *table; eth_ir_node **exprs; } multimatch;
   };
   eth_location *loc;
@@ -2270,6 +2277,9 @@ eth_ir_update(eth_ir_node *src, eth_ir_node *const fields[], size_t const ids[],
 
 eth_ir_node*
 eth_ir_throw(eth_ir_node *exn);
+
+eth_ir_node*
+eth_ir_return(eth_ir_node *expr);
 
 struct eth_ir {
   size_t rc;

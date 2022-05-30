@@ -1371,6 +1371,13 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
       return vid;
     }
 
+    case ETH_IR_RETURN:
+    {
+      int vid = build(bldr, tape, ir->retrn.expr, istc, e);
+      eth_write_insn(tape, eth_insn_ret(vid));
+      return vid;
+    }
+
     case ETH_IR_MULTIMATCH:
     {
       abort();

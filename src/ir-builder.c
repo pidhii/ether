@@ -1239,6 +1239,14 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       return ret;
     }
 
+    case ETH_AST_RETURN:
+    {
+      eth_ir_node *expr = build_with_toplvl(bldr, ast->retrn.expr, e, false);
+      eth_ir_node *ret = eth_ir_return(expr);
+      eth_set_ir_location(ret, ast->loc);
+      return ret;
+    }
+
     // XXX: i dont like this, i think classes are redundant in this language
     case ETH_AST_CLASS:
     {

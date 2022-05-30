@@ -182,12 +182,10 @@ let git =
       -- Sort versions.
       |> sort $ (_, a) (_, b) ->
         do loop xs:a ys:b =
-          if let x :: xs' = xs then
-            if let y :: ys' = ys then
-              if x > y then true
-              else x == y && loop xs' ys'
-            else true
-          else true
+          when let x :: xs' = xs then
+            when let y :: ys' = ys then
+              return if x > y then true else x == y && loop xs' ys'
+          true
       |> map first
 
   let head_commit url =

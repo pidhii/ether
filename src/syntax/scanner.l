@@ -612,6 +612,7 @@ case   { return CASE; }
 of     { return OF; }
 lazy   { return LAZY; }
 assert { return ASSERT; }
+return { return RETURN; }
 
 defined { return DEFINED; }
 

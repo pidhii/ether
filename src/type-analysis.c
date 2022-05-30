@@ -449,6 +449,12 @@ specialize(context *ctx, eth_ir_node *ir, ir_spec *out, bool *err)
     {
       eth_unimplemented();
     }
+
+    case ETH_IR_RETURN:
+    {
+      eth_unimplemented();
+    }
+
   }
 }
 

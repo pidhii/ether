@@ -1,15 +1,15 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -209,6 +209,10 @@ destroy_ir_node(eth_ir_node *node)
 
     case ETH_IR_THROW:
       eth_unref_ir_node(node->throw.exn);
+      break;
+
+    case ETH_IR_RETURN:
+      eth_unref_ir_node(node->retrn.expr);
       break;
 
     case ETH_IR_MULTIMATCH:
@@ -447,6 +451,14 @@ eth_ir_throw(eth_ir_node *exn)
 {
   eth_ir_node *node = create_ir_node(ETH_IR_THROW);
   eth_ref_ir_node(node->throw.exn = exn);
+  return node;
+}
+
+eth_ir_node*
+eth_ir_return(eth_ir_node *expr)
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_RETURN);
+  eth_ref_ir_node(node->retrn.expr = expr);
   return node;
 }
 

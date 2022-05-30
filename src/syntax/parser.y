@@ -220,6 +220,7 @@ _create_attr(int aflag, void *locpp)
 %right RARROW
 %right ';' ',' START_BLOCK END_BLOCK KEEP_BLOCK
 %right LET REC AND ASSERT
+%nonassoc RETURN
 %left LAZY
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %right TERNARY
@@ -911,6 +912,11 @@ Stmt
     eth_ref_attr(lhs->ident.attr = eth_create_attr($1));
     free($5);
     $$ = eth_ast_let(&lhs, &rhs, 1, eth_ast_cval(eth_nil));
+  }
+
+  | RETURN Stmt {
+    $$ = eth_ast_return($2);
+    LOC($$, @$);
   }
 ;
 

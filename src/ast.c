@@ -353,6 +353,10 @@ destroy_ast_node(eth_ast *ast)
       eth_unref_ast(ast->assign.val);
       break;
 
+    case ETH_AST_RETURN:
+      eth_unref_ast(ast->retrn.expr);
+      break;
+
     case ETH_AST_CLASS:
       for (int i = 0; i < ast->clas.npars; ++i)
         eth_unref_ast_pattern(ast->clas.pars[i]);
@@ -716,6 +720,14 @@ eth_ast_assign(const char *ident, eth_ast *val)
   eth_ast *ast = create_ast_node(ETH_AST_ASSIGN);
   ast->assign.ident = strdup(ident);
   eth_ref_ast(ast->assign.val = val);
+  return ast;
+}
+
+eth_ast*
+eth_ast_return(eth_ast *expr)
+{
+  eth_ast *ast = create_ast_node(ETH_AST_RETURN);
+  eth_ref_ast(ast->retrn.expr = expr);
   return ast;
 }
 
