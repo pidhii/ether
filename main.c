@@ -142,7 +142,7 @@ main(int argc, char **argv)
   int tracelimt = 1;
   bool batchmode = false;
   /*opterr = 0;*/
-  while ((opt = getopt_long(argc, argv, "+hv:L:b", longopts, NULL)) > 0)
+  while ((opt = getopt_long(argc, argv, "+hvL:b", longopts, NULL)) > 0)
   {
     switch (opt)
     {
