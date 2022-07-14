@@ -96,7 +96,7 @@ typedef enum {
    * object is handled by the algorithm, we are done. Otherwize, lifetime is
    * defined branch-wise. Each branch is handled separately and independently of
    * the others. For each branch:
-   * 1. lifetime start is at MOV (it must always present).
+   * 1. lifetime start is at MOV (it must always be present).
    * ..TODO..
    */
   RC_RULES_PHI,
@@ -561,7 +561,8 @@ create_tracer(eth_location *loc)
 }
 
 static void
-write_throw(ssa_builder *bldr, eth_ssa_tape *tape, int exnvid, eth_location *loc)
+write_throw(ssa_builder *bldr, eth_ssa_tape *tape, int exnvid,
+    eth_location *loc)
 {
   if (loc)
   {

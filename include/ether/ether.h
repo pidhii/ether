@@ -709,7 +709,7 @@ eth_drop_source(eth_source *src);
 struct eth_function {
   eth_header header;
   bool islam;
-  int arity;
+  int32_t arity;
 
   union {
     struct {
