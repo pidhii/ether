@@ -53,11 +53,8 @@ eth_module *repl_defs;
 static
 eth_root *repl_root;
 
-static const eth_module*
-resolve_ident(const char** ident);
-
 static eth_t
-resolve_ident2(const eth_module *root, const char *ident);
+resolve_ident(const eth_module *root, const char *ident);
 
 static char**
 completer(const char *text, int start, int end);
@@ -83,6 +80,22 @@ trimr(char *str)
   for (; i >= 0 and isspace(str[i]); --i);
   str[i+1] = '\0';
   return str;
+}
+
+static char*
+extract_ident_module_path(const char *ident, char *modpath, char *varname)
+{
+  char *p;
+  if ((p = strrchr(ident, '.')))
+  {
+    int modpathlen = p - ident;
+    strncpy(modpath, ident, modpathlen);
+    modpath[modpathlen] = 0;
+    strcpy(varname, p + 1);
+    return modpath;
+  }
+  else
+    return NULL;
 }
 
 static void
@@ -342,40 +355,48 @@ main(int argc, char **argv)
         char *ident = (char*)triml(strchr(line, ' '));
         trimr(ident);
         const char *orig = ident;
-        const eth_module *mod = resolve_ident((const char**)&ident);
-        bool try_help(const eth_module *mod)
+
+        char modpath[PATH_MAX];
+        char varname[PATH_MAX];
+        const eth_def *vardef = NULL;
+        if (extract_ident_module_path(ident, modpath, varname))
         {
-          eth_def *def = eth_find_def(mod, ident);
-          if (def)
+          eth_printf("module path: \"%s\"\n", modpath);
+          const eth_module *mod =
+            eth_require_module(repl_root, eth_get_root_env(repl_root), modpath);
+          if (not mod)
           {
-            if (def->attr->help)
-            {
-              // XXX: mutating help it here
-              // XXX: oh do I?
-              if (strncmp(line, ".help ", 6) == 0)
-                asciidoc(def->attr->help);
-              else
-                asciidoc_less(def->attr->help);
-            }
-            else if (def->attr->loc)
-            {
-              int opt = ETH_LOPT_NOLINENO | ETH_LOPT_NOCOLOR;
-              eth_print_location_opt(def->attr->loc, stdout, opt);
-            }
+            eth_warning("failed to load module");
+            free(line);
+            continue;
+          }
+          vardef = eth_find_def(mod, varname);
+        }
+        else
+          vardef = eth_find_def(repl_defs, ident);
+
+        if (vardef)
+        {
+          if (vardef->attr->help)
+          {
+            // XXX: mutating help here
+            // XXX: oh do I?
+            if (strncmp(line, ".help ", 6) == 0)
+              asciidoc(vardef->attr->help);
             else
-            {
-              eth_warning("no help available");
-            }
-            return true;
+              asciidoc_less(vardef->attr->help);
+          }
+          else if (vardef->attr->loc)
+          {
+            int opt = ETH_LOPT_NOLINENO | ETH_LOPT_NOCOLOR;
+            eth_print_location_opt(vardef->attr->loc, stdout, opt);
           }
           else
-            return false;
+            eth_warning("no help available");
         }
-        if (mod)
-        {
-          if (not (try_help(mod) or (ident==orig and try_help(eth_get_builtins(repl_root)))))
-            eth_warning("no such identifier");
-        }
+        else
+          eth_warning("no such variable");
+
         free(line);
         continue;
       }
@@ -624,30 +645,8 @@ print_trace(eth_location *const trace[], int start, int n, int hi)
   }
 }
 
-static const eth_module*
-resolve_ident(const char** ident)
-{
-  const eth_module *mod = repl_defs;
-  //char *p;
-  //if ((p = strrchr(*ident, '.')))
-  //{
-    //int modnamelen = p - *ident;
-    //char modname[modnamelen + 1];
-    //memcpy(modname, *ident, modnamelen);
-    //modname[modnamelen] = '\0';
-    //mod = eth_require_module(repl_root, modname);
-    //if (mod == NULL)
-    //{
-      //eth_warning("no module '%s'", modname);
-      //return NULL;
-    //}
-    //*ident = p + 1;
-  //}
-  return mod;
-}
-
 static eth_t
-resolve_ident2(const eth_module *root, const char *ident)
+resolve_ident(const eth_module *root, const char *ident)
 {
   char *p;
   if ((p = strchr(ident, '.')))
@@ -714,7 +713,7 @@ completion_generator(const char *text, int state)
     // resolve module
     if (strchr(text, '.'))
     {
-      eth_t base = resolve_ident2(repl_defs, text);
+      eth_t base = resolve_ident(repl_defs, text);
       if (base == NULL)
         return NULL;
 
