@@ -9,6 +9,8 @@
 #include <array>
 #include <type_traits>
 #include <vector>
+#include <functional>
+
 
 namespace eth {
 
@@ -207,6 +209,12 @@ class value {
       throw type_exn {"not a pair"};
   }
 
+  void*
+  udata() const;
+
+  void*
+  drain_udata();
+
   private:
   operator eth_t () const noexcept
   { return m_ptr; }
@@ -313,7 +321,13 @@ namespace detail {
 
   static eth_t
   _function_handle(void)
-  { return static_cast<_function*>(eth_this->proc.data)->apply().drain_ptr(); }
+  {
+    try {
+      return static_cast<_function*>(eth_this->proc.data)->apply().drain_ptr();
+    } catch (const std::exception &exn) {
+      return eth_exn(eth_str(exn.what()));
+    };
+  }
 } // namespace eth::detail
 
 template <size_t Arity, typename Func>
@@ -321,13 +335,39 @@ value
 function(Func fn)
 {
   using namespace detail;
-  eth_t proc = eth_create_proc(
+  const eth_t proc = eth_create_proc(
     _function_handle,
     Arity,
     static_cast<_function*>(new _function_impl<Arity, Func> {fn}),
     _function_dtor
   );
   return value {proc};
+}
+
+extern eth_type *user_data_type;
+
+namespace detail {
+  struct _user_data_wrapper {
+    eth_header header;
+    void *data;
+    std::function<void(void*)> dtor;
+  };
+
+  static void
+  _default_dtor(void*)
+  { }
+} // namespace eth::detail
+
+value
+user_data(void *data);
+
+template <typename Dtor>
+value
+user_data(void *data, Dtor dtor)
+{
+  value x = user_data(data);
+  reinterpret_cast<detail::_user_data_wrapper*>(x.ptr())->dtor = dtor;
+  return x;
 }
 
 } // namespace eth

@@ -1317,6 +1317,9 @@ eth_create_strong_ref(eth_t init);
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                               vector
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+#define ETH_VECTOR_SLICE_SIZE_LOG2 5
+#define ETH_VECTOR_SLICE_SIZE (1 << ETH_VECTOR_SLICE_SIZE_LOG2)
+
 extern
 eth_type *eth_vector_type;
 
@@ -1348,6 +1351,24 @@ eth_front(eth_t v);
 
 eth_t
 eth_back(eth_t v);
+
+typedef struct {
+  // public:
+  eth_t *slice;
+  int n;
+  int sliceoffs;
+
+  // private:
+  void *vec;
+  void *curbr;
+  bool isfirst;
+} eth_vector_iterator;
+
+void
+eth_vector_begin(eth_vector_iterator *iter, eth_t v, int start);
+
+eth_t*
+eth_vector_next(eth_t v, eth_vector_iterator *iter, int *n);
 
 /** @} BuiltinTypes */
 
