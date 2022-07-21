@@ -97,6 +97,10 @@ class value {
   ptr() const noexcept
   { return m_ptr; }
 
+  eth_t
+  drain_ptr() noexcept
+  { eth_t ret = m_ptr; m_ptr = nullptr; return ret; }
+
   detail::format_proxy::write
   w() const noexcept
   { return {*this}; }
@@ -234,7 +238,6 @@ rev_list(Iterator begin, Iterator end)
   return value {acc};
 }
 
-
 inline value
 nil()
 { return value {eth_nil}; }
@@ -279,6 +282,52 @@ record(std::initializer_list<std::pair<std::string, eth::value>> pairs)
   return value {eth_record(
       const_cast<char* const*>(keys.data()), vals.data(), keys.size()
   )};
+}
+
+namespace detail {
+  template <size_t Arity, typename Func, typename ...Args>
+  typename std::enable_if<sizeof...(Args) == Arity, value>::type
+  _apply_function(Func& fn, Args&& ...args)
+  { return fn(args...); }
+
+  template <size_t Arity, typename Func, typename ...Args>
+  typename std::enable_if<sizeof...(Args) != Arity, value>::type
+  _apply_function(Func& fn, Args&& ...args)
+  { return _apply_function<Arity>(fn, args..., value(*eth_sp++)); }
+
+  struct _function {
+    virtual ~_function() = default;
+    virtual value apply() = 0;
+  }; // struct eth::detail::_function
+
+  template <size_t Arity, typename Func>
+  struct _function_impl: public _function {
+    _function_impl(const Func &fn): fn {fn} { }
+    value apply() override { return _apply_function<Arity>(fn); }
+    Func fn;
+  }; // class eth::detail::_function_impl
+
+  static void
+  _function_dtor(void *fn)
+  { delete static_cast<_function*>(fn); }
+
+  static eth_t
+  _function_handle(void)
+  { return static_cast<_function*>(eth_this->proc.data)->apply().drain_ptr(); }
+} // namespace eth::detail
+
+template <size_t Arity, typename Func>
+value
+function(Func fn)
+{
+  using namespace detail;
+  eth_t proc = eth_create_proc(
+    _function_handle,
+    Arity,
+    static_cast<_function*>(new _function_impl<Arity, Func> {fn}),
+    _function_dtor
+  );
+  return value {proc};
 }
 
 } // namespace eth
