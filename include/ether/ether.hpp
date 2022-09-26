@@ -142,7 +142,7 @@ class value {
 
   template <typename ...Args>
   value
-  operator () (Args&& ...args)
+  operator () (Args&& ...args) const
   {
     if (eth_unlikely(not is_function()))
       throw type_exn {"not a function"};

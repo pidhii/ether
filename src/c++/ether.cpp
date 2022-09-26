@@ -1,7 +1,7 @@
 #include "ether/ether.hpp"
 
 
-eth_type *user_data_type;
+eth_type *eth::user_data_type;
 
 eth::value
 eth::user_data(void *data)
@@ -46,13 +46,13 @@ _user_data_destroy(eth_type*, eth_t x)
 static void
 _init_user_data_type()
 {
-  user_data_type = eth_create_type("user-data");
-  user_data_type->destroy = _user_data_destroy;
+  eth::user_data_type = eth_create_type("user-data");
+  eth::user_data_type->destroy = _user_data_destroy;
 }
 
 static void
 _cleanup_user_data_type()
-{ eth_destroy_type(user_data_type); }
+{ eth_destroy_type(eth::user_data_type); }
 
 
 static bool s_initialized = false;
