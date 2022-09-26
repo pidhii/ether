@@ -170,6 +170,65 @@ get(void)
   return ret;
 }
 
+static eth_t
+iter(void)
+{
+  eth_args args = eth_start(2);
+  const eth_t f = eth_arg2(args, eth_function_type);
+  const eth_t v = eth_arg2(args, eth_vector_type);
+
+  eth_vector_iterator iter;
+  eth_vector_begin(v, &iter, 0);
+  while (not iter.isend)
+  {
+    for (eth_t *p = iter.slice.begin; p != iter.slice.end; ++p)
+    {
+      eth_reserve_stack(1);
+      eth_sp[0] = *p;
+      eth_t r = eth_apply(f, 1);
+      if (eth_unlikely(eth_is_exn(r)))
+        eth_rethrow(args, v);
+      eth_drop(r);
+    }
+
+    eth_vector_next(&iter);
+  }
+
+  eth_return(args, eth_nil);
+}
+
+static eth_t
+iteri(void)
+{
+  eth_args args = eth_start(2);
+  const eth_t f = eth_arg2(args, eth_function_type);
+  const eth_t v = eth_arg2(args, eth_vector_type);
+
+  eth_vector_iterator iter;
+  eth_vector_begin(v, &iter, 0);
+  int i = 0;
+  while (not iter.isend)
+  {
+    for (eth_t *p = iter.slice.begin; p != iter.slice.end; ++p)
+    {
+      eth_reserve_stack(2);
+      eth_sp[0] = eth_num(i);
+      eth_sp[1] = *p;
+      eth_t r = eth_apply(f, 2);
+      if (eth_unlikely(eth_is_exn(r)))
+        eth_rethrow(args, v);
+      eth_drop(r);
+
+      i++;
+    }
+
+    eth_vector_next(&iter);
+  }
+
+  eth_return(args, eth_nil);
+}
+
+
 int
 ether_module(eth_module *mod, eth_root *topenv)
 {
@@ -180,6 +239,8 @@ ether_module(eth_module *mod, eth_root *topenv)
   eth_define(mod, "front", eth_create_proc(front, 1, NULL, NULL));
   eth_define(mod, "back", eth_create_proc(back, 1, NULL, NULL));
   eth_define(mod, "get", eth_create_proc(get, 2, NULL, NULL));
+  eth_define(mod, "iter", eth_create_proc(iter, 2, NULL, NULL));
+  eth_define(mod, "iteri", eth_create_proc(iteri, 2, NULL, NULL));
 
   eth_module *aux = eth_load_module_from_script2(topenv, "./lib.eth", NULL, mod);
   if (not aux)

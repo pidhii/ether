@@ -1,15 +1,15 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -18,13 +18,14 @@
 #include <stdlib.h>
 #include <math.h>
 #include <assert.h>
+#include <string.h>
 
 
 ETH_MODULE("ether:vector")
 
 
-#define NODE_SIZE_LOG2 5
-#define NODE_SIZE (1 << NODE_SIZE_LOG2)
+#define NODE_SIZE_LOG2 ETH_VECTOR_SLICE_SIZE_LOG2
+#define NODE_SIZE ETH_VECTOR_SLICE_SIZE
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -58,7 +59,7 @@ unref_node(vector_node *node, int depth)
   if (--node->rc == 0)
   {
     if (depth == 1)
-    {
+    { // we are on a leaf-node, so just unref all values
       for (int i = 0; i < NODE_SIZE; ++i)
       {
         if (node->leafs[i])
@@ -68,7 +69,7 @@ unref_node(vector_node *node, int depth)
       }
     }
     else
-    {
+    { // we are on an intermediate node, so recursively unref all branches
       for (int i = 0; i < NODE_SIZE; ++i)
       {
         if (node->subnodes[i])
@@ -536,6 +537,75 @@ eth_vec_get(eth_t v, int k)
 {
   return get(VECTOR(v), k);
 }
+
+void
+eth_vector_begin(eth_t v, eth_vector_iterator *iter, int start)
+{
+  vector *vec = VECTOR(v);
+
+  iter->vec = v;
+  if (start < eth_vec_len(v))
+  {
+    iter->isend = false;
+
+    vector* v = VECTOR(vec);
+    if (start >= v->tree.size)
+    { // tail slice
+      iter->slice.begin = v->tail->leafs + start - v->tree.size;
+      iter->slice.end = iter->slice.begin + v->tailsize;
+      iter->slice.offset = v->tree.size;
+    }
+    else
+    { // inside the tree
+      int k = start;
+      vector_node *node = find_node(&v->tree, &k);
+      iter->slice.begin = node->leafs + k;
+      iter->slice.end = node->leafs + NODE_SIZE; // all slices inside the tree
+                                                 // body are full
+      iter->slice.offset = start - k;
+    }
+  }
+  else
+  {
+    iter->isend = true;
+  }
+}
+
+bool
+eth_vector_next(eth_vector_iterator *iter)
+{
+
+  if (eth_unlikely(iter->isend))
+    return false;
+
+  vector *v = VECTOR(iter->vec);
+  int slicelen = iter->slice.end - iter->slice.begin;
+  int nextoffs = iter->slice.offset + slicelen;
+  if (nextoffs >= v->tree.size + v->tailsize)
+  { // no more slices
+    iter->isend = true;
+    return false;
+  }
+  else if (nextoffs >= v->tree.size)
+  { // tail slice
+    iter->slice.begin = v->tail->leafs;
+    iter->slice.end = iter->slice.begin + v->tailsize;
+    iter->slice.offset = v->tree.size;
+    return true;
+  }
+  else
+  { // inside the tree
+    int k = nextoffs;
+    vector_node *node = find_node(&v->tree, &k);
+    assert(k == 0);
+    iter->slice.begin = node->leafs;
+    iter->slice.end = node->leafs + NODE_SIZE; // all slices inside the tree
+                                               // body are full
+    iter->slice.offset = nextoffs;
+    return true;
+  }
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 //                               Tests

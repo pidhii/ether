@@ -1317,6 +1317,9 @@ eth_create_strong_ref(eth_t init);
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                               vector
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+/** @defgroup Vector Vector
+ * @brief Container optimised for fast random access operations.
+ * @{ */
 #define ETH_VECTOR_SLICE_SIZE_LOG2 5
 #define ETH_VECTOR_SLICE_SIZE (1 << ETH_VECTOR_SLICE_SIZE_LOG2)
 
@@ -1352,23 +1355,62 @@ eth_front(eth_t v);
 eth_t
 eth_back(eth_t v);
 
+/** @brief Iterator over vector slices.
+ *
+ * @details This strucutre, together with related functions allows for an
+ * efficient iteration over vector elements. This approach should be preferred
+ * over a trivial iteration via eth_vector_get() whenever it is possible.
+ *
+ * The interface is the following:
+ * - eth_vector_begin() sets up an iterator to point to the initial slice a
+ *   vector. User can now read this slice.
+ * - eth_vector_next() will advance the iterator to the next slice of the
+ *   vector. **Note that this function allways shifts an iterator**, thus to
+ *   read the first slice one has to do *between* calls to eth_vector_begin()
+ *   and eth_vector_next().
+ * - To check whether theres no more slices left to read, one can either test
+ *   a return value of eth_vector_next() or test a corresponding field,
+ *   eth_vector_iterator.isend.
+ *
+ * A typical loop:
+ * @code{.c}
+ * eth_vector_iterator iter;
+ * eth_vector_begin(v, &iter, 0);
+ * while (not iter.isend)
+ * {
+ *   for (eth_t *p = iter.slice.begin; p != iter.slice.end; ++p)
+ *   {
+ *     eth_t x = *p;
+ *     ...
+ *   }
+ *    eth_vector_next(&iter);
+ *  }
+ * @endcode
+ */
 typedef struct {
-  // public:
-  eth_t *slice;
-  int n;
-  int sliceoffs;
+  struct {
+    eth_t *begin;
+    eth_t *end;
+    int offset;
+  } slice;
 
-  // private:
-  void *vec;
-  void *curbr;
-  bool isfirst;
+  eth_t vec;
+  bool isend;
 } eth_vector_iterator;
 
+/** @brief Initialize vector iterator
+ * @details Initialize iterator at a index sipecified by @p start. Vector's
+ * slice can be accessed immediately after this call.
+ */
 void
-eth_vector_begin(eth_vector_iterator *iter, eth_t v, int start);
+eth_vector_begin(eth_t vec, eth_vector_iterator *iter, int start);
 
-eth_t*
-eth_vector_next(eth_t v, eth_vector_iterator *iter, int *n);
+/** @brief Advance vector iterator.
+ * @details Advance iterator to the next vector slice, if available.
+ */
+bool
+eth_vector_next(eth_vector_iterator *iter);
+/** @} Vector */
 
 /** @} BuiltinTypes */
 
