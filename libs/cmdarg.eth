@@ -1,6 +1,5 @@
 let {*} = @(require 'list')
-let string = @(require 'string')
-let {*} = string.prelude
+let {*} = @(require 'string')
 
 let get_options cfg os =
 
@@ -25,17 +24,17 @@ let get_options cfg os =
     else (kws, rev pos)
 
   and handle_long_option o os kws pos =
-    if let (brk, _) = string.find "=" o then
+    if let (brk, _) = strstr "=" o then
       -- Long option with '=' 
-      let lopt = string.sub (2 .. brk-1) o
+      let lopt = substr (2 .. brk-1) o
       let {has_arg, val, arg_pat} = get_rules lopt
       if has_arg then
-        let arg = string.sub (brk + 1 ...) o
+        let arg = substr (brk + 1 ...) o
         raise (`invalid_option_argument lopt) unless arg =~ arg_pat
         loop os ((val, arg) :: kws) pos
       else raise `unexpected_argument
     else
-      let lopt = string.sub (2...) o
+      let lopt = substr (2...) o
       let {has_arg, val, arg_pat} = get_rules lopt
       if has_arg then
         if let arg::os = os then
@@ -45,12 +44,12 @@ let get_options cfg os =
       else loop os ((val, true) :: kws) pos
 
   and handle_short_option o os kws pos =
-    let shopt = string.sub (1..1) o
+    let shopt = substr (1..1) o
     let {has_arg, val, arg_pat} = get_rules shopt
-    if string.len o > 2 then
+    if strlen o > 2 then
       -- Option and argument are merged 
       if has_arg then
-        let arg = string.sub (2...) o
+        let arg = substr (2...) o
         raise (`invalid_option_argument shopt) unless arg =~ arg_pat
         loop os ((val, arg) :: kws) pos
       else raise `unexpected_argument

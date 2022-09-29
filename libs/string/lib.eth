@@ -8,7 +8,7 @@
 -- * make (C)
 --
 -- Miscelenious:
--- * len (C)
+-- * strlen (C)
 -- * to_upper (C)
 -- * to_lower (C)
 -- * chr (C)
@@ -86,7 +86,7 @@ Create a string of given length initialized with zeros.
 
 
 --------------------------------------------------------------------------------
-let pub make =
+let pub make_string =
 {.help|
 = String.make
 == DESCRIPTION
@@ -97,14 +97,13 @@ string. If it is of zero length, then the it is treated as 0-byte.
 |.help}
   __make
 
-let pub len = __len
-let pub rev s = list s |> list.rev |> cat -- TODO: optimize
-let pub sub x s =
-  if let l .. r = x then __substr s l (r - l + 1)
-  else if let l... = x then __substr s l (len s - l)
+let pub strlen = __len
+let pub substr x s =
+  if let (k, n) = x then __substr s k n
+  else if let l .. r = x then __substr s l (r - l + 1)
+  else if let l... = x then __substr s l (strlen s - l)
   else if let ...r = x then __substr s 0 (r + 1)
   else invalid_argument ()
-let pub get s i = __substr s i 1
 
 --------------------------------------------------------------------------------
 --                                Regexp
@@ -113,18 +112,12 @@ let pub get s i = __substr s i 1
 -- * split
 -- * gsub
 
-let pub find pat s =
+let pub strstr pat s =
   if regexp? pat then __find_regexp pat s
   else if string? pat then
-    if let `some start = __strstr_opt s pat
-    then (start, start + len pat)
+    if let `some start = __strstr_opt s pat then
+      (start, start + strlen pat)
     else false
   else type_error ()
 
-
-let pub prelude = {
-  cat, join, to_upper, to_lower, chr, ord, to_number, to_symbol, chomp, chop,
-  trim_left, trim_right, trim, strcmp, strcasecmp, match, gsub, rev_split,
-  split, malloc, calloc,
-}
 

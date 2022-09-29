@@ -1,8 +1,7 @@
 #!/bin/env ether
 
 open 'list'
-import 'string'
-open string.prelude
+open 'string'
 open 'io'
 open 'os'
 import 'vector'
@@ -113,13 +112,13 @@ let require_network! =
 let fuzzy_cmp a b =
   let {*} = @(require 'math')
   -- Will memorize sub-distances.
-  let lena = string.len a
-  let lenb = string.len b
+  let lena = strlen a
+  let lenb = strlen b
   let mem = vector.init (lena * lenb) (const false)
   let getmem i j mem = vector.get mem (i-1 + lena * (j-1))
   let setmem i j x mem = vector.insert mem (i-1 + lena * (j-1)) x
   -- Indicator function.
-  let ind i j = 0 if string.get a (i-1) eq string.get b (j-1) else 1
+  let ind i j = 0 if substr (i-1, 1) a eq substr (j-1, 1) b else 1
   -- Levenshtein distance function.
   let rec distance i j mem =
     if min i j == 0 then

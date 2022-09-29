@@ -15,11 +15,11 @@ let string_tests =
   [
     ("cat", fn -> cat ["a", "b", "c"] eq "abc"),
     ("join", fn -> join "," ["a", "b", "c"] eq "a,b,c"),
-    ("malloc", fn -> len (malloc 10) == 10),
-    ("calloc", fn -> calloc 10 eq make 10 "\0"),
-    ("make", fn -> make 10 "@" eq "@@@@@@@@@@" && make 2 "" eq "\0\0"),
+    ("malloc", fn -> strlen (malloc 10) == 10),
+    ("calloc", fn -> calloc 10 eq make_string 10 "\0"),
+    ("make_string", fn -> make_string 10 "@" eq "@@@@@@@@@@" && make_string 2 "" eq "\0\0"),
 
-    ("len", fn -> len "1234" == 4),
+    ("strlen", fn -> strlen "1234" == 4),
     ("to_upper", fn -> to_upper "AbcD" eq "ABCD"),
     ("to_lower", fn -> to_lower "AbcD" eq "abcd"),
     ("chr", fn -> chr 0x61 eq "a"),
@@ -38,21 +38,21 @@ let string_tests =
     ("chop", fn -> chop "asd" eq "as" && chop "" eq ""),
     ("trim", fn -> trim "\t\n\v asdf \v\t\n " eq "asdf" && trim "" eq ""),
 
-    ("sub", fn ->
+    ("substr", fn ->
       let str = "Hello World!"
       list.all? id [
-        sub (6...) str eq "World!",
-        sub (...4) str eq "Hello",
-        sub (4..6) str eq "o W"
+        substr (2, 3) str eq "llo",
+        substr (6...) str eq "World!",
+        substr (...4) str eq "Hello",
+        substr (4..6) str eq "o W"
       ]
     ),
-    ("get", fn -> get "1234" 2 eq "3"),
 
     ("strcmp", fn -> strcmp "asdf" "asdf" == 0),
     ("strcasecmp", fn -> strcasecmp "asdf" "ASdF" == 0),
 
-    ("find", fn ->
-      find "45" "123456" eq (3, 3+2) && find \[3-5]+/ "123456" eq (2, 2+3)),
+    ("strstr", fn ->
+      strstr "45" "123456" eq (3, 3+2) && strstr \[3-5]+/ "123456" eq (2, 2+3)),
 
     ("match", fn -> match \[^^]\K(\w+)\s+(\w)/ "a bu c" eq ["bu c", "bu", "c"]),
     ("split", fn -> split \\s+/ "asd asdf asdf " eq ["asd", "asdf", "asdf", ""]),

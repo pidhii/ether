@@ -2,7 +2,7 @@
 let {*} = @(require 'os')
 let {*} = @(require 'io')
 let {*} = @(require 'list')
-let {prelude={*}} as string = @(require 'string')
+let {*} = @(require 'string')
 
 chdir (get command_line 1)
 

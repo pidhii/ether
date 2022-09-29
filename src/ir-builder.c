@@ -407,6 +407,13 @@ build_pattern_constexpr(ir_builder *bldr, eth_ast_pattern *pat, eth_t expr,
       for (int i = 0; i < n; ++i)
       {
         eth_field *fld = eth_get_field(expr->type, pat->record.fields[i]);
+        if (fld == NULL)
+        {
+          eth_error("no field '%s' in type '%s'\n", pat->record.fields[i], expr->type->name);
+          *e = 1;
+          return false;
+        }
+
         eth_t val = *(eth_t*)((char*)expr + fld->offs);
         if (not build_pattern_constexpr(bldr, pat->record.subpats[i], val, loc, e))
           return false;

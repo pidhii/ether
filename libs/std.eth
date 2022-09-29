@@ -1,5 +1,4 @@
 
 pub open 'list'
-pub import 'string'
-pub open string.prelude
+pub open 'string'
 
