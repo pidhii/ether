@@ -247,6 +247,7 @@ let empty_db_entry = {
 }
 
 let uninstall {db, modname} =
+  print "... uninstalling ..."
   if let `some {install_dir} = db:get_module_opt modname then
     -- Remove module directory
     info "uninstalling module '{modname}'"
@@ -259,17 +260,17 @@ let uninstall {db, modname} =
     error "no such module"
     raise `failure
 
-let build_and_install {conf, modentry, db, dir, args, owerwrite} =
+let build_and_install {conf, modentry, db, dir, args, overwrite} =
   let {name, files, main, build, post_install} = conf
 
   -- Check if module name is unique
   when db:get_module_opt name then
-    if owerwrite then
+    if overwrite then
       info "module already present"
-      uninstall {db, name}
+      uninstall {db, modname=name}
       info "old version of '{name}' was removed"
     else
-      error "module already present"
+      error "module already present (will not overwrite)"
       raise `failure
 
   -- Build (if build-hook is speciefied)
@@ -312,14 +313,14 @@ let fetch {repo_url, version} =
 
 -- Clone repository to a temporary directory. There we will build it and
 -- probably install.
-let install {db, repo_url, version, args, owerwrite} =
+let install {db, repo_url, version, args, overwrite} =
   do_in_tempdir $ fn ->
     info "fetching '{repo_url}' ({version})"
     let repo_dir = fetch {repo_url, version}
     info "installing {version}"
     let conf = load_config repo_dir args
     let modentry = {empty_db_entry with repository = repo_url, version}
-    build_and_install {modentry, conf, db, dir = repo_dir, args, owerwrite}
+    build_and_install {modentry, conf, db, dir = repo_dir, args, overwrite}
 
 
 let check_update {name, local_version, repo_url} =
@@ -560,7 +561,7 @@ let commands =
             -- Install
             let db = load_db_from default_db_path
             let modentry = install {
-              db, repo_url, version, args = modargs, owerwrite = true
+              db, repo_url, version, args = modargs, overwrite = true
             }
 
             -- Update registry
@@ -626,7 +627,7 @@ let commands =
               -- Install
               let db = load_db_from default_db_path
               let modentry = install {
-                db, repo_url, version = new_version, args = [], owerwrite = true
+                db, repo_url, version = new_version, args = [], overwrite = true
               }
               -- Update registry
               info "updating registry"
@@ -647,7 +648,7 @@ let commands =
                 db, args,
                 repo_url = repository,
                 version = new_version,
-                owerwrite = true
+                overwrite = true
               }
               -- Update registry
               info "updating registry"
