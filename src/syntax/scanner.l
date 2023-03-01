@@ -255,8 +255,6 @@ OPERATOR {OPCHR}+|mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|eq|not|lnot
   * Porbably have to intoduce CATCH keyword to have TRY-CATCH (and then hande
   * the CATCH here).
   */
-class           { ENTER_STATE(IGNORE_INDENT); return CLASS; }
-method          { ENTER_STATE(IGNORE_INDENT); return METHOD; }
 let             { ENTER_STATE(IGNORE_INDENT); return LET; }
 and             { ENTER_STATE(IGNORE_INDENT); return AND; }
 if[ \t\n]+let   { ENTER_STATE(IGNORE_INDENT); return IFLET; }
@@ -600,8 +598,6 @@ if     { return IF; }
 then   { return THEN; }
 else   { return ELSE; }
 when   { return WHEN; }
-object { return OBJECT; }
-inherit { return INHERIT; }
 unless { return UNLESS; }
 as     { return AS; }
 try    { return TRY; }

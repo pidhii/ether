@@ -1188,21 +1188,6 @@ void
 eth_destroy_record_hn(eth_type *type, eth_t x);
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-//                               objects
-// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-/*
- * Syntax `class ... = object ... end` creates an object of type "class" (call
- * it class-specification).  Syntax `new ...` takes a class-specification as
- * an argument and creates an instance of this class (call it class-instance).
- *
- * A class-instance is implemented as a record containing all the fields and a
- * reference to the class-specification (field `__class`).
- *
- * Methods are stored in the class-specification and invoked via operator `#`.
- *
- */
-
-// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                 file
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 extern
@@ -1954,7 +1939,6 @@ typedef enum {
   ETH_AST_MULTIMATCH,
   ETH_AST_ASSIGN,
   ETH_AST_RETURN,
-  ETH_AST_CLASS,
 } eth_ast_tag;
 
 typedef enum {
@@ -1975,22 +1959,6 @@ eth_create_match_table(eth_ast_pattern **const tab[], eth_ast *const exprs[],
 
 void
 eth_destroy_match_table(eth_match_table *table);
-
-typedef struct {
-  char *name;
-  eth_ast *init;
-} eth_class_val;
-
-typedef struct {
-  char *name;
-  eth_ast *fn;
-} eth_class_method;
-
-typedef struct {
-  char *classname;
-  eth_ast **args;
-  int nargs;
-} eth_class_inherit;
 
 struct eth_ast {
   eth_ast_tag tag;
@@ -2021,9 +1989,6 @@ struct eth_ast {
     struct { eth_match_table *table; eth_ast **exprs; } multimatch;
     struct { eth_ast *expr; } evmac;
     struct { char *ident; eth_ast *val; } assign;
-    struct { eth_ast_pattern **pars; int npars; eth_class_inherit *inherits;
-      int ninherits; eth_class_val *vals; int nvals;
-      eth_class_method *methods; int nmethods; } clas;
     struct { eth_ast *expr; } retrn;
   };
   eth_location *loc;
@@ -2135,11 +2100,6 @@ eth_ast_assign(const char *ident, eth_ast *val);
 
 eth_ast*
 eth_ast_return(eth_ast *expr);
-
-eth_ast*
-eth_ast_class(eth_ast_pattern *const pars[], int npars,
-    eth_class_inherit *inherits, int ninherits, eth_class_val *vals,
-    int nvals, eth_class_method *methods, int nmethods);
 
 eth_ast_pattern*
 eth_ast_to_pattern(eth_ast *ast);

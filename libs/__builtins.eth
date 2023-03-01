@@ -41,9 +41,6 @@ let pub __builtin (not) x = not x
 let pub ($) f x = f x
 let pub (|>) x f = f x
 
-
-let pub new c = c.ctor c.template
-
 -- Pairs
 let pub car (x::_) = x
 let pub cdr (_::x) = x
@@ -133,10 +130,6 @@ let pub record = lazy
       else
         __record acc
 
-
-let pub __merge_class_templates = lazy
-  let {append} = require 'list'
-  fn base child -> record (append (list base) (list child))
 
 --------------------------------------------------------------------------------
 --                                   IO
