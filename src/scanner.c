@@ -50,7 +50,6 @@ eth_create_scanner(eth_root *root, FILE *stream)
   eth_scanner_data *data = malloc(sizeof(eth_scanner_data));
   data->root = root;
   cod_vec_init(data->primtoks);
-  data->commentcnt = 0;
   cod_vec_init(data->fmtbracecnt);
   cod_vec_init(data->quotestack);
   cod_vec_init(data->indentstack);

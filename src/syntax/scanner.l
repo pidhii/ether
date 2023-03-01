@@ -29,7 +29,6 @@ ETH_MODULE("ether:scanner");
 
 #define YY_EXTRA_TYPE eth_scanner_data*
 #define primtoks (yyextra->primtoks)
-#define commentcnt (yyextra->commentcnt)
 #define fmtbracecnt (yyextra->fmtbracecnt)
 #define quotestack (yyextra->quotestack)
 #define push_quote(tag, str) _push_quote(yyextra, tag, str)
@@ -116,24 +115,8 @@ OPERATOR {OPCHR}+|mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|eq|not|lnot
 
 <INDENT>^" "*\n
 
-<INITIAL,INDENT,IGNORE_INDENT>[[:space:]]*"--".*$ {
-  if (strncmp(yytext, "--[""[", 4) == 0)
-    REJECT;
-}
+<INITIAL,INDENT,IGNORE_INDENT>[[:space:]]*"--".*$
 
-<INITIAL,INDENT,IGNORE_INDENT>"--[""[" {
-  ENTER_STATE(COMMENT);
-}
-<INITIAL,INDENT,IGNORE_INDENT>[[:space:]]*"--[[" {
-  ENTER_STATE(COMMENT);
-}
-<COMMENT>"--[[" { commentcnt += 1; }
-<COMMENT>"]]" {
-  if (commentcnt > 0)
-    commentcnt -= 1;
-  else
-    PREV_STATE();
-}
 <COMMENT>.
 <COMMENT>\n
 

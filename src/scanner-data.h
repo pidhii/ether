@@ -42,7 +42,6 @@ typedef struct indent_level {
 
 struct eth_scanner_data {
   cod_vec(int) primtoks;
-  int commentcnt;
   cod_vec(int) fmtbracecnt;
   cod_vec(quote) quotestack;
   cod_vec(indent_level) indentstack;
