@@ -80,7 +80,11 @@ ether_module(eth_module *mod, eth_root *topenv)
   eth_define(mod, "pcre_utf32", eth_num(PCRE_UTF32));
   eth_define(mod, "pcre_utf8", eth_num(PCRE_UTF8));
 
-  if (not eth_add_module_script(mod, "lib.eth", topenv))
-    return 1;
+  eth_module *ethmod = eth_load_module_from_script2(topenv, "lib.eth", NULL, mod);
+  if (not ethmod)
+    return -1;
+  eth_copy_defs(ethmod, mod);
+  eth_destroy_module(ethmod);
+
   return 0;
 }
