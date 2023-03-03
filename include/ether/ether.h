@@ -369,7 +369,7 @@ eth_free_h6(void *ptr);
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                              METHODS
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-typedef eth_t (*eth_method_cb)(eth_t self);
+typedef eth_t (*eth_method_cb)(eth_t self, void *data);
 typedef struct eth_methods eth_methods;
 
 eth_methods*
@@ -379,10 +379,11 @@ void
 eth_destroy_methods(eth_methods *ms);
 
 bool
-eth_add_method(eth_methods *ms, eth_t sym, eth_method_cb cb);
+eth_add_method(eth_methods *ms, eth_t sym, eth_method_cb cb, void *data,
+    void (*dtor) (void*));
 
-eth_method_cb
-eth_get_method(eth_methods *ms, eth_t sym);
+eth_t
+eth_eval_method(eth_methods *ms, eth_t sym, eth_t self);
 
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
@@ -399,11 +400,11 @@ struct eth_field {
 };
 typedef struct eth_field eth_field;
 
-#define ETH_TFLAG_PLAIN   0x01
-#define ETH_TFLAG_TUPLE   (ETH_TFLAG_PLAIN | 1 << 1)
-#define ETH_TFLAG_RECORD  (ETH_TFLAG_PLAIN | 1 << 2)
-#define ETH_TFLAG_VARIANT (ETH_TFLAG_PLAIN | 1 << 3)
-/*#define ETH_TFLAG_OBJECT  (ETH_TFLAG_RECORD | 1 << 4)*/
+#define ETH_TFLAG_PLAIN     0x01
+#define ETH_TFLAG_TUPLE     (ETH_TFLAG_PLAIN  | 1 << 1)
+#define ETH_TFLAG_RECORD    (ETH_TFLAG_PLAIN  | 1 << 2)
+#define ETH_TFLAG_VARIANT   (ETH_TFLAG_PLAIN  | 1 << 3)
+#define ETH_TFLAG_EXTRECORD (ETH_TFLAG_RECORD | 1 << 4)
 
 struct eth_type {
   char *name;
@@ -412,6 +413,7 @@ struct eth_type {
   void (*write)(eth_type *type, eth_t x, FILE *out);
   void (*display)(eth_type *type, eth_t x, FILE *out);
   bool (*equal)(eth_type *type, eth_t x, eth_t y);
+  void (*notify_copy)(eth_type *type, eth_t newx, eth_t oldx);
   eth_methods *methods;
 
   uint8_t flag;
@@ -437,6 +439,9 @@ eth_type* __attribute__((malloc))
 eth_create_struct_type(const char *name, char *const *fields,
     ptrdiff_t const *offs, int n);
 
+eth_type*
+eth_create_struct_type2(const char *name, const eth_field *fields, int n);
+
 static inline bool
 eth_is_plain(eth_type *type)
 {
@@ -453,6 +458,12 @@ static inline bool
 eth_is_record(eth_type *type)
 {
   return type->flag == ETH_TFLAG_RECORD;
+}
+
+static inline bool
+eth_is_like_record(eth_type *type)
+{
+  return (type->flag & ETH_TFLAG_RECORD) == ETH_TFLAG_RECORD;
 }
 
 static inline bool

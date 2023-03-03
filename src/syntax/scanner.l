@@ -615,6 +615,7 @@ __deprecated { return DEPRECATED; }
 "^"     |
 "."     |
 ":"     |
+"#"     |
 "$"     |
 "!"     |
 ">"|"<" |

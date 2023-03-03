@@ -13,6 +13,8 @@ ETH_MODULE("ether:methods")
 typedef struct {
   size_t id;
   eth_method_cb cb;
+  void *data;
+  void (*dtor) (void*);
 } method;
 
 struct eth_methods {
@@ -54,16 +56,34 @@ eth_create_methods()
   return ms;
 }
 
+static void
+_free_method(void *ptr)
+{
+  method *m = ptr;
+  if (m->dtor)
+    m->dtor(m->data);
+  free(m);
+}
+
 void
 eth_destroy_methods(eth_methods *ms)
 {
   if (ms->n >= ETH_METHOD_STAB_SIZE)
-    cod_hash_map_delete(ms->ltab, NULL);
+    cod_hash_map_delete(ms->ltab, _free_method);
+  else
+  {
+    for (int i = 0; i < ms->n; ++i)
+    {
+      if (ms->stab[i].dtor)
+        ms->stab[i].dtor(ms->stab[i].data);
+    }
+  }
   free(ms);
 }
 
 bool
-eth_add_method(eth_methods *ms, eth_t sym, eth_method_cb cb)
+eth_add_method(eth_methods *ms, eth_t sym, eth_method_cb cb, void *data,
+    void (*dtor) (void*))
 {
   size_t id = eth_get_symbol_id(sym);
   if (ms->n + 1 < ETH_METHOD_STAB_SIZE)
@@ -76,6 +96,8 @@ eth_add_method(eth_methods *ms, eth_t sym, eth_method_cb cb)
     method *m = ms->stab + ms->n++;
     m->id = id;
     m->cb = cb;
+    m->data = data;
+    m->dtor = dtor;
     sort_stab(ms->stab, ms->n);
   }
   else
@@ -92,7 +114,11 @@ eth_add_method(eth_methods *ms, eth_t sym, eth_method_cb cb)
       cod_hash_map *ltab = cod_hash_map_new(COD_HASH_MAP_INTKEYS);
       // copy stab to ltab
       for (int i = 0; i < ETH_METHOD_STAB_SIZE; ++i)
-        cod_hash_map_insert(ltab, (void*)sym, id, ms->stab[i].cb, NULL);
+      {
+        method *m = malloc(sizeof(method));
+        *m = ms->stab[i];
+        cod_hash_map_insert(ltab, (void*)sym, id, m, NULL);
+      }
       ms->ltab = ltab;
     }
 
@@ -101,28 +127,39 @@ eth_add_method(eth_methods *ms, eth_t sym, eth_method_cb cb)
       eth_warning("method '~w` already present, won't update", sym);
       return false;
     }
-    cod_hash_map_insert(ms->ltab, (void*)sym, id, cb, NULL);
+    method *m = malloc(sizeof(method));
+    m->id = id;
+    m->cb = cb;
+    m->data = data;
+    m->dtor = dtor;
+    cod_hash_map_insert(ms->ltab, (void*)sym, id, m, NULL);
   }
 
   return true;
 }
 
-eth_method_cb
-eth_get_method(eth_methods *ms, eth_t sym)
+eth_t
+eth_eval_method(eth_methods *ms, eth_t sym, eth_t self)
 {
   size_t id = eth_get_symbol_id(sym);
-  if (ms->n >= ETH_METHOD_STAB_SIZE)
+  if (ms->n <= ETH_METHOD_STAB_SIZE)
   {
     int idx = find_in_stab(ms->stab, ms->n, id);
     if (eth_unlikely(idx >= ms->n))
+    {
+      eth_warning("no such method (~w)", sym);
       return NULL;
+    }
     else
-      return ms->stab[idx].cb;
+      return ms->stab[idx].cb(self, ms->stab[idx].data);
   }
   else
   {
     cod_hash_map_elt *elt = cod_hash_map_find(ms->ltab, (void*)sym, id);
-    return elt ? elt->val : NULL;
+    if (elt == NULL)
+      return NULL;
+    method *m = elt->val;
+    return m->cb(self, m->data);
   }
 }
 

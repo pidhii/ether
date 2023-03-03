@@ -1332,6 +1332,111 @@ _record(void)
   return ret;
 }
 
+static eth_t
+_method(eth_t self, void *data)
+{
+  eth_reserve_stack(1);
+  eth_sp[0] = self;
+  eth_t ret = eth_apply(ETH(data), 1);
+  return ret;
+}
+
+typedef struct {
+  void (*orig_destroy)(eth_type*, eth_t);
+  size_t rc;
+} usertype_data;
+
+static void
+_usertype_destroy(eth_type *type, eth_t x)
+{
+  usertype_data *data = type->clos;
+  data->orig_destroy(type, x);
+  if (--data->rc == 0)
+    eth_destroy_type(type);
+}
+
+static void
+_usertype_notify_copy(eth_type *type, eth_t newx, eth_t oldx)
+{
+  usertype_data *data = type->clos;
+  ++data->rc;
+}
+
+static eth_t
+_make_usertype(void)
+{
+  eth_use_tuple_as(tup2_type, 2)
+
+  eth_args args = eth_start(3);
+  eth_t name = eth_arg2(args, eth_string_type);
+  eth_t temp = eth_arg(args);
+  eth_t methods = eth_arg(args);
+
+  if (not eth_is_record(temp->type))
+    eth_throw(args, eth_invalid_argument());
+
+  eth_type* newtype = eth_create_struct_type2(eth_str_cstr(name),
+      temp->type->fields, temp->type->nfields);
+  newtype->flag = ETH_TFLAG_EXTRECORD;
+  newtype->destroy = _usertype_destroy;
+  usertype_data *data = malloc(sizeof(usertype_data));
+  data->orig_destroy = temp->type->destroy;
+  data->rc = 1;
+  newtype->clos = data;
+  newtype->dtor = free;
+  newtype->notify_copy = _usertype_notify_copy;
+  for (eth_t l = methods; eth_is_pair(l); l = eth_cdr(l))
+  {
+    eth_t x = eth_car(l);
+    if (x->type != tup2_type or
+        not eth_is_str(eth_tup_get(x, 0)) or
+        not eth_is_fn(eth_tup_get(x, 1)))
+    {
+      eth_destroy_type(newtype);
+      eth_throw(args, eth_invalid_argument());
+    }
+    eth_t methodname = eth_sym(eth_str_cstr(eth_tup_get(x, 0)));
+    eth_t methodfn = eth_tup_get(x, 1);
+    eth_ref(methodfn);
+    eth_add_method(newtype->methods, methodname, _method, methodfn,
+        (void(*)(void*))eth_unref);
+  }
+
+  int n = newtype->nfields;
+  eth_t ret;
+  switch (n)
+  {
+    case 1:  ret = eth_alloc_h1(); break;
+    case 2:  ret = eth_alloc_h2(); break;
+    case 3:  ret = eth_alloc_h3(); break;
+    case 4:  ret = eth_alloc_h4(); break;
+    case 5:  ret = eth_alloc_h5(); break;
+    case 6:  ret = eth_alloc_h6(); break;
+    default: ret = malloc(sizeof(eth_tuple) + sizeof(eth_t) * n);
+  }
+
+  eth_init_header(ret, newtype);
+  for (int i = 0; i < n; ++i)
+    eth_ref(ETH_TUPLE(ret)->data[i] = ETH_TUPLE(temp)->data[i]);
+
+  eth_return(args, ret);
+}
+
+static eth_t
+_send(void)
+{
+  eth_use_symbol(no_such_method_error)
+
+  eth_args args = eth_start(2);
+  eth_t self = eth_arg(args);
+  eth_t mname = eth_arg2(args, eth_symbol_type);
+  eth_t ret = eth_eval_method(self->type->methods, mname, self);
+  if (ret == NULL)
+    eth_throw(args, eth_exn(no_such_method_error));
+  eth_return(args, ret);
+}
+
+
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                 module
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -1412,6 +1517,9 @@ eth_create_builtins(eth_root *root)
   eth_define(mod, "__create_ref", eth_create_proc(_create_ref, 1, NULL, NULL));
   eth_define(mod, "__dereference", eth_create_proc(_dereference, 1, NULL, NULL));
   eth_define(mod, "__assign", eth_create_proc(_assign, 2, NULL, NULL));
+
+  eth_define(mod, "__make_usertype", eth_create_proc(_make_usertype, 3, NULL, NULL));
+  eth_define(mod, "#", eth_create_proc(_send, 2, NULL, NULL));
 
 
   if (not eth_resolve_path(eth_get_env(mod), "__builtins.eth", buf))

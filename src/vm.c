@@ -1,15 +1,15 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -436,7 +436,7 @@ eth_vm(eth_bytecode *bc)
       {
         eth_t x = r[ip->loadrcrd.src];
         eth_type *restrict type = x->type;
-        test = type->flag == ETH_TFLAG_RECORD;
+        test = eth_is_like_record(type);
         if (eth_likely(test))
         {
           size_t *restrict ids = type->fieldids;
@@ -475,7 +475,7 @@ eth_vm(eth_bytecode *bc)
       {
         eth_t x = r[ip->loadrcrd1.vid];
         eth_type *restrict type = x->type;
-        test = type->flag & ETH_TFLAG_PLAIN;
+        test = eth_is_plain(type);
         if (eth_likely(test))
         {
           size_t *restrict ids = type->fieldids;
@@ -536,7 +536,7 @@ eth_vm(eth_bytecode *bc)
       {
         eth_t const x = r[ip->updtrcrd.src];
         eth_type *restrict const type = x->type;
-        test = type->flag == ETH_TFLAG_RECORD;
+        test = eth_is_like_record(type);
         if (eth_likely(test))
         {
           size_t *restrict const ids = type->fieldids;
@@ -563,7 +563,7 @@ eth_vm(eth_bytecode *bc)
             if (ids[i] == id)
             {
               if (eth_unlikely(i == n))
-              { // not found
+              { // field not found => type error
                 test = 0;
                 for (i = n - 1; i >= 0; --i)
                   eth_dec(rec->data[i]);
@@ -581,12 +581,16 @@ eth_vm(eth_bytecode *bc)
               }
               else
               {
+                // update ith field for the new record
                 eth_ref(rec->data[i] = r[ip->updtrcrd.vids[I++]]);
                 if (I == N)
-                {
+                { // all requested fields are updated
+                  // => copy remaining fields and were done
                   for (i += 1; i < n; ++i)
                     eth_ref(rec->data[i] = eth_tup_get(x, i));
                   eth_init_header(rec, type);
+                  if (type->notify_copy)
+                    type->notify_copy(type, ETH(rec), x);
                   eth_ref(ETH(rec)); // due to PHI-semantics
                   r[ip->updtrcrd.out] = ETH(rec);
                   break;
@@ -596,6 +600,7 @@ eth_vm(eth_bytecode *bc)
               }
             }
             else
+              // copy ith field from the original record
               eth_ref(rec->data[i] = eth_tup_get(x, i));
           }
         }

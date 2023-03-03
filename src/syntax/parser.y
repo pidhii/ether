@@ -245,7 +245,7 @@ _create_attr(int aflag, void *locpp)
 %left UMINUS UPLUS NOT LNOT
 %right COMPOSE
 %nonassoc '!'
-%left '.' ':'
+%left '.' ':' '#'
 
 
 // =============================================================================
@@ -377,6 +377,14 @@ FnAtom
     LOC($$, @$);
     free($4);
     cod_vec_destroy($5);
+  }
+
+  | FnAtom '#' SYMBOL {
+    eth_ast *send = eth_ast_cval(eth_get_builtin(SCANROOT, "#"));
+    eth_ast *p[2] = { $1, eth_ast_cval(eth_create_symbol($3)) };
+    $$ = eth_ast_apply(send, p, 2);
+    LOC($$, @$);
+    free($3);
   }
 
   | '[' Expr DDOT Expr ']' %prec LIST_DDOT {

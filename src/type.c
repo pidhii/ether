@@ -50,6 +50,7 @@ create_type(const char *name, int nfields)
   type->write = eth_default_write;
   type->display = default_display;
   type->equal = NULL;
+  type->notify_copy = NULL;
   type->nfields = 0;
   type->fields = NULL;
   type->clos = NULL;
@@ -80,6 +81,22 @@ eth_create_struct_type(const char *name, char *const *fields,
   }
   return type;
 }
+
+eth_type*
+eth_create_struct_type2(const char *name, const eth_field *fields, int n)
+{
+  eth_type *type = create_type(name, n);
+  type->fields = malloc(sizeof(eth_field) * n);
+  type->nfields = n;
+  for (int i = 0; i < n; ++i)
+  {
+    type->fields[i].name = strdup(fields[i].name);
+    type->fields[i].offs = fields[i].offs;
+    type->fieldids[i] = eth_get_symbol_id(eth_sym(fields[i].name));
+  }
+  return type;
+}
+
 
 void
 eth_destroy_type(eth_type *type)

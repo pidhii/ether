@@ -40,6 +40,7 @@ let pub __builtin (not) x = not x
 -- Application
 let pub ($) f x = f x
 let pub (|>) x f = f x
+let pub (|) x f = f x
 
 -- Pairs
 let pub car (x::_) = x
@@ -114,7 +115,7 @@ let pub record = lazy
           else if cmp == 0 then i < j
           else false
       |> map second
-      
+
     -- remove duplicate keys (leave the latest one) and construct a record
     do loop l:pairs acc:[] =
       if let x :: xs = l then
@@ -129,6 +130,13 @@ let pub record = lazy
           loop xs (x :: acc)
       else
         __record acc
+
+
+let pub object typespec =
+  let typename = typespec.name or "usertype"
+  let base = typespec.base
+  let methods = if let {methods} = typespec then list methods else []
+  __make_usertype typename base methods
 
 
 --------------------------------------------------------------------------------
