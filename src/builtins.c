@@ -957,7 +957,7 @@ _list(void)
   else
   {
     eth_drop(x);
-    return eth_exn(eth_failure());
+    return eth_exn(eth_invalid_argument());
   }
 }
 
