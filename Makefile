@@ -55,7 +55,7 @@ test: test_Debug test_Release
 test_%:
 	source ./env.sh $*/install
 	test -d $*
-	$(MAKE) -C $*/build test #CTEST_OUTPUT_ON_FAILURE=1
+	$(MAKE) -C $*/build test CTEST_OUTPUT_ON_FAILURE=1
 
 fuzzy: t/test.eth
 	valgrind --leak-check=full ./Debug/install/bin/ether --log=debug -Lt t/builtins.eth

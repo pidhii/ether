@@ -58,8 +58,6 @@ _rev_append(void)
 static eth_t
 _rev_map(void)
 {
-  eth_use_symbol(improper_list)
-
   eth_args args = eth_start(2);
   const eth_t f = eth_arg2(args, eth_function_type);
   const eth_t l = eth_arg(args);
@@ -78,11 +76,6 @@ _rev_map(void)
     }
     acc = eth_cons(v, acc);
   }
-  if (eth_unlikely(it != eth_nil))
-  {
-    eth_drop(acc);
-    eth_throw(args, improper_list);
-  }
 
   eth_return(args, acc);
 }
@@ -90,8 +83,6 @@ _rev_map(void)
 static eth_t
 _rev_mapi(void)
 {
-  eth_use_symbol(improper_list)
-
   eth_args args = eth_start(2);
   const eth_t f = eth_arg2(args, eth_function_type);
   const eth_t l = eth_arg(args);
@@ -112,11 +103,6 @@ _rev_mapi(void)
     }
     acc = eth_cons(v, acc);
   }
-  if (eth_unlikely(it != eth_nil))
-  {
-    eth_drop(acc);
-    eth_throw(args, improper_list);
-  }
 
   eth_return(args, acc);
 }
@@ -124,8 +110,6 @@ _rev_mapi(void)
 static eth_t
 _rev_map2(void)
 {
-  eth_use_symbol(improper_list)
-
   eth_args args = eth_start(3);
   const eth_t f = eth_arg2(args, eth_function_type);
   const eth_t xs = eth_arg(args);
@@ -147,12 +131,6 @@ _rev_map2(void)
     }
     acc = eth_cons(v, acc);
   }
-  if (eth_unlikely(not eth_is_pair(it1) and it1 != eth_nil or
-                   not eth_is_pair(it2) and it2 != eth_nil))
-  {
-    eth_drop(acc);
-    eth_throw(args, improper_list);
-  }
 
   eth_return(args, acc);
 }
@@ -160,8 +138,6 @@ _rev_map2(void)
 static eth_t
 _rev_zip(void)
 {
-  eth_use_symbol(improper_list);
-
   eth_args args = eth_start(2);
   const eth_t f = eth_arg2(args, eth_function_type);
   const eth_t ltup = eth_arg(args);
@@ -204,14 +180,7 @@ _rev_zip(void)
     {
       it[i] = eth_cdr(it[i]);
       if (eth_unlikely(not eth_is_pair(it[i])))
-      {
-        if (eth_unlikely(it[i] != eth_nil))
-        {
-          eth_drop(acc);
-          eth_throw(args, improper_list);
-        }
         goto end_loop;
-      }
     }
   }
   end_loop:
@@ -221,8 +190,6 @@ _rev_zip(void)
 static eth_t
 _fold_zip(void)
 {
-  eth_use_symbol(improper_list);
-
   eth_args args = eth_start(3);
   const eth_t f = eth_arg2(args, eth_function_type);
   const eth_t z = eth_arg(args);
@@ -262,14 +229,7 @@ _fold_zip(void)
     {
       it[i] = eth_cdr(it[i]);
       if (eth_unlikely(not eth_is_pair(it[i])))
-      {
-        if (eth_unlikely(it[i] != eth_nil))
-        {
-          eth_drop(acc);
-          eth_throw(args, improper_list);
-        }
         goto end_loop;
-      }
     }
   }
   end_loop:
@@ -279,8 +239,7 @@ _fold_zip(void)
 static eth_t
 _rev_filter_map(void)
 {
-  eth_use_symbol(filter_out)
-  eth_use_symbol(improper_list)
+  eth_use_variant(some)
 
   eth_args args = eth_start(2);
   const eth_t f = eth_arg2(args, eth_function_type);
@@ -292,24 +251,17 @@ _rev_filter_map(void)
   {
     eth_reserve_stack(1);
     eth_sp[0] = eth_car(it);
-    const eth_t v = eth_apply(f, 1);
-    if (eth_is_exn(v))
+    const eth_t optv = eth_apply(f, 1);
+    if (optv->type == some_type)
     {
-      if (eth_what(v) == filter_out)
-        eth_drop(v);
-      else
-      {
-        eth_drop(acc);
-        eth_rethrow(args, v);
-      }
-    }
-    else
+      eth_t v = eth_get_variant_value(optv);
       acc = eth_cons(v, acc);
-  }
-  if (eth_unlikely(it != eth_nil))
-  {
-    eth_drop(acc);
-    eth_throw(args, improper_list);
+    }
+    else if (eth_unlikely(eth_is_exn(optv)))
+    {
+      eth_drop(acc);
+      eth_rethrow(args, optv);
+    }
   }
 
   eth_return(args, acc);

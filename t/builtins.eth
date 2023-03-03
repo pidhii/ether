@@ -87,10 +87,10 @@ let list_tests =
   , ("rev_flat_map", fn -> rev_flat_map (fn x -> [1..x-1]) [1, 2, 3] eq [2, 1, 1])
   , ("flat_map", fn -> flat_map (fn x -> [1..x-1]) [1, 2, 3] eq [1, 1, 2])
   , ("rev_filter_map", fn ->
-      let f x = x + x if even? x else raise `filter_out
+      let f x = `some (x + x) when even? x
       rev_filter_map f [1, 2, 3, 4] eq [8, 4])
   , ("filter_map", fn ->
-      let f x = x + x if even? x else raise `filter_out
+      let f x = `some (x + x) when even? x
       filter_map f [1, 2, 3, 4] eq [4, 8])
   , ("fold_left", fn -> fold_left (-) 0 [1, 2, 3] == -6)
   , ("fold_right", fn -> fold_right (-) 0 [1, 2, 3] == 2)

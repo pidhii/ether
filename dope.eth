@@ -175,9 +175,8 @@ let git =
       |> map $ line -> line =~ \refs\/tags\/(.+)/
       -- Decode version-tags into major, minor and a patch.
       |> rev_filter_map $ tag ->
-        if let _ :: version = match \([0-9]+)\.([0-9]+)\.([0-9]+)/ tag then
-          (tag, map to_number version)
-        else raise `filter_out
+        when let _ :: version = match \([0-9]+)\.([0-9]+)\.([0-9]+)/ tag then
+          `some (tag, map to_number version)
       -- Sort versions.
       |> sort $ (_, a) (_, b) ->
         do loop xs:a ys:b =
