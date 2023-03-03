@@ -1484,10 +1484,6 @@ eth_create_builtins(eth_root *root)
   // ---
   eth_define(mod,         "=~", eth_create_proc( _regexp_eq, 2, NULL, NULL));
   // ---
-  eth_define(mod, "__inclusive_range", eth_create_proc(_inclusive_range, 2, NULL, NULL));
-  eth_define(mod, "__List_map", eth_create_proc(_map, 2, NULL, NULL));
-  eth_define(mod, "__List_filter_map", eth_create_proc(_filter_map, 2, NULL, NULL));
-  // ---
   eth_define(mod,      "stdin", eth_stdin);
   eth_define(mod,     "stdout", eth_stdout);
   eth_define(mod,     "stderr", eth_stderr);

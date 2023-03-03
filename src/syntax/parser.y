@@ -112,11 +112,6 @@ _create_attr(int aflag, void *locpp)
     cod_vec(eth_ast_pattern*) vals;
   } record_pattern;
 
-  struct {
-    lc_in in;
-    eth_ast *pred;
-  } lc_aux;
-
   cod_vec(eth_ast*) astvec;
   cod_vec(char) charvec;
   eth_ast_pattern *pattern;
@@ -179,13 +174,6 @@ _create_attr(int aflag, void *locpp)
   cod_vec_iter($$, i, x, eth_drop_ast_pattern(x));
   cod_vec_destroy($$);
 } <patvec>
-
-%destructor {
-  eth_drop_ast_pattern($$.in.pat);
-  eth_drop_ast($$.in.expr);
-  if ($$.pred)
-    eth_drop_ast($$.pred);
-} <lc_aux>
 
 // =============================================================================
 %token START_REPL UNDEFINED
@@ -273,7 +261,6 @@ _create_attr(int aflag, void *locpp)
 %type<boolean> MaybeComaDots
 %type<record> Record
 %type<record_pattern> RecordPattern
-%type<lc_aux> LcAux
 %type<ast> Block
 %type<ast> StmtOrBlock
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -387,43 +374,6 @@ FnAtom
     free($3);
   }
 
-  | '[' Expr DDOT Expr ']' %prec LIST_DDOT {
-    eth_ast *p[2] = { $2, $4 };
-    eth_ast *range = eth_ast_cval(eth_get_builtin(SCANROOT, "__inclusive_range"));
-    $$ = eth_ast_apply(range, p, 2);
-  }
-  | '[' Expr WITH LcAux ']' {
-  /*| '[' Expr '|' LcAux ']' {*/
-    eth_ast_pattern *fnargs[] = { $4.in.pat };
-    // ---
-    eth_ast *fn;
-    if ($4.pred)
-    {
-      eth_ast *filterout = eth_ast_cval(eth_sym("filter_out"));
-      eth_ast *raise = eth_ast_cval(eth_get_builtin(SCANROOT, "raise"));
-      eth_ast *elsebr = eth_ast_apply(raise, &filterout, 1);
-      eth_ast *body = eth_ast_if($4.pred, $2, elsebr);
-      fn = eth_ast_fn_with_patterns(fnargs, 1, body);
-      // ---
-      eth_t mapfn = eth_get_builtin(SCANROOT, "__List_filter_map");
-      assert(mapfn);
-      eth_ast *map = eth_ast_cval(mapfn);
-      // ---
-      eth_ast *p[] = { fn, $4.in.expr };
-      $$ = eth_ast_apply(map, p, 2);
-    }
-    else
-    {
-      fn = eth_ast_fn_with_patterns(fnargs, 1, $2);
-      // ---
-      eth_t mapfn = eth_get_builtin(SCANROOT, "__List_map");
-      assert(mapfn);
-      eth_ast *map = eth_ast_cval(mapfn);
-      // ---
-      eth_ast *p[] = { fn, $4.in.expr };
-      $$ = eth_ast_apply(map, p, 2);
-    }
-  }
   | '@' '(' StmtSeq ')' { $$ = eth_ast_evmac($3); LOC($$, @$); }
 ;
 
@@ -1377,19 +1327,6 @@ Record
     $$ = $1;
     cod_vec_push($$.keys, $3);
     cod_vec_push($$.vals, eth_ast_ident($3));
-  }
-;
-
-LcAux
-  : Pattern LARROW Expr {
-    $$.in.pat = $1;
-    $$.in.expr = $3;
-    $$.pred = NULL;
-  }
-  | Pattern LARROW Expr ',' Expr {
-    $$.in.pat = $1;
-    $$.in.expr = $3;
-    $$.pred = $5;
   }
 ;
 

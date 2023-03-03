@@ -103,8 +103,8 @@ print (info.login eq login) --> true
 --
 -- `|>` is a "pipe"-operator from OCaml: `x |> f` is equivalent to `f x`
 -- `()` is a synonim for `nil`.
-let list = @(require "list")
-[1 .. 100] |> list.iter $ i ->
+open 'list'
+range (1 .. 100) |> iter $ i ->
   if i mod 3 == 0 then print "FIZZ"
   else if i mod 5 == 0 then print "BUZZ"
   else print i
