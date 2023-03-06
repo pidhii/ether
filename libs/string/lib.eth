@@ -65,36 +65,36 @@ let pub rev_split = __rev_split
 let pub split re str = list.rev $ rev_split re str
 
 let pub malloc =
-{.help|
-= String.malloc
-== DESCRIPTION:
-Create an uninitialized string of given length.\n
-== SYNOPSIS\n
-  malloc number? -> string?
-|.help}
+  {help|
+  = String.malloc
+  == DESCRIPTION:
+  Create an uninitialized string of given length.\n
+  == SYNOPSIS\n
+    malloc number? -> string?
+  |help}
   __malloc
 
 let pub calloc =
-{.help|
-= String.calloc
-== DESCRIPTION:
-Create a string of given length initialized with zeros.
-== SYNOPSIS
-  calloc number? -> string?
-|.help}
+  {help|
+  = String.calloc
+  == DESCRIPTION:
+  Create a string of given length initialized with zeros.
+  == SYNOPSIS
+    calloc number? -> string?
+  |help}
   __calloc
 
 
 --------------------------------------------------------------------------------
 let pub make_string =
-{.help|
-= String.make
-== DESCRIPTION
-Create  a  string of given length filled with a first  character  of  supplied
-string. If it is of zero length, then the it is treated as 0-byte.
-== SYNOPSIS
-  make number? string? -> string?
-|.help}
+  {help|
+  = String.make
+  == DESCRIPTION
+  Create  a  string of given length filled with a first  character  of  supplied
+  string. If it is of zero length, then the it is treated as 0-byte.
+  == SYNOPSIS
+    make number? string? -> string?
+  |help}
   __make
 
 let pub strlen = __len

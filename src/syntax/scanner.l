@@ -434,11 +434,6 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
   ENTER_STATE(QSTRING);
   return '"';
 }
-"{.help|" {
-  push_quote(QUOTES_STRING, ".help");
-  ENTER_STATE(QSTRING);
-  return HELP;
-}
 "{"[-a-zA-Z0-9_+]+"|" {
   char buf[yyleng-1];
   memcpy(buf, yytext+1, yyleng-2);
@@ -505,19 +500,6 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
   {
     yylval->character = '"';
     return CHAR;
-  }
-}
-<QSTRING>"|.help}" {
-  if (strcmp(".help", cod_vec_last(quotestack).str) == 0)
-  {
-    pop_quote();
-    PREV_STATE();
-    return HELP;
-  }
-  else
-  {
-    yylval->string = strdup(".help");
-    return STR;
   }
 }
 <STRING>"|"[-a-zA-Z0-9_+]+"}" {

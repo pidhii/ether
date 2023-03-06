@@ -23,21 +23,21 @@ let pub o_nonblock = __o_nonblock
 let pub chdir = __chdir
 
 let pub access =
-{.help|
-= Os.access
+  {help|
+  = Os.access
 
-== SYNOPSIS
+  == SYNOPSIS
 
-  access <path> <amode> -> boolean?
+    access <path> <amode> -> boolean?
 
-== DESCRIPTION
-The function shall chek the file named by  the  pathname  (possibly  relative)
-_path_ for acessibility according to the bit pattern specified in _amode_.
+  == DESCRIPTION
+  The function shall chek the file named by  the  pathname  (possibly  relative)
+  _path_ for acessibility according to the bit pattern specified in _amode_.
 
-The value of _amode_  is either the bitwise-inclusive OR of \`r_ok`, \`w_ok`, \`x_ok` or existence test, \`f_ok`.
+  The value of _amode_  is either the bitwise-inclusive OR of \`r_ok`, \`w_ok`, \`x_ok` or existence test, \`f_ok`.
 
-See also man(3) access for complete documentation.
-|.help}
+  See also man(3) access for complete documentation.
+  |help}
   __access
 
 let pub getcwd = __getcwd
@@ -56,20 +56,20 @@ let pub realpath path =
   else __realpath path
 
 let pub mkdtemp =
-{.help|
-= Os.mkdtemp
+  {help|
+  = Os.mkdtemp
 
-== Synopsis
+  == Synopsis
 
-  mkdtemp <template-string> -> string?
+    mkdtemp <template-string> -> string?
 
-== DESCRIPTION
-Create temporary directory with name created from _template-string_  and  return
-obtained path.
+  == DESCRIPTION
+  Create temporary directory with name created from _template-string_  and  return
+  obtained path.
 
-==== ARGUMENTS
-- _emplate-string_: Template path for the directory ending with six 'X' characters.
-|.help}
+  ==== ARGUMENTS
+  - _emplate-string_: Template path for the directory ending with six 'X' characters.
+  |help}
   __mkdtemp
 
 let pub fork = __fork

@@ -169,23 +169,23 @@ let pub rev_filter_map = __rev_filter_map
 let pub filter_map f xs = rev $ rev_filter_map f xs
 
 let pub fold_left f z xs =
-{.help|
-= List.fold_left
+  {help|
+  = List.fold_left
 
-== DESCRIPTION
-It takes the second argument and the first item of the list and applies the
-function to them, then feeds the function with this result and the second
-argument and so on:
+  == DESCRIPTION
+  It takes the second argument and the first item of the list and applies the
+  function to them, then feeds the function with this result and the second
+  argument and so on:
 
-  fold_left f z xs = f (... (f (f z x1) x2)) xn
+    fold_left f z xs = f (... (f (f z x1) x2)) xn
 
-See _scan_left_ for intermediate results.
+  See _scan_left_ for intermediate results.
 
-== SYNOPSIS
+  == SYNOPSIS
 
-  fold_left (z -> x -> z) z [x] -> z
+    fold_left (z -> x -> z) z [x] -> z
 
-|.help}
+  |help}
   let rec loop xs acc =
     if let x::xs = xs then
       loop xs (f acc x)

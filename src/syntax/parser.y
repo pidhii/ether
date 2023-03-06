@@ -184,7 +184,6 @@ _create_attr(int aflag, void *locpp)
 %token<constant> CONST
 %token<character> CHAR
 %token<string> STR
-%token HELP
 %token START_REGEXP
 %token<integer> END_REGEXP
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -249,7 +248,6 @@ _create_attr(int aflag, void *locpp)
 %type<integer> Attribute
 %type<astvec> Args ArgsAux
 %type<patvec> FnArgs
-%type<string> Help MaybeHelp
 %type<charvec> String
 %type<ast> FmtString FmtStringAux
 %type<ast> RegExp
@@ -958,9 +956,9 @@ Block: START_BLOCK StmtSeq END_BLOCK { $$ = $2; }
 StmtOrBlock: Stmt | Block;
 
 Bind
-  : Pattern '=' MaybeHelp StmtOrBlock {
+  : Pattern '=' StmtOrBlock {
     $$.pat = $1;
-    $$.val = $4;
+    $$.val = $3;
     if ($1->tag == ETH_AST_PATTERN_IDENT &&
         $1->ident.attr &&
         $1->ident.attr->flag & ETH_ATTR_MUT)
@@ -969,54 +967,25 @@ Bind
       eth_ast *p[] = { $$.val };
       $$.val = eth_ast_apply(eth_ast_cval(mkref), p, 1);
     }
-    if ($3)
-    {
-      if ($1->tag == ETH_AST_PATTERN_IDENT)
-      {
-        eth_set_help($1->ident.attr, $3);
-        free($3);
-      }
-      else
-      {
-        eth_warning(".help will be ignored");
-        if (g_filename)
-        {
-          eth_location *loc = location(&@$);
-          eth_print_location(loc, stderr);
-          eth_drop_location(loc);
-        }
-        free($3);
-      }
-    }
   }
-  | Attribute SYMBOL FnArgs AtomicPattern '=' MaybeHelp StmtOrBlock {
+  | Attribute SYMBOL FnArgs AtomicPattern '=' StmtOrBlock {
     $$.pat = eth_ast_ident_pattern($2);
     eth_attr *attr = eth_create_attr($1);
     if (g_filename)
       eth_set_location(attr, location(&@$));
-    if ($6)
-    {
-      eth_set_help(attr, $6);
-      free($6);
-    }
     eth_ref_attr($$.pat->ident.attr = attr);
     cod_vec_push($3, $4);
-    $$.val = eth_ast_fn_with_patterns($3.data, $3.len, $7);
+    $$.val = eth_ast_fn_with_patterns($3.data, $3.len, $6);
     free($2);
     cod_vec_destroy($3);
   }
-  | Attribute SYMBOL '!' '=' MaybeHelp StmtOrBlock {
+  | Attribute SYMBOL '!' '=' StmtOrBlock {
     $$.pat = eth_ast_ident_pattern($2);
     eth_attr *attr = eth_create_attr($1);
     if (g_filename)
       eth_set_location(attr, location(&@$));
-    if ($5)
-    {
-      eth_set_help(attr, $5);
-      free($5);
-    }
     eth_ref_attr($$.pat->ident.attr = attr);
-    $$.val = eth_ast_fn(NULL, 0, $6);
+    $$.val = eth_ast_fn(NULL, 0, $5);
     free($2);
   }
 ;
@@ -1038,18 +1007,6 @@ FmtString
     eth_ast *fmt = eth_ast_cval(eth_get_builtin(SCANROOT, "__fmt"));
     eth_ast *p[1] = { $2 };
     $$ = eth_ast_apply(fmt, p, 1);
-  }
-;
-
-MaybeHelp
-  : { $$ = NULL; }
-  | KEEP_BLOCK Help { $$ = $2; }
-
-Help
-  : HELP StringAux HELP {
-    cod_vec_push($2, 0);
-    $$ = $2.data;
-    $2.data = NULL;
   }
 ;
 

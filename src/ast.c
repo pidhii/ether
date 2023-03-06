@@ -449,6 +449,15 @@ eth_ast_seq(eth_ast *e1, eth_ast *e2)
   return ast;
 }
 
+static eth_ast*
+_dig_out_body(eth_ast *ast)
+{
+  if (ast->tag == ETH_AST_FN)
+    return _dig_out_body(ast->fn.body);
+  else
+    return ast;
+}
+
 eth_ast*
 eth_ast_let(eth_ast_pattern *const pats[], eth_ast *const *vals, int n,
     eth_ast *body)
@@ -463,6 +472,24 @@ eth_ast_let(eth_ast_pattern *const pats[], eth_ast *const *vals, int n,
     eth_ref_ast(ast->let.vals[i] = vals[i]);
     eth_ref_ast_pattern(ast->let.pats[i] = pats[i]);
   }
+
+  // handle documentations
+  for (int i = 0; i < n; ++i)
+  {
+    eth_ast_pattern *pat = ast->let.pats[i];
+    eth_ast *expr = ast->let.vals[i];
+    if (pat->tag != ETH_AST_PATTERN_IDENT)
+      continue;
+    if (expr->tag == ETH_AST_FN)
+      expr = _dig_out_body(expr);
+    if (expr->tag != ETH_AST_SEQ)
+      continue;
+    eth_ast *head = expr->seq.e1;
+    if (head->tag != ETH_AST_CVAL or not eth_is_str(head->cval.val))
+      continue;
+    eth_set_help(pat->ident.attr, eth_str_cstr(head->cval.val));
+  }
+
   return ast;
 }
 

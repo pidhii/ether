@@ -64,23 +64,23 @@ let get_options cfg os =
   loop os [] []
 
 let pub get =
-{.help|
-= CmdArg.get
+  {help|
+  = CmdArg.get
 
-== DESCRIPTION
-Parse command line arguments in GNU style. Both short and long formats are available.
+  == DESCRIPTION
+  Parse command line arguments in GNU style. Both short and long formats are available.
 
-== SYNOPSIS
+  == SYNOPSIS
 
-  get <list-of-options> <list-of-arguments> -> (opts, non-opt-args)
+    get <list-of-options> <list-of-arguments> -> (opts, non-opt-args)
 
-=== ARGUMENTS
-* _list-of-options_ is a list of configurations for expected argumets of the form 
+  === ARGUMENTS
+  * _list-of-options_ is a list of configurations for expected argumets of the form 
 
-    {name = string?, val = <any-tag>, has_arg = boolean?}
+      \{name = string?, val = <any-tag>, has_arg = boolean?}
 
-* _list-of-arguments_ is a list of strings to be parsed (to parse command-line
-  arguments passed to your script use \`cdr command_line`.
-|.help}
+  * _list-of-arguments_ is a list of strings to be parsed (to parse command-line
+    arguments passed to your script use \`cdr command_line`.
+  |help}
   get_options
 
