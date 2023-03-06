@@ -102,7 +102,7 @@ eth_print_location_opt(eth_location *loc, FILE *stream, int opt)
   }
 
   int start = loc->fl;
-  int end = loc->ll;
+  int end = loc->lc > 1 ? loc->ll : loc->ll-1;
   if (opt & ETH_LOPT_EXTRALINES)
   {
     if (start > 1)
