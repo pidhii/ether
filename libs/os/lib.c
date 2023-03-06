@@ -143,6 +143,8 @@ _fork(void)
   return pid < 0 ? eth_exn(eth_system_error(errno)) : eth_num(pid);
 }
 
+// TODO: need some different structure for return value (dont return exit-status
+// only)
 static eth_t
 _waitpid(void)
 {
@@ -155,7 +157,12 @@ _waitpid(void)
   int err = errno;
   if (ret < 0)
     eth_throw(args, eth_system_error(err));
-  eth_return(args, eth_tup2(eth_num(ret), eth_num(wstatus)));
+  eth_t ret_wstatus;
+  if (WIFEXITED(wstatus))
+    ret_wstatus = eth_num(WEXITSTATUS(wstatus));
+  else
+    ret_wstatus = eth_nil;
+  eth_return(args, eth_tup2(eth_num(ret), ret_wstatus));
 }
 
 static eth_t

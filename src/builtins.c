@@ -24,6 +24,8 @@
 #include <unistd.h>
 #include <limits.h>
 
+#include <sys/wait.h>
+
 ETH_MODULE("ether:builtins")
 
 
@@ -533,8 +535,8 @@ _system(void)
   errno = 0;
   int ret = system(eth_str_cstr(cmd));
   if (errno)
-    eth_throw(args, eth_sym("System_error"));
-  eth_return(args, eth_num(ret));
+    eth_throw(args, eth_sym("system_error"));
+  eth_return(args, eth_num(WEXITSTATUS(ret)));
 }
 
 
