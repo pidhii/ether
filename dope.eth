@@ -246,7 +246,6 @@ let empty_db_entry = {
 }
 
 let uninstall {db, modname} =
-  print "... uninstalling ..."
   if let `some {install_dir} = db:get_module_opt modname then
     -- Remove module directory
     info "uninstalling module '{modname}'"
@@ -520,19 +519,20 @@ let commands =
                   else
                     -- Multiple matches. Have to select only a single one of these.
                     info "multiple repositories match the name, select one to install:"
-                    do_in_tempdir $ fn ->
-                      let tmp = open_out "list"
-                      github_matches |> iter $ github_repo ->
-                        write_to tmp github_repo.full_name
-
-                      let ans = shell {sh|
-                        select x in $(cat list) Cancel;
-                        do test -n "$x" && break; done
-                        echo $x
-                      |sh}
-                      if ans eq "" || ans eq "Cancel"
-                      then info "exiting then"; exit 0
-                      else (find (x -> x:full_name eq ans) github_matches).clone_url
+                    let quoted_names =
+                      github_matches
+                      |> map $ github_repo -> "'" ++ github_repo.full_name ++ "'"
+                      |> join ' '
+                    let ans = shell {sh|
+                      select x in {quoted_names} Cancel;
+                      do test -n "$x" && break; done
+                      echo $x
+                    |sh}
+                    if ans eq "" || ans eq "Cancel" then
+                      info "exiting then"
+                      exit 0
+                    else
+                      (find (x -> x.full_name eq ans) github_matches).clone_url
 
             -- Figure out a version of the module to use. If version-tags
             -- available will install the latest version. Otherwize, use latest
@@ -591,15 +591,15 @@ let commands =
     {
       keys = ['check-updates'],
       handle = command_line ->
-        let db = (load_db_from default_db_path):get_modlist
+        let modlist = (load_db_from default_db_path):get_modlist
         let cnt =
-          fold_left (cnt { name, version = local_version, repository = repo_url } ->
+          fold_left (cnt {name, version = local_version, repository = repo_url} ->
             write_to stdout $ paint " checking \e[1m{name}\e[22m ... "
             flush stdout
             if let {info_mesg} = check_update {name, local_version, repo_url}
             then write_to stdout "\e[2K\r"; info info_mesg; cnt + 1
             else write_to stdout "\e[2K\r"; cnt
-          ) 0 db
+          ) 0 modlist
         when cnt == 0 then info "no updates available, all modules are up to date"
     },
     {
@@ -612,52 +612,51 @@ let commands =
         let opts, args = cmdarg.get options command_line
         if assoc_opt "help" opts then
           die "unimplemented"
-        else if args eq [] then
-          -- Update all modules.
-          (load_db_from default_db_path):get_modlist |> iter $ {
-            name, version = local_version, repository = repo_url
-          } ->
-            write_to stdout $ paint " checking \e[1m{name}\e[22m ... "
-            flush stdout
-            if let {new_version, info_mesg} =
-              check_update {name, local_version, repo_url}
-            then
-              write_to stdout "\e[2K\r"; info info_mesg
-              -- Install
-              let db = load_db_from default_db_path
-              let modentry = install {
-                db, repo_url, version = new_version, args = [], overwrite = true
-              }
-              -- Update registry
-              info "updating registry"
-              db:remove name
-              db:add modentry
-              db:update
-            else write_to stdout "\e[2K\r"
         else
-          let name::args = args
           let db = load_db_from default_db_path
-          if let `some {repository, version} = db:get_module_opt name then
-            if let {new_version} = check_update {
-              name, local_version = version, repo_url = repository
-            } then
-              -- Install
-              let db = load_db_from default_db_path
-              let modentry = install {
-                db, args,
-                repo_url = repository,
-                version = new_version,
-                overwrite = true
-              }
-              -- Update registry
-              info "updating registry"
-              db:remove name
-              db:add modentry
-              db:update
-            else
-              info "already using the latest version of '{name}'"
+          if args eq [] then
+            -- Update all modules.
+            db:get_modlist |> iter $ {
+              name, version = local_version, repository = repo_url
+            } ->
+              write_to stdout $ paint " checking \e[1m{name}\e[22m ... "
+              flush stdout
+              if let {new_version, info_mesg} =
+                check_update {name, local_version, repo_url}
+              then
+                write_to stdout "\e[2K\r"; info info_mesg
+                -- Install
+                let modentry = install {
+                  db, repo_url, version = new_version, args = [], overwrite = true
+                }
+                -- Update registry
+                info "updating registry"
+                db:remove name
+                db:add modentry
+                db:update
+              else write_to stdout "\e[2K\r"
           else
-            fatal_error "no such module, '{name}'"
+            let name::args = args
+            if let `some {repository, version} = db:get_module_opt name then
+              if let {new_version} = check_update {
+                name, local_version = version, repo_url = repository
+              } then
+                -- Install
+                let modentry = install {
+                  db, args,
+                  repo_url = repository,
+                  version = new_version,
+                  overwrite = true
+                }
+                -- Update registry
+                info "updating registry"
+                db:remove name
+                db:add modentry
+                db:update
+              else
+                info "already using the latest version of '{name}'"
+            else
+              fatal_error "no such module, '{name}'"
     },
   ]
 
