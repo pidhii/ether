@@ -793,6 +793,12 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       {
         varids[i] = new_vid(bldr);
         eth_prepend_var(bldr->vars, eth_dyn_var(scpvarnams[i], varids[i], NULL));
+        eth_attr *attr = ast->letrec.pats[i]->ident.attr;
+        if (attr)
+        { // handle PUB
+          if (attr->flag & ETH_ATTR_PUB)
+            trace_pub_var(bldr, scpvarnams[i], varids[i], attr, ast->loc, e);
+        }
       }
 
       // build body

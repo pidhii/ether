@@ -249,6 +249,8 @@ _dump(void)
 {
   eth_args args = eth_start(1);
   eth_t fn = eth_arg2(args, eth_function_type);
+  if (not ETH_FUNCTION(fn)->islam)
+    eth_return(args, eth_str("error: not a lambda"));
   char *ptr = NULL;
   size_t size = 0;
   FILE *out = open_memstream(&ptr, &size);

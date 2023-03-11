@@ -422,6 +422,9 @@ build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int selfscpidx,
       fnbldr->ssavinfo[args_local[i]]->creatloc = pop;
   }
 
+  // prepare loop entry point
+  eth_insn *last_before_loop = NULL;
+
   // declare captures [arity, arity + ncap):
   int capvids_local[ncap];
   if (ncap > 0)
@@ -433,7 +436,8 @@ build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int selfscpidx,
       copy_ssa_value_info(fnbldr->ssavinfo[capvids_local[i]],
           bldr->ssavinfo[capvids_parent[i]]);
     }
-    eth_write_insn(fntape, eth_insn_cap(capvids_local, ncap));
+    eth_write_insn(fntape,
+        last_before_loop = eth_insn_cap(capvids_local, ncap));
   }
 
   // declare scope vars [arity + ncap, arity + ncap + nscp):
@@ -453,33 +457,25 @@ build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int selfscpidx,
       int selfvid_local = scpvids_local[selfscpidx];
       fnbldr->ssavinfo[selfvid_local]->isthis = true;
     }
-    eth_write_insn(fntape, eth_insn_ldscp(scpvids_local, scpsize));
+    // LDSCP
+    eth_write_insn(fntape,
+        last_before_loop = eth_insn_ldscp(scpvids_local, scpsize));
+    //for (int i = 0; i < scpsize; ++i)
+      //fnbldr->ssavinfo[scpvids_local[i]]->creatloc = ldscp;
   }
 
-  // prepare loop entry point (if has captures or scope-vars)
-  eth_insn *ent = NULL;
-  if (ncap > 0 or scpsize > 0)
+  if (last_before_loop)
   {
-    // has captures or scope
-    // => has CAP- or LDSCP-instruction
-    // => point is non-null
-    ent = fntape->point;
-    // move ctor-instruction of arguments to entry point:
+    // move ctor-instruction of arguments:
     for (int i = 0; i < arity; ++i)
-      fnbldr->ssavinfo[args_local[i]]->creatloc = ent;
+      fnbldr->ssavinfo[args_local[i]]->creatloc = last_before_loop;
   }
 
   // build body and set up loop entry point (if has captures or scope-vars):
   eth_ssa *ssa = build_body(fnbldr, fntape, ir->fn.body->body, e);
   // move entry point to after CAP- and LDSCP- instructions
-  int nmove = (ncap > 0) + (scpsize > 0);
-  if (nmove)
-  {
-    eth_insn *newent = ent;
-    for (int i = 0; i < nmove; ++i)
-      newent = newent->next;
-    newent->flag |= ETH_IFLAG_ENTRYPOINT;
-  }
+  if (last_before_loop)
+    last_before_loop->next->flag |= ETH_IFLAG_ENTRYPOINT;
 
   eth_destroy_ssa_tape(fntape);
   destroy_ssa_builder(fnbldr);

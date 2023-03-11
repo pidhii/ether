@@ -495,6 +495,13 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
   for (int i = 0; i < ident; ++i)
     putc(' ', stream);
 
+  if (insn->flag & ETH_IFLAG_ENTRYPOINT)
+  {
+    fprintf(stream, "ENTRY-POINT:\n");
+    for (int i = 0; i < ident; ++i)
+      putc(' ', stream);
+  }
+
   switch (insn->tag)
   {
     case ETH_INSN_NOP:
