@@ -38,7 +38,6 @@ destroy_insn(eth_bc_insn *insn)
       break;
 
     case ETH_OPC_FN:
-    case ETH_OPC_FINFN:
       eth_unref_source(insn->fn.data->src);
       eth_unref_bytecode(insn->fn.data->bc);
       free(insn->fn.data);
@@ -367,16 +366,6 @@ write_fn(bc_builder *bldr, int out, int arity, eth_source *src, eth_bytecode *bc
 }
 
 static int
-write_alcfn(bc_builder *bldr, int out, int arity)
-{
-  eth_bc_insn *insn = append_insn(bldr);
-  insn->opc = ETH_OPC_ALCFN;
-  insn->alcfn.out = out;
-  insn->alcfn.arity = arity;
-  return bldr->len - 1;
-}
-
-static int
 write_cap(bc_builder *bldr, int vid0, int n)
 {
   eth_bc_insn *insn = append_insn(bldr);
@@ -387,20 +376,12 @@ write_cap(bc_builder *bldr, int vid0, int n)
 }
 
 static int
-write_finfn(bc_builder *bldr, int out, int arity, eth_source *src,
-    eth_bytecode *bc, int *caps, int ncap)
+write_ldscp(bc_builder *bldr, int vid0, int n)
 {
   eth_bc_insn *insn = append_insn(bldr);
-  insn->opc = ETH_OPC_FINFN;
-  insn->fn.out = out;
-  insn->fn.data = malloc(sizeof(insn->fn.data[0]) + sizeof(int) * ncap);
-  insn->fn.data->arity = arity;
-  insn->fn.data->src = src;
-  insn->fn.data->bc = bc;
-  insn->fn.data->ncap = ncap;
-  eth_ref_source(src);
-  eth_ref_bytecode(bc);
-  memcpy(insn->fn.data->caps, caps, sizeof(int) * ncap);
+  insn->opc = ETH_OPC_LDSCP;
+  insn->ldscp.vid0 = vid0;
+  insn->ldscp.n = n;
   return bldr->len - 1;
 }
 
@@ -923,25 +904,6 @@ end_if:
         break;
       }
 
-      case ETH_INSN_ALCFN:
-        write_alcfn(bldr, new_reg(bldr, ip->out), ip->alcfn.arity);
-        break;
-
-      case ETH_INSN_FINFN:
-      {
-        eth_bytecode *bc = eth_build_bytecode(ip->finfn.ssa);
-        eth_ir *ir = ip->finfn.ir;
-        int out = get_reg(bldr, ip->out);
-        int ncap = ip->fn.ncap;
-        int caps[ncap];
-        for (int i = 0; i < ncap; ++i)
-          caps[i] = get_reg(bldr, ip->finfn.caps[i]);
-        eth_source *src = eth_create_source(ip->finfn.ast, ip->finfn.ir,
-            ip->finfn.ssa);
-        write_finfn(bldr, out, ip->finfn.arity, src, bc, caps, ncap);
-        break;
-      }
-
       case ETH_INSN_POP:
       {
         int n = ip->pop.n;
@@ -957,16 +919,30 @@ end_if:
 
       case ETH_INSN_CAP:
       {
-        int n = ip->pop.n;
+        int n = ip->cap.n;
         int regs[n];
         for (int i = 0; i < n; ++i)
         {
-          regs[i] = new_reg(bldr, ip->pop.vids[i]);
+          regs[i] = new_reg(bldr, ip->cap.vids[i]);
           assert(regs[i] == regs[0] + i);
         }
         write_cap(bldr, regs[0], n);
         break;
       }
+
+      case ETH_INSN_LDSCP:
+      {
+        int n = ip->ldscp.n;
+        int regs[n];
+        for (int i = 0; i < n; ++i)
+        {
+          regs[i] = new_reg(bldr, ip->ldscp.vids[i]);
+          assert(regs[i] == regs[0] + i);
+        }
+        write_ldscp(bldr, regs[0], n);
+        break;
+      }
+
 
       case ETH_INSN_MKSCP:
       {

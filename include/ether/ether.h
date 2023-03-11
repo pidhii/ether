@@ -579,13 +579,13 @@ eth_drop(eth_t x)
  * @{ */
 
 typedef struct {
-  eth_function **clos; /**< Scope closures. */
-  size_t nclos; /**< Length of clos-array. */
+  eth_function **fns; /**< Functions inside the rec-scope. */
+  size_t nfns; /**< Length of clos-array. */
   size_t rc; /**< Count members with non-zero RC. */
 } eth_scp;
 
 eth_scp*
-eth_create_scp(eth_function **clos, int nclos);
+eth_create_scp(eth_function **fns, int nfns);
 
 void
 eth_destroy_scp(eth_scp *scp);
@@ -2191,9 +2191,8 @@ typedef enum {
   ETH_IR_UNOP,
   ETH_IR_FN,
   ETH_IR_MATCH,
+  ETH_IR_LETREC,
   ETH_IR_MULTIMATCH,
-  ETH_IR_STARTFIX,
-  ETH_IR_ENDFIX,
   ETH_IR_MKRCRD,
   ETH_IR_UPDATE,
   ETH_IR_THROW,
@@ -2227,12 +2226,21 @@ struct eth_ir_node {
     struct { eth_ir_node *e1, *e2; } seq;
     struct { eth_binop op; eth_ir_node *lhs, *rhs; } binop;
     struct { eth_unop op; eth_ir_node *expr; } unop;
-    struct { int arity, *caps, *capvars, ncap; eth_ast *ast; eth_ir *body; } fn;
+    struct {
+      int arity;
+      int *caps; /**< IDs of IR variables to be captured from the higher level */
+      int *capvars; /**< IDs of IR variables in function body refering to
+                         corresponding captures */
+      int  ncap;
+      int *scpvars_local;
+      int nscpvars;
+      eth_ast *ast; eth_ir *body;
+    } fn;
+    struct { int *varids, nvars; eth_ir_node **exprs; eth_ir_node *body; }
+      letrec;
     struct { eth_ir_pattern *pat; eth_ir_node *expr, *thenbr, *elsebr;
              eth_toplvl_flag toplvl; int likely; }
       match;
-    struct { int *vars, n; eth_ir_node *body; } startfix;
-    struct { int *vars, n; eth_ir_node *body; } endfix;
     struct { eth_type *type; eth_ir_node **fields; } mkrcrd;
     struct { eth_ir_node *src, **fields; size_t *ids; int n; } update;
     struct { eth_ir_node *exn; } throw;
@@ -2282,21 +2290,18 @@ eth_ir_node* __attribute__((malloc))
 eth_ir_unop(eth_unop op, eth_ir_node *expr);
 
 eth_ir_node* __attribute__((malloc))
-eth_ir_fn(int arity, int *caps, int *capvars, int ncap, eth_ir *body,
-    eth_ast *ast);
+eth_ir_fn(int arity, int *caps, int *capvars, int ncap, int *scpvars_local,
+    int nscpvars, eth_ir *body, eth_ast *ast);
 
 eth_ir_node* __attribute__((malloc))
 eth_ir_match(eth_ir_pattern *pat, eth_ir_node *expr, eth_ir_node *thenbr,
     eth_ir_node *elsebr);
 
+eth_ir_node* __attribute__((malloc))
+eth_ir_letrec(int *varids, eth_ir_node **exprs, int nvars, eth_ir_node *body);
+
 eth_ir_node*
 eth_ir_multimatch(eth_ir_match_table *table, eth_ir_node *const exprs[]);
-
-eth_ir_node* __attribute__((malloc))
-eth_ir_startfix(int const vars[], int n, eth_ir_node *body);
-
-eth_ir_node* __attribute__((malloc))
-eth_ir_endfix(int const vars[], int n, eth_ir_node *body);
 
 eth_ir_node*
 eth_ir_bind(int const varids[], eth_ir_node *const vals[], int n,
@@ -2315,10 +2320,30 @@ eth_ir_throw(eth_ir_node *exn);
 eth_ir_node*
 eth_ir_return(eth_ir_node *expr);
 
+typedef enum eth_spec_tag {
+  ETH_SPEC_TYPE,
+} eth_spec_tag;
+
+typedef struct eth_spec {
+  eth_spec_tag tag;
+  union {
+    struct { int varid; eth_type *type; } type_spec;
+    eth_type *type;
+  };
+} eth_spec;
+
+eth_spec*
+eth_create_type_spec(int varid, eth_type *type);
+
+void
+eth_destroy_spec(eth_spec* spec);
+
 struct eth_ir {
   size_t rc;
   eth_ir_node *body;
   int nvars;
+  eth_spec **specs;
+  int nspecs;
 };
 
 eth_ir* __attribute__((malloc))
@@ -2332,6 +2357,9 @@ eth_drop_ir(eth_ir *ir);
 
 void
 eth_unref_ir(eth_ir *ir);
+
+void
+eth_add_spec(eth_ir *ir, eth_spec *spec);
 
 typedef struct eth_var_cfg eth_var_cfg;
 struct eth_var_cfg {
@@ -2441,77 +2469,6 @@ eth_ir*
 eth_build_module_ir(eth_ast *ast, eth_root *root, eth_module *mod,
     eth_ir_defs *defs, eth_module *uservars);
 
-
-// ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
-//                             TYPE ANALYSIS
-// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-typedef enum {
-  ETH_ATYPE_ERROR,
-  ETH_ATYPE_UNION,
-  ETH_ATYPE_RECORD,
-  ETH_ATYPE_TUPLE,
-  ETH_ATYPE_LIST,
-  ETH_ATYPE_FN,
-  ETH_ATYPE_ATOM,
-} eth_atype_tag;
-
-typedef struct eth_atype eth_atype;
-
-struct eth_atype {
-  eth_atype_tag tag;
-  int rc;
-  union {
-    struct { eth_atype **types; int n; } un;
-    struct { eth_atype **types; int *ids, n; } record;
-    struct { eth_atype **types; int n; } tuple;
-    struct { eth_atype *elttype; } list;
-    struct { int arity; eth_ir *body; } fn;
-    struct { eth_type *type; } atom;
-    struct { eth_t val; } cval;
-  };
-  eth_type *type;
-};
-
-void
-eth_ref_atype(eth_atype *aty);
-
-void
-eth_unref_atype(eth_atype *aty);
-
-void
-eth_drop_atype(eth_atype *aty);
-
-eth_atype*
-eth_create_atype_error(void);
-
-eth_atype*
-eth_create_atype_atom(eth_type *type);
-
-eth_atype*
-eth_create_atype_list(eth_atype *elttype);
-
-eth_atype*
-eth_create_atype_record(int const ids[], eth_atype *const types[], int n);
-
-eth_atype*
-eth_create_atype_tuple(eth_atype *const types[], int n);
-
-eth_atype*
-eth_create_atype_fn(int arity, eth_ir *body);
-
-eth_atype*
-eth_create_atype_union(eth_atype *const types[], int n);
-
-static inline eth_atype*
-eth_create_atype_any(void)
-{ return eth_create_atype_union(NULL, 0); }
-
-static inline bool
-eth_atype_is_atom(eth_atype *atype, eth_type *type)
-{ return atype->tag == ETH_ATYPE_ATOM && atype->atom.type == type; }
-
-eth_ir_node*
-eth_specialize(const eth_ir *ir);
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                STATIC SINGLE ASSIGNEMENT REPRESENTATION
@@ -2705,10 +2662,9 @@ typedef enum {
   ETH_INSN_BINOP,
   ETH_INSN_UNOP,
   ETH_INSN_FN,
-  ETH_INSN_ALCFN,
-  ETH_INSN_FINFN,
   ETH_INSN_POP,
   ETH_INSN_CAP,
+  ETH_INSN_LDSCP,
   ETH_INSN_MKSCP,
   ETH_INSN_CATCH,
   ETH_INSN_TRY,
@@ -2748,12 +2704,9 @@ struct eth_insn {
     struct { eth_unop op; int vid; } unop;
     struct { int arity, *caps, ncap; eth_ast *ast; eth_ir *ir; eth_ssa *ssa; }
       fn;
-    struct { int arity, *caps, ncap, *movs, nmov; eth_ast *ast; eth_ir *ir;
-             eth_ssa *ssa; }
-      finfn;
-    struct { int arity; } alcfn;
     struct { int *vids, n; } pop;
     struct { int *vids, n; } cap;
+    struct { int *vids, n; } ldscp;
     struct { int *clos, nclos; } mkscp;
     struct { int tryid, vid; } catch;
     struct { int id, likely; eth_insn *trybr, *catchbr; } try;
@@ -2830,17 +2783,13 @@ eth_insn_fn(int out, int arity, int *caps, int ncap, eth_ast *ast, eth_ir *ir,
     eth_ssa *ssa);
 
 eth_insn* __attribute__((malloc))
-eth_insn_alcfn(int out, int arity);
-
-eth_insn* __attribute__((malloc))
-eth_insn_finfn(int c, int arity, int *caps, int ncap, int *movs, int nmov,
-    eth_ast *ast, eth_ir *ir, eth_ssa *ssa);
-
-eth_insn* __attribute__((malloc))
 eth_insn_pop(int const vids[], int n);
 
 eth_insn* __attribute__((malloc))
 eth_insn_cap(int const vids[], int n);
+
+eth_insn* __attribute__((malloc))
+eth_insn_ldscp(int const vids[], int n);
 
 eth_insn* __attribute__((malloc))
 eth_insn_mkscp(int *clos, int nclos);
@@ -2979,9 +2928,8 @@ typedef enum {
   ETH_OPC_LNOT,
 
   ETH_OPC_FN,
-  ETH_OPC_ALCFN,
-  ETH_OPC_FINFN,
   ETH_OPC_CAP,
+  ETH_OPC_LDSCP,
   ETH_OPC_MKSCP,
 
   ETH_OPC_LOAD,
@@ -3041,11 +2989,10 @@ struct eth_bc_insn {
         int ncap;
         int caps[];
       } *restrict data;
-    } fn, finfn;
-    struct { uint64_t out; int arity; } alcfn;
+    } fn;
     struct { uint64_t vid0, n; } cap;
-    struct { struct { uint64_t *clos, nclos; } *restrict data; }
-      mkscp;
+    struct { uint64_t vid0, n; } ldscp;
+    struct { struct { uint64_t *clos, nclos; } *restrict data; } mkscp;
 
     struct { uint64_t out; uint32_t vid, offs; } load;
     // TODO: flatten vids
@@ -3055,7 +3002,9 @@ struct eth_bc_insn {
     struct { uint64_t vid; } setexn;
     struct { uint64_t out; } getexn;
 
+    // TODO: flatten vids
     struct { uint64_t out; eth_type *type; uint64_t *vids; } mkrcrd;
+    // TODO: smaller!
     struct { uint32_t out; uint16_t src, n; uint64_t *vids; size_t *ids; }
       updtrcrd;
   };

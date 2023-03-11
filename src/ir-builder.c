@@ -149,7 +149,7 @@ require_var(ir_builder *bldr, const char *ident, eth_var *ret)
   {
     if (require_var(bldr->parent, ident, ret))
     {
-      // immidiately return constants (don't perform capture)
+      // immediately return constants (don't perform capture)
       if (ret->cval)
         return true;
       int vid = new_vid(bldr);
@@ -499,43 +499,6 @@ build_let(ir_builder *bldr, int idx, const eth_ast *ast,
   }
 }
 
-static eth_ir_node*
-build_letrec(ir_builder *bldr, int idx, eth_ast *ast, int nvars0, int nvars,
-    eth_ir_pattern *const pats[], int *e)
-{
-  if (idx < ast->letrec.n)
-  {
-    eth_ir_node *expr = build_with_toplvl(bldr, ast->letrec.vals[idx], e, false);
-    eth_set_ir_location(expr, ast->letrec.vals[idx]->loc);
-
-    eth_ir_node *thenbr = build_letrec(bldr, idx + 1, ast, nvars0, nvars, pats, e);
-
-    eth_t exn = eth_exn(eth_type_error());
-    eth_ir_node *elsebr = eth_ir_throw(eth_ir_cval(exn));
-    eth_set_ir_location(elsebr, ast->letrec.vals[idx]->loc);
-
-    eth_ir_node *ret = eth_ir_match(pats[idx], expr, thenbr, elsebr);
-    eth_set_ir_location(ret, ast->loc);
-    ret->match.toplvl = ETH_TOPLVL_THEN;
-    ret->match.likely = 1;
-    return ret;
-  }
-  else
-  {
-    nvars = bldr->vars->len - bldr->capoffs - nvars0;
-
-    int varids[nvars];
-    eth_var *it = bldr->vars->head;
-    for (int i = nvars-1; i >= 0; --i, it = it->next)
-      varids[i] = it->vid;
-
-    eth_ir_node *body = build(bldr, ast->letrec.body, e);
-    eth_ir_node *ret = eth_ir_endfix(varids, nvars, body);
-
-    return ret;
-  }
-}
-
 static bool
 is_binop_redefined(ir_builder *bldr, eth_binop op)
 {
@@ -642,6 +605,66 @@ constexpr_unop(eth_unop op, eth_t x, int *e)
 }
 
 static eth_ir_node*
+build_fn(ir_builder *bldr, eth_ast *fnast, char *scpvarnams[], int nscpvars,
+    int *e)
+{
+  ir_builder *fnbldr = create_ir_builder(bldr);
+
+  // arguments:
+  int nargs = fnast->fn.arity;
+  int args_local[nargs];
+  eth_ir_pattern *pats[nargs];
+  // Note: arguments MUST be continuous and start at 0:
+  for (int i = 0; i < nargs; ++i)
+    args_local[i] = new_vid(fnbldr);
+  for (int i = 0; i < nargs; ++i)
+    pats[i] = build_pattern(fnbldr, fnast->fn.args[i], fnast->loc, e);
+  int nargvars = fnbldr->vars->len;
+
+  // declare recursive scope vars
+  int scpvars_local[nscpvars];
+  for (int i = 0; i < nscpvars; ++i)
+  {
+    scpvars_local[i] = new_vid(fnbldr);
+    eth_prepend_var(fnbldr->vars,
+        eth_dyn_var(scpvarnams[i], scpvars_local[i], NULL));
+  }
+
+  // body:
+  eth_ir_node *body_acc = build_with_toplvl(fnbldr, fnast->fn.body, e, false);
+  eth_ir_node *throw = eth_ir_throw(eth_ir_cval(eth_exn(eth_type_error())));
+  for (int i = nargs - 1; i >= 0; --i)
+  {
+    body_acc = eth_ir_match(pats[i], eth_ir_var(args_local[i]), body_acc, throw);
+    body_acc->match.likely = 1;
+  }
+  eth_drop_ir_node(throw);
+  eth_ir *body = eth_create_ir(body_acc, fnbldr->nvars);
+
+  // resolve captures:
+  eth_pop_var(fnbldr->vars, nscpvars); // pop scope vars => args and captures
+                                       // are left
+  eth_pop_var(fnbldr->vars, nargvars); // pop args => only captures are left
+  int ncap = fnbldr->vars->len;
+  int capvars_parent[ncap];
+  int capvars_local[ncap];
+  int i = 0;
+  for (eth_var *cap = fnbldr->vars->head; i < ncap; cap = cap->next, ++i)
+  {
+    assert(cap->vid >= 0);
+    capvars_local[i] = cap->vid;
+
+    eth_var *var = eth_find_var(bldr->vars->head, cap->ident, NULL);
+    assert(var && var->vid >= 0);
+    capvars_parent[i] = var->vid;
+  }
+
+  destroy_ir_builder(fnbldr);
+  return eth_ir_fn(fnast->fn.arity, capvars_parent, capvars_local, ncap,
+      scpvars_local, nscpvars, body, fnast);
+}
+
+static eth_ir_node*
 build(ir_builder *bldr, eth_ast *ast, int *e)
 {
   switch (ast->tag)
@@ -732,14 +755,12 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
 
     case ETH_AST_LETREC:
     {
-      eth_ir_pattern *pats[ast->letrec.n];
+      const int n = ast->letrec.n;
 
-      /* TODO:
-       *  Figure out a way to have recursive structures (not only closures) s.t.
-       *  record-updates won't yeild dangling resources.
-       */
       // validate expressions: only closures allowed
-      for (int i = 0; i < ast->letrec.n; ++i)
+      // and collect scope vars
+      char *scpvarnams[n];
+      for (int i = 0; i < n; ++i)
       {
         if (ast->letrec.vals[i]->tag != ETH_AST_FN)
         {
@@ -748,23 +769,39 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
           *e = true;
           return eth_ir_error();
         }
+
+        if (ast->letrec.pats[i]->tag != ETH_AST_PATTERN_IDENT)
+        {
+          eth_error("Only closures allowed in recursive scope (thus can't match"
+            " non-symbol pattern)");
+          eth_print_location(ast->loc, stderr);
+          *e = true;
+          return eth_ir_error();
+        }
+
+        scpvarnams[i] = ast->letrec.pats[i]->ident.str;
       }
 
-      int n1 = bldr->vars->len - bldr->capoffs;
-      for (int i = 0; i < ast->letrec.n; ++i)
-        pats[i] = build_pattern(bldr, ast->letrec.pats[i], ast->loc, e);
-      int n2 = bldr->vars->len - bldr->capoffs;
-      int nvars = n2 - n1;
+      // build scope vars
+      eth_ir_node *fns[n];
+      for (int i = 0; i < n; ++i)
+        fns[i] = build_fn(bldr, ast->letrec.vals[i], scpvarnams, n, e);
 
-      eth_ir_node *body = build_letrec(bldr, 0, ast, n1, nvars, pats, e);
+      // declare scope vars
+      int varids[n];
+      for (int i = 0; i < n; ++i)
+      {
+        varids[i] = new_vid(bldr);
+        eth_prepend_var(bldr->vars, eth_dyn_var(scpvarnams[i], varids[i], NULL));
+      }
 
-      int varids[nvars];
-      eth_var *it = bldr->vars->head;
-      for (int i = nvars-1; i >= 0; --i, it = it->next)
-        varids[i] = it->vid;
-      eth_pop_var(bldr->vars, nvars);
+      // build body
+      eth_ir_node *body = build(bldr, ast->letrec.body, e);
 
-      return eth_ir_startfix(varids, nvars, body);
+      // pop scope vars
+      eth_pop_var(bldr->vars, n);
+
+      return eth_ir_letrec(varids, fns, n, body);
     }
 
     case ETH_AST_BINOP:
@@ -833,54 +870,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
     }
 
     case ETH_AST_FN:
-    {
-      ir_builder *fnbldr = create_ir_builder(bldr);
-
-      // arguments:
-      int nargs = ast->fn.arity;
-      int args[nargs];
-      eth_ir_pattern *pats[nargs];
-      // Note: arguments MUST be continuous and start at 0:
-      for (int i = 0; i < nargs; ++i)
-        args[i] = new_vid(fnbldr);
-      for (int i = 0; i < nargs; ++i)
-        pats[i] = build_pattern(fnbldr, ast->fn.args[i], ast->loc, e);
-      int nargvars = fnbldr->vars->len;
-
-      // body:
-      eth_ir_node *body_acc = build_with_toplvl(fnbldr, ast->fn.body, e, false);
-      eth_ir_node *throw = NULL;
-      for (int i = nargs - 1; i >= 0; --i)
-      {
-        if (throw == NULL)
-        {
-          eth_t exn = eth_exn(eth_type_error());
-          throw = eth_ir_throw(eth_ir_cval(exn));
-        }
-        body_acc = eth_ir_match(pats[i], eth_ir_var(args[i]), body_acc, throw);
-        body_acc->match.likely = 1;
-      }
-      eth_ir *body = eth_create_ir(body_acc, fnbldr->nvars);
-
-      // resolve captures:
-      eth_pop_var(fnbldr->vars, nargvars); // pop args so only captures are left
-      int ncap = fnbldr->vars->len;
-      int caps[ncap];
-      int capvars[ncap];
-      int i = 0;
-      for (eth_var *cap = fnbldr->vars->head; i < ncap; cap = cap->next, ++i)
-      {
-        assert(cap->vid >= 0);
-        capvars[i] = cap->vid;
-
-        eth_var *var = eth_find_var(bldr->vars->head, cap->ident, NULL);
-        assert(var && var->vid >= 0);
-        caps[i] = var->vid;
-      }
-
-      destroy_ir_builder(fnbldr);
-      return eth_ir_fn(ast->fn.arity, caps, capvars, ncap, body, ast);
-    }
+      return build_fn(bldr, ast, 0, 0, e);
 
     // TODO: handle constexprs
     case ETH_AST_MATCH:

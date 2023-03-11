@@ -180,6 +180,7 @@ destroy_ir_node(eth_ir_node *node)
     case ETH_IR_FN:
       free(node->fn.caps);
       free(node->fn.capvars);
+      free(node->fn.scpvars_local);
       eth_unref_ir(node->fn.body);
       eth_unref_ast(node->fn.ast);
       break;
@@ -191,14 +192,12 @@ destroy_ir_node(eth_ir_node *node)
       eth_unref_ir_node(node->match.elsebr);
       break;
 
-    case ETH_IR_STARTFIX:
-      free(node->startfix.vars);
-      eth_unref_ir_node(node->startfix.body);
-      break;
-
-    case ETH_IR_ENDFIX:
-      free(node->endfix.vars);
-      eth_unref_ir_node(node->endfix.body);
+    case ETH_IR_LETREC:
+      free(node->letrec.varids);
+      for (int i = 0; i < node->letrec.nvars; ++i)
+        eth_unref_ir_node(node->letrec.exprs[i]);
+      free(node->letrec.exprs);
+      eth_unref_ir_node(node->letrec.body);
       break;
 
     case ETH_IR_MKRCRD:
@@ -343,20 +342,21 @@ eth_ir_unop(eth_unop op, eth_ir_node *expr)
 }
 
 eth_ir_node*
-eth_ir_fn(int arity, int *caps, int *capvars, int ncap, eth_ir *body,
-    eth_ast *ast)
+eth_ir_fn(int arity, int *caps, int *capvars, int ncap, int *scpvars_local,
+    int nscpvars, eth_ir *body, eth_ast *ast)
 {
   eth_ir_node *node = create_ir_node(ETH_IR_FN);
   node->fn.arity = arity;
   node->fn.caps = malloc(sizeof(int) * ncap);
-  node->fn.capvars = malloc(sizeof(int) * ncap);
-  node->fn.ncap = ncap;
-  node->fn.body = body;
-  node->fn.ast = ast;
   memcpy(node->fn.caps, caps, sizeof(int) * ncap);
+  node->fn.capvars = malloc(sizeof(int) * ncap);
   memcpy(node->fn.capvars, capvars, sizeof(int) * ncap);
-  eth_ref_ir(body);
-  eth_ref_ast(ast);
+  node->fn.ncap = ncap;
+  node->fn.scpvars_local = malloc(sizeof(int) * nscpvars);
+  memcpy(node->fn.scpvars_local, scpvars_local, sizeof(int) * nscpvars);
+  node->fn.nscpvars = nscpvars;
+  eth_ref_ir(node->fn.body = body);
+  eth_ref_ast(node->fn.ast = ast);
   return node;
 }
 
@@ -371,6 +371,20 @@ eth_ir_match(eth_ir_pattern *pat, eth_ir_node *expr, eth_ir_node *thenbr,
   eth_ref_ir_node(node->match.elsebr = elsebr);
   node->match.toplvl = ETH_TOPLVL_NONE;
   node->match.likely = 0;
+  return node;
+}
+
+eth_ir_node*
+eth_ir_letrec(int *varids, eth_ir_node **exprs, int nvars, eth_ir_node *body)
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_LETREC);
+  node->letrec.varids = malloc(sizeof(int) * nvars);
+  memcpy(node->letrec.varids, varids, sizeof(int) * nvars);
+  node->letrec.exprs = malloc(sizeof(eth_ir_node*) * nvars);
+  for (int i = 0; i < nvars; ++i)
+    eth_ref_ir_node(node->letrec.exprs[i] = exprs[i]);
+  node->letrec.nvars = nvars;
+  eth_ref_ir_node(node->letrec.body = body);
   return node;
 }
 
@@ -394,28 +408,6 @@ eth_ir_bind(int const varids[], eth_ir_node *const vals[], int n,
     eth_ir_node *body)
 {
   return create_bind(0, varids, vals, n, body);
-}
-
-eth_ir_node*
-eth_ir_startfix(int const vars[], int n, eth_ir_node *body)
-{
-  eth_ir_node *node = create_ir_node(ETH_IR_STARTFIX);
-  node->startfix.vars = malloc(sizeof(int) * n);
-  node->startfix.n = n;
-  eth_ref_ir_node(node->startfix.body = body);
-  memcpy(node->startfix.vars, vars, sizeof(int) * n);
-  return node;
-}
-
-eth_ir_node*
-eth_ir_endfix(int const vars[], int n, eth_ir_node *body)
-{
-  eth_ir_node *node = create_ir_node(ETH_IR_ENDFIX);
-  node->endfix.vars = malloc(sizeof(int) * n);
-  node->endfix.n = n;
-  eth_ref_ir_node(node->endfix.body = body);
-  memcpy(node->endfix.vars, vars, sizeof(int) * n);
-  return node;
 }
 
 eth_ir_node*

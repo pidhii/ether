@@ -24,43 +24,6 @@
 ETH_MODULE("ether:ssa-builder")
 
 
-/*
- * 1. Evaluate LETREC as is but creating dummy place-holders instead of all
- *    internal closures.
- *
- * 2. Finalize all closures.
- */
-typedef struct closure closure;
-typedef struct weak_ref weak_ref;
-
-struct closure {
-  int vid;
-  eth_ir_node *ctor;
-};
-
-struct weak_ref {
-  int vid;
-};
-
-typedef struct {
-  cod_vec(closure) clos;
-} rec_scope;
-
-static rec_scope*
-create_rec_scope(void)
-{
-  rec_scope *scp = malloc(sizeof(rec_scope));
-  cod_vec_init(scp->clos);
-  return scp;
-}
-
-static void
-destroy_rec_scope(rec_scope *scp)
-{
-  cod_vec_destroy(scp->clos);
-  free(scp);
-}
-
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                               BUILDER
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -91,7 +54,7 @@ typedef enum {
    * Object MUST be referenced by hand at MOV instructions. Note, it does not
    * imply, in general, the need for REF instruction. The statement stress that
    * it just has to be *referenced* without specifying a way to ensure/acomplish
-   * this. Object is fed to \ref kill_value_T() launched at the instruction next
+   * this. Object is fed to @ref kill_value_T() launched at the instruction next
    * to the parent form (IF/TRY). If *user* is found and thus release of the
    * object is handled by the algorithm, we are done. Otherwize, lifetime is
    * defined branch-wise. Each branch is handled separately and independently of
@@ -100,6 +63,7 @@ typedef enum {
    * ..TODO..
    */
   RC_RULES_PHI,
+
   RC_RULES_UNREF,
 } rc_rules;
 
@@ -114,10 +78,49 @@ typedef struct {
   eth_type *type;
   eth_insn *creatloc;
   cod_vec(field_info) fields;
-  bool isrec;
-  bool isdummy;
   bool isthis;
-} value_info;
+} ssa_value_info;
+
+static ssa_value_info*
+create_empty_ssa_value_info()
+{
+  ssa_value_info *ssavinfo = calloc(1, sizeof(ssa_value_info));
+  cod_vec_init(ssavinfo->fields);
+  return ssavinfo;
+}
+
+static void
+destroy_ssa_value_info(ssa_value_info *ssavinfo)
+{
+  cod_vec_destroy(ssavinfo->fields);
+  free(ssavinfo);
+}
+
+static void
+copy_ssa_value_info(ssa_value_info *dst, ssa_value_info *src)
+{
+  dst->cval = src->cval;
+  dst->type = src->type;
+}
+
+typedef struct ir_variable_info {
+  int ssavid;
+  eth_type *type;
+} ir_variable_info;
+
+static ir_variable_info*
+create_empty_ir_variable_info()
+{
+  ir_variable_info *irvinfo = calloc(1, sizeof(ir_variable_info));
+  return irvinfo;
+}
+
+static void
+destroy_ir_variable_info(ir_variable_info *irvinfo)
+{
+  free(irvinfo);
+}
+
 
 typedef enum {
   ACTION_SETCVAL,
@@ -134,50 +137,32 @@ typedef struct {
   };
 } action;
 
-typedef struct  {
-  int nvars;
-  int *vars;
+typedef struct {
+  int nirvars;
+  ir_variable_info **irvinfo;
   // TODO: use cod_vec
-  int vilen;
+  int nssavals;
   int vicap;
-  value_info **vinfo;
+  ssa_value_info **ssavinfo;
   cod_vec(eth_insn*) movs;
-  rec_scope *recscp;
-  int recscpcnt;
   bool testexn;
   int ntries;
   int istry, tryid;
   cod_vec(action) actions;
 } ssa_builder;
 
-static value_info*
-create_empty_vinfo()
-{
-  value_info *vinfo = calloc(1, sizeof(value_info));
-  cod_vec_init(vinfo->fields);
-  vinfo->isrec = false;
-  return vinfo;
-}
-
-static void
-destroy_vinfo(value_info *vinfo)
-{
-  cod_vec_destroy(vinfo->fields);
-  free(vinfo);
-}
-
 static ssa_builder*
-create_ssa_builder(int nvars)
+create_ssa_builder(int nirvars)
 {
   ssa_builder *bldr = malloc(sizeof(ssa_builder));
-  bldr->nvars = nvars;
-  bldr->vars = malloc(sizeof(int) * nvars);
-  bldr->vilen = 0;
-  bldr->vicap = 0x400;
-  bldr->vinfo = malloc(sizeof(value_info*) * bldr->vicap);
+  bldr->nirvars = nirvars;
+  bldr->irvinfo = malloc(sizeof(ir_variable_info*) * nirvars);
+  for (int i = 0; i < nirvars; ++i)
+    bldr->irvinfo[i] = create_empty_ir_variable_info();
+  bldr->nssavals = 0;
+  bldr->vicap = 0x40;
+  bldr->ssavinfo = malloc(sizeof(ssa_value_info*) * bldr->vicap);
   cod_vec_init(bldr->movs);
-  bldr->recscp = NULL;
-  bldr->recscpcnt = 0;
   bldr->testexn = true;
   bldr->ntries = 0;
   bldr->istry = 0;
@@ -188,12 +173,13 @@ create_ssa_builder(int nvars)
 static void
 destroy_ssa_builder(ssa_builder *bldr)
 {
-  free(bldr->vars);
-  for (int i = 0; i < bldr->vilen; ++i)
-    destroy_vinfo(bldr->vinfo[i]);
-  free(bldr->vinfo);
+  for (int i = 0; i < bldr->nirvars; ++i)
+    destroy_ir_variable_info(bldr->irvinfo[i]);
+  free(bldr->irvinfo);
+  for (int i = 0; i < bldr->nssavals; ++i)
+    destroy_ssa_value_info(bldr->ssavinfo[i]);
+  free(bldr->ssavinfo);
   cod_vec_destroy(bldr->movs);
-  assert(bldr->recscp == NULL);
   assert(bldr->actions.len == 0);
   cod_vec_destroy(bldr->actions);
   free(bldr);
@@ -201,9 +187,7 @@ destroy_ssa_builder(ssa_builder *bldr)
 
 static int
 begin_logical_block(ssa_builder *bldr)
-{
-  return bldr->actions.len;
-}
+{ return bldr->actions.len; }
 
 static void
 set_cval(ssa_builder *bldr, int vid, eth_t val)
@@ -213,10 +197,10 @@ set_cval(ssa_builder *bldr, int vid, eth_t val)
     .setcval = {
       .vid = vid,
       .new = val,
-      .old = bldr->vinfo[vid]->cval,
+      .old = bldr->ssavinfo[vid]->cval,
     }
   });
-  bldr->vinfo[vid]->cval = val;
+  bldr->ssavinfo[vid]->cval = val;
 }
 
 static void
@@ -227,10 +211,10 @@ set_type(ssa_builder *bldr, int vid, eth_type *type)
     .settype = {
       .vid = vid,
       .new = type,
-      .old = bldr->vinfo[vid]->type,
+      .old = bldr->ssavinfo[vid]->type,
     }
   });
-  bldr->vinfo[vid]->type = type;
+  bldr->ssavinfo[vid]->type = type;
 }
 
 // XXX: use this!!
@@ -245,7 +229,7 @@ set_field(ssa_builder *bldr, int vid, size_t fid, int fldvid)
     }
   });
   field_info info = { .fid = fid, .vid = fldvid };
-  cod_vec_push(bldr->vinfo[vid]->fields, info);
+  cod_vec_push(bldr->ssavinfo[vid]->fields, info);
 }
 
 static void
@@ -254,21 +238,21 @@ undo_action(ssa_builder *bldr, action *a)
   switch (a->tag)
   {
     case ACTION_SETCVAL:
-      bldr->vinfo[a->setcval.vid]->cval = a->setcval.old;
+      bldr->ssavinfo[a->setcval.vid]->cval = a->setcval.old;
       break;
 
     case ACTION_SETTYPE:
-      bldr->vinfo[a->settype.vid]->type = a->settype.old;
+      bldr->ssavinfo[a->settype.vid]->type = a->settype.old;
       break;
 
     case ACTION_SETFIELD:
     {
-      value_info *vinfo = bldr->vinfo[a->setfield.vid];
-      for (size_t i = 0; i < vinfo->fields.len; ++i)
+      ssa_value_info *ssavinfo = bldr->ssavinfo[a->setfield.vid];
+      for (size_t i = 0; i < ssavinfo->fields.len; ++i)
       {
-        if (vinfo->fields.data[i].fid == a->setfield.fid)
+        if (ssavinfo->fields.data[i].fid == a->setfield.fid)
         {
-          cod_vec_erase(vinfo->fields, i);
+          cod_vec_erase(ssavinfo->fields, i);
           return;
         }
       }
@@ -300,14 +284,14 @@ new_try(ssa_builder *bldr)
 static int
 new_val(ssa_builder *bldr, rc_rules rules)
 {
-  if (bldr->vicap == bldr->vilen)
+  if (bldr->vicap == bldr->nssavals)
   {
     bldr->vicap <<= 1;
-    bldr->vinfo = realloc(bldr->vinfo, sizeof(value_info*) * bldr->vicap);
+    bldr->ssavinfo = realloc(bldr->ssavinfo, sizeof(ssa_value_info*) * bldr->vicap);
   }
-  int vid = bldr->vilen++;
-  bldr->vinfo[vid] = create_empty_vinfo();
-  bldr->vinfo[vid]->rules = rules;
+  int vid = bldr->nssavals++;
+  bldr->ssavinfo[vid] = create_empty_ssa_value_info();
+  bldr->ssavinfo[vid]->rules = rules;
   return vid;
 }
 
@@ -337,7 +321,8 @@ build_body(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *body, bool *e);
 
 #define FN_NEW (-1)
 static int
-build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *fn, int f, bool *e);
+build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *fn, int selfscpidx,
+    bool *e);
 
 static int
 build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e);
@@ -352,54 +337,10 @@ build_logical_block(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir,
   return ret;
 }
 
-static rec_scope*
-start_rec_scope(ssa_builder *bldr)
-{
-  if (bldr->recscpcnt++)
-    return bldr->recscp;
-  else
-    return bldr->recscp = create_rec_scope();
-}
-
-static void
-deffer_closure(ssa_builder *bldr, int vid, eth_ir_node *ctor)
-{
-  assert(bldr->recscp);
-  closure c = { .vid = vid, .ctor = ctor };
-  cod_vec_push(bldr->recscp->clos, c);
-  bldr->vinfo[vid]->isrec = true;
-}
-
-static void
-finalize_rec_scope(ssa_builder *bldr, eth_ssa_tape *tape, bool *e)
-{
-  rec_scope *scp = bldr->recscp;
-
-  assert(bldr->recscpcnt > 0);
-  if (--bldr->recscpcnt > 0)
-    return;
-
-  // finalize closures
-  cod_vec_iter(scp->clos, i, x, build_fn(bldr, tape, x.ctor, x.vid, e));
-
-  // remove marks from recursive variables
-  cod_vec_iter(scp->clos, i, x, bldr->vinfo[x.vid]->isrec = false);
-
-  // build scope
-  int nclos = scp->clos.len;
-  int clos[nclos];
-  for (int i = 0; i < nclos; ++i)
-    clos[i] = scp->clos.data[i].vid;
-  eth_write_insn(tape, eth_insn_mkscp(clos, nclos));
-
-  destroy_rec_scope(scp);
-  bldr->recscp = NULL;
-}
-
 static void
 move_to_phi_default(ssa_builder *bldr, eth_ssa_tape *tape, int phi, int vid)
 {
-  switch (bldr->vinfo[vid]->rules)
+  switch (bldr->ssavinfo[vid]->rules)
   {
     case RC_RULES_DEFAULT:
     case RC_RULES_PHI:
@@ -424,8 +365,8 @@ move_to_phi_default(ssa_builder *bldr, eth_ssa_tape *tape, int phi, int vid)
 static int
 resolve_phi(ssa_builder *bldr, eth_ssa_tape *t1, int r1, eth_ssa_tape *t2, int r2)
 {
-  int rc1 = bldr->vinfo[r1]->rules;
-  int rc2 = bldr->vinfo[r2]->rules;
+  int rc1 = bldr->ssavinfo[r1]->rules;
+  int rc2 = bldr->ssavinfo[r2]->rules;
   int phi;
   if (rc1 == rc2 && rc1 == RC_RULES_DISABLE)
   {
@@ -446,97 +387,107 @@ resolve_phi(ssa_builder *bldr, eth_ssa_tape *t1, int r1, eth_ssa_tape *t2, int r
 }
 
 static int
-build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int f, bool *e)
+build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int selfscpidx,
+    bool *e)
 {
   int arity = ir->fn.arity;
 
   // enclose outer variables:
   int ncap = ir->fn.ncap;
-  int caps[ncap];
-  int nmov = 0;
-  int movs[ncap];
+  int capvids_parent[ncap];
   for (int i = 0; i < ncap; ++i)
   {
-    caps[i] = bldr->vars[ir->fn.caps[i]];
-    if (not bldr->vinfo[caps[i]]->isrec)
-      movs[nmov++] = caps[i];
+    capvids_parent[i] = bldr->irvinfo[ir->fn.caps[i]]->ssavid;
   }
 
   ssa_builder *fnbldr = create_ssa_builder(ir->fn.body->nvars);
   eth_ssa_tape *fntape = eth_create_ssa_tape();
 
   // declare arguments [0, arity):
-  int fnargs[arity];
+  int args_local[arity];
   if (arity)
   {
     for (int i = 0; i < arity; ++i)
     {
-      fnargs[i] = new_val(fnbldr, RC_RULES_DEFAULT);
-      fnbldr->vars[i] = fnargs[i]; // varids of args are [0 ... arity)
+      args_local[i] = new_val(fnbldr, RC_RULES_DEFAULT);
+      fnbldr->irvinfo[i]->ssavid = args_local[i]; // varids of args are
+                                                  // [0 ... arity)
+                                                  // XXX so what?
     }
 
-    eth_insn *pop = eth_insn_pop(fnargs, arity);
+    eth_insn *pop = eth_insn_pop(args_local, arity);
     eth_write_insn(fntape, pop);
 
     for (int i = 0; i < arity; ++i)
-      fnbldr->vinfo[fnargs[i]]->creatloc = pop;
+      fnbldr->ssavinfo[args_local[i]]->creatloc = pop;
   }
 
   // declare captures [arity, arity + ncap):
-  int fncaps[ncap];
+  int capvids_local[ncap];
   if (ncap > 0)
   {
     for (int i = 0; i < ncap; ++i)
     {
-      fncaps[i] = new_val(fnbldr, RC_RULES_DISABLE);
-      fnbldr->vars[ir->fn.capvars[i]] = fncaps[i];
-      fnbldr->vinfo[fncaps[i]]->cval = bldr->vinfo[caps[i]]->cval;
-      fnbldr->vinfo[fncaps[i]]->type = bldr->vinfo[caps[i]]->type;
-
-      // detect self-capture for loop-detection:
-      if (f != FN_NEW and caps[i] == f)
-        fnbldr->vinfo[fncaps[i]]->isthis = true;
+      capvids_local[i] = new_val(fnbldr, RC_RULES_DISABLE);
+      fnbldr->irvinfo[ir->fn.capvars[i]]->ssavid = capvids_local[i];
+      copy_ssa_value_info(fnbldr->ssavinfo[capvids_local[i]],
+          bldr->ssavinfo[capvids_parent[i]]);
     }
-    eth_write_insn(fntape, eth_insn_cap(fncaps, ncap));
+    eth_write_insn(fntape, eth_insn_cap(capvids_local, ncap));
   }
 
-  // prepare entry point (if has captures)
-  eth_insn *ent = NULL;
-  if (ncap > 0)
+  // declare scope vars [arity + ncap, arity + ncap + nscp):
+  int scpsize = ir->fn.nscpvars;
+  int scpvids_local[scpsize];
+  if (scpsize > 0)
   {
-    // has captures => have CAP-instruction => point is non-null
+    for (int i = 0; i < scpsize; ++i)
+    {
+      scpvids_local[i] = new_val(fnbldr, RC_RULES_DISABLE);
+      fnbldr->irvinfo[ir->fn.scpvars_local[i]]->ssavid = scpvids_local[i];
+      fnbldr->ssavinfo[scpvids_local[i]]->type = eth_function_type;
+    }
+    // mark self for loop-detection:
+    if (selfscpidx >= 0)
+    {
+      int selfvid_local = scpvids_local[selfscpidx];
+      fnbldr->ssavinfo[selfvid_local]->isthis = true;
+    }
+    eth_write_insn(fntape, eth_insn_ldscp(scpvids_local, scpsize));
+  }
+
+  // prepare loop entry point (if has captures or scope-vars)
+  eth_insn *ent = NULL;
+  if (ncap > 0 or scpsize > 0)
+  {
+    // has captures or scope
+    // => has CAP- or LDSCP-instruction
+    // => point is non-null
     ent = fntape->point;
     // move ctor-instruction of arguments to entry point:
     for (int i = 0; i < arity; ++i)
-      fnbldr->vinfo[fnargs[i]]->creatloc = ent;
+      fnbldr->ssavinfo[args_local[i]]->creatloc = ent;
   }
 
-  // build body and set up entry-point (if has captures):
+  // build body and set up loop entry point (if has captures or scope-vars):
   eth_ssa *ssa = build_body(fnbldr, fntape, ir->fn.body->body, e);
-  if (ncap > 0)
+  // move entry point to after CAP- and LDSCP- instructions
+  int nmove = (ncap > 0) + (scpsize > 0);
+  if (nmove)
   {
-    // actual entry point is just after that initial one
-    ent->next->flag |= ETH_IFLAG_ENTRYPOINT;
+    eth_insn *newent = ent;
+    for (int i = 0; i < nmove; ++i)
+      newent = newent->next;
+    newent->flag |= ETH_IFLAG_ENTRYPOINT;
   }
 
   eth_destroy_ssa_tape(fntape);
   destroy_ssa_builder(fnbldr);
 
-  int ret;
-  eth_insn *insn;
-  if (f == FN_NEW)
-  {
-    assert(nmov == ncap);
-    ret = new_val(bldr, RC_RULES_DEFAULT);
-    insn = eth_insn_fn(ret, arity, caps, ncap, ir->fn.ast, ir->fn.body, ssa);
-    bldr->vinfo[ret]->creatloc = insn;
-  }
-  else
-  {
-    ret = -1;
-    insn = eth_insn_finfn(f, arity, caps, ncap, movs, nmov, ir->fn.ast,
-        ir->fn.body, ssa);
-  }
+  int ret = new_val(bldr, RC_RULES_DEFAULT);
+  eth_insn *insn =
+    eth_insn_fn(ret, arity, capvids_parent, ncap, ir->fn.ast, ir->fn.body, ssa);
+  bldr->ssavinfo[ret]->creatloc = insn;
   eth_write_insn(tape, insn);
   trace_mov(bldr, insn);
   return ret;
@@ -572,7 +523,7 @@ write_throw(ssa_builder *bldr, eth_ssa_tape *tape, int exnvid,
 
     int newexn = new_val(bldr, RC_RULES_DEFAULT);
     eth_insn *dotrace = eth_insn_apply(newexn, tracervid, &exnvid, 1);
-    bldr->vinfo[newexn]->creatloc = dotrace;
+    bldr->ssavinfo[newexn]->creatloc = dotrace;
     eth_write_insn(tape, dotrace);
 
     exnvid = newexn;
@@ -592,12 +543,12 @@ static void
 assert_number(ssa_builder *bldr, eth_ssa_tape *tape, int vid, eth_location *loc,
     bool *e)
 {
-  if (bldr->vinfo[vid]->type)
+  if (bldr->ssavinfo[vid]->type)
   {
-    if (bldr->vinfo[vid]->type != eth_number_type)
+    if (bldr->ssavinfo[vid]->type != eth_number_type)
     {
       eth_warning("expression will fail: expected number, got %s",
-          bldr->vinfo[vid]->type->name);
+          bldr->ssavinfo[vid]->type->name);
       *e = 1;
       int exn = new_val(bldr, RC_RULES_DISABLE);
       eth_write_insn(tape, eth_insn_cval(exn, eth_exn(eth_type_error())));
@@ -634,8 +585,8 @@ assert_number(ssa_builder *bldr, eth_ssa_tape *tape, int vid, eth_location *loc,
  * @return SSA-pattern.
  */
 static eth_ssa_pattern*
-build_pattern(ssa_builder *bldr, const eth_ir_pattern *pat, int expr, bool myrules,
-    bool *e)
+build_pattern(ssa_builder *bldr, const eth_ir_pattern *pat, int expr,
+    bool myrules, bool *e)
 {
   switch (pat->tag)
   {
@@ -644,13 +595,10 @@ build_pattern(ssa_builder *bldr, const eth_ir_pattern *pat, int expr, bool myrul
 
     case ETH_PATTERN_IDENT:
     {
-      bldr->vars[pat->ident.varid] = expr;
+      bldr->irvinfo[pat->ident.varid]->ssavid = expr;
 
       if (myrules)
-        bldr->vinfo[expr]->rules = RC_RULES_DEFAULT;
-
-      if (bldr->recscp)
-        bldr->vinfo[expr]->isrec = true;
+        bldr->ssavinfo[expr]->rules = RC_RULES_DEFAULT;
 
       return eth_ssa_ident_pattern(expr);
     }
@@ -658,12 +606,12 @@ build_pattern(ssa_builder *bldr, const eth_ir_pattern *pat, int expr, bool myrul
     case ETH_PATTERN_UNPACK:
     {
       bool dotest;
-      if (bldr->vinfo[expr]->type)
+      if (bldr->ssavinfo[expr]->type)
       {
-        if (bldr->vinfo[expr]->type != pat->unpack.type)
+        if (bldr->ssavinfo[expr]->type != pat->unpack.type)
         {
           eth_warning("pattern won't match: expect %s, but value is of type %s",
-              pat->unpack.type->name, bldr->vinfo[expr]->type->name);
+              pat->unpack.type->name, bldr->ssavinfo[expr]->type->name);
           *e = true;
           dotest = true;
         }
@@ -677,9 +625,9 @@ build_pattern(ssa_builder *bldr, const eth_ir_pattern *pat, int expr, bool myrul
       set_type(bldr, expr, pat->unpack.type);
 
       // set up aliasing variable
-      bldr->vars[pat->unpack.varid] = expr;
+      bldr->irvinfo[pat->unpack.varid]->ssavid = expr;
       if (myrules) // TODO: don't do this if alias is not used
-        bldr->vinfo[expr]->rules = RC_RULES_DEFAULT;
+        bldr->ssavinfo[expr]->rules = RC_RULES_DEFAULT;
 
       eth_ssa_pattern *pats[pat->unpack.n];
       int vids[pat->unpack.n];
@@ -695,20 +643,20 @@ build_pattern(ssa_builder *bldr, const eth_ir_pattern *pat, int expr, bool myrul
 
     case ETH_PATTERN_CONSTANT:
     {
-      value_info *vinfo = bldr->vinfo[expr];
+      ssa_value_info *ssavinfo = bldr->ssavinfo[expr];
 
       // # NIL & BOOLEANs & SYMBOLs
       if (pat->constant.val->type == eth_nil_type
           or pat->constant.val->type == eth_boolean_type
           or pat->constant.val->type == eth_symbol_type)
       {
-        if (vinfo->cval and vinfo->cval == pat->constant.val)
+        if (ssavinfo->cval and ssavinfo->cval == pat->constant.val)
           return eth_ssa_constant_pattern(pat->constant.val, ETH_TEST_IS, false);
 
-        if (vinfo->type and vinfo->type != pat->constant.val->type)
+        if (ssavinfo->type and ssavinfo->type != pat->constant.val->type)
         {
           eth_warning("pattern won't match: expect %s, but value is of type %s",
-              pat->constant.val->type->name, vinfo->type->name);
+              pat->constant.val->type->name, ssavinfo->type->name);
           *e = 1;
         }
 
@@ -722,13 +670,13 @@ build_pattern(ssa_builder *bldr, const eth_ir_pattern *pat, int expr, bool myrul
       else if (pat->constant.val->type == eth_string_type
           or pat->constant.val->type == eth_number_type)
       {
-        if (vinfo->cval and eth_equal(vinfo->cval, pat->constant.val))
+        if (ssavinfo->cval and eth_equal(ssavinfo->cval, pat->constant.val))
           return eth_ssa_constant_pattern(pat->constant.val, ETH_TEST_EQUAL, false);
 
-        if (vinfo->type and vinfo->type != pat->constant.val->type)
+        if (ssavinfo->type and ssavinfo->type != pat->constant.val->type)
         {
           eth_warning("pattern won't match: expect %s, but value is of type %s",
-              pat->constant.val->type->name, vinfo->type->name);
+              pat->constant.val->type->name, ssavinfo->type->name);
           *e = 1;
         }
 
@@ -748,9 +696,9 @@ build_pattern(ssa_builder *bldr, const eth_ir_pattern *pat, int expr, bool myrul
     case ETH_PATTERN_RECORD:
     {
       // set up aliasing variable
-      bldr->vars[pat->record.varid] = expr;
+      bldr->irvinfo[pat->record.varid]->ssavid = expr;
       if (myrules) // TODO: don't do this if alias is not used
-        bldr->vinfo[expr]->rules = RC_RULES_DEFAULT;
+        bldr->ssavinfo[expr]->rules = RC_RULES_DEFAULT;
 
       eth_ssa_pattern *pats[pat->record.n];
       int vids[pat->record.n];
@@ -971,21 +919,15 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
     case ETH_IR_CVAL:
     {
       int ret = new_val(bldr, RC_RULES_DISABLE);
-      bldr->vinfo[ret]->cval = ir->cval.val;
-      bldr->vinfo[ret]->type = ir->cval.val->type;
+      bldr->ssavinfo[ret]->cval = ir->cval.val;
+      bldr->ssavinfo[ret]->type = ir->cval.val->type;
       eth_write_insn(tape, eth_insn_cval(ret, ir->cval.val));
       return ret;
     }
 
     case ETH_IR_VAR:
     {
-      int vid = bldr->vars[ir->var.vid];
-      if (bldr->vinfo[vid]->isdummy)
-      {
-        eth_error("evaluating variable before initialization");
-        *e = 1;
-        return 0;
-      }
+      int vid = bldr->irvinfo[ir->var.vid]->ssavid;
       return vid;
     }
 
@@ -1000,9 +942,9 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
       // apply:
       int ret;
       eth_insn *insn;
-      if (istc && bldr->vinfo[fn]->rules == RC_RULES_DISABLE)
+      if (istc && bldr->ssavinfo[fn]->rules == RC_RULES_DISABLE)
       {
-        if (bldr->vinfo[fn]->isthis)
+        if (bldr->ssavinfo[fn]->isthis)
         {
           eth_write_insn(tape, eth_insn_loop(args, ir->apply.nargs));
           return -1;
@@ -1018,7 +960,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
         ret = new_val(bldr, RC_RULES_DEFAULT);
         insn = eth_insn_apply(ret, fn, args, ir->apply.nargs);
       }
-      bldr->vinfo[ret]->creatloc = insn;
+      bldr->ssavinfo[ret]->creatloc = insn;
       eth_write_insn(tape, insn);
 
       // handle exception:
@@ -1068,7 +1010,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
 
       eth_write_insn(tape, insn);
       if (ret >= 0)
-        bldr->vinfo[ret]->creatloc = insn;
+        bldr->ssavinfo[ret]->creatloc = insn;
       return ret;
     }
 
@@ -1086,10 +1028,10 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
       eth_ssa_tape *cchtape = eth_create_ssa_tape();
       // ---
       int exnvid = new_val(bldr, RC_RULES_UNREF);
-      bldr->vinfo[exnvid]->type = eth_exception_type;
+      bldr->ssavinfo[exnvid]->type = eth_exception_type;
       eth_insn *getexn = eth_insn_getexn(exnvid);
-      bldr->vinfo[exnvid]->creatloc = getexn;
-      bldr->vars[ir->try.exnvar] = exnvid;
+      bldr->ssavinfo[exnvid]->creatloc = getexn;
+      bldr->irvinfo[ir->try.exnvar]->ssavid = exnvid;
       eth_write_insn(cchtape, getexn);
       // ---
       int cchret = build_logical_block(bldr, cchtape, ir->try.catchbr, istc, e);
@@ -1112,7 +1054,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
 
       eth_write_insn(tape, insn);
       if (ret >= 0)
-        bldr->vinfo[ret]->creatloc = insn;
+        bldr->ssavinfo[ret]->creatloc = insn;
       return ret;
     }
 
@@ -1121,25 +1063,6 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
       int v1 = build(bldr, tape, ir->seq.e1, false, e);
       int v2 = build(bldr, tape, ir->seq.e2, istc, e);
       return v2;
-    }
-
-    case ETH_IR_STARTFIX:
-    {
-      start_rec_scope(bldr);
-
-      int dummy = new_val(bldr, RC_RULES_DISABLE);
-      bldr->vinfo[dummy]->isrec = true;
-      bldr->vinfo[dummy]->isdummy = true;
-      for (int i = 0; i < ir->startfix.n; ++i)
-        bldr->vars[ir->startfix.vars[i]] = dummy;
-
-      return build(bldr, tape, ir->startfix.body, istc, e);
-    }
-
-    case ETH_IR_ENDFIX:
-    {
-      finalize_rec_scope(bldr, tape, e);
-      return build(bldr, tape, ir->endfix.body, istc, e);
     }
 
     case ETH_IR_BINOP:
@@ -1158,8 +1081,8 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
           insn = eth_insn_binop(ir->binop.op, ret, lhs, rhs);
 
           testnum = true;
-          bldr->vinfo[ret]->type = eth_number_type;
-          bldr->vinfo[ret]->creatloc = insn;
+          bldr->ssavinfo[ret]->type = eth_number_type;
+          bldr->ssavinfo[ret]->creatloc = insn;
           break;
 
         case ETH_LT ... ETH_GE:
@@ -1167,7 +1090,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
           insn = eth_insn_binop(ir->binop.op, ret, lhs, rhs);
 
           testnum = true;
-          bldr->vinfo[ret]->creatloc = insn;
+          bldr->ssavinfo[ret]->creatloc = insn;
           break;
 
         case ETH_EQ ... ETH_NE:
@@ -1175,8 +1098,8 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
           insn = eth_insn_binop(ir->binop.op, ret, lhs, rhs);
 
           testnum = true;
-          bldr->vinfo[ret]->type = eth_boolean_type;
-          bldr->vinfo[ret]->creatloc = insn;
+          bldr->ssavinfo[ret]->type = eth_boolean_type;
+          bldr->ssavinfo[ret]->creatloc = insn;
           break;
 
         case ETH_IS:
@@ -1185,8 +1108,8 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
           insn = eth_insn_binop(ir->binop.op, ret, lhs, rhs);
 
           testnum = false;
-          bldr->vinfo[ret]->type = eth_boolean_type;
-          bldr->vinfo[ret]->creatloc = insn;
+          bldr->ssavinfo[ret]->type = eth_boolean_type;
+          bldr->ssavinfo[ret]->creatloc = insn;
           break;
 
         case ETH_CONS:
@@ -1195,8 +1118,8 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
           trace_mov(bldr, insn);
 
           testnum = false;
-          bldr->vinfo[ret]->type = eth_pair_type;
-          bldr->vinfo[ret]->creatloc = insn;
+          bldr->ssavinfo[ret]->type = eth_pair_type;
+          bldr->ssavinfo[ret]->creatloc = insn;
           break;
       }
 
@@ -1225,15 +1148,15 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
           ret = new_val(bldr, RC_RULES_DISABLE);
           insn = eth_insn_unop(ir->unop.op, ret, expr);
           testnum = false;
-          bldr->vinfo[ret]->type = eth_boolean_type;
+          bldr->ssavinfo[ret]->type = eth_boolean_type;
           break;
 
         case ETH_LNOT:
           ret = new_val(bldr, RC_RULES_DEFAULT);
           insn = eth_insn_unop(ir->unop.op, ret, expr);
           testnum = true;
-          bldr->vinfo[ret]->type = eth_number_type;
-          bldr->vinfo[ret]->creatloc = insn;
+          bldr->ssavinfo[ret]->type = eth_number_type;
+          bldr->ssavinfo[ret]->creatloc = insn;
           break;
       }
 
@@ -1245,23 +1168,31 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
     }
 
     case ETH_IR_FN:
-    {
-      int arity = ir->fn.arity;
+      return build_fn(bldr, tape, ir, FN_NEW, e);
 
-      if (bldr->recscp)
+    case ETH_IR_LETREC:
+    {
+      int lbstart = begin_logical_block(bldr);
+
+      // init scope vars
+      int vids[ir->letrec.nvars];
+      for (int i = 0; i < ir->letrec.nvars; ++i)
       {
-        // create temporary dummy place-holder
-        int ret = new_val(bldr, RC_RULES_DEFAULT);
-        bldr->vinfo[ret]->type = eth_function_type;
-        eth_insn *insn = eth_insn_alcfn(ret, arity);
-        eth_write_insn(tape, insn);
-        bldr->vinfo[ret]->creatloc = insn;
-        // finalize closure at the end of the rec-scope
-        deffer_closure(bldr, ret, ir);
-        return ret;
+        vids[i] = build_fn(bldr, tape, ir->letrec.exprs[i], i, e);
+        int varid = ir->letrec.varids[i];
+        bldr->irvinfo[varid]->ssavid = vids[i];
+        set_type(bldr, vids[i], eth_function_type);
       }
-      else
-        return build_fn(bldr, tape, ir, FN_NEW, e);
+      // add scope ctor
+      eth_insn *mkscp = eth_insn_mkscp(vids, ir->letrec.nvars);
+      eth_write_insn(tape, mkscp);
+
+      // build body
+      int ret = build(bldr, tape, ir->letrec.body, istc, e);
+
+      // done
+      end_logical_block(bldr, lbstart);
+      return ret;
     }
 
     // TODO: collect similar code (see IF)
@@ -1279,9 +1210,9 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
       {
         int lbstart = begin_logical_block(bldr);
         // --
-        int n1 = bldr->vilen;
+        int n1 = bldr->nssavals;
         eth_ssa_pattern *pat = build_pattern(bldr, ir->match.pat, cond, false, e);
-        int n2 = bldr->vilen;
+        int n2 = bldr->nssavals;
         // --
         eth_ssa_tape *thentape = eth_create_ssa_tape();
         eth_insn *ctor = eth_insn_nop();
@@ -1314,13 +1245,13 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
 
         for (int i = n1; i < n2; ++i)
         {
-          if (not bldr->vinfo[i]->creatloc)
-            bldr->vinfo[i]->creatloc = ctor;
+          if (not bldr->ssavinfo[i]->creatloc)
+            bldr->ssavinfo[i]->creatloc = ctor;
         }
 
         eth_write_insn(tape, insn);
         if (ret >= 0)
-          bldr->vinfo[ret]->creatloc = insn;
+          bldr->ssavinfo[ret]->creatloc = insn;
 
         return ret;
       }
@@ -1334,8 +1265,8 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
         vids[i] = build(bldr, tape, ir->mkrcrd.fields[i], false, e);
       int out = new_val(bldr, RC_RULES_DEFAULT);
       eth_insn *insn = eth_insn_mkrcrd(out, vids, ir->mkrcrd.type);
-      bldr->vinfo[out]->creatloc = insn;
-      bldr->vinfo[out]->type = ir->mkrcrd.type;
+      bldr->ssavinfo[out]->creatloc = insn;
+      bldr->ssavinfo[out]->type = ir->mkrcrd.type;
       eth_write_insn(tape, insn);
       trace_mov(bldr, insn);
       return out;
@@ -1359,8 +1290,8 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
           eth_insn_nop(), errtape->head);
       insn->iff.likely = 1;
       eth_destroy_ssa_tape(errtape);
-      bldr->vinfo[out]->creatloc = insn;
-      bldr->vinfo[out]->type = bldr->vinfo[src]->type;
+      bldr->ssavinfo[out]->creatloc = insn;
+      bldr->ssavinfo[out]->type = bldr->ssavinfo[src]->type;
       eth_write_insn(tape, insn);
       return out;
     }
@@ -1463,15 +1394,12 @@ is_using(eth_insn *insn, int vid)
       }
       return false;
 
-    case ETH_INSN_FINFN:
-      for (int i = 0; i < insn->finfn.ncap; ++i)
+    case ETH_INSN_MKSCP:
+      for (int i = 0; i < insn->mkscp.nclos; ++i)
       {
-        if (insn->finfn.caps[i] == vid)
+        if (insn->mkscp.clos[i] == vid)
           return true;
       }
-      return false;
-
-    case ETH_INSN_ALCFN:
       return false;
 
     case ETH_INSN_POP:
@@ -1480,12 +1408,7 @@ is_using(eth_insn *insn, int vid)
     case ETH_INSN_CAP:
       return false;
 
-    case ETH_INSN_MKSCP:
-      for (int i = 0; i < insn->mkscp.nclos; ++i)
-      {
-        if (insn->mkscp.clos[i] == vid)
-          return true;
-      }
+    case ETH_INSN_LDSCP:
       return false;
 
     case ETH_INSN_CATCH:
@@ -1556,14 +1479,6 @@ is_moving(eth_insn *insn, int vid)
       }
       return false;
 
-    case ETH_INSN_FINFN:
-      for (int i = 0; i < insn->finfn.nmov; ++i)
-      {
-        if (insn->finfn.movs[i] == vid)
-          return true;
-      }
-      return false;
-
     case ETH_INSN_CATCH:
       return insn->catch.vid == vid;
 
@@ -1598,10 +1513,6 @@ get_moved_vids(eth_insn *insn, int *n)
     case ETH_INSN_FN:
       *n = insn->fn.ncap;
       return insn->fn.caps;
-
-    case ETH_INSN_FINFN:
-      *n = insn->finfn.nmov;
-      return insn->finfn.movs;
 
     case ETH_INSN_CATCH:
       *n = 1;
@@ -1985,7 +1896,7 @@ handle_movs(ssa_builder *bldr, kill_info *kinfo)
       int vid = vids[i];
       bool doref;
 
-      if (bldr->vinfo[vid]->rules == RC_RULES_DISABLE)
+      if (bldr->ssavinfo[vid]->rules == RC_RULES_DISABLE)
       {
         doref = true;
       }
@@ -2025,26 +1936,26 @@ handle_movs(ssa_builder *bldr, kill_info *kinfo)
 static void
 insert_rc(ssa_builder *bldr, eth_insn *body)
 {
-  kill_info *kinfo = create_kill_info(bldr->vilen);
+  kill_info *kinfo = create_kill_info(bldr->nssavals);
 
-  for (int vid = 0; vid < bldr->vilen; ++vid)
+  for (int vid = 0; vid < bldr->nssavals; ++vid)
   {
-    value_info *vinfo = bldr->vinfo[vid];
-    switch (vinfo->rules)
+    ssa_value_info *ssavinfo = bldr->ssavinfo[vid];
+    switch (ssavinfo->rules)
     {
       case RC_RULES_DEFAULT:
-        assert(vinfo->creatloc);
-        insert_rc_default(kinfo, vinfo->creatloc, vid);
+        assert(ssavinfo->creatloc);
+        insert_rc_default(kinfo, ssavinfo->creatloc, vid);
         break;
 
       case RC_RULES_PHI:
-        assert(vinfo->creatloc);
-        insert_rc_phi(kinfo, vinfo->creatloc, vid);
+        assert(ssavinfo->creatloc);
+        insert_rc_phi(kinfo, ssavinfo->creatloc, vid);
         break;
 
       case RC_RULES_UNREF:
-        assert(vinfo->creatloc);
-        insert_rc_unref(kinfo, vinfo->creatloc, vid);
+        assert(ssavinfo->creatloc);
+        insert_rc_unref(kinfo, ssavinfo->creatloc, vid);
         break;
 
       case RC_RULES_DISABLE:
@@ -2089,8 +2000,57 @@ build_body(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *body, bool *e)
   int fnret = build_logical_block(bldr, tape, body, true, e);
   eth_write_insn(tape, eth_insn_ret(fnret));
   insert_rc(bldr, tape->head);
-  return create_ssa(tape->head, bldr->vilen, bldr->ntries);
+  return create_ssa(tape->head, bldr->nssavals, bldr->ntries);
 }
+
+#if 0
+static eth_ssa*
+build_fn_body(eth_ir *fnbody, int arity, int *capvars, int ncaps, int fidx,
+    bool *e)
+{
+  ssa_builder *bldr = create_ssa_builder(fnbody->nvars);
+  eth_ssa_tape *tape = eth_create_ssa_tape();
+
+  // declare arguments [0, arity):
+  int args[arity];
+  if (arity)
+  {
+    for (int i = 0; i < arity; ++i)
+    {
+      args[i] = new_val(bldr, RC_RULES_DEFAULT);
+      bldr->irvinfo[i]->ssavid = args[i]; // varids of args are [0 ... arity)
+    }
+    eth_insn *pop = eth_insn_pop(args, arity);
+    eth_write_insn(tape, pop);
+    for (int i = 0; i < arity; ++i)
+      bldr->ssavinfo[args[i]]->creatloc = pop;
+  }
+
+  // declare captures [arity, arity + ncap):
+  int capvids[ncaps];
+  if (ncaps > 0)
+  {
+    for (int i = 0; i < ncaps; ++i)
+    {
+      capvids[i] = new_val(bldr, RC_RULES_DISABLE);
+      bldr->irvinfo[capvars[i]]->ssavid = capvids[i];
+      // TODO:
+      /*copy_ssa_value_info(bldr->ssavinfo[fncaps[i]], bldr->ssavinfo[caps[i]]);*/
+
+      // detect self-capture for loop-detection:
+      if (caps[i] == this)
+        fnbldr->ssavinfo[fncaps[i]]->isthis = true;
+    }
+    eth_write_insn(fntape, eth_insn_cap(fncaps, ncap));
+  }
+
+  int fnret = build_logical_block(bldr, tape, fnbody->body, true, e);
+  eth_write_insn(tape, eth_insn_ret(fnret));
+  insert_rc(bldr, tape->head);
+  return create_ssa(tape->head, bldr->nssavals, bldr->ntries);
+}
+#endif
+
 
 typedef struct {
   int ndefs;
@@ -2139,17 +2099,23 @@ eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
   eth_ssa *ssa = NULL;
   bool e = false;
 
-  /*eth_ir_node *specir = eth_specialize(ir);*/
-  /*if (not specir)*/
-    /*abort();*/
-  /*eth_ref_ir_node(specir);*/
-
+  // create build-context and an SSA-tape to write to
   ssa_builder *bldr = create_ssa_builder(ir->nvars);
   eth_ssa_tape *tape = eth_create_ssa_tape();
-
-  /*int ret = build_logical_block(bldr, tape, specir, false, &e);*/
-  int ret = build_logical_block(bldr, tape, ir->body, false, &e);
-  /*eth_unref_ir_node(specir);*/
+  int lbstart = begin_logical_block(bldr);
+  // add specializations to the build-context
+  for (int i = 0; i < ir->nspecs; ++i)
+  {
+    eth_spec *spec = ir->specs[i];
+    switch (spec->tag)
+    {
+      case ETH_SPEC_TYPE:
+        bldr->irvinfo[spec->type_spec.varid]->type = spec->type_spec.type;
+        break;
+    }
+  }
+  int ret = build(bldr, tape, ir->body, false, &e);
+  end_logical_block(bldr, lbstart);
 
   if (e)
   {
@@ -2184,7 +2150,7 @@ eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
         switch (defs->defs[i].tag)
         {
           case ETH_IRDEF_VAR:
-            argvids[i+1] = bldr->vars[defs->defs[i].varid];
+            argvids[i+1] = bldr->irvinfo[defs->defs[i].varid]->ssavid;
             break;
 
           case ETH_IRDEF_CVAL:
@@ -2199,7 +2165,7 @@ eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
 
       eth_insn *insn = eth_insn_apply(modret, fnvid, argvids, n + 1);
       eth_write_insn(tlvltape, insn);
-      bldr->vinfo[modret]->creatloc = insn;
+      bldr->ssavinfo[modret]->creatloc = insn;
 
       eth_write_insn(tlvltape, eth_insn_ret(modret));
 
@@ -2217,7 +2183,7 @@ eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
     }
 
     insert_rc(bldr, tape->head);
-    ssa = create_ssa(tape->head, bldr->vilen, bldr->ntries);
+    ssa = create_ssa(tape->head, bldr->nssavals, bldr->ntries);
   }
   eth_destroy_ssa_tape(tape);
   destroy_ssa_builder(bldr);

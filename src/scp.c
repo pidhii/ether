@@ -22,16 +22,16 @@
 ETH_MODULE("scp")
 
 eth_scp*
-eth_create_scp(eth_function **clos, int nclos)
+eth_create_scp(eth_function **fns, int nfns)
 {
   eth_scp *scp = malloc(sizeof(eth_scp));
-  scp->clos = malloc(sizeof(eth_function*) * nclos);
-  scp->nclos = nclos;
-  scp->rc = nclos;
-  memcpy(scp->clos, clos, sizeof(eth_function*) * nclos);
+  scp->fns = malloc(sizeof(eth_function*) * nfns);
+  scp->nfns = nfns;
+  scp->rc = nfns;
+  memcpy(scp->fns, fns, sizeof(eth_function*) * nfns);
 
-  for (int i = 0; i < nclos; ++i)
-    clos[i]->clos.scp = scp;
+  for (int i = 0; i < nfns; ++i)
+    fns[i]->clos.scp = scp;
 
   return scp;
 }
@@ -39,34 +39,34 @@ eth_create_scp(eth_function **clos, int nclos)
 void
 eth_destroy_scp(eth_scp *scp)
 {
-  free(scp->clos);
+  free(scp->fns);
   free(scp);
 }
 
 void
 eth_drop_out(eth_scp *scp)
 {
-  size_t nclos = scp->nclos;
-  eth_function **restrict clos = scp->clos;
+  size_t nfns = scp->nfns;
+  eth_function **restrict fns = scp->fns;
 
   if (--scp->rc != 0)
     return;
 
   // validate scope-RC:
   size_t rc = 0;
-  for (size_t i = 0; i < nclos; ++i)
-    rc += (clos[i]->header.rc != 0);
+  for (size_t i = 0; i < nfns; ++i)
+    rc += (fns[i]->header.rc != 0);
   if ((scp->rc = rc) != 0)
     return;
 
   // Drop scope:
   // 1. deactivate closures
   // 2. release closures
-  for (size_t i = 0; i < nclos; ++i)
-    eth_deactivate_clos(clos[i]);
+  for (size_t i = 0; i < nfns; ++i)
+    eth_deactivate_clos(fns[i]);
   // --
-  for (size_t i = 0; i < nclos; ++i)
-    eth_delete(ETH(clos[i]));
+  for (size_t i = 0; i < nfns; ++i)
+    eth_delete(ETH(fns[i]));
 
   eth_destroy_scp(scp);
 }

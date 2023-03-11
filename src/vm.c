@@ -92,9 +92,8 @@ eth_vm(eth_bytecode *bc)
     [ETH_OPC_NOT      ] = &&INSN_NOT,
     [ETH_OPC_LNOT     ] = &&INSN_LNOT,
     [ETH_OPC_FN       ] = &&INSN_FN,
-    [ETH_OPC_FINFN    ] = &&INSN_FINFN,
-    [ETH_OPC_ALCFN    ] = &&INSN_ALCFN,
     [ETH_OPC_CAP      ] = &&INSN_CAP,
+    [ETH_OPC_LDSCP    ] = &&INSN_LDSCP,
     [ETH_OPC_MKSCP    ] = &&INSN_MKSCP,
     [ETH_OPC_LOAD     ] = &&INSN_LOAD,
     [ETH_OPC_LOADRCRD ] = &&INSN_LOADRCRD,
@@ -393,27 +392,16 @@ eth_vm(eth_bytecode *bc)
         FAST_DISPATCH_NEXT();
       }
 
-      OP(FINFN)
-      {
-        size_t ncap = ip->fn.data->ncap;
-        eth_t *cap = malloc(sizeof(eth_t) * ncap);
-        for (size_t i = 0; i < ncap; ++i)
-          cap[i] = r[ip->fn.data->caps[i]];
-        eth_function *fn = ETH_FUNCTION(r[ip->fn.out]);
-        eth_finalize_clos(fn, ip->fn.data->src, ip->fn.data->bc, cap, ncap,
-            ip->fn.data->arity);
-        FAST_DISPATCH_NEXT();
-      }
-
-      OP(ALCFN)
-      {
-        r[ip->alcfn.out] = eth_create_dummy_func(ip->alcfn.arity);
-        FAST_DISPATCH_NEXT();
-      }
-
       OP(CAP)
       {
         memcpy(r + ip->cap.vid0, eth_this->clos.cap, sizeof(eth_t) * ip->cap.n);
+        FAST_DISPATCH_NEXT();
+      }
+
+      OP(LDSCP)
+      {
+        memcpy(r + ip->ldscp.vid0, eth_this->clos.scp->fns,
+            sizeof(eth_t) * ip->ldscp.n);
         FAST_DISPATCH_NEXT();
       }
 
