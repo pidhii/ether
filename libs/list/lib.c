@@ -256,6 +256,7 @@ _rev_filter_map(void)
     {
       eth_t v = eth_get_variant_value(optv);
       acc = eth_cons(v, acc);
+      eth_drop(optv);
     }
     else if (eth_unlikely(eth_is_exn(optv)))
     {
