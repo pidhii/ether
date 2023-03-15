@@ -30,7 +30,6 @@ eth_vm(eth_bytecode *bc)
 
   if (eth_unlikely(not eth_reserve_c_stack(nreg * sizeof(eth_t))))
   {
-    eth_warning("stack overflow");
     int nargs = eth_nargs;
     for (int i = 0; i < nargs; ++i)
       eth_ref(eth_sp[i]);
@@ -40,13 +39,13 @@ eth_vm(eth_bytecode *bc)
     return eth_exn(eth_sym("stack_overflow"));
   }
 
-  eth_t *restrict r = alloca(nreg * sizeof(eth_t));
+  eth_t *restrict const r = alloca(nreg * sizeof(eth_t));
   bool test = 0;
   int nstack = 0;
   eth_t exn = NULL;
 
   register eth_bc_insn *restrict ip = bc->code;
-  static void *insn[] = {
+  static const void *insn[] = {
     [ETH_OPC_CVAL     ] = &&INSN_CVAL,
     [ETH_OPC_PUSH     ] = &&INSN_PUSH,
     [ETH_OPC_POP      ] = &&INSN_POP,
@@ -126,7 +125,7 @@ eth_vm(eth_bytecode *bc)
   INSN_##opc:   \
   case ETH_OPC_##opc:
 
-  FAST_DISPATCH();
+  PREDICT(POP);
   for (;;)
   {
     switch (ip->opc)
@@ -163,7 +162,8 @@ eth_vm(eth_bytecode *bc)
         eth_t fn = r[ip->apply.fn];
         if (eth_unlikely(fn->type != eth_function_type))
         {
-          while (nstack--) eth_drop(*eth_sp++);
+          for (int i = 0; i < nstack; eth_ref(eth_sp[i++]));
+          for (int i = 0; i < nstack; eth_unref(eth_sp[i++]));
           r[ip->apply.out] = eth_exn(eth_sym("apply_error"));
           nstack = 0;
           FAST_DISPATCH_NEXT();
@@ -179,7 +179,8 @@ eth_vm(eth_bytecode *bc)
         eth_t fn = r[ip->apply.fn];
         if (eth_unlikely(fn->type != eth_function_type))
         {
-          while (nstack--) eth_drop(*eth_sp++);
+          for (int i = 0; i < nstack; eth_ref(eth_sp[i]));
+          for (int i = 0; i < nstack; eth_unref(eth_sp[i]));
           r[ip->apply.out] = eth_exn(eth_sym("apply_error"));
           nstack = 0;
           FAST_DISPATCH_NEXT();
@@ -416,7 +417,7 @@ eth_vm(eth_bytecode *bc)
 
       OP(LOAD)
       {
-        r[ip->load.out] = *(eth_t*) ((char*)r[ip->load.vid] + ip->load.offs);
+        r[ip->load.out] = *(eth_t*)((char*)r[ip->load.vid] + ip->load.offs);
         FAST_DISPATCH_NEXT();
       }
 
