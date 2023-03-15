@@ -1,3 +1,6 @@
 [submodule "codeine"]
 	path = codeine
 	url = https://github.com/pidhii/codeine.git
+[submodule "eco"]
+	path = eco
+	url = https://github.com/pidhii/eco.git

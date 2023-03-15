@@ -68,8 +68,32 @@ add_definitions (
 set (ETHER_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 include_directories (${ETHER_INCLUDE_DIR})
 include_directories (${CMAKE_SOURCE_DIR}/codeine/include)
+include_directories (${CMAKE_SOURCE_DIR}/eco/include)
 include_directories (${CMAKE_SOURCE_DIR}/src)
 
+
+################################################################################
+#                                   eco
+#
+set (ECO_REPOSITORY_DIR "${CMAKE_SOURCE_DIR}/eco")
+set (ECO_BUILD_PREFIX "${CMAKE_BINARY_DIR}/eco")
+set (ECO_BUILD_DIR "${ECO_BUILD_PREFIX}/build")
+set (ECO_TMP_INSTALL_DIR "${ECO_BUILD_PREFIX}/install")
+ExternalProject_Add(eco
+  #PREFIX "${ECO_BUILD_PREFIX}"
+  SOURCE_DIR "${ECO_REPOSITORY_DIR}"
+  INSTALL_DIR "${ECO_TMP_INSTALL_DIR}"
+  CONFIGURE_COMMAND
+    ${CMAKE_COMMAND} -DCMAKE_INSTALL_PREFIX=${ECO_TMP_INSTALL_DIR}
+                     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+                     -DBUILD_TESTS=OFF
+                     -S${ECO_REPOSITORY_DIR}
+                     -B${ECO_BUILD_DIR}
+  BUILD_COMMAND
+    make -C ${ECO_BUILD_DIR}
+
+  INSTALL_COMMAND
+    make -C ${ECO_BUILD_DIR} install)
 
 ################################################################################
 #                                SOURCE FILES
@@ -87,9 +111,11 @@ ADD_FLEX_BISON_DEPENDENCY (scanner parser)
 # object files:
 set (SYNTAX_SRC ${BISON_parser_OUTPUTS} ${FLEX_scanner_OUTPUTS})
 add_library (ether_obj OBJECT ${ETHER_SRC} ${SYNTAX_SRC})
+add_dependencies (ether_obj eco)
 target_include_directories (ether_obj PRIVATE ${CMAKE_BINARY_DIR})
 
 add_library (ether_c++_obj OBJECT ${ETHER_CPPAPI_SRC})
+add_dependencies (ether_c++_obj eco)
 
 # install headers:
 install (DIRECTORY ${ETHER_INCLUDE_DIR} DESTINATION ".")
@@ -98,6 +124,7 @@ install (DIRECTORY "${CMAKE_SOURCE_DIR}/codeine/include/codeine" DESTINATION "in
 # shared library:
 if (BUILD_SHARED_LIBRARY)
   add_library (ether_so SHARED ${ETHER_SRC} ${SYNTAX_SRC})
+  add_dependencies (ether_so eco)
   set_target_properties (ether_so
     PROPERTIES
       POSITION_INDEPENDENT_CODE ON
@@ -115,6 +142,7 @@ endif (BUILD_STATIC_LIBRARY)
 # shared C++ API library:
 if (BUILD_CPPAPI_SHARED_LIBRARY)
   add_library (ether++_so SHARED ${ETHER_CPPAPI_SRC})
+  add_dependencies (ether++_so eco)
   set_target_properties (ether++_so
     PROPERTIES
       POSITION_INDEPENDENT_CODE ON
@@ -142,7 +170,6 @@ if (CMAKE_INSTALL_PREFIX)
   configure_file (${CMAKE_SOURCE_DIR}/ether.pc ${CMAKE_BINARY_DIR}/ether.pc @ONLY)
   install (FILES ${CMAKE_BINARY_DIR}/ether.pc DESTINATION lib/pkgconfig)
 endif (CMAKE_INSTALL_PREFIX)
-
 
 # Install scripts and libraries
 install (PROGRAMS ${CMAKE_SOURCE_DIR}/dope.eth RENAME "dope" DESTINATION bin)
