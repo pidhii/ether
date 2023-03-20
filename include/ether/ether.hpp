@@ -37,7 +37,7 @@ class type_exn: public std::runtime_error {
 typedef eth_number_t number_t;
 
 void
-init(const int *argc);
+init(void *argv);
 
 void
 cleanup();

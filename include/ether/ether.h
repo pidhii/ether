@@ -25,6 +25,9 @@
 #include <stdint.h>
 #include <float.h>
 
+#include <eco/eco.h>
+
+
 #define eth_likely(expr) __builtin_expect(!!(expr), 1)
 #define eth_unlikely(expr) __builtin_expect((expr), 0)
 
@@ -209,7 +212,7 @@ eth_errno_to_str(int e);
 
 
 void
-eth_init(const int *argc);
+eth_init(void *argv);
 
 void
 eth_cleanup(void);
@@ -264,28 +267,65 @@ eth_unop_name(eth_unop op);
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                            CALL PROPAGATION
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-extern
-eth_t *eth_stack;
+/**
+ * @brief Arguments-stack size.
+ *
+ * It doesnt have to be huge, as, usually, arguments are popped right at the
+ * entry to the function in question. And I doubt that enyone will need a
+ * function with hundreds of arguments.
+ *
+ * Thus, 1 kB = 128 eth_t objects should be sufficient.
+ *
+ * @todo TODO make it an option at the level of runtime initialization, instead
+ * of compilation option.
+ */
+#ifndef ETH_STACK_SIZE
+# define ETH_STACK_SIZE 0x400
+#endif
 
-extern
-eth_t *eth_sp;
+/**
+ * @name State
+ * @{
+ */
+extern eth_t *eth_sb;
+extern size_t eth_ss;
+extern eth_t *eth_sp;
+extern eth_function *eth_this;
+extern uintptr_t eth_cpu_se;
 
-extern
-int eth_nargs;
+typedef struct eth_vm_state {
+  eth_t *sb;
+  eth_t *sp;
+  size_t ss;
+  eth_function *thiss;
+  uintptr_t cpuse;
+} eth_vm_state;
 
-extern
-eth_function *eth_this;
+typedef struct eth_state {
+  eco_t cpustate;
+  eco_stack_t cpustack;
+  eth_vm_state vmstate;
+  void *astack;
+  void *data;
+} eth_state;
 
-extern
-ssize_t eth_c_stack_size;
+eth_state*
+eth_create_initial_state(int cpu_stack_npag, eco_entry_point_t entry);
 
-extern
-char *eth_c_stack_start;
+void
+eth_destroy_state(eth_state *state);
 
-static inline void
+bool
+eth_switch_state(eth_state *from, eth_state *to, void *parcel,
+                 eth_state **ret_caller, void **ret_parcel);
+/** @} */
+
+
+static inline bool
 eth_reserve_stack(int n)
 {
   eth_sp -= n;
+  return (uintptr_t)eth_sp >= (uintptr_t)eth_sb - eth_ss;
 }
 
 static inline void
@@ -297,9 +337,8 @@ eth_pop_stack(int n)
 static inline bool
 eth_reserve_c_stack(ssize_t size)
 {
-  char x;
-  ssize_t avsize = eth_c_stack_size - (eth_c_stack_start - &x);
-  return avsize > size;
+  uintptr_t cpu_sp = (uintptr_t)&cpu_sp;
+  return cpu_sp > eth_cpu_se;
 }
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
@@ -546,7 +585,7 @@ eth_ref(eth_t x)
 {
 #if defined(ETH_DEBUG_MODE)
   if (x->rc >= ETH_RC_MAX)
-    fprintf(stderr, "FATAL ERROR: overflow of reference count\n");
+    eth_fprintf(stderr, "FATAL ERROR: overflow of reference count (~w)\n", x);
 #endif
   x->rc += 1;
 }
@@ -764,7 +803,6 @@ _eth_raw_apply(eth_t fn, int narg)
   extern eth_t eth_vm(eth_bytecode *bc);
   eth_function *proc = ETH_FUNCTION(fn);
   eth_this = proc;
-  eth_nargs = narg;
   if (proc->islam)
     return eth_vm(proc->clos.bc);
   else
@@ -2847,8 +2885,18 @@ struct eth_ssa {
   eth_insn *body;
 };
 
-eth_ssa* __attribute__((malloc))
+eth_ssa*
 eth_build_ssa(eth_ir *ir, eth_ir_defs *defs);
+
+typedef struct eth_capvar_info {
+  int varid_local;
+  eth_type *type;
+  eth_t cval;
+} eth_capvar_info;
+
+eth_ssa*
+eth_build_fn_body(eth_ir *fnbody, int arity, eth_capvar_info *caps, int ncaps,
+    int *scpvars_local, int nscpvars, int selfscpidx, bool *e);
 
 void
 eth_ref_ssa(eth_ssa *ssa);
@@ -3013,12 +3061,13 @@ struct eth_bc_insn {
 struct eth_bytecode {
   int rc;
   int nreg;
+  int nargs;
   int len;
   eth_bc_insn *code;
 };
 
 eth_bytecode* __attribute__((malloc))
-eth_build_bytecode(eth_ssa *ssa);
+eth_build_bytecode(eth_ssa *ssa, int nargs);
 
 void
 eth_ref_bytecode(eth_bytecode *bc);

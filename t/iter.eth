@@ -1,3 +1,4 @@
+import 'list'
 
 let pub map f {state, next} =
   { state
@@ -12,7 +13,7 @@ let pub take n {state, next} =
         try
           let (x, i) = next i
           (x, (i, n - 1))
-        with Match_error -> raise Range_error
+        with Match_error -> raise `range_error
   }
 
 let pub filter f {state, next} =
@@ -31,7 +32,7 @@ let pub to_list {state, next} =
   let rec loop i acc =
     if let (x, i) = next i then
       loop i (x::acc)
-    else List.rev acc
+    else list.rev acc
   loop state nil
 
 let pub range from to =
@@ -45,4 +46,11 @@ let pub fold_left f z {state, next} =
       loop i (f acc x)
     else acc
   loop state z
+
+
+when defined __main then
+  let n = 10_000_000
+  let job! = range 0 n | map (x -> x + 1) | filter even? | fold_left (+) 0
+  print job!
+  job!
 

@@ -1,7 +1,7 @@
 
-let {*} = @(require 'os')
+let {*} = @(require 'os') in
 
-let [_, dope, testDir] = command_line
+let [_, dope, testDir] = command_line in
 chdir testDir
 
 system "echo ether: `which ether`"
@@ -11,6 +11,7 @@ let fail! =
   system "ether {dope} uninstall foo &>/dev/null"
   system "rm -rf foo/.git &>/dev/null"
   exit 1
+in
 
 system "cd foo && git init && git add . && git commit -m 'Test' && git tag '2.2.8'"
 

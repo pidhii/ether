@@ -1,5 +1,5 @@
 
-let pub empty = of_list []
+let pub empty = of_list [] in
 
 -- TODO: optimize
 let pub init n f =
@@ -7,9 +7,13 @@ let pub init n f =
     if i < n then
       loop (i + 1) (push acc (f i))
     else acc
+  in
   loop 0 empty
+in
 
 -- TODO: optimize
 let pub make n x =
   init n (const x)
+in
 
+()

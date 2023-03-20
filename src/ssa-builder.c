@@ -201,6 +201,7 @@ set_cval(ssa_builder *bldr, int vid, eth_t val)
     }
   });
   bldr->ssavinfo[vid]->cval = val;
+  bldr->ssavinfo[vid]->type = val->type;
 }
 
 static void
@@ -238,7 +239,10 @@ undo_action(ssa_builder *bldr, action *a)
   switch (a->tag)
   {
     case ACTION_SETCVAL:
-      bldr->ssavinfo[a->setcval.vid]->cval = a->setcval.old;
+      if ((bldr->ssavinfo[a->setcval.vid]->cval = a->setcval.old))
+        bldr->ssavinfo[a->setcval.vid]->type = a->setcval.old->type;
+      else
+        bldr->ssavinfo[a->setcval.vid]->type = NULL;
       break;
 
     case ACTION_SETTYPE:
@@ -316,9 +320,6 @@ create_ssa(eth_insn *body, int nvals, int ntries)
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                               build SSA
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-static eth_ssa*
-build_body(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *body, bool *e);
-
 #define FN_NEW (-1)
 static int
 build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *fn, int selfscpidx,
@@ -396,89 +397,17 @@ build_fn(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, int selfscpidx,
   int ncap = ir->fn.ncap;
   int capvids_parent[ncap];
   for (int i = 0; i < ncap; ++i)
-  {
     capvids_parent[i] = bldr->irvinfo[ir->fn.caps[i]]->ssavid;
-  }
 
-  ssa_builder *fnbldr = create_ssa_builder(ir->fn.body->nvars);
-  eth_ssa_tape *fntape = eth_create_ssa_tape();
-
-  // declare arguments [0, arity):
-  int args_local[arity];
-  if (arity)
+  eth_capvar_info capinfo[ncap];
+  for (int i = 0; i < ncap; ++i)
   {
-    for (int i = 0; i < arity; ++i)
-    {
-      args_local[i] = new_val(fnbldr, RC_RULES_DEFAULT);
-      fnbldr->irvinfo[i]->ssavid = args_local[i]; // varids of args are
-                                                  // [0 ... arity)
-                                                  // XXX so what?
-    }
-
-    eth_insn *pop = eth_insn_pop(args_local, arity);
-    eth_write_insn(fntape, pop);
-
-    for (int i = 0; i < arity; ++i)
-      fnbldr->ssavinfo[args_local[i]]->creatloc = pop;
+    capinfo[i].varid_local = ir->fn.capvars[i];
+    capinfo[i].type = bldr->ssavinfo[capvids_parent[i]]->type;
+    capinfo[i].cval = bldr->ssavinfo[capvids_parent[i]]->cval;
   }
-
-  // prepare loop entry point
-  eth_insn *last_before_loop = NULL;
-
-  // declare captures [arity, arity + ncap):
-  int capvids_local[ncap];
-  if (ncap > 0)
-  {
-    for (int i = 0; i < ncap; ++i)
-    {
-      capvids_local[i] = new_val(fnbldr, RC_RULES_DISABLE);
-      fnbldr->irvinfo[ir->fn.capvars[i]]->ssavid = capvids_local[i];
-      copy_ssa_value_info(fnbldr->ssavinfo[capvids_local[i]],
-          bldr->ssavinfo[capvids_parent[i]]);
-    }
-    eth_write_insn(fntape,
-        last_before_loop = eth_insn_cap(capvids_local, ncap));
-  }
-
-  // declare scope vars [arity + ncap, arity + ncap + nscp):
-  int scpsize = ir->fn.nscpvars;
-  int scpvids_local[scpsize];
-  if (scpsize > 0)
-  {
-    for (int i = 0; i < scpsize; ++i)
-    {
-      scpvids_local[i] = new_val(fnbldr, RC_RULES_DISABLE);
-      fnbldr->irvinfo[ir->fn.scpvars_local[i]]->ssavid = scpvids_local[i];
-      fnbldr->ssavinfo[scpvids_local[i]]->type = eth_function_type;
-    }
-    // mark self for loop-detection:
-    if (selfscpidx >= 0)
-    {
-      int selfvid_local = scpvids_local[selfscpidx];
-      fnbldr->ssavinfo[selfvid_local]->isthis = true;
-    }
-    // LDSCP
-    eth_write_insn(fntape,
-        last_before_loop = eth_insn_ldscp(scpvids_local, scpsize));
-    //for (int i = 0; i < scpsize; ++i)
-      //fnbldr->ssavinfo[scpvids_local[i]]->creatloc = ldscp;
-  }
-
-  if (last_before_loop)
-  {
-    // move ctor-instruction of arguments:
-    for (int i = 0; i < arity; ++i)
-      fnbldr->ssavinfo[args_local[i]]->creatloc = last_before_loop;
-  }
-
-  // build body and set up loop entry point (if has captures or scope-vars):
-  eth_ssa *ssa = build_body(fnbldr, fntape, ir->fn.body->body, e);
-  // move entry point to after CAP- and LDSCP- instructions
-  if (last_before_loop)
-    last_before_loop->next->flag |= ETH_IFLAG_ENTRYPOINT;
-
-  eth_destroy_ssa_tape(fntape);
-  destroy_ssa_builder(fnbldr);
+  eth_ssa *ssa = eth_build_fn_body(ir->fn.body, arity, capinfo, ncap,
+        ir->fn.scpvars_local, ir->fn.nscpvars, selfscpidx, e);
 
   int ret = new_val(bldr, RC_RULES_DEFAULT);
   eth_insn *insn =
@@ -568,6 +497,27 @@ assert_number(ssa_builder *bldr, eth_ssa_tape *tape, int vid, eth_location *loc,
   }
 }
 
+typedef enum match_result {
+  MATCH_UNKNOWN,
+  MATCH_SUCCESS,
+  MATCH_FAILURE,
+} match_result;
+
+static match_result
+combine_match_results(match_result a, match_result b)
+{
+  if (a == MATCH_FAILURE or b == MATCH_FAILURE)
+    return MATCH_FAILURE;
+
+  if (a == MATCH_UNKNOWN or b == MATCH_UNKNOWN)
+    return MATCH_UNKNOWN;
+
+  // at this point it is guaranteed that both
+  // - a == MATCH_SUCCESS, and
+  // - b == MATCH_SUCCESS
+  return MATCH_SUCCESS;
+}
+
 /**
  * @brief Build SSA-pattern.
  *
@@ -575,66 +525,64 @@ assert_number(ssa_builder *bldr, eth_ssa_tape *tape, int vid, eth_location *loc,
  * @param pat IR-pattern.
  * @param expr SSA value identifier refering to the expression to be matched by
  *  the pattern.
- * @param myrules ..TODO..
  * @param[out] e Will be set to `true` in case of errors.
  *
  * @return SSA-pattern.
  */
 static eth_ssa_pattern*
 build_pattern(ssa_builder *bldr, const eth_ir_pattern *pat, int expr,
-    bool myrules, bool *e)
+    match_result *mchres, bool *e)
 {
+  match_result dummy_mchres;
+  if (mchres == NULL)
+    mchres = &dummy_mchres;
+
   switch (pat->tag)
   {
     case ETH_PATTERN_DUMMY:
+      *mchres = MATCH_SUCCESS;
       return eth_ssa_dummy_pattern();
 
     case ETH_PATTERN_IDENT:
     {
       bldr->irvinfo[pat->ident.varid]->ssavid = expr;
-
-      if (myrules)
-        bldr->ssavinfo[expr]->rules = RC_RULES_DEFAULT;
-
+      *mchres = MATCH_SUCCESS;
       return eth_ssa_ident_pattern(expr);
     }
 
     case ETH_PATTERN_UNPACK:
     {
-      bool dotest;
+      match_result mymchres = MATCH_UNKNOWN;
+
+      // TODO: handle cval
       if (bldr->ssavinfo[expr]->type)
       {
         if (bldr->ssavinfo[expr]->type != pat->unpack.type)
-        {
-          eth_warning("pattern won't match: expect %s, but value is of type %s",
-              pat->unpack.type->name, bldr->ssavinfo[expr]->type->name);
-          *e = true;
-          dotest = true;
-        }
+          mymchres = MATCH_FAILURE;
         else
-          dotest = false;
+          mymchres = MATCH_SUCCESS;
       }
-      else
-        dotest = true;
 
       // fix type for inner branch
       set_type(bldr, expr, pat->unpack.type);
 
       // set up aliasing variable
       bldr->irvinfo[pat->unpack.varid]->ssavid = expr;
-      if (myrules) // TODO: don't do this if alias is not used
-        bldr->ssavinfo[expr]->rules = RC_RULES_DEFAULT;
 
       eth_ssa_pattern *pats[pat->unpack.n];
       int vids[pat->unpack.n];
       for (int i = 0; i < pat->unpack.n; ++i)
       {
-        vids[i] = new_val(bldr, RC_RULES_DISABLE);
-        pats[i] = build_pattern(bldr, pat->unpack.subpats[i], vids[i], true, e);
+        vids[i] = new_val(bldr, RC_RULES_DEFAULT);
+        match_result submchres;
+        pats[i] = build_pattern(bldr, pat->unpack.subpats[i], vids[i],
+            &submchres, e);
+        mymchres = combine_match_results(mymchres, submchres);
       }
 
+      *mchres = mymchres;
       return eth_ssa_unpack_pattern(pat->unpack.type, pat->unpack.offs, vids,
-          pats, pat->unpack.n, dotest);
+          pats, pat->unpack.n, mymchres != MATCH_SUCCESS);
     }
 
     case ETH_PATTERN_CONSTANT:
@@ -647,40 +595,47 @@ build_pattern(ssa_builder *bldr, const eth_ir_pattern *pat, int expr,
           or pat->constant.val->type == eth_symbol_type)
       {
         if (ssavinfo->cval and ssavinfo->cval == pat->constant.val)
-          return eth_ssa_constant_pattern(pat->constant.val, ETH_TEST_IS, false);
-
-        if (ssavinfo->type and ssavinfo->type != pat->constant.val->type)
         {
-          eth_warning("pattern won't match: expect %s, but value is of type %s",
-              pat->constant.val->type->name, ssavinfo->type->name);
-          *e = 1;
+          *mchres = MATCH_SUCCESS;
+          return eth_ssa_constant_pattern(pat->constant.val, ETH_TEST_IS, false);
         }
-
-        // fix type and value for inner branch
-        set_cval(bldr, expr, pat->constant.val);
-        set_type(bldr, expr, pat->constant.val->type);
-
-        return eth_ssa_constant_pattern(pat->constant.val, ETH_TEST_IS, true);
+        else if (ssavinfo->type and ssavinfo->type != pat->constant.val->type)
+        {
+          *mchres = MATCH_FAILURE;
+          return eth_ssa_constant_pattern(pat->constant.val, ETH_TEST_IS, true);
+        }
+        else
+        {
+          // fix type and value for inner branch
+          set_cval(bldr, expr, pat->constant.val);
+          *mchres = MATCH_UNKNOWN;
+          return eth_ssa_constant_pattern(pat->constant.val, ETH_TEST_IS, true);
+        }
       }
       // # STRINGs and NUMBERs
       else if (pat->constant.val->type == eth_string_type
           or pat->constant.val->type == eth_number_type)
       {
         if (ssavinfo->cval and eth_equal(ssavinfo->cval, pat->constant.val))
-          return eth_ssa_constant_pattern(pat->constant.val, ETH_TEST_EQUAL, false);
-
-        if (ssavinfo->type and ssavinfo->type != pat->constant.val->type)
         {
-          eth_warning("pattern won't match: expect %s, but value is of type %s",
-              pat->constant.val->type->name, ssavinfo->type->name);
-          *e = 1;
+          *mchres = MATCH_SUCCESS;
+          return eth_ssa_constant_pattern(pat->constant.val, ETH_TEST_EQUAL,
+              false);
         }
-
-        // fix type and value for inner branch
-        set_cval(bldr, expr, pat->constant.val);
-        set_type(bldr, expr, pat->constant.val->type);
-
-        return eth_ssa_constant_pattern(pat->constant.val, ETH_TEST_EQUAL, true);
+        else if (ssavinfo->type and ssavinfo->type != pat->constant.val->type)
+        {
+          *mchres = MATCH_FAILURE;
+          return eth_ssa_constant_pattern(pat->constant.val, ETH_TEST_EQUAL,
+              true);
+        }
+        else
+        {
+          // fix type and value for inner branch
+          set_cval(bldr, expr, pat->constant.val);
+          *mchres = MATCH_UNKNOWN;
+          return eth_ssa_constant_pattern(pat->constant.val, ETH_TEST_EQUAL,
+              true);
+        }
       }
       else
       {
@@ -693,16 +648,70 @@ build_pattern(ssa_builder *bldr, const eth_ir_pattern *pat, int expr,
     {
       // set up aliasing variable
       bldr->irvinfo[pat->record.varid]->ssavid = expr;
-      if (myrules) // TODO: don't do this if alias is not used
-        bldr->ssavinfo[expr]->rules = RC_RULES_DEFAULT;
 
+      match_result mymchres = MATCH_UNKNOWN;
+#if 1
+      if (bldr->ssavinfo[expr]->type)
+      {
+        eth_type *type = bldr->ssavinfo[expr]->type;
+        int nmchfields = pat->record.n;
+        //int fieldids[nmchfields];
+        int fieldoffs[nmchfields];
+        for (int i = 0; i < nmchfields; ++i)
+        {
+          int fieldidx = eth_get_field_by_id(type, pat->record.ids[i]);
+          if (fieldidx == type->nfields)
+          { // wont match
+            mymchres = MATCH_FAILURE;
+            goto l_match_record_without_vinfo;
+          }
+          eth_field *field = &type->fields[fieldidx];
+          fieldoffs[i] = field->offs;
+        }
+
+        // TODO:
+#if 0
+        if (bldr->ssavinfo[expr]->cval)
+        {
+          int vids[nmchfields];
+          for (int i = 0; i < nmchfields; ++i)
+          {
+            vids[i] = new_val(bldr, RC_RULES_DISABLE);
+          }
+        }
+        else
+#endif
+        { // convert into UNPACK
+          eth_ssa_pattern *pats[nmchfields];
+          int vids[nmchfields];
+          for (int i = 0; i < nmchfields; ++i)
+          {
+            vids[i] = new_val(bldr, RC_RULES_DEFAULT);
+            match_result submchres;
+            pats[i] = build_pattern(bldr, pat->record.subpats[i], vids[i],
+                &submchres, e);
+            mymchres = combine_match_results(mymchres, submchres);
+          }
+
+          *mchres = mymchres;
+          return eth_ssa_unpack_pattern(type, fieldoffs, vids, pats, nmchfields,
+              true);
+        }
+      }
+#endif
+
+l_match_record_without_vinfo:
       eth_ssa_pattern *pats[pat->record.n];
       int vids[pat->record.n];
       for (int i = 0; i < pat->record.n; ++i)
       {
-        vids[i] = new_val(bldr, RC_RULES_DISABLE);
-        pats[i] = build_pattern(bldr, pat->record.subpats[i], vids[i], true, e);
+        vids[i] = new_val(bldr, RC_RULES_DEFAULT);
+        match_result submchres;
+        pats[i] = build_pattern(bldr, pat->record.subpats[i], vids[i],
+            &submchres, e);
+        mymchres = combine_match_results(mymchres, submchres);
       }
+      *mchres = mymchres;
       return eth_ssa_record_pattern(pat->record.ids, vids, pats, pat->record.n);
     }
   }
@@ -1192,13 +1201,14 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
     }
 
     // TODO: collect similar code (see IF)
+    // TODO: handle constants
     case ETH_IR_MATCH:
     {
-      int cond = build(bldr, tape, ir->match.expr, false, e);
+      int expr = build(bldr, tape, ir->match.expr, false, e);
 
       if (ir->match.pat->tag == ETH_PATTERN_IDENT)
       { // optimize trivial identifier-match
-        eth_ssa_pattern *pat = build_pattern(bldr, ir->match.pat, cond, false, e);
+        eth_ssa_pattern *pat = build_pattern(bldr, ir->match.pat, expr, NULL, e);
         eth_destroy_ssa_pattern(pat);
         return build(bldr, tape, ir->match.thenbr, istc, e);
       }
@@ -1207,7 +1217,8 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
         int lbstart = begin_logical_block(bldr);
         // --
         int n1 = bldr->nssavals;
-        eth_ssa_pattern *pat = build_pattern(bldr, ir->match.pat, cond, false, e);
+        match_result mchres;
+        eth_ssa_pattern *pat = build_pattern(bldr, ir->match.pat, expr, &mchres, e);
         int n2 = bldr->nssavals;
         // --
         eth_ssa_tape *thentape = eth_create_ssa_tape();
@@ -1232,7 +1243,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
         else
           ret = resolve_phi(bldr, thentape, thenret, elsetape, elseret);
 
-        eth_insn *insn = eth_insn_if_match(ret, cond, pat, thentape->head,
+        eth_insn *insn = eth_insn_if_match(ret, expr, pat, thentape->head,
             elsetape->head);
         insn->iff.toplvl = ir->match.toplvl;
         insn->iff.likely = ir->match.likely;
@@ -1999,53 +2010,99 @@ build_body(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *body, bool *e)
   return create_ssa(tape->head, bldr->nssavals, bldr->ntries);
 }
 
-#if 0
-static eth_ssa*
-build_fn_body(eth_ir *fnbody, int arity, int *capvars, int ncaps, int fidx,
-    bool *e)
+static void
+populate_capinfo(ssa_value_info *ssavinfo, const eth_capvar_info *capinfo)
 {
-  ssa_builder *bldr = create_ssa_builder(fnbody->nvars);
-  eth_ssa_tape *tape = eth_create_ssa_tape();
+  ssavinfo->type = capinfo->type;
+  ssavinfo->cval = capinfo->cval;
+}
+
+eth_ssa*
+eth_build_fn_body(eth_ir *fnbody, int arity, eth_capvar_info *caps, int ncaps,
+    int *scpvars_local, int nscpvars, int selfscpidx, bool *e)
+{
+  ssa_builder *fnbldr = create_ssa_builder(fnbody->nvars);
+  eth_ssa_tape *fntape = eth_create_ssa_tape();
+
+  int capvars_local[ncaps];
+  for (int i = 0; i < ncaps; ++i)
+    capvars_local[i] = caps[i].varid_local;
 
   // declare arguments [0, arity):
-  int args[arity];
+  int args_local[arity];
   if (arity)
   {
     for (int i = 0; i < arity; ++i)
     {
-      args[i] = new_val(bldr, RC_RULES_DEFAULT);
-      bldr->irvinfo[i]->ssavid = args[i]; // varids of args are [0 ... arity)
+      args_local[i] = new_val(fnbldr, RC_RULES_DEFAULT);
+      fnbldr->irvinfo[i]->ssavid = args_local[i]; // varids of args are
+                                                  // [0 ... arity)
+                                                  // XXX so what?
     }
-    eth_insn *pop = eth_insn_pop(args, arity);
-    eth_write_insn(tape, pop);
+
+    eth_insn *pop = eth_insn_pop(args_local, arity);
+    eth_write_insn(fntape, pop);
+
     for (int i = 0; i < arity; ++i)
-      bldr->ssavinfo[args[i]]->creatloc = pop;
+      fnbldr->ssavinfo[args_local[i]]->creatloc = pop;
   }
 
+  // prepare loop entry point
+  eth_insn *last_before_loop = NULL;
+
   // declare captures [arity, arity + ncap):
-  int capvids[ncaps];
+  int capvids_local[ncaps];
   if (ncaps > 0)
   {
     for (int i = 0; i < ncaps; ++i)
     {
-      capvids[i] = new_val(bldr, RC_RULES_DISABLE);
-      bldr->irvinfo[capvars[i]]->ssavid = capvids[i];
-      // TODO:
-      /*copy_ssa_value_info(bldr->ssavinfo[fncaps[i]], bldr->ssavinfo[caps[i]]);*/
-
-      // detect self-capture for loop-detection:
-      if (caps[i] == this)
-        fnbldr->ssavinfo[fncaps[i]]->isthis = true;
+      capvids_local[i] = new_val(fnbldr, RC_RULES_DISABLE);
+      fnbldr->irvinfo[capvars_local[i]]->ssavid = capvids_local[i];
+      populate_capinfo(fnbldr->ssavinfo[capvids_local[i]], &caps[i]);
     }
-    eth_write_insn(fntape, eth_insn_cap(fncaps, ncap));
+    eth_write_insn(fntape,
+        last_before_loop = eth_insn_cap(capvids_local, ncaps));
   }
 
-  int fnret = build_logical_block(bldr, tape, fnbody->body, true, e);
-  eth_write_insn(tape, eth_insn_ret(fnret));
-  insert_rc(bldr, tape->head);
-  return create_ssa(tape->head, bldr->nssavals, bldr->ntries);
+  // declare scope vars [arity + ncap, arity + ncap + nscp):
+  int scpvids_local[nscpvars];
+  if (nscpvars > 0)
+  {
+    for (int i = 0; i < nscpvars; ++i)
+    {
+      scpvids_local[i] = new_val(fnbldr, RC_RULES_DISABLE);
+      fnbldr->irvinfo[scpvars_local[i]]->ssavid = scpvids_local[i];
+      fnbldr->ssavinfo[scpvids_local[i]]->type = eth_function_type;
+    }
+    // mark self for loop-detection:
+    if (selfscpidx >= 0)
+    {
+      int selfvid_local = scpvids_local[selfscpidx];
+      fnbldr->ssavinfo[selfvid_local]->isthis = true;
+    }
+    // LDSCP
+    eth_write_insn(fntape,
+        last_before_loop = eth_insn_ldscp(scpvids_local, nscpvars));
+  }
+
+  if (last_before_loop)
+  {
+    // move ctor-instruction of arguments:
+    for (int i = 0; i < arity; ++i)
+      fnbldr->ssavinfo[args_local[i]]->creatloc = last_before_loop;
+  }
+
+  // build body and set up loop entry point (if has captures or scope-vars):
+  eth_ssa *ssa = build_body(fnbldr, fntape, fnbody->body, e);
+  // move entry point to after CAP- and LDSCP- instructions
+  if (last_before_loop)
+    last_before_loop->next->flag |= ETH_IFLAG_ENTRYPOINT;
+
+  eth_destroy_ssa_tape(fntape);
+  destroy_ssa_builder(fnbldr);
+
+  return ssa;
 }
-#endif
 
 
 typedef struct {

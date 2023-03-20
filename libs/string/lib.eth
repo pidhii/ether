@@ -35,34 +35,35 @@
 -- * find
 --
 
-let list = @(require "list")
+let list = @(require "list") in
 
 
 -- Prelude
-let pub cat = __cat
+let pub cat = __cat in
 let pub join sep xs =
   if xs is nil then ""
   else if let hd::[] = xs then hd
   else if let hd::tl = xs then
     list.fold_left (fn x y -> cat [x, sep, y]) hd tl
   else invalid_argument ()
-let pub to_upper = __to_upper
-let pub to_lower = __to_lower
-let pub chr = __chr
-let pub ord = __ord
-let pub to_number = __to_number
-let pub to_symbol = __to_symbol
-let pub chomp = __chomp
-let pub chop = __chop
-let pub trim_left = __trim_left
-let pub trim_right = __trim_right
-let pub trim s = trim_left $ trim_right s
-let pub strcmp = __strcmp
-let pub strcasecmp = __strcasecmp
-let pub match = __match
-let pub gsub = __gsub
-let pub rev_split = __rev_split
-let pub split re str = list.rev $ rev_split re str
+in
+let pub to_upper = __to_upper in
+let pub to_lower = __to_lower in
+let pub chr = __chr in
+let pub ord = __ord in
+let pub to_number = __to_number in
+let pub to_symbol = __to_symbol in
+let pub chomp = __chomp in
+let pub chop = __chop in
+let pub trim_left = __trim_left in
+let pub trim_right = __trim_right in
+let pub trim s = trim_left $ trim_right s in
+let pub strcmp = __strcmp in
+let pub strcasecmp = __strcasecmp in
+let pub match = __match in
+let pub gsub = __gsub in
+let pub rev_split = __rev_split in
+let pub split re str = list.rev $ rev_split re str in
 
 let pub malloc =
   {help|
@@ -73,6 +74,7 @@ let pub malloc =
     malloc number? -> string?
   |help}
   __malloc
+in
 
 let pub calloc =
   {help|
@@ -83,6 +85,7 @@ let pub calloc =
     calloc number? -> string?
   |help}
   __calloc
+in
 
 
 --------------------------------------------------------------------------------
@@ -96,14 +99,16 @@ let pub make_string =
     make number? string? -> string?
   |help}
   __make
+in
 
-let pub strlen = __len
+let pub strlen = __len in
 let pub substr x s =
   if let (k, n) = x then __substr s k n
   else if let l .. r = x then __substr s l (r - l + 1)
   else if let l... = x then __substr s l (strlen s - l)
   else if let ...r = x then __substr s 0 (r + 1)
   else invalid_argument ()
+in
 
 --------------------------------------------------------------------------------
 --                                Regexp
@@ -119,5 +124,6 @@ let pub strstr pat s =
       (start, start + strlen pat)
     else false
   else type_error ()
+in
 
-
+()

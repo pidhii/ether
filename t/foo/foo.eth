@@ -1,3 +1,6 @@
 
 let pub foo! =
   print "foo!"
+in
+
+()

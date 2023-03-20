@@ -94,6 +94,7 @@ ExternalProject_Add(eco
 
   INSTALL_COMMAND
     make -C ${ECO_BUILD_DIR} install)
+set (ECO_A "${ECO_TMP_INSTALL_DIR}/lib/libeco.a")
 
 ################################################################################
 #                                SOURCE FILES
@@ -159,7 +160,8 @@ endif (BUILD_CPPAPI_STATIC_LIBRARY)
 
 # executable:
 add_executable (ether ${CMAKE_SOURCE_DIR}/main.c $<TARGET_OBJECTS:ether_obj>)
-target_link_libraries (ether -lm -ldl -lpcre -lreadline)
+add_dependencies(ether eco)
+target_link_libraries (ether -lm -ldl -lpcre -lreadline ${ECO_A})
 install (TARGETS ether DESTINATION bin)
 
 # directory for modules

@@ -1,5 +1,5 @@
-let {*} = @(require 'list')
-let {*} = @(require 'string')
+let {*} = @(require 'list') in
+let {*} = @(require 'string') in
 
 let get_options cfg os =
 
@@ -7,35 +7,40 @@ let get_options cfg os =
     if pair? optcfg.name
     then map (name -> {optcfg with name}) optcfg.name
     else [optcfg]
+  in
   let cfg = cfg | map $ optcfg ->
     if optcfg is of {arg_pat} then optcfg
-    else record $ ('arg_pat', \.*/) :: list optcfg
+    else
+      let re = /.*/ in
+      record $ ('arg_pat', re) :: list optcfg
+  in
 
   let get_rules opt =
     try find (fn {name} -> name eq opt) cfg
     with `failure -> raise `undefined_option
+  in
 
   let rec loop os kws pos =
     if let o::os = os then
       if o eq "--" then (kws, rev_append pos os)
-      else if o =~ \^--/ then handle_long_option o os kws pos
-      else if o =~ \^-/ then handle_short_option o os kws pos
+      else if o =~ /^--/ then handle_long_option o os kws pos
+      else if o =~ /^-/ then handle_short_option o os kws pos
       else loop os kws (o :: pos)
     else (kws, rev pos)
 
   and handle_long_option o os kws pos =
     if let (brk, _) = strstr "=" o then
       -- Long option with '=' 
-      let lopt = substr (2 .. brk-1) o
-      let {has_arg, val, arg_pat} = get_rules lopt
+      let lopt = substr (2 .. brk-1) o in
+      let {has_arg, val, arg_pat} = get_rules lopt in
       if has_arg then
-        let arg = substr (brk + 1 ...) o
+        let arg = substr (brk + 1 ...) o in
         raise (`invalid_option_argument lopt) unless arg =~ arg_pat
         loop os ((val, arg) :: kws) pos
       else raise `unexpected_argument
     else
-      let lopt = substr (2...) o
-      let {has_arg, val, arg_pat} = get_rules lopt
+      let lopt = substr (2...) o in
+      let {has_arg, val, arg_pat} = get_rules lopt in
       if has_arg then
         if let arg::os = os then
           raise (`invalid_option_argument lopt) unless arg =~ arg_pat
@@ -44,12 +49,12 @@ let get_options cfg os =
       else loop os ((val, true) :: kws) pos
 
   and handle_short_option o os kws pos =
-    let shopt = substr (1..1) o
-    let {has_arg, val, arg_pat} = get_rules shopt
+    let shopt = substr (1..1) o in
+    let {has_arg, val, arg_pat} = get_rules shopt in
     if strlen o > 2 then
       -- Option and argument are merged 
       if has_arg then
-        let arg = substr (2...) o
+        let arg = substr (2...) o in
         raise (`invalid_option_argument shopt) unless arg =~ arg_pat
         loop os ((val, arg) :: kws) pos
       else raise `unexpected_argument
@@ -60,8 +65,10 @@ let get_options cfg os =
           loop os ((val, arg) :: kws) pos
         else raise `missing_argument
       else loop os ((val, true) :: kws) pos
+  in
 
   loop os [] []
+in
 
 let pub get =
   {help|
@@ -83,4 +90,7 @@ let pub get =
     arguments passed to your script use \`cdr command_line`.
   |help}
   get_options
+in
+
+()
 

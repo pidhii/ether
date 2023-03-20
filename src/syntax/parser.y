@@ -260,7 +260,7 @@ _create_attr(int aflag, void *locpp)
 %type<record> Record
 %type<record_pattern> RecordPattern
 %type<ast> Block
-%type<ast> StmtOrBlock
+%type<ast> StmtOrBlock StmtOrSeq
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %start Entry
 
@@ -409,57 +409,39 @@ Form
 StmtSeq
   : Stmt
   | Stmt KEEP_BLOCK StmtSeq {
-    switch ($1->tag)
-    {
-      case ETH_AST_LET:
-        if (is_dummy($1->letrec.body))
-        {
-          $$ = $1;
-          eth_set_let_expr($1, $3);
-        }
-        else
-          goto _default;
-        break;
-      case ETH_AST_LETREC:
-        if (is_dummy($1->letrec.body))
-        {
-          $$ = $1;
-          eth_set_letrec_expr($1, $3);
-        }
-        else
-          goto _default;
-        break;
-      default:
-      _default:
-        $$ = eth_ast_seq($1, $3); LOC($$, @$);
-    }
+    $$ = eth_ast_seq($1, $3); LOC($$, @$);
   }
 
-  | LET Binds KEEP_BLOCK StmtSeq {
-    $$ = eth_ast_let($2.pats.data, $2.vals.data, $2.pats.len, $4);
-    cod_vec_destroy($2.pats);
-    cod_vec_destroy($2.vals);
-    LOC($$, @$);
-  }
-  | LET Binds {
-    $$ = eth_ast_let($2.pats.data, $2.vals.data, $2.pats.len, dummy_ast());
-    cod_vec_destroy($2.pats);
-    cod_vec_destroy($2.vals);
-    LOC($$, @$);
-  }
+  /*| LET Binds KEEP_BLOCK StmtSeq {*/
+    /*$$ = eth_ast_let($2.pats.data, $2.vals.data, $2.pats.len, $4);*/
+    /*cod_vec_destroy($2.pats);*/
+    /*cod_vec_destroy($2.vals);*/
+    /*LOC($$, @$);*/
+  /*}*/
+  /*| LET Binds {*/
+    /*$$ = eth_ast_let($2.pats.data, $2.vals.data, $2.pats.len, dummy_ast());*/
+    /*cod_vec_destroy($2.pats);*/
+    /*cod_vec_destroy($2.vals);*/
+    /*LOC($$, @$);*/
+  /*}*/
 
-  | LET REC Binds KEEP_BLOCK StmtSeq {
-    $$ = eth_ast_letrec($3.pats.data, $3.vals.data, $3.pats.len, $5);
-    cod_vec_destroy($3.pats);
-    cod_vec_destroy($3.vals);
-    LOC($$, @$);
-  }
-  | LET REC Binds {
-    $$ = eth_ast_letrec($3.pats.data, $3.vals.data, $3.pats.len, dummy_ast());
-    cod_vec_destroy($3.pats);
-    cod_vec_destroy($3.vals);
-    LOC($$, @$);
-  }
+  /*| LET REC Binds KEEP_BLOCK StmtSeq {*/
+    /*$$ = eth_ast_letrec($3.pats.data, $3.vals.data, $3.pats.len, $5);*/
+    /*cod_vec_destroy($3.pats);*/
+    /*cod_vec_destroy($3.vals);*/
+    /*LOC($$, @$);*/
+  /*}*/
+  /*| LET REC Binds {*/
+    /*$$ = eth_ast_letrec($3.pats.data, $3.vals.data, $3.pats.len, dummy_ast());*/
+    /*cod_vec_destroy($3.pats);*/
+    /*cod_vec_destroy($3.vals);*/
+    /*LOC($$, @$);*/
+  /*}*/
+;
+
+StmtOrSeq
+  : Stmt
+  | KEEP_BLOCK StmtSeq { $$ = $2; }
 ;
 
 Expr
@@ -763,6 +745,18 @@ Stmt
     cod_vec_destroy($2.vals);
     LOC($$, @$);
   }
+  | LET Binds IN KEEP_BLOCK StmtSeq {
+    $$ = eth_ast_let($2.pats.data, $2.vals.data, $2.pats.len, $5);
+    cod_vec_destroy($2.pats);
+    cod_vec_destroy($2.vals);
+    LOC($$, @$);
+  }
+  | LET Binds KEEP_BLOCK IN KEEP_BLOCK StmtSeq {
+    $$ = eth_ast_let($2.pats.data, $2.vals.data, $2.pats.len, $6);
+    cod_vec_destroy($2.pats);
+    cod_vec_destroy($2.vals);
+    LOC($$, @$);
+  }
 
   | LET REC Binds IN Stmt {
     $$ = eth_ast_letrec($3.pats.data, $3.vals.data, $3.pats.len, $5);
@@ -770,6 +764,20 @@ Stmt
     cod_vec_destroy($3.vals);
     LOC($$, @$);
   }
+  | LET REC Binds IN KEEP_BLOCK StmtSeq {
+    $$ = eth_ast_letrec($3.pats.data, $3.vals.data, $3.pats.len, $6);
+    cod_vec_destroy($3.pats);
+    cod_vec_destroy($3.vals);
+    LOC($$, @$);
+  }
+  | LET REC Binds KEEP_BLOCK IN KEEP_BLOCK StmtSeq {
+    $$ = eth_ast_letrec($3.pats.data, $3.vals.data, $3.pats.len, $7);
+    cod_vec_destroy($3.pats);
+    cod_vec_destroy($3.vals);
+    LOC($$, @$);
+  }
+
+
 
   | DO SYMBOL LoopArgs '=' StmtOrBlock {
     eth_ast_pattern *ident = eth_ast_ident_pattern($2);
@@ -819,7 +827,7 @@ Stmt
   /*| Expr '$' StmtOrBlock { if ($1->tag == ETH_AST_APPLY) { $$ = $1; eth_ast_append_arg($$, $3); } else $$ = eth_ast_apply($1, &$3, 1); LOC($$, @$); }*/
   /*| Expr '$' KEEP_BLOCK Stmt { if ($1->tag == ETH_AST_APPLY) { $$ = $1; eth_ast_append_arg($$, $4); } else $$ = eth_ast_apply($1, &$4, 1); LOC($$, @$); }*/
 
-  | Attribute OPEN Expr {
+  | Attribute OPEN Atom IN StmtOrSeq {
     eth_ast *rhs;
     if ($3->tag == ETH_AST_CVAL and $3->cval.val->type == eth_string_type)
     {
@@ -830,10 +838,11 @@ Stmt
       rhs = $3;
     eth_ast_pattern *lhs = eth_ast_record_star_pattern();
     eth_ref_attr(lhs->recordstar.attr = eth_create_attr($1));
-    $$ = eth_ast_let(&lhs, &rhs, 1, eth_ast_cval(eth_nil));
+    $$ = eth_ast_let(&lhs, &rhs, 1, $5);
   }
 
-  | Attribute IMPORT String {
+
+  | Attribute IMPORT String IN StmtOrSeq {
     cod_vec_push($3, 0);
     eth_ast *require = eth_ast_cval(eth_get_builtin(SCANROOT, "__require"));
     eth_ast_pattern *lhs = eth_ast_ident_pattern($3.data);
@@ -841,9 +850,9 @@ Stmt
     eth_ast *arg = eth_ast_cval(eth_create_string_from_ptr2($3.data, $3.len - 1));
     eth_ast *rhs = eth_ast_evmac(eth_ast_apply(require, &arg, 1));
     $3.data = NULL;
-    $$ = eth_ast_let(&lhs, &rhs, 1, eth_ast_cval(eth_nil));
+    $$ = eth_ast_let(&lhs, &rhs, 1, $5);
   }
-  | Attribute IMPORT Expr AS SYMBOL {
+  | Attribute IMPORT Expr AS SYMBOL IN StmtOrSeq {
     eth_ast *rhs;
     if ($3->tag == ETH_AST_CVAL and $3->cval.val->type == eth_string_type)
     {
@@ -855,7 +864,7 @@ Stmt
     eth_ast_pattern *lhs = eth_ast_ident_pattern($5);
     eth_ref_attr(lhs->ident.attr = eth_create_attr($1));
     free($5);
-    $$ = eth_ast_let(&lhs, &rhs, 1, eth_ast_cval(eth_nil));
+    $$ = eth_ast_let(&lhs, &rhs, 1, $7);
   }
 
   | RETURN Stmt {

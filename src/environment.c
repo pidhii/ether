@@ -165,7 +165,7 @@ load_from_ast(eth_root *root, eth_module *mod, eth_ast *ast,
 
   eth_debug("converting SSA to bytecode...");
   eth_indent_log();
-  eth_bytecode *bc = eth_build_bytecode(ssa);
+  eth_bytecode *bc = eth_build_bytecode(ssa, 0);
   eth_drop_ssa(ssa);
   if (bc == NULL)
   {

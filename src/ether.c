@@ -19,19 +19,20 @@
 #include <assert.h>
 #include <limits.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/resource.h>
-
-#define STACK_SIZE 0x1000
 
 ETH_MODULE("ether")
 
-int eth_nargs = 0;
-eth_function *eth_this;
-eth_t *eth_stack, *eth_reg_stack;
-eth_t *eth_sp, *eth_reg_sp;
 
-ssize_t eth_c_stack_size;
-char *eth_c_stack_start;
+static
+eth_t *_main_arg_stack;
+
+eth_t *eth_sb;
+eth_t *eth_sp;
+size_t eth_ss;
+eth_function *eth_this;
+uintptr_t eth_cpu_se;
 
 const char*
 eth_get_prefix(void)
@@ -141,25 +142,31 @@ eth_get_siphash_key(void)
   return g_siphash_key;
 }
 
-
-
 void
-eth_init(const int *argc)
+eth_init(void *argv)
 {
+  eco_init_this_thread();
+
   if (eth_get_prefix() == NULL)
   {
     eth_warning("can't determine installation prefix, "
                 "may fail to resolve installed modules");
   }
 
-  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-  eth_stack = malloc(sizeof(eth_t) * STACK_SIZE);
-  eth_sp = eth_stack + STACK_SIZE;
+  _main_arg_stack = malloc(ETH_STACK_SIZE);
+  // move SP to the end of the allocated memory
+  eth_sp = (eth_t*)((uintptr_t)_main_arg_stack + ETH_STACK_SIZE);
+  // and allign it at <ptr-size> bytes
+  eth_sp = (eth_t*)((uintptr_t)eth_sp & ~(sizeof(void*)-1));
+  // save stack base and size for tests on overflow
+  eth_sb = eth_sp;
+  eth_ss = (uintptr_t)eth_sb - (uintptr_t)_main_arg_stack;
 
   struct rlimit limit;
   getrlimit(RLIMIT_STACK, &limit);
-  eth_c_stack_size = limit.rlim_cur / 2; // ...I don't know...
-  eth_c_stack_start = (char*)argc;
+  size_t ss = limit.rlim_cur / 2; // ...I don't know...
+  uintptr_t sb = (uintptr_t)argv;
+  eth_cpu_se = sb - ss;
 
   extern void _eth_init_alloc(void);
   _eth_init_alloc();
@@ -246,10 +253,9 @@ eth_cleanup(void)
   extern void _eth_cleanup_alloc(void);
   _eth_cleanup_alloc();
 
-  if (eth_sp - eth_stack != STACK_SIZE)
+  if (eth_sp != eth_sb)
     eth_warning("stack pointer is not on the top of the stack");
-  free(eth_stack);
-  free(eth_reg_stack);
+  free(_main_arg_stack);
 }
 
 const char*
@@ -258,7 +264,7 @@ eth_binop_sym(eth_binop op)
   static char sym[][5] = {
     "+", "-", "*", "/", "mod", "^",
     "land", "lor", "lxor", "lshl", "lshr", "ashl", "ashr",
-    "<", "<=", ">", ">=", "==", "/=",
+    "<", "<=", ">", ">=", "==", "!=",
     "is", "eq",
     "::"
   };

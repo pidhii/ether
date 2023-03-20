@@ -247,7 +247,7 @@ main(int argc, char **argv)
   }
 
   eth_debug("[main] init");
-  eth_init(&argc);
+  eth_init(argv);
 
   eth_root *root = eth_create_root();
   cod_vec_iter(L, i, path, eth_add_module_path(eth_get_root_env(root), path));
@@ -483,7 +483,7 @@ main(int argc, char **argv)
         if (ssa)
         {
           eth_debug("[main] build bytecode");
-          eth_bytecode *bc = eth_build_bytecode(ssa);
+          eth_bytecode *bc = eth_build_bytecode(ssa, 0);
           eth_drop_ssa(ssa);
           if (bc)
           {

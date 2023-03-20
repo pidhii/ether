@@ -27,10 +27,10 @@ eth_t
 eth_vm(eth_bytecode *bc)
 {
   const int nreg = bc->nreg;
+  int nargs = bc->nargs;
 
   if (eth_unlikely(not eth_reserve_c_stack(nreg * sizeof(eth_t))))
   {
-    int nargs = eth_nargs;
     for (int i = 0; i < nargs; ++i)
       eth_ref(eth_sp[i]);
     for (int i = 0; i < nargs; ++i)
@@ -192,7 +192,7 @@ eth_vm(eth_bytecode *bc)
           bc = func->clos.bc;
           ip = func->clos.bc->code;
           eth_this = func;
-          eth_nargs = nstack;
+          nargs = nstack;
           nstack = 0;
           PREDICT(POP);
           FAST_DISPATCH();

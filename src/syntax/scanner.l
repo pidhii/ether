@@ -442,9 +442,11 @@ fn              { ENTER_STATE(IGNORE_INDENT); return FN; }
   ENTER_STATE(STRING);
   return '"';
 }
-"\\" {
+[[:space:]]+"/"/[^[:space:]] {
   ENTER_STATE(REGEXP);
-  yylval->character = yytext[yyleng-1];
+  /*char *p = strchr(yytext, '/');*/
+  /*yyless(p - yytext + 1);*/
+  yylval->character = '/';
   return START_REGEXP;
 }
 <STRING>\\\n
@@ -591,6 +593,15 @@ __deprecated { return DEPRECATED; }
 "."[[:space:]]*"(" { return DOT_OPEN1; }
 "."[[:space:]]*"[" { return DOT_OPEN2; }
 
+"("({OPERATOR}|","+)")"     {
+  char *buf = malloc(yyleng - 2 + 1);
+  strncpy(buf, yytext + 1, yyleng - 2);
+  buf[yyleng - 2] = 0;
+  yylval->string = buf;
+  return SYMBOL;
+}
+
+
 "@"     |
 "="     |
 "_"     |
@@ -611,7 +622,7 @@ __deprecated { return DEPRECATED; }
 "<="    { return LE; }
 ">="    { return GE; }
 "=="    { return EQ; }
-"/="    { return NE; }
+"!="    { return NE; }
 "=~"    { return EQ_TILD; }
 is      { return IS; }
 is[ \t\n]+not { return ISNOT; }
@@ -635,15 +646,10 @@ lnot    { return LNOT; }
 "..."   { return DDDOT; }
 ":="   { return ASSIGN; }
 
-"("({OPERATOR}|","+)")"     {
-  char *buf = malloc(yyleng - 2 + 1);
-  strncpy(buf, yytext + 1, yyleng - 2);
-  buf[yyleng - 2] = 0;
-  yylval->string = buf;
-  return SYMBOL;
-}
 
 {OPCHR}+ {
+  if (yytext[0] == '/')
+    REJECT;
   yylval->string = strdup(yytext);
   return USROP;
 }

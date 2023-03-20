@@ -15,6 +15,7 @@
  */
 #include "ether/ether.h"
 #include "codeine/vec.h"
+#include "eco/eco.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -1202,6 +1203,120 @@ _send(void)
 }
 
 
+
+
+#define COROUTINES 1
+#if COROUTINES
+
+static eth_type *_state_obj_type;
+
+
+typedef struct _state_obj {
+  eth_header hdr;
+  eth_state *state;
+  eth_t entry;
+  bool full_destroy_state;
+} _state_obj;
+#define SOBJ(x) ((_state_obj*)(x))
+#define GET_STATE(x) ((_state_obj*)(x))->state
+
+static eth_t
+_make_state_obj(eth_state *state, eth_t entry, bool full_destroy_state)
+{
+  _state_obj *sobj = malloc(sizeof(_state_obj));
+  memset(sobj, 0, sizeof(_state_obj));
+  eth_init_header(ETH(sobj), _state_obj_type);
+  sobj->state = state;
+  sobj->state->data = sobj;
+  if (entry)
+    eth_ref(sobj->entry = entry);
+  sobj->full_destroy_state = full_destroy_state;
+  return ETH(sobj);
+}
+
+static void
+_destroy_state_obj(eth_type *type, eth_t x)
+{
+  _state_obj *sobj = (_state_obj*)x;
+
+  if (sobj->full_destroy_state)
+    eth_destroy_state(sobj->state);
+  else
+    free(sobj->state);
+
+  if (sobj->entry)
+    eth_unref(sobj->entry);
+
+  free(sobj);
+}
+
+
+static eth_t
+_g_current_state_box;
+
+static eth_t
+_get_current_state(void)
+{
+  return eth_ref_get(_g_current_state_box);
+}
+
+static eth_t
+_switch_state(void)
+{
+  eth_args args = eth_start(3);
+  eth_t from = eth_arg2(args, _state_obj_type);
+  eth_t to = eth_arg2(args, _state_obj_type);
+  eth_t parcel = eth_arg(args); // TODO: remove ref
+
+  if (eth_unlikely(from == to))
+    eth_throw(args, eth_invalid_argument());
+
+  eth_state *ret_caller;
+  eth_t ret_parcel;
+  eth_set_strong_ref(_g_current_state_box, to);
+  if (not eth_switch_state(GET_STATE(from), GET_STATE(to), parcel,
+        &ret_caller, (void**)&ret_parcel))
+  {
+    eth_set_strong_ref(_g_current_state_box, from);
+    eth_return(args, eth_false);
+  }
+  else
+  {
+    eth_t ret = eth_tup2(ret_caller->data, ret_parcel);
+    eth_return(args, ret);
+  }
+}
+
+static void
+_co_entry_point(eth_state *this_state, eth_state *caller_state, eth_t parcel)
+{
+  eth_t this_sobj = this_state->data;
+  eth_t caller_sobj = caller_state->data;
+
+  eth_reserve_stack(3);
+  eth_sp[0] = this_sobj;
+  eth_sp[1] = caller_sobj;
+  eth_sp[2] = parcel;
+  eth_t ret = eth_apply(SOBJ(this_sobj)->entry, 3);
+  if (ret->type == eth_exception_type)
+    eth_warning("<coroutine> returned an unhandled exception: ~w", ret);
+  eth_drop(ret);
+}
+
+static eth_t
+_make_initial_state(void)
+{
+  eth_args args = eth_start(1);
+  eth_t entry = eth_arg2(args, eth_function_type);
+
+  eth_state *state = eth_create_initial_state(1, _co_entry_point);
+  eth_t sobj = _make_state_obj(state, entry, true);
+
+  eth_return(args, sobj);
+}
+#endif
+
+
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                 module
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -1216,6 +1331,23 @@ eth_create_builtins(eth_root *root)
   eth_module *mod = eth_create_module("builtins", NULL);
   if (eth_get_module_path())
     eth_add_module_path(eth_get_env(mod), eth_get_module_path());
+
+
+#if COROUTINES
+  _state_obj_type = eth_create_type("coroutine");
+  _state_obj_type->destroy = _destroy_state_obj;
+
+  eth_state *initial_state = malloc(sizeof(eth_state));
+  memset(initial_state, 0, sizeof(eth_state));
+  eth_t initial_sobj = _make_state_obj(initial_state, NULL, false);
+
+  _g_current_state_box = eth_create_strong_ref(initial_sobj);
+  eth_ref(_g_current_state_box);
+
+  eth_add_destructor(mod, _g_current_state_box, (void*)eth_unref);
+  eth_add_destructor(mod, _state_obj_type, (void*)eth_destroy_type);
+#endif
+
 
   extern void _eth_set_builtins(eth_root*, eth_module*);
   _eth_set_builtins(root, mod);
@@ -1281,6 +1413,12 @@ eth_create_builtins(eth_root *root)
 
   eth_define(mod, "__make_usertype", eth_create_proc(_make_usertype, 3, NULL, NULL));
   eth_define(mod, "#", eth_create_proc(_send, 2, NULL, NULL));
+
+#if COROUTINES
+  eth_define(mod, "__switch_state", eth_create_proc(_switch_state, 3, NULL, NULL));
+  eth_define(mod, "__make_initial_state", eth_create_proc(_make_initial_state, 1, NULL, NULL));
+  eth_define(mod, "__get_current_state", eth_create_proc(_get_current_state, 0, NULL, NULL));
+#endif
 
 
   if (not eth_resolve_path(eth_get_env(mod), "__builtins.eth", buf))

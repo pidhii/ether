@@ -83,7 +83,7 @@ eth_eval(eth_evaluator *evl, eth_ast *ast)
         return NULL;
       }
 
-      eth_bytecode *bc = eth_build_bytecode(ssa);
+      eth_bytecode *bc = eth_build_bytecode(ssa, 0);
       eth_drop_ssa(ssa);
       if (not bc)
       {
@@ -122,7 +122,7 @@ eth_eval(eth_evaluator *evl, eth_ast *ast)
       if (not ssa)
         return NULL;
 
-      eth_bytecode *bc = eth_build_bytecode(ssa);
+      eth_bytecode *bc = eth_build_bytecode(ssa, 0);
       eth_drop_ssa(ssa);
       if (not bc)
         return NULL;

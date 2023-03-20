@@ -1,5 +1,5 @@
 
-open 'string'
+let {*} = @(require 'string') in
 
 --------------------------------------------------------------------------------
 -- Functions:
@@ -11,16 +11,16 @@ open 'string'
 -- Values:
 -- * f_ok, r_ok, w_ok, x_ok
 
-let pub f_ok = __f_ok
-let pub r_ok = __r_ok
-let pub w_ok = __w_ok
-let pub x_ok = __x_ok
+let pub f_ok = __f_ok in
+let pub r_ok = __r_ok in
+let pub w_ok = __w_ok in
+let pub x_ok = __x_ok in
 
-let pub o_cloexec = __o_cloexec
-let pub o_direct = __o_direct
-let pub o_nonblock = __o_nonblock
+let pub o_cloexec = __o_cloexec in
+let pub o_direct = __o_direct in
+let pub o_nonblock = __o_nonblock in
 
-let pub chdir = __chdir
+let pub chdir = __chdir in
 
 let pub access =
   {help|
@@ -39,21 +39,24 @@ let pub access =
   See also man(3) access for complete documentation.
   |help}
   __access
+in
 
-let pub getcwd = __getcwd
+let pub getcwd = __getcwd in
 
-let pub getenv = __getenv
+let pub getenv = __getenv in
 let pub setenv x =
   if let name, value, overwrite? = x then
     __setenv name value overwrite?
   else
-    let name = x
+    let name = x in
     fn value -> __setenv name value true
+in
 
 let pub realpath path =
   if substr path (0 .. 1) path eq "~/" or false
   then __realpath (getenv "HOME" ++ substr (1...) path)
   else __realpath path
+in
 
 let pub mkdtemp =
   {help|
@@ -71,11 +74,14 @@ let pub mkdtemp =
   - _emplate-string_: Template path for the directory ending with six 'X' characters.
   |help}
   __mkdtemp
+in
 
-let pub fork = __fork
-let pub waitpid = __waitpid
+let pub fork = __fork in
+let pub waitpid = __waitpid in
 
-let pub pipe = __pipe
-let pub pipe2 = __pipe2
+let pub pipe = __pipe in
+let pub pipe2 = __pipe2 in
 
-let pub fileno = __fileno
+let pub fileno = __fileno in
+
+()

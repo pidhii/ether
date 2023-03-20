@@ -1,63 +1,62 @@
-let pub __builtin (+) x y = x + y
-let pub __builtin (-) x y = x - y
-let pub __builtin (*) x y = x * y
-let pub __builtin (/) x y = x / y
-let pub __builtin (mod) x y = x mod y
-let pub __builtin (^) x y = x ^ y
+let pub __builtin (+) x y = x + y in
+let pub __builtin (-) x y = x - y in
+let pub __builtin (*) x y = x * y in
+let pub __builtin (/) x y = x / y in
+let pub __builtin (mod) x y = x mod y in
+let pub __builtin (^) x y = x ^ y in
 
-let pub __builtin (land) x y = x land y
-let pub __builtin (lor) x y = x lor y
-let pub __builtin (lxor) x y = x lxor y
-let pub __builtin (lshl) x y = x lshl y
-let pub __builtin (lshr) x y = x lshr y
-let pub __builtin (ashl) x y = x ashl y
-let pub __builtin (ashr) x y = x ashr y
-let pub __builtin (lnot) x = lnot x
+let pub __builtin (land) x y = x land y in
+let pub __builtin (lor) x y = x lor y in
+let pub __builtin (lxor) x y = x lxor y in
+let pub __builtin (lshl) x y = x lshl y in
+let pub __builtin (lshr) x y = x lshr y in
+let pub __builtin (ashl) x y = x ashl y in
+let pub __builtin (ashr) x y = x ashr y in
+let pub __builtin (lnot) x = lnot x in
 
-let pub __builtin (<) x y = x < y
-let pub __builtin (>) x y = x > y
-let pub __builtin (<=) x y = x <= y
-let pub __builtin (>=) x y = x >= y
-let pub __builtin (==) x y = x == y
-let pub __builtin (/=) x y = x /= y
+let pub __builtin (<) x y = x < y in
+let pub __builtin (>) x y = x > y in
+let pub __builtin (<=) x y = x <= y in
+let pub __builtin (>=) x y = x >= y in
+let pub __builtin (==) x y = x == y in
+let pub __builtin (!=) x y = x != y in
 
-let pub __builtin (is) x y = x is y
+let pub __builtin (is) x y = x is y in
 
-let pub (++) x y = x ++ y
+let pub (++) x y = x ++ y in
 
-let pub __builtin (::) x y = x :: y
+let pub __builtin (::) x y = x :: y in
 
-let pub (,) a b = (a, b)
-let pub (,,) a b c = (a, b, c)
-let pub (,,,) a b c d = (a, b, c, d)
-let pub (,,,,) a b c d e = (a, b, c, d, e)
+let pub (,) a b = (a, b) in
+let pub (,,) a b c = (a, b, c) in
+let pub (,,,) a b c d = (a, b, c, d) in
+let pub (,,,,) a b c d e = (a, b, c, d, e) in
 
-let pub __builtin (not) x = not x
+let pub __builtin (not) x = not x in
 
 
 --let pub (∘) f g x = f (g x)
 
 -- Application
-let pub ($) f x = f x
-let pub (|>) x f = f x
-let pub (|) x f = f x
+let pub ($) f x = f x in
+let pub (|>) x f = f x in
 
 -- Pairs
-let pub car (x::_) = x
-let pub cdr (_::x) = x
+let pub car (x::_) = x in
+let pub cdr (_::x) = x in
 
 -- Tuples
-let pub first  {_1 = x} = x
-let pub second {_2 = x} = x
-let pub third  {_3 = x} = x
+let pub first  {_1 = x} = x in
+let pub second {_2 = x} = x in
+let pub third  {_3 = x} = x in
 
 -- Functions
-let pub id x = x
+let pub id x = x in
 
-let pub flip f x y = f y x
-let pub const x = fn _ -> x
-let pub curry f = fn x y -> f (x, y)
-let pub uncurry f = fn (x, y) -> f x y
+let pub flip f x y = f y x in
+let pub const x = fn _ -> x in
+let pub curry f = fn x y -> f (x, y) in
+let pub uncurry f = fn (x, y) -> f x y in
 
 -- Sequences
 --let pub index seq idx =
@@ -65,21 +64,24 @@ let pub uncurry f = fn (x, y) -> f x y
   --else __index seq idx
 
 -- Math
-let pub even? x = x mod 2 == 0
-let pub odd?  x = x mod 2 == 1
+let pub even? x = x mod 2 == 0 in
+let pub odd?  x = x mod 2 == 1 in
 
 let compose_va f g =
   let rec aux x =
     if function? x then
       fn y -> aux (x y)
     else f x
+  in
   aux g
+in
 
 let pub die msg =
   __print_to stderr msg
   exit 1
+in
 
-let pub require = __require
+let pub require = __require in
 
 let pub create_env defs =
   { defs
@@ -87,34 +89,38 @@ let pub create_env defs =
   , load_stream = fn {defs} file -> __load_stream file defs
   , load_string = fn {defs} str -> __load_stream (__open_string str) defs
   }
-let pub load path = __load path []
-let pub load_stream file = __load_stream file []
-let pub load_string str = __load_stream (__open_string str) []
+in
+let pub load path = __load path [] in
+let pub load_stream file = __load_stream file [] in
+let pub load_string str = __load_stream (__open_string str) [] in
 
 
 let pub __fmt l =
   let rec loop l acc =
     if let x :: xs = l then
-      let x = if string? x then x else format "%w" x
+      let x = if string? x then x else format "%w" x in
       loop xs (x ++ acc)
     else acc
+  in
   loop l ""
+in
 
 
 let pub record = lazy
-  let {strcmp} = require 'string'
-  let {sort, mapi, map} = require 'list'
+  let {strcmp} = require 'string' in
+  let {sort, mapi, map} = require 'list' in
   fn pairs ->
     -- sort pairs
     let pairs =
       pairs
       |> mapi (curry id)
       |> sort $ (i, (a, _)) (j, (b, _)) ->
-          let cmp = strcmp a b
+          let cmp = strcmp a b in
           if cmp < 0 then true
           else if cmp == 0 then i < j
           else false
       |> map second
+    in
 
     -- remove duplicate keys (leave the latest one) and construct a record
     do loop l:pairs acc:[] =
@@ -130,13 +136,15 @@ let pub record = lazy
           loop xs (x :: acc)
       else
         __record acc
+in
 
 
 let pub object typespec =
-  let typename = typespec.name or "usertype"
-  let base = typespec.base
-  let methods = if let {methods} = typespec then list methods else []
+  let typename = typespec.name or "object" in
+  let base = typespec.base in
+  let methods = if let {methods} = typespec then list methods else [] in
   __make_usertype typename base methods
+in
 
 
 --------------------------------------------------------------------------------
@@ -156,30 +164,31 @@ let pub object typespec =
 -- * print
 -- * eprint
 --
-let pub open_in path = __open path "r"
-let pub open_out path = __open path "w"
-let pub open_append path = __open path "a"
-let pub open_pipe_in cmd = __popen cmd "r"
-let pub open_pipe_out cmd = __popen cmd "w"
-let pub open_string_in = __open_string
+let pub open_in path = __open path "r" in
+let pub open_out path = __open path "w" in
+let pub open_append path = __open path "a" in
+let pub open_pipe_in cmd = __popen cmd "r" in
+let pub open_pipe_out cmd = __popen cmd "w" in
+let pub open_string_in = __open_string in
 
-let pub print_to = __print_to
-let pub print = print_to stdout
-let pub eprint = print_to stderr
+let pub print_to = __print_to in
+let pub print = print_to stdout in
+let pub eprint = print_to stderr in
 
 --------------------------------------------------------------------------------
 --                                System
-let pub system = __system
+let pub system = __system in
 
 --------------------------------------------------------------------------------
 --                                Random
-let pub rand = __rand
-let pub srand = __srand
+let pub rand = __rand in
+let pub srand = __srand in
 
 --------------------------------------------------------------------------------
 --                                Errors
 --
-let pub failure () = raise `failure
-let pub invalid_argument () = raise `invalid_argument
-let pub type_error () = raise `type_error
+let pub failure () = raise `failure in
+let pub invalid_argument () = raise `invalid_argument in
+let pub type_error () = raise `type_error in
 
+()

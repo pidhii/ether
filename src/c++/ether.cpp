@@ -58,11 +58,11 @@ _cleanup_user_data_type()
 static bool s_initialized = false;
 
 void
-eth::init(const int *argc)
+eth::init(void *argv)
 {
   if (not s_initialized)
   {
-    eth_init(argc);
+    eth_init(argv);
     _init_user_data_type();
   }
   s_initialized = true;

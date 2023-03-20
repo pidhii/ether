@@ -585,8 +585,6 @@ build_pattern(bc_builder *bldr, eth_ssa_pattern *pat, int expr, int_vec *jmps)
 
       for (int i = 0; i < pat->unpack.n; ++i)
       {
-        if (pat->unpack.subpat[i]->tag == ETH_PATTERN_DUMMY)
-          continue;
         int oreg = new_reg(bldr, pat->unpack.vids[i]);
         write_load(bldr, oreg, expr, pat->unpack.offs[i]);
         build_pattern(bldr, pat->unpack.subpat[i], oreg, jmps);
@@ -892,7 +890,7 @@ end_if:
 
       case ETH_INSN_FN:
       {
-        eth_bytecode *bc = eth_build_bytecode(ip->fn.ssa);
+        eth_bytecode *bc = eth_build_bytecode(ip->fn.ssa, ip->fn.arity);
         eth_ir *ir = ip->fn.ir;
         int out = new_reg(bldr, ip->out);
         int ncap = ip->fn.ncap;
@@ -994,7 +992,7 @@ end_if:
 }
 
 eth_bytecode*
-eth_build_bytecode(eth_ssa *ssa)
+eth_build_bytecode(eth_ssa *ssa, int nargs)
 {
   bc_builder *bldr = create_bc_builder(ssa->nvals, ssa->ntries);
 
@@ -1020,6 +1018,7 @@ eth_build_bytecode(eth_ssa *ssa)
   eth_bytecode *bc = malloc(sizeof(eth_bytecode));
   bc->rc = 0;
   bc->nreg = ssa->nvals;
+  bc->nargs = nargs;
   bc->len = bldr->len;
   bc->code = bldr->arr;
   destroy_bc_builder(bldr);

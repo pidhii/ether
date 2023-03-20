@@ -1,72 +1,91 @@
 #!/bin/env ether
 
-open 'list'
-open 'string'
-open 'io'
-open 'os'
-import 'vector'
-import 'json'
-import 'cmdarg'
+open 'list' in
+open 'string' in
+open 'io' in
+open 'os' in
+import 'vector' in
+import 'json' in
+import 'cmdarg' in
 
 -------------------------[ Log and text formatting ]----------------------------
 let paint text =
   "\e[48;5;232;38;5;231m{text}\e[0m"
+in
 
 let info msg =
   print $ paint " {msg} "
+in
 
 let error msg =
   eprint "\e[48;5;196;38;5;232;1;7merror\e[0m\e[48;5;232;38;5;231m:{paint " {msg} "}"
+in
 
 let fatal_error msg =
   error msg
   exit 1
+in
 
 --------------------------------[ Utilities ]-----------------------------------
 -- Get direcory containing modules
 let module_path =
-  let pipe = open_pipe_in "ether --prefix"
-  let prefix = read_line_of pipe |> chomp
-  if close pipe /= 0
+  let pipe = open_pipe_in "ether --prefix" in
+  let prefix = read_line_of pipe |> chomp in
+  if close pipe != 0
   then raise `failed_to_resolve_prefix
   else prefix ++ "/lib/ether"
+in
 
 -- Checks whether a file exists in the file system
 let exist? path =
   try access path f_ok
   with `system_error `ENOENT -> false
+in
 
 let mkdir path =
   unless system "mkdir -vp '{path}'" == 0
   then raise `system_error
+in
 
 let copy src dst =
   unless system "cp -rv '{src}' '{dst}'" == 0
   then raise `system_error
+in
 
 let create_symlink src dst =
   unless system "ln -vs '{src}' '{dst}'" == 0
   then raise `system_error
+in
 
 let unlink path =
   unless system "rm -rfv '{path}'" == 0
   then raise `system_error
+in
 
 let unlink_quite path =
   unless system "rm -rf '{path}'" == 0
   then raise `system_error
+in
+
+--(let (utc_date)
+  --(let pipe (open_ppie_in "..."))
+  --(let line (read_line_of pipe))
+  --(if (close pipe != 0)
+    --(raise 'system_error')
+    --(chomp line)))
 
 let utc_date! =
-  let pipe = open_pipe_in "date -u +'%x %X'"
-  let line = read_line_of pipe
-  if close pipe /= 0
+  let pipe = open_pipe_in "date -u +'%x %X'" in
+  let line = read_line_of pipe in
+  if close pipe != 0
   then raise `system_error
   else chomp line
+in
 
-let elf? path = read_of (open_in path) 4 eq "\x7fELF"
+let elf? path = read_of (open_in path) 4 eq "\x7fELF" in
 
 let do_in dir thunk =
-  let cwd = getcwd!
+  let cwd = getcwd! in
   chdir dir
   try
     thunk!
@@ -74,78 +93,125 @@ let do_in dir thunk =
     chdir cwd
     raise e
   chdir cwd
+in
 
 let do_in_tempdir thunk =
-  let cwd = getcwd!
+  let cwd = getcwd! in
 
-  let tempdir = mkdtemp "/tmp/dope-XXXXXX"
+  let tempdir = mkdtemp "/tmp/dope-XXXXXX" in
   chdir tempdir
   let cleanup! =
     unlink_quite tempdir
     chdir cwd
+  in
 
-  let thunk_result = try thunk! with e -> cleanup!; raise e
+  let thunk_result = try thunk! with e -> cleanup!; raise e in
   cleanup!
   thunk_result
+in
 
 
 let rec confirm? x =
   if let (prompt1, prompt2) = x then
     do loop ans:(input prompt1) =
-      if ans =~ \[Yy](es)?/ then true
-      else if ans =~ \[Nn]o?/ then false
+      if ans =~ /[Yy](es)?/ then true
+      else if ans =~ /[Nn]o?/ then false
       else loop (input prompt2)
   else
     confirm? (x, paint " try again (yes/no): ")
+in
+
+--(let-rec (confirm? x)
+  --(if-let ((prompt1, prompt2) x)
+    --(let-rec (loop ans)
+      --(if (ans =~ /.../)
+        --true
+        --(if (ans =~ /.../)
+          --false
+          --(loop (input prompt2)))))
+    --(confirm? (x, paint "...")))
+
 
 let check_network! =
   shell 'ping -c 1 www.google.com &>/dev/null' or false
+in
 
 let require_network! =
   unless check_network! then
     error "no network connection"
     raise `failure
+in
 
 
 --------------------------------[ Algorithms ]-----------------------------------
 -- Levenshtein distance of strings
 let fuzzy_cmp a b =
-  let {*} = @(require 'math')
+  let {*} = @(require 'math') in
   -- Will memorize sub-distances.
-  let lena = strlen a
-  let lenb = strlen b
-  let mem = vector.init (lena * lenb) (const false)
-  let getmem i j mem = vector.get mem (i-1 + lena * (j-1))
-  let setmem i j x mem = vector.insert mem (i-1 + lena * (j-1)) x
+  let lena = strlen a in
+  let lenb = strlen b in
+  let mem = vector.init (lena * lenb) (const false) in
+  let getmem i j mem = vector.get mem (i-1 + lena * (j-1)) in
+  let setmem i j x mem = vector.insert mem (i-1 + lena * (j-1)) x in
   -- Indicator function.
-  let ind i j = 0 if substr (i-1, 1) a eq substr (j-1, 1) b else 1
+  let ind i j = 0 if substr (i-1, 1) a eq substr (j-1, 1) b else 1 in
   -- Levenshtein distance function.
   let rec distance i j mem =
     if min i j == 0 then
       (max i j, mem)
     else
-      let dist = getmem i j mem
+      let dist = getmem i j mem in
       if dist then
         -- Already computed.
         (dist, mem)
       else
         -- Honestly compute it.
         let dist, mem =
-          let dist1, mem = distance (i-1) j mem
-          let dist2, mem = distance i (j-1) mem
-          let dist3, mem = distance (i-1) (j-1) mem
+          let dist1, mem = distance (i-1) j mem in
+          let dist2, mem = distance i (j-1) mem in
+          let dist3, mem = distance (i-1) (j-1) mem in
           --(reduce_left min [dist1 + 1, dist2 + 1, dist3 + ind i j], mem) -- original
           (reduce_left min [dist1, dist2, dist3 + ind i j - 1], mem) -- mine
+        in
         (dist, setmem i j dist mem)
+  in
   -- Compute distance.
   first $ distance lena lenb mem
+in
+
+--(let (fuzzy_cmp a b)
+  --(let {*} (require 'math'))
+  --(let lena (strlen a))
+  --(let lenb (strlen b))
+  --(let mem (vector-init (* lena lenb) (const false)))
+  --(let (getmem i j mem) (vector-get mem ($ i - 1 + lena * (j-1))))
+  --(let (setmem i j mem) (vector-insert mem ($ i - 1 + lena * (j-1))))
+  --(let (ind i j)
+    --(if (eq? (substr a @(($ i-1) 1)) (substr b @(($ j-1) 1))) 0 1))
+  --(let (distance i j mem)
+    --(if (= (min i j) 0)
+      --@(max i j, mem)
+      --(begin
+        --(let dist (getmem i j mem))
+        --(if dis
+          --@(dist mem)
+          --(begin
+            --(let @(dist mem)
+              --(let @(dist1 mem) (distance (- i 1) j mem))
+              --(let @(dist2 mem) (distance i (- j 1) mem))
+              --(let @(dist3 mem) (distance (- i 1) (- j 1) mem))
+              --(reduce_left min [dist1 dist2 ($ dist3 + (ind i j) - 1)] mem))
+            --@(dist (setmem i j dist mem))))))))
+
+    
+
 
 
 --------------------------------[ Database ]------------------------------------
-let default_db_path = module_path ++ "/__db.eth"
+let default_db_path = module_path ++ "/__db.eth" in
 
 let load_db_from path =
-  let mut modlist = first (load path) if exist? path else []
+  let mut modlist = first (load path) if exist? path else [] in
   { get_modlist = fn _ -> modlist
   , get_path = fn _ -> path
   , get_module_opt = fn _ name ->
@@ -154,28 +220,39 @@ let load_db_from path =
       modlist := remove ({name = name'} -> strcasecmp name' name == 0) modlist
   , add = fn _ entry -> modlist := entry :: modlist
   , update = fn _ ->
-      let dbfile = open_out path
+      let dbfile = open_out path in
       write_to dbfile (format "%w\n" modlist)
   }
+in
+
+--(let (load_db_from path)
+  --(let-mut modlist (if (exist? path) (first (load path)) []))
+  --{
+    --:get_modlist (fn () modlist)
+    --:get_path (fn (_) path)
+    --(get_module_opt
+      --(fn (_ name)
+        --(find_opt (fn ({(name name')}) (= (strcasecmp name' name) 0)) modlist)))
 
 ---------------------------------[ Git-API ]------------------------------------
 let git =
   let repository? url =
     require_network! unless exist? url
     system "git ls-remote -h '{url}' &>/dev/null" == 0
+  in
 
   let list_versions url =
     require_network! unless exist? url
-    let refs = shell "git ls-remote -t '{url}'"
+    let refs = shell "git ls-remote -t '{url}'" in
     if refs eq ""
     then []
     else
       refs
-      |> split \\n/
-      |> map $ line -> line =~ \refs\/tags\/(.+)/
+      |> split /\n/
+      |> map $ line -> line =~ /refs\/tags\/(.+)/
       -- Decode version-tags into major, minor and a patch.
-      |> rev_filter_map $ tag ->
-        when let _ :: version = match \([0-9]+)\.([0-9]+)\.([0-9]+)/ tag then
+      |> filter_map $ tag ->
+        when let _ :: version = match /([0-9]+)\.([0-9]+)\.([0-9]+)/ tag then
           `some (tag, map to_number version)
       -- Sort versions.
       |> sort $ (_, a) (_, b) ->
@@ -185,32 +262,36 @@ let git =
               return if x > y then true else x == y && loop xs' ys'
           true
       |> map first
+  in
 
   let head_commit url =
     require_network! unless exist? url
-    let line = shell "git ls-remote -h '{url}'"
-    let commit = line =~ \^([0-9a-z]+)\s/
+    let line = shell "git ls-remote -h '{url}'" in
+    let commit = line =~ /^([0-9a-z]+)\s/ in
     commit
+  in
 
   let clone {url, dir, version} =
     require_network! unless exist? url
     unless system "git clone --progress '{url}' '{dir}'" == 0
     then raise $ `git_failure "git clone failed"
-    let dir = realpath dir
+    let dir = realpath dir in
 
     let checkout what =
       unless system "cd {dir}; git checkout {what}" == 0
       then raise $ `git_failure "checkout failed"
+    in
 
     if let `commit commit = version then
       unless shell "cd {dir}; git rev-parse HEAD" eq commit
       then checkout commit
     else
-      let `tag tag = version
+      let `tag tag = version in
       unless shell "cd {dir}; git describe --tags" eq tag
       then checkout tag
-
+  in
   {repository?, list_versions, head_commit, clone}
+in
 
 --------------------------------[ GitHub-API ]----------------------------------
 let search_repositories tgt_name =
@@ -218,32 +299,37 @@ let search_repositories tgt_name =
   let {items} =
     shell "curl -s 'https://api.github.com/search/repositories?q={tgt_name}'"
     |> json.parse
+  in
   -- Remove items with name mismatch
   items |> filter $ {name} -> name eq tgt_name
+in
 
 -----------------------------------[ Misc ]-------------------------------------
 let load_config dir args =
   let _, conf =
     try
-      let env = create_env [("command_line", args), ("root", dir)]
+      let env = create_env [("command_line", args), ("root", dir)] in
       env:load (dir ++ "/install.eth")
     with _ ->
       error "failed to load install-script"
       raise `failure
+  in
   { name = assoc "name" conf
   , files = assoc "files" conf or []
   , main = assoc "main" conf
   , build = assoc_opt "build" conf
   , post_install = assoc_opt "post_install" conf
   }
+in
 
 let empty_db_entry = {
-  name = nil,
-  date = nil,
-  install_dir = nil,
-  repository = nil,
-  version = nil,
-}
+    name = nil,
+    date = nil,
+    install_dir = nil,
+    repository = nil,
+    version = nil,
+  }
+in
 
 let uninstall {db, modname} =
   if let `some {install_dir} = db:get_module_opt modname then
@@ -257,9 +343,10 @@ let uninstall {db, modname} =
   else
     error "no such module"
     raise `failure
+in
 
 let build_and_install {conf, modentry, db, dir, args, overwrite} =
-  let {name, files, main, build, post_install} = conf
+  let {name, files, main, build, post_install} = conf in
 
   -- Check if module name is unique
   when db:get_module_opt name then
@@ -279,7 +366,7 @@ let build_and_install {conf, modentry, db, dir, args, overwrite} =
   -- Start installation
   info "installing module {name}"
   -- Create separate direcory for new module
-  let moddir = module_path ++ "/" ++ name
+  let moddir = module_path ++ "/" ++ name in
   mkdir moddir
   -- Copy module sources
   main::files |> iter $ file ->
@@ -288,8 +375,8 @@ let build_and_install {conf, modentry, db, dir, args, overwrite} =
   info "module is ready for use"
 
   -- Create symlink to main
-  let mainext = ".so" if elf? (dir ++ "/" ++ main) else ".eth"
-  let mainpath = moddir ++ "/__main__" ++ mainext
+  let mainext = ".so" if elf? (dir ++ "/" ++ main) else ".eth" in
+  let mainpath = moddir ++ "/__main__" ++ mainext in
   unless exist? mainpath then
     create_symlink (moddir ++ "/" ++ main) mainpath
 
@@ -302,28 +389,31 @@ let build_and_install {conf, modentry, db, dir, args, overwrite} =
     date = utc_date! or "<undefined>",
     install_dir = realpath moddir or "<undefined>",
   }
+in
 
 let fetch {repo_url, version} =
-  let repo_dir = "repo_dir"
+  let repo_dir = "repo_dir" in
   try git.clone {url = repo_url, dir = repo_dir, version}
   with `git_failure what -> fatal_error what
   repo_dir
+in
 
 -- Clone repository to a temporary directory. There we will build it and
 -- probably install.
 let install {db, repo_url, version, args, overwrite} =
   do_in_tempdir $ fn ->
     info "fetching '{repo_url}' ({version})"
-    let repo_dir = fetch {repo_url, version}
+    let repo_dir = fetch {repo_url, version} in
     info "installing {version}"
-    let conf = load_config repo_dir args
-    let modentry = {empty_db_entry with repository = repo_url, version}
+    let conf = load_config repo_dir args in
+    let modentry = {empty_db_entry with repository = repo_url, version} in
     build_and_install {modentry, conf, db, dir = repo_dir, args, overwrite}
+in
 
 
 let check_update {name, local_version, repo_url} =
   require_network! unless exist? repo_url
-  let remote_versions = git.list_versions repo_url
+  let remote_versions = git.list_versions repo_url in
   if remote_versions is not [] then
     if let `tag local_version_tag = local_version then
       when local_version_tag not eq car remote_versions then
@@ -336,23 +426,24 @@ let check_update {name, local_version, repo_url} =
       , info_mesg = "release of \e[1m{name}\e[22m is now avaialble"
       }
   else -- remote_versions is []
-    let `commit local_commit = local_version
-    let remote_head = git.head_commit repo_url
+    let `commit local_commit = local_version in
+    let remote_head = git.head_commit repo_url in
     when local_commit not eq remote_head then
       { new_version = `commit remote_head
       , info_mesg = "new commit of \e[1m{name}\e[22m is available: {remote_head}"
       }
+in
 
 
 
 let list_modules! =
-  let db = (load_db_from default_db_path):get_modlist
+  let db = (load_db_from default_db_path):get_modlist in
   if db is [] then
     info "no installed modules"
   else
     let f isfirst modentry =
       print "" unless isfirst
-      let { name } = modentry
+      let { name } = modentry in
       --info "module \e[1m{name}\e[21m:"
       info "module \e[1m{name}:"
       list modentry
@@ -360,11 +451,14 @@ let list_modules! =
       |> iter $ (k, v) ->
         info "- \e[4m{k}\e[24m: {v}"
       false
+    in
     fold_left f true db
+in
 
 
 let basename path =
-  path =~ \\/?([^\/]+)$/
+  path =~ /\/?([^\/]+)$/
+in
 
 let help! =
   print "\e[1mUSAGE:\e[0m"
@@ -380,6 +474,7 @@ let help! =
   print ""
   print "  Furethermore, each command may contain additional options. For  instance  one"
   print "  can check --help for any command to, probably, find out more."
+in
 
 let help_help! =
   print "\e[1mUSAGE:\e[0m"
@@ -391,6 +486,7 @@ let help_help! =
         "                          information about installation procedure and  how  to\n" ++
         "                          set up your library so that  it  could  be  installed\n" ++
         "                          with this script."
+in
 
 let help_dev! =
   let text = {TEXT|
@@ -438,7 +534,9 @@ Installation script will  be evaluated within the root directory  of the library
 be available via the \`command_line\`-variable; and  the root directory -- via the
 \`root\`-variable.
 |TEXT}
+  in
   system "LESS=-FX /usr/bin/less -R <<TEXT{text}TEXT"
+in
 
 let install_help! =
   print "\e[1mUSAGE:\e[0m"
@@ -447,9 +545,10 @@ let install_help! =
   print "\e[1mOPTIONS:\e[0m"
   print "  --latest                Install the latest commit ignoring release versions."
   print "  --help   -h             Show this message."
+in
 
 
-let sub_command = { keys = [], handle = _ -> die "wtf" }
+let sub_command = { keys = [], handle = _ -> die "wtf" } in
 
 
 --------------------------------- Main -----------------------------------------
@@ -457,7 +556,7 @@ when len command_line < 2 then
   help!
   exit 1
 
-let dopepath :: cmd :: command_line = id command_line
+let dopepath :: cmd :: command_line = id command_line in
 
 let commands =
   [
@@ -470,7 +569,8 @@ let commands =
             { name = "help", val = "help", has_arg = false },
             { name = "h", val = "help", has_arg = false }
           ]
-        let opts, _ = cmdarg.get options command_line
+        in
+        let opts, _ = cmdarg.get options command_line in
 
         if assoc_opt "help" opts then help_help!
         else if assoc_opt "dev" opts then help_dev!
@@ -489,7 +589,8 @@ let commands =
             { name = ["h", "help"], val = "help", has_arg = false },
             { name = "latest", val = "latest", has_arg = false },
           ]
-        let opts, args = cmdarg.get options command_line
+        in
+        let opts, args = cmdarg.get options command_line in
 
         if assoc_opt "help" opts then
           install_help!
@@ -501,13 +602,18 @@ let commands =
             let repo_url =
               -- URL may be a local path. In this case we need it to be a full path
               -- to be able to clone from the temporary directory.
-              if exist? url then realpath url else
+              if exist? url then
+                realpath url
+              else
                 -- Resolve repository path.
-                if git.repository? url then url else
+                if git.repository? url then
+                  url
+                else
                   -- Not a valied URL. Search on GitHub.
                   let github_matches =
                     try search_repositories url
                     with _ -> fatal_error "\"{url}\" is not a git repository"
+                  in
 
                   if let [github_repo] = github_matches then
                     -- Single match! Perfect!
@@ -523,17 +629,19 @@ let commands =
                       github_matches
                       |> map $ github_repo -> "'" ++ github_repo.full_name ++ "'"
                       |> join ' '
+                    in
                     let ans = shell {sh|
-                      select x in {quoted_names} Cancel;
-                      do test -n "$x" && break; done
-                      echo $x
-                    |sh}
+                        select x in {quoted_names} Cancel;
+                        do test -n "$x" && break; done
+                        echo $x
+                      |sh}
+                    in
                     if ans eq "" || ans eq "Cancel" then
                       info "exiting then"
                       exit 0
                     else
                       (find (x -> x.full_name eq ans) github_matches).clone_url
-
+            in -- let repo_url
             -- Figure out a version of the module to use. If version-tags
             -- available will install the latest version. Otherwize, use latest
             -- commit in the repository.
@@ -541,7 +649,7 @@ let commands =
               if assoc_opt "latest" opts then
                 `commit (git.head_commit repo_url)
               else
-                let versions = git.list_versions repo_url or []
+                let versions = git.list_versions repo_url or [] in
                 if versions is [] then
                   -- No releases available. Try to install from the latest commit
                   -- if user accepts it.
@@ -553,15 +661,16 @@ let commands =
                   -- Will use latest version. Check if current commit corresponds to
                   -- the latest version, if not - checkout desired commit.
                   info "available versions of the module: {versions}"
-                  let latest_tag = car versions
+                  let latest_tag = car versions in
                   info "latest: {latest_tag}"
                   `tag latest_tag
-
+            in -- let version
             -- Install
-            let db = load_db_from default_db_path
+            let db = load_db_from default_db_path in
             let modentry = install {
-              db, repo_url, version, args = modargs, overwrite = true
-            }
+                db, repo_url, version, args = modargs, overwrite = true
+              }
+            in
 
             -- Update registry
             info "updating registry"
@@ -580,18 +689,19 @@ let commands =
             { name = "help", val = "help", has_arg = false },
             { name = "h", val = "help", has_arg = false }
           ]
-        let opts, args = cmdarg.get options command_line
+        in
+        let opts, args = cmdarg.get options command_line in
 
         if assoc_opt "help" opts then
           die "unimplemented"
         else
-          let [modname] = args
+          let [modname] = args in
           uninstall {modname, db = load_db_from default_db_path}
     },
     {
       keys = ['check-updates'],
       handle = command_line ->
-        let modlist = (load_db_from default_db_path):get_modlist
+        let modlist = (load_db_from default_db_path):get_modlist in
         let cnt =
           fold_left (cnt {name, version = local_version, repository = repo_url} ->
             write_to stdout $ paint " checking \e[1m{name}\e[22m ... "
@@ -600,20 +710,23 @@ let commands =
             then write_to stdout "\e[2K\r"; info info_mesg; cnt + 1
             else write_to stdout "\e[2K\r"; cnt
           ) 0 modlist
-        when cnt == 0 then info "no updates available, all modules are up to date"
+        in
+        when cnt == 0 then
+          info "no updates available, all modules are up to date"
     },
     {
       keys = ['update'],
       handle = command_line ->
         let options = [
-          { name = "help", val = "help", has_arg = false },
-          { name = "h", val = "help", has_arg = false },
-        ]
-        let opts, args = cmdarg.get options command_line
+            { name = "help", val = "help", has_arg = false },
+            { name = "h", val = "help", has_arg = false },
+          ]
+        in
+        let opts, args = cmdarg.get options command_line in
         if assoc_opt "help" opts then
           die "unimplemented"
         else
-          let db = load_db_from default_db_path
+          let db = load_db_from default_db_path in
           if args eq [] then
             -- Update all modules.
             db:get_modlist |> iter $ {
@@ -627,8 +740,9 @@ let commands =
                 write_to stdout "\e[2K\r"; info info_mesg
                 -- Install
                 let modentry = install {
-                  db, repo_url, version = new_version, args = [], overwrite = true
-                }
+                    db, repo_url, version = new_version, args = [], overwrite = true
+                  }
+                in
                 -- Update registry
                 info "updating registry"
                 db:remove name
@@ -636,18 +750,19 @@ let commands =
                 db:update
               else write_to stdout "\e[2K\r"
           else
-            let name::args = args
+            let name::args = args in
             if let `some {repository, version} = db:get_module_opt name then
               if let {new_version} = check_update {
                 name, local_version = version, repo_url = repository
               } then
                 -- Install
                 let modentry = install {
-                  db, args,
-                  repo_url = repository,
-                  version = new_version,
-                  overwrite = true
-                }
+                    db, args,
+                    repo_url = repository,
+                    version = new_version,
+                    overwrite = true
+                  }
+                in
                 -- Update registry
                 info "updating registry"
                 db:remove name
@@ -659,9 +774,11 @@ let commands =
               fatal_error "no such module, '{name}'"
     },
   ]
+in
 
 let find_command_opt name =
   find_opt ({ keys } -> member? name keys) commands
+in
 
 let main! =
   if let `some { handle } = find_command_opt cmd then
@@ -669,15 +786,17 @@ let main! =
   else
     error "undefined command: '{cmd}'"
 
-    let possible_commands = flat_map ({ keys } -> keys) commands
+    let possible_commands = flat_map ({ keys } -> keys) commands in
     let cands =
       possible_commands
       |> rev_map $ str -> (str, fuzzy_cmp str cmd)
       |> sort $ (_, a) (_, b) -> a < b
+    in
     info "did you mean '\e[1m{first (car cands)}\e[22m'?"
 
     info "see `{basename dopepath} help` for avaliable commands"
     exit 1
+in
 
 try main! with _ -> exit 1
 

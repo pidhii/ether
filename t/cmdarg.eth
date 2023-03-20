@@ -1,5 +1,5 @@
-let {*} = @(require 'list')
-let cmdarg = @(require 'cmdarg')
+let {*} = @(require 'list') in
+let cmdarg = @(require 'cmdarg') in
 
 let options = [
   {name = "long-arg", val = "long-arg", has_arg = true},
@@ -8,10 +8,11 @@ let options = [
   {name = "f", val = "short-no-arg", has_arg = false},
   {name = ["help", "h"], val = "h", has_arg = false},
 ]
+in
 
 let tests = [
-  let cmd = ["first", "--long-arg", "arg", "second", "--long-no-arg", "-a", "1", "-f", "third"]
-  let (kw, pos) = cmdarg.get options cmd
+  let cmd = ["first", "--long-arg", "arg", "second", "--long-no-arg", "-a", "1", "-f", "third"] in
+  let (kw, pos) = cmdarg.get options cmd in
   ("test-1", fn -> all? id [
       pos eq ["first", "second", "third"],
       assoc "long-arg" kw eq "arg",
@@ -22,7 +23,8 @@ let tests = [
 
   let cmd =
     ["first","--long-arg=arg","second","--long-no-arg","-a1","-f","third"]
-  let (kw, pos) = cmdarg.get options cmd
+  in
+  let (kw, pos) = cmdarg.get options cmd in
   ("test-2", fn -> all? id [
       pos eq ["first", "second", "third"],
       assoc "long-arg" kw eq "arg",
@@ -30,43 +32,44 @@ let tests = [
       assoc "short-arg" kw eq "1",
       assoc "short-no-arg" kw eq true]),
 
-  let cmd = ["--long-arg="]
-  let (kw, pos) = cmdarg.get options cmd
+  let cmd = ["--long-arg="] in
+  let (kw, pos) = cmdarg.get options cmd in
   ("test-3", fn -> assoc "long-arg" kw eq ""),
 
-  let cmd = ["--long-arg"]
+  let cmd = ["--long-arg"] in
   ("test-4", fn ->
     try cmdarg.get options cmd; false
     with e -> e eq `missing_argument),
 
-  let cmd = ["-a"]
+  let cmd = ["-a"] in
   ("test-5", fn ->
     try cmdarg.get options cmd; false
     with e -> e eq `missing_argument),
 
-  let cmd = ["--long-no-arg=x"]
+  let cmd = ["--long-no-arg=x"] in
   ("test-6", fn ->
     try cmdarg.get options cmd; false
     with e -> e eq `unexpected_argument),
 
-  let cmd = ["-fx"]
+  let cmd = ["-fx"] in
   ("test-7", fn ->
     try cmdarg.get options cmd; false
     with e -> e eq `unexpected_argument),
 
-  let cmd = ["-o"]
+  let cmd = ["-o"] in
   ("test-8", fn ->
     try cmdarg.get options cmd; false
     with e -> e eq `undefined_option),
 
   ("test-9", fn ->
-    let cmd1 = ["-h"]
-    let kw1 = first $ cmdarg.get options cmd1
-    let cmd2 = ["--help"]
-    let kw2 = first $ cmdarg.get options cmd2
+    let cmd1 = ["-h"] in
+    let kw1 = first $ cmdarg.get options cmd1 in
+    let cmd2 = ["--help"] in
+    let kw2 = first $ cmdarg.get options cmd2 in
     assoc "h" kw1 eq true && assoc "h" kw2 eq true),
 ]
+in
 
-let (nok, nfail) = @(require 'test').run [(nil, tests)]
+let (nok, nfail) = @(require 'test').run [(nil, tests)] in
 exit 1 when nfail > 0;
 

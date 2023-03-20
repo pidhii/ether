@@ -1,6 +1,6 @@
 
 -- Define a variable
-let my_variable = 666
+let my_variable = 666 in
 
 
 -- Lists
@@ -9,7 +9,7 @@ print ([1, 2, 3] eq 1 :: 2 :: 3 :: []) --> true
 
 -- Equality operators
 print (1 == 1) --> true
-print (1 /= 2) --> true
+print (1 != 2) --> true
 print ("string" eq "string") --> true
 print ("string" not eq "different string") --> true
 print ([1, [2], 3] eq [1, [2], 3]) --> true
@@ -18,12 +18,12 @@ print (true is not false) --> true
 
 
 -- Numeric comaprison operators (<, >, <=, >=) can be chained together
-let other_variable = 228
+let other_variable = 228 in
 print (123 < other_variable < my_variable is not false) --> true
 
 
 -- Simple function
-let square x = x * x
+let square x = x * x in
 print (square 2)
 
 
@@ -31,6 +31,7 @@ print (square 2)
 let rec factorial x =
   if x <= 1 then 1
   else x * factorial (x - 1)
+in
 
 print (factorial 3)
 
@@ -39,7 +40,8 @@ print (factorial 3)
 let rec even? x =
   x == 0 || odd? (x - 1)
 and odd? x =
-  x /= 0 && even? (x - 1)
+  x != 0 && even? (x - 1)
+in
 
 print (even? 42)
 
@@ -48,6 +50,7 @@ print (even? 42)
 let rec factorial2 x acc =
   if x <= 1 then acc
   else factorial2 (x - 1) (acc * x)
+in
 
 print (factorial2 1000000 1)
 
@@ -58,8 +61,8 @@ with `stack_overflow -> print "Stack overflow"
 
 
 -- Currying
-let add x y = x + y
-let increment = add 1
+let add x y = x + y in
+let increment = add 1 in
 print (increment 3)
 
 
@@ -68,6 +71,7 @@ let rec map f xs =
   if let x :: xs' = xs then
     f x :: map f xs'
   else []
+in
 
 print (map increment [1, 2, 3])
 
@@ -77,24 +81,24 @@ print (map (x -> x^2) [1, 2, 3])
 
 
 -- Pattern matching
-let x :: xs = [1, 2, 3]
+let x :: xs = [1, 2, 3] in
 print (x, xs)
 
 
 -- Variants (tagged wrapper-types)
-let safe_div x y = `some (x / y) if y /= 0 else false
-let `some x = safe_div 1 2
+let safe_div x y = `some (x / y) if y != 0 else false in
+let `some x = safe_div 1 2 in
 print x
 
 
 -- Tuples
-let (a, b) = (`a, `b)
+let (a, b) = (`a, `b) in
 print (a, b) --> `a     `b
 
 
 -- Records (a.k.a. structs)
-let info = { name = "Jill", login = "Mikle Jackson" }
-let { login } = info
+let info = { name = "Jill", login = "Mikle Jackson" } in
+let { login } = info in
 print login --> Mikle Jackson
 print (info.login eq login) --> true
 
@@ -103,7 +107,7 @@ print (info.login eq login) --> true
 --
 -- `|>` is a "pipe"-operator from OCaml: `x |> f` is equivalent to `f x`
 -- `()` is a synonim for `nil`.
-open 'list'
+open 'list' in
 range (1 .. 100) |> iter $ i ->
   if i mod 3 == 0 then print "FIZZ"
   else if i mod 5 == 0 then print "BUZZ"

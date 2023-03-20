@@ -224,7 +224,7 @@ curried(void)
   {
     memcpy(eth_sp, data->p, sizeof(eth_t) * data->n);
   }
-  return eth_apply(data->f, eth_nargs + data->n);
+  return eth_apply(data->f, eth_this->arity + data->n);
 }
 
 eth_t

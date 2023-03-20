@@ -36,14 +36,14 @@ let range from to =
   loop (to - 1) nil
 
 let even x = x mod 2 == 0
-let odd  x = x mod 2 /= 0
+let odd  x = x mod 2 != 0
 
 let rec doTimes n thunk =
   if n == 0 then nil
   else (thunk nil; doTimes (n - 1) thunk)
 
 
-let n = 5_000_000
+let n = 10_000_000
 
 let job_user_nobrain =
   fn _ ->
@@ -63,8 +63,8 @@ let job_native =
 
 
 --let job = job_user_nobrain
-let job = job_user_smart
---let job = job_native
+--let job = job_user_smart
+let job = job_native
 
 print $ job ()
 doTimes 1 job

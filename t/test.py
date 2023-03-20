@@ -30,7 +30,7 @@ def iseven(x): return x % 2 == 0
 def isodd(x): return x % 2 != 0
 
 
-n = 5000000
+n = 10000000
 
 def job_user():
     return foldl(add, 0, myfilter(iseven, mymap(lambda x: x + 1, myrange(0, n))))
@@ -38,8 +38,8 @@ def job_user():
 def job_native():
     return foldl(add, 0, [x + 1 for x in range(0, n) if isodd(x)])
 
-job = job_user
-# job = job_native
+# job = job_user
+job = job_native
 
 print(job())
 for _ in range(1):
