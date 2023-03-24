@@ -25,7 +25,7 @@
 #include <stdint.h>
 #include <float.h>
 
-#include <eco/eco.h>
+#include "eco/eco.h"
 
 
 #define eth_likely(expr) __builtin_expect(!!(expr), 1)

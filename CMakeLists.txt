@@ -121,6 +121,7 @@ add_dependencies (ether_c++_obj eco)
 # install headers:
 install (DIRECTORY ${ETHER_INCLUDE_DIR} DESTINATION ".")
 install (DIRECTORY "${CMAKE_SOURCE_DIR}/codeine/include/codeine" DESTINATION "include")
+install (DIRECTORY "${CMAKE_SOURCE_DIR}/eco/include/eco" DESTINATION "include")
 
 # shared library:
 if (BUILD_SHARED_LIBRARY)
