@@ -16,4 +16,4 @@ let pub make n x =
   init n (const x)
 in
 
-()
+nil

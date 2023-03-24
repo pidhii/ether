@@ -37,7 +37,7 @@ let pub access =
   The value of _amode_  is either the bitwise-inclusive OR of \`r_ok`, \`w_ok`, \`x_ok` or existence test, \`f_ok`.
 
   See also man(3) access for complete documentation.
-  |help}
+  |help};
   __access
 in
 
@@ -72,7 +72,7 @@ let pub mkdtemp =
 
   ==== ARGUMENTS
   - _emplate-string_: Template path for the directory ending with six 'X' characters.
-  |help}
+  |help};
   __mkdtemp
 in
 
@@ -84,4 +84,4 @@ let pub pipe2 = __pipe2 in
 
 let pub fileno = __fileno in
 
-()
+nil

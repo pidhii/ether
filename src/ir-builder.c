@@ -720,20 +720,29 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
     case ETH_AST_IF:
     {
       eth_ir_node *cond = build_with_toplvl(bldr, ast->iff.cond, e, false);
+      eth_ast *thenast = ast->iff.then;
+      eth_ast *elseast = ast->iff.els ? ast->iff.els : eth_ast_cval(eth_nil);
+      eth_ref_ast(thenast);
+      eth_ref_ast(elseast);
+
       if (cond->tag == ETH_IR_CVAL)
       {
         eth_ir_node *ret;
         if (cond->cval.val != eth_false)
-          ret = build_with_toplvl(bldr, ast->iff.then, e, false);
+          ret = build_with_toplvl(bldr, thenast, e, false);
         else
-          ret = build_with_toplvl(bldr, ast->iff.els, e, false);
+          ret = build_with_toplvl(bldr, elseast, e, false);
         eth_drop_ir_node(cond);
+        eth_unref_ast(thenast);
+        eth_unref_ast(elseast);
         return ret;
       }
       else
       {
-        eth_ir_node *thenbr = build_with_toplvl(bldr, ast->iff.then, e, false);
-        eth_ir_node *elsebr = build_with_toplvl(bldr, ast->iff.els, e, false);
+        eth_ir_node *thenbr = build_with_toplvl(bldr, thenast, e, false);
+        eth_ir_node *elsebr = build_with_toplvl(bldr, elseast, e, false);
+        eth_unref_ast(thenast);
+        eth_unref_ast(elseast);
         return eth_ir_if(cond, thenbr, elsebr);
       }
     }
@@ -892,11 +901,14 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
 
       eth_pop_var(bldr->vars, nvars);
 
-      eth_ir_node *elsebr = build_with_toplvl(bldr, ast->match.elsebr, e,
+      eth_ast *elseast = ast->match.elsebr ? ast->match.elsebr : eth_ast_cval(eth_nil);
+      eth_ref_ast(elseast);
+      eth_ir_node *elsebr = build_with_toplvl(bldr, elseast, e,
           ast->match.toplvl == ETH_TOPLVL_ELSE);
 
       eth_ir_node *ret = eth_ir_match(pat, expr, thenbr, elsebr);
       ret->match.toplvl = ast->match.toplvl;
+      eth_unref_ast(elseast);
       return ret;
     }
 

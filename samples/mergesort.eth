@@ -73,7 +73,7 @@ let read_list file =
   -- `Some _`-variant.
   let read_line_opt file =
     try `some (io.read_line_of file)
-    with `end_of_file -> ()
+    with `end_of_file -> nil
   in
 
   -- And here is the actual loop to read the list
@@ -96,5 +96,5 @@ let l = read_list stdin in
 print ("Given list:", l);
 
 -- Sort it
-print ("Sorted list:", sort l);
+print ("Sorted list:", sort l)
 

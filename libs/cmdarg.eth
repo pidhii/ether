@@ -35,16 +35,20 @@ let get_options cfg os =
       let {has_arg, val, arg_pat} = get_rules lopt in
       if has_arg then
         let arg = substr (brk + 1 ...) o in
-        raise (`invalid_option_argument lopt) unless arg =~ arg_pat
-        loop os ((val, arg) :: kws) pos
+        if arg =~ arg_pat then
+          loop os ((val, arg) :: kws) pos
+        else
+          raise (`invalid_option_argument lopt)
       else raise `unexpected_argument
     else
       let lopt = substr (2...) o in
       let {has_arg, val, arg_pat} = get_rules lopt in
       if has_arg then
         if let arg::os = os then
-          raise (`invalid_option_argument lopt) unless arg =~ arg_pat
-          loop os ((val, arg) :: kws) pos
+          if arg =~ arg_pat then
+            loop os ((val, arg) :: kws) pos
+          else
+            raise (`invalid_option_argument lopt)
         else raise `missing_argument
       else loop os ((val, true) :: kws) pos
 
@@ -55,14 +59,18 @@ let get_options cfg os =
       -- Option and argument are merged 
       if has_arg then
         let arg = substr (2...) o in
-        raise (`invalid_option_argument shopt) unless arg =~ arg_pat
-        loop os ((val, arg) :: kws) pos
+        if arg =~ arg_pat then
+          loop os ((val, arg) :: kws) pos
+        else
+          raise (`invalid_option_argument shopt)
       else raise `unexpected_argument
     else
       if has_arg then
         if let arg::os = os then
-          raise (`invalid_option_argument shopt) unless arg =~ arg_pat
-          loop os ((val, arg) :: kws) pos
+          if arg =~ arg_pat then
+            loop os ((val, arg) :: kws) pos
+          else
+            raise (`invalid_option_argument shopt)
         else raise `missing_argument
       else loop os ((val, true) :: kws) pos
   in
@@ -88,9 +96,8 @@ let pub get =
 
   * _list-of-arguments_ is a list of strings to be parsed (to parse command-line
     arguments passed to your script use \`cdr command_line`.
-  |help}
+  |help};
   get_options
 in
 
-()
-
+nil

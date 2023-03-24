@@ -4,27 +4,27 @@ let my_variable = 666 in
 
 
 -- Lists
-print ([1, 2, 3] eq 1 :: 2 :: 3 :: []) --> true
+print ([1, 2, 3] eq 1 :: 2 :: 3 :: []); --> true
 
 
 -- Equality operators
-print (1 == 1) --> true
-print (1 != 2) --> true
-print ("string" eq "string") --> true
-print ("string" not eq "different string") --> true
-print ([1, [2], 3] eq [1, [2], 3]) --> true
-print (true is true) --> true
-print (true is not false) --> true
+print (1 == 1); --> true
+print (1 != 2); --> true
+print ("string" eq "string"); --> true
+print ("string" not eq "different string"); --> true
+print ([1, [2], 3] eq [1, [2], 3]); --> true
+print (true is true); --> true
+print (true is not false); --> true
 
 
 -- Numeric comaprison operators (<, >, <=, >=) can be chained together
 let other_variable = 228 in
-print (123 < other_variable < my_variable is not false) --> true
+print (123 < other_variable < my_variable is not false); --> true
 
 
 -- Simple function
 let square x = x * x in
-print (square 2)
+print (square 2);
 
 
 -- Recursive function
@@ -33,7 +33,7 @@ let rec factorial x =
   else x * factorial (x - 1)
 in
 
-print (factorial 3)
+print (factorial 3);
 
 
 -- Multiple cross-referencing functions
@@ -43,7 +43,7 @@ and odd? x =
   x != 0 && even? (x - 1)
 in
 
-print (even? 42)
+print (even? 42);
 
 
 -- Better way to write factorial: tail-recursion
@@ -52,18 +52,18 @@ let rec factorial2 x acc =
   else factorial2 (x - 1) (acc * x)
 in
 
-print (factorial2 1000000 1)
+print (factorial2 1000000 1);
 
 
 -- Exception handling
 try factorial 1000000
-with `stack_overflow -> print "Stack overflow"
+with `stack_overflow -> print "Stack overflow";
 
 
 -- Currying
 let add x y = x + y in
 let increment = add 1 in
-print (increment 3)
+print (increment 3);
 
 
 -- Higher order functions
@@ -73,34 +73,34 @@ let rec map f xs =
   else []
 in
 
-print (map increment [1, 2, 3])
+print (map increment [1, 2, 3]);
 
 
 -- Closures/lambda functions
-print (map (x -> x^2) [1, 2, 3])
+print (map (x -> x^2) [1, 2, 3]);
 
 
 -- Pattern matching
 let x :: xs = [1, 2, 3] in
-print (x, xs)
+print (x, xs);
 
 
 -- Variants (tagged wrapper-types)
-let safe_div x y = `some (x / y) if y != 0 else false in
+let safe_div x y = if y != 0 then `some (x / y) else false in
 let `some x = safe_div 1 2 in
-print x
+print x;
 
 
 -- Tuples
 let (a, b) = (`a, `b) in
-print (a, b) --> `a     `b
+print (a, b); --> `a     `b
 
 
 -- Records (a.k.a. structs)
 let info = { name = "Jill", login = "Mikle Jackson" } in
 let { login } = info in
-print login --> Mikle Jackson
-print (info.login eq login) --> true
+print login; --> Mikle Jackson
+print (info.login eq login); --> true
 
 
 -- FizzBuzz
@@ -108,8 +108,9 @@ print (info.login eq login) --> true
 -- `|>` is a "pipe"-operator from OCaml: `x |> f` is equivalent to `f x`
 -- `()` is a synonim for `nil`.
 open 'list' in
-range (1 .. 100) |> iter $ i ->
+range (1 .. 100) |> iter (i ->
   if i mod 3 == 0 then print "FIZZ"
   else if i mod 5 == 0 then print "BUZZ"
   else print i
+)
 

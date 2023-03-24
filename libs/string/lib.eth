@@ -35,7 +35,7 @@
 -- * find
 --
 
-let list = @(require "list") in
+let list = require "list" in
 
 
 -- Prelude
@@ -45,7 +45,7 @@ let pub join sep xs =
   else if let hd::[] = xs then hd
   else if let hd::tl = xs then
     list.fold_left (fn x y -> cat [x, sep, y]) hd tl
-  else invalid_argument ()
+  else invalid_argument nil
 in
 let pub to_upper = __to_upper in
 let pub to_lower = __to_lower in
@@ -72,7 +72,7 @@ let pub malloc =
   Create an uninitialized string of given length.\n
   == SYNOPSIS\n
     malloc number? -> string?
-  |help}
+  |help};
   __malloc
 in
 
@@ -83,7 +83,7 @@ let pub calloc =
   Create a string of given length initialized with zeros.
   == SYNOPSIS
     calloc number? -> string?
-  |help}
+  |help};
   __calloc
 in
 
@@ -97,7 +97,7 @@ let pub make_string =
   string. If it is of zero length, then the it is treated as 0-byte.
   == SYNOPSIS
     make number? string? -> string?
-  |help}
+  |help};
   __make
 in
 
@@ -107,7 +107,7 @@ let pub substr x s =
   else if let l .. r = x then __substr s l (r - l + 1)
   else if let l... = x then __substr s l (strlen s - l)
   else if let ...r = x then __substr s 0 (r + 1)
-  else invalid_argument ()
+  else invalid_argument nil
 in
 
 --------------------------------------------------------------------------------
@@ -123,7 +123,7 @@ let pub strstr pat s =
     if let `some start = __strstr_opt s pat then
       (start, start + strlen pat)
     else false
-  else type_error ()
+  else type_error nil
 in
 
-()
+nil

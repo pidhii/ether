@@ -187,9 +187,9 @@ _create_attr(int aflag, void *locpp)
 %token START_REGEXP
 %token<integer> END_REGEXP
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-%nonassoc IN FN IFLET WHENLET
+%left WTF
+%nonassoc IN FN
 %nonassoc AS
-%nonassoc DOT_OPEN1 DOT_OPEN2 DOT_OPEN3
 %nonassoc LARROW
 %nonassoc PUB MUT BUILTIN DEPRECATED
 %nonassoc LIST_DDOT
@@ -198,14 +198,15 @@ _create_attr(int aflag, void *locpp)
 %nonassoc DEFINED
 %nonassoc OPEN IMPORT
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-%right RARROW
-%right ';' ',' START_BLOCK END_BLOCK KEEP_BLOCK
+%right RARROW 
 %right LET REC AND ASSERT
 %nonassoc RETURN
 %left LAZY
+%right ',' ';'
+%right ELSE TERNARY
+/*%nonassoc ELSE*/
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-%right TERNARY
-%nonassoc IF THEN ELSE WHEN UNLESS TRY WITH
+%nonassoc IF IFLET THEN TRY WITH
 %right OR
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 // level 0:
@@ -233,20 +234,19 @@ _create_attr(int aflag, void *locpp)
 %right COMPOSE
 %nonassoc '!'
 %left '.' ':' '#'
+%right DUMMY_SEMICOLON
 
 
 // =============================================================================
-%type<ast> FnAtom Atom
+%type<ast> Atom
 %type<ast> Form
 %type<ast> Expr
-%type<ast> Stmt StmtSeq
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %type<string> Ident
 %type<binds> Binds
-%type<binds> LoopArgs
 %type<bind> Bind
 %type<integer> Attribute
-%type<astvec> Args ArgsAux
+%type<astvec> Args
 %type<patvec> FnArgs
 %type<charvec> String
 %type<ast> FmtString FmtStringAux
@@ -259,41 +259,21 @@ _create_attr(int aflag, void *locpp)
 %type<boolean> MaybeComaDots
 %type<record> Record
 %type<record_pattern> RecordPattern
-%type<ast> Block
-%type<ast> StmtOrBlock StmtOrSeq
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %start Entry
 
 
 %%
 
-MaybeKeepBlock: | KEEP_BLOCK;
-
 Entry
-  : StmtSeq { g_result = $1; }
-  | KEEP_BLOCK StmtSeq { g_result = $2; }
-
-  | START_REPL LET Binds {
-    g_result = eth_ast_let($3.pats.data, $3.vals.data, $3.pats.len, eth_ast_cval(eth_nil));
-    cod_vec_destroy($3.pats);
-    cod_vec_destroy($3.vals);
-  }
-  | START_REPL LET REC Binds {
-    g_result = eth_ast_letrec($4.pats.data, $4.vals.data, $4.pats.len, eth_ast_cval(eth_nil));
-    cod_vec_destroy($4.pats);
-    cod_vec_destroy($4.vals);
-  }
-  | START_REPL Stmt {
-    g_result = $2;
-  }
+  : Expr { g_result = $1; }
 ;
 
-FnAtom
+Atom
   : Ident { $$ = eth_ast_ident($1); free($1); LOC($$, @$); }
-  | '(' StmtSeq ')' { $$ = $2; }
-  | FnAtom '!' { $$ = eth_ast_apply($1, NULL, 0); LOC($$, @$); }
+  | '(' Expr ')' { $$ = $2; }
+  | Atom '!' { $$ = eth_ast_apply($1, NULL, 0); LOC($$, @$); }
 
-  | '('')' { $$ = eth_ast_cval(eth_nil); LOC($$, @$); }
   /*| '(' Expr DDOT Expr ')' { char *fields[] = { "l", "r" }; eth_ast *vals[] = { $2, $4 }; $$ = eth_ast_make_record(eth_rangelr_type, fields, vals, 2); }*/
   | '['']' { $$ = eth_ast_cval(eth_nil); }
   | '[' List MaybeComa ']' {
@@ -302,7 +282,7 @@ FnAtom
     cod_vec_destroy($2);
     LOC($$, @$);
   }
-  | '(' List ',' StmtSeq ')' {
+  | '(' List ',' Expr ')' {
     cod_vec_push($2, $4);
     int n = $2.len;
     char fieldsbuf[n][22];
@@ -323,48 +303,26 @@ FnAtom
     cod_vec_destroy($2.vals);
   }
 
-  | '{' Stmt WITH Record MaybeComa '}' {
+  | '{' Expr WITH Record MaybeComa '}' {
     $$ = eth_ast_update($2, $4.vals.data, $4.keys.data, $4.vals.len);
     cod_vec_destroy($4.vals);
     cod_vec_iter($4.keys, i, x, free(x));
     cod_vec_destroy($4.keys);
   }
-  | '{' Stmt WITH KEEP_BLOCK Record MaybeComa '}' {
-    $$ = eth_ast_update($2, $5.vals.data, $5.keys.data, $5.vals.len);
-    cod_vec_destroy($5.vals);
-    cod_vec_iter($5.keys, i, x, free(x));
-    cod_vec_destroy($5.keys);
-  }
-  /*| '{' Stmt WITH START_BLOCK Record MaybeComa END_BLOCK '}' {*/
-    /*$$ = eth_ast_update($2, $5.vals.data, $5.keys.data, $5.vals.len);*/
-    /*cod_vec_destroy($5.vals);*/
-    /*cod_vec_iter($5.keys, i, x, free(x));*/
-    /*cod_vec_destroy($5.keys);*/
-  /*}*/
 
-  | FnAtom '.' SYMBOL {
+  | Atom '.' SYMBOL {
     $$ = eth_ast_access($1, $3);
     LOC($$, @$);
     free($3);
   }
-  | FnAtom ':' SYMBOL {
+  | Atom ':' SYMBOL {
     eth_ast *access = eth_ast_access($1, $3);
     LOC(access, @$);
     $$ = eth_ast_apply(access, &$1, 1);
     LOC($$, @$);
     free($3);
   }
-
-  | FnAtom ':' '(' SYMBOL Args ')' {
-    eth_ast *access = eth_ast_access($1, $4);
-    cod_vec_insert($5, $1, 0);
-    $$ = eth_ast_apply(access, $5.data, $5.len);
-    LOC($$, @$);
-    free($4);
-    cod_vec_destroy($5);
-  }
-
-  | FnAtom '#' SYMBOL {
+  | Atom '#' SYMBOL {
     eth_ast *send = eth_ast_cval(eth_get_builtin(SCANROOT, "#"));
     eth_ast *p[2] = { $1, eth_ast_cval(eth_create_symbol($3)) };
     $$ = eth_ast_apply(send, p, 2);
@@ -372,11 +330,17 @@ FnAtom
     free($3);
   }
 
-  | '@' '(' StmtSeq ')' { $$ = eth_ast_evmac($3); LOC($$, @$); }
-;
+  /*| Atom ':' '(' SYMBOL Args ')' {*/
+    /*eth_ast *access = eth_ast_access($1, $4);*/
+    /*cod_vec_insert($5, $1, 0);*/
+    /*$$ = eth_ast_apply(access, $5.data, $5.len);*/
+    /*LOC($$, @$);*/
+    /*free($4);*/
+    /*cod_vec_destroy($5);*/
+  /*}*/
 
-Atom
-  : FnAtom
+  | '@' '(' Expr ')' { $$ = eth_ast_evmac($3); LOC($$, @$); }
+
   | '_' { $$ = eth_ast_ident("_"); }
   | CAPSYMBOL { $$ = eth_ast_cval(eth_sym($1)); free($1); LOC($$, @$); }
   | NUMBER { $$ = eth_ast_cval(eth_create_number($1)); LOC($$, @$); }
@@ -392,56 +356,25 @@ Atom
 
 Form
   : Atom
-  | FnAtom Args {
-    $$ = eth_ast_apply($1, $2.data, $2.len);
-    LOC($$, @$);
-    cod_vec_destroy($2);
+  | Atom Args {
+    if ($1->tag == ETH_AST_CVAL and
+        $1->cval.val->type == eth_symbol_type)
+    {
+      // FIXME
+      eth_type *type = eth_variant_type(eth_sym_cstr($1->cval.val));
+      char *_0 = "_0";
+      $$ = eth_ast_make_record(type, &_0, &$2.data[0], 1);
+      eth_drop_ast($1);
+      cod_vec_destroy($2);
+      LOC($$, @$);
+    }
+    else
+    {
+      $$ = eth_ast_apply($1, $2.data, $2.len);
+      LOC($$, @$);
+      cod_vec_destroy($2);
+    }
   }
-  | CAPSYMBOL Atom {
-    eth_type *type = eth_variant_type($1);
-    char *_0 = "_0";
-    $$ = eth_ast_make_record(type, &_0, &$2, 1);
-    free($1);
-    LOC($$, @$);
-  }
-;
-
-StmtSeq
-  : Stmt
-  | Stmt KEEP_BLOCK StmtSeq {
-    $$ = eth_ast_seq($1, $3); LOC($$, @$);
-  }
-
-  /*| LET Binds KEEP_BLOCK StmtSeq {*/
-    /*$$ = eth_ast_let($2.pats.data, $2.vals.data, $2.pats.len, $4);*/
-    /*cod_vec_destroy($2.pats);*/
-    /*cod_vec_destroy($2.vals);*/
-    /*LOC($$, @$);*/
-  /*}*/
-  /*| LET Binds {*/
-    /*$$ = eth_ast_let($2.pats.data, $2.vals.data, $2.pats.len, dummy_ast());*/
-    /*cod_vec_destroy($2.pats);*/
-    /*cod_vec_destroy($2.vals);*/
-    /*LOC($$, @$);*/
-  /*}*/
-
-  /*| LET REC Binds KEEP_BLOCK StmtSeq {*/
-    /*$$ = eth_ast_letrec($3.pats.data, $3.vals.data, $3.pats.len, $5);*/
-    /*cod_vec_destroy($3.pats);*/
-    /*cod_vec_destroy($3.vals);*/
-    /*LOC($$, @$);*/
-  /*}*/
-  /*| LET REC Binds {*/
-    /*$$ = eth_ast_letrec($3.pats.data, $3.vals.data, $3.pats.len, dummy_ast());*/
-    /*cod_vec_destroy($3.pats);*/
-    /*cod_vec_destroy($3.vals);*/
-    /*LOC($$, @$);*/
-  /*}*/
-;
-
-StmtOrSeq
-  : Stmt
-  | KEEP_BLOCK StmtSeq { $$ = $2; }
 ;
 
 Expr
@@ -458,22 +391,8 @@ Expr
     LOC($$, @$);
   }
 
-  | Expr IF Expr ELSE Expr %prec TERNARY {
-    $$ = eth_ast_if($3, $1, $5);
-    LOC($$, @$);
-  }
-  | Expr WHEN Expr %prec TERNARY {
-    $$ = eth_ast_if($3, $1, eth_ast_cval(eth_nil));
-    LOC($$, @$);
-  }
-  | Expr UNLESS Expr %prec TERNARY {
-    $$ = eth_ast_if($3, eth_ast_cval(eth_nil), $1);
-    LOC($$, @$);
-  }
-
   | ASSERT Expr { $$ = eth_ast_assert($2); }
 
-  /*| SYMBOL RARROW Expr { $$ = eth_ast_fn(&$1, 1, $3); free($1); LOC($$, @$); }*/
   | Form RARROW Expr {
     if ($1->tag == ETH_AST_APPLY)
     {
@@ -511,178 +430,42 @@ Expr
       LOC($$, @$);
     }
   }
-  | Form RARROW START_BLOCK StmtSeq END_BLOCK {
-    if ($1->tag == ETH_AST_APPLY)
-    {
-      int n = 1 + $1->apply.nargs;
-      cod_vec(eth_ast_pattern*) pats;
-      /*cod_vec_init_with_cap(pats, n);*/
-      cod_vec_init(pats);
-      cod_vec_push(pats, eth_ast_to_pattern($1->apply.fn));
-      for (int i = 1; i < n; ++i)
-        cod_vec_push(pats, eth_ast_to_pattern($1->apply.args[i-1]));
-
-      /* check if all expressions successfully converted */
-      bool failed = false;
-      cod_vec_iter(pats, i, x, if (x == NULL) failed = true);
-      if (failed)
-      {
-        eth_error("can not convert AST-expression to a pattern");
-        abort();
-      }
-
-      $$ = eth_ast_fn_with_patterns(pats.data, n, $4);
-      cod_vec_destroy(pats);
-      eth_drop_ast($1);
-      LOC($$, @$);
-    }
-    else
-    {
-      eth_ast_pattern *pat = eth_ast_to_pattern($1);
-      if (pat == NULL)
-      {
-        eth_error("can not convert AST-expression to a pattern");
-        abort();
-      }
-      $$ = eth_ast_fn_with_patterns(&pat, 1, $4);
-      eth_drop_ast($1);
-      LOC($$, @$);
-    }
-  }
 
   | Expr OR Expr { $$ = eth_ast_try(NULL, $1, $3, 0); LOC($$, @$); }
-  | Expr OR KEEP_BLOCK Expr { $$ = eth_ast_try(NULL, $1, $4, 0); LOC($$, @$); }
-  | Expr OR START_BLOCK Expr END_BLOCK { $$ = eth_ast_try(NULL, $1, $4, 0); LOC($$, @$); }
-
   | Expr OPAND Expr { $$ = eth_ast_and($1, $3); LOC($$, @$); }
-  | Expr OPAND KEEP_BLOCK Expr { $$ = eth_ast_and($1, $4); LOC($$, @$); }
-  | Expr OPAND START_BLOCK Expr END_BLOCK { $$ = eth_ast_and($1, $4); LOC($$, @$); }
-
   | Expr OPOR Expr { $$ = eth_ast_or($1, $3); LOC($$, @$); }
-  | Expr OPOR KEEP_BLOCK  Expr { $$ = eth_ast_or($1, $4); LOC($$, @$); }
-  | Expr OPOR START_BLOCK  Expr END_BLOCK { $$ = eth_ast_or($1, $4); LOC($$, @$); }
-
   | Expr ';' Expr { $$ = eth_ast_seq($1, $3); LOC($$, @$); }
-  | Expr ';' KEEP_BLOCK Expr { $$ = eth_ast_seq($1, $4); LOC($$, @$); }
-  | Expr ';' START_BLOCK Expr END_BLOCK { $$ = eth_ast_seq($1, $4); LOC($$, @$); }
-
-  | Expr ';' { $$ = $1; LOC($$, @$); }
-
+  | Expr ';' %prec DUMMY_SEMICOLON { $$ = $1; }
   | Expr '+' Expr { $$ = eth_ast_binop(ETH_ADD , $1, $3); LOC($$, @$); }
-  | Expr '+' KEEP_BLOCK Expr { $$ = eth_ast_binop(ETH_ADD , $1, $4); LOC($$, @$); }
-  | Expr '+' START_BLOCK Expr END_BLOCK { $$ = eth_ast_binop(ETH_ADD , $1, $4); LOC($$, @$); }
-
   | Expr '-' Expr { $$ = eth_ast_binop(ETH_SUB , $1, $3); LOC($$, @$); }
-  | Expr '-' KEEP_BLOCK Expr { $$ = eth_ast_binop(ETH_SUB , $1, $4); LOC($$, @$); }
-  | Expr '-' START_BLOCK Expr END_BLOCK { $$ = eth_ast_binop(ETH_SUB , $1, $4); LOC($$, @$); }
-
   | Expr '*' Expr { $$ = eth_ast_binop(ETH_MUL , $1, $3); LOC($$, @$); }
-  | Expr '*' KEEP_BLOCK Expr { $$ = eth_ast_binop(ETH_MUL , $1, $4); LOC($$, @$); }
-  | Expr '*' START_BLOCK Expr END_BLOCK { $$ = eth_ast_binop(ETH_MUL , $1, $4); LOC($$, @$); }
-
   | Expr '/' Expr { $$ = eth_ast_binop(ETH_DIV , $1, $3); LOC($$, @$); }
-  | Expr '/' KEEP_BLOCK Expr { $$ = eth_ast_binop(ETH_DIV , $1, $4); LOC($$, @$); }
-  | Expr '/' START_BLOCK Expr END_BLOCK { $$ = eth_ast_binop(ETH_DIV , $1, $4); LOC($$, @$); }
-
   | Expr '<' Expr { $$ = eth_ast_binop(ETH_LT  , $1, $3); LOC($$, @$); }
-  | Expr '<' KEEP_BLOCK Expr { $$ = eth_ast_binop(ETH_LT  , $1, $4); LOC($$, @$); }
-  | Expr '<' START_BLOCK Expr END_BLOCK { $$ = eth_ast_binop(ETH_LT  , $1, $4); LOC($$, @$); }
-
   | Expr LE  Expr { $$ = eth_ast_binop(ETH_LE  , $1, $3); LOC($$, @$); }
-  | Expr LE KEEP_BLOCK  Expr { $$ = eth_ast_binop(ETH_LE  , $1, $4); LOC($$, @$); }
-  | Expr LE START_BLOCK  Expr END_BLOCK { $$ = eth_ast_binop(ETH_LE  , $1, $4); LOC($$, @$); }
-
   | Expr '>' Expr { $$ = eth_ast_binop(ETH_GT  , $1, $3); LOC($$, @$); }
-  | Expr '>' KEEP_BLOCK Expr { $$ = eth_ast_binop(ETH_GT  , $1, $4); LOC($$, @$); }
-  | Expr '>' START_BLOCK Expr END_BLOCK { $$ = eth_ast_binop(ETH_GT  , $1, $4); LOC($$, @$); }
-
   | Expr GE Expr { $$ = eth_ast_binop(ETH_GE  , $1, $3); LOC($$, @$); }
-  | Expr GE KEEP_BLOCK Expr { $$ = eth_ast_binop(ETH_GE  , $1, $4); LOC($$, @$); }
-  | Expr GE START_BLOCK Expr END_BLOCK { $$ = eth_ast_binop(ETH_GE  , $1, $4); LOC($$, @$); }
-
   | Expr EQ Expr { $$ = eth_ast_binop(ETH_EQ  , $1, $3); LOC($$, @$); }
-  | Expr EQ KEEP_BLOCK Expr { $$ = eth_ast_binop(ETH_EQ  , $1, $4); LOC($$, @$); }
-  | Expr EQ START_BLOCK Expr END_BLOCK { $$ = eth_ast_binop(ETH_EQ  , $1, $4); LOC($$, @$); }
-
   | Expr NE Expr { $$ = eth_ast_binop(ETH_NE  , $1, $3); LOC($$, @$); }
-  | Expr NE KEEP_BLOCK Expr { $$ = eth_ast_binop(ETH_NE  , $1, $4); LOC($$, @$); }
-  | Expr NE START_BLOCK Expr END_BLOCK { $$ = eth_ast_binop(ETH_NE  , $1, $4); LOC($$, @$); }
-
   | Expr IS Expr { $$ = eth_ast_binop(ETH_IS  , $1, $3); LOC($$, @$); }
-  | Expr IS KEEP_BLOCK Expr { $$ = eth_ast_binop(ETH_IS  , $1, $4); LOC($$, @$); }
-  | Expr IS START_BLOCK Expr END_BLOCK { $$ = eth_ast_binop(ETH_IS  , $1, $4); LOC($$, @$); }
-
   | Expr EQUAL Expr { $$ = eth_ast_binop(ETH_EQUAL,$1, $3); LOC($$, @$); }
-  | Expr EQUAL KEEP_BLOCK Expr { $$ = eth_ast_binop(ETH_EQUAL,$1, $4); LOC($$, @$); }
-  | Expr EQUAL START_BLOCK Expr END_BLOCK { $$ = eth_ast_binop(ETH_EQUAL,$1, $4); LOC($$, @$); }
-
   | Expr CONS Expr { $$ = eth_ast_binop(ETH_CONS, $1, $3); LOC($$, @$); }
-  | Expr CONS KEEP_BLOCK Expr { $$ = eth_ast_binop(ETH_CONS, $1, $4); LOC($$, @$); }
-  | Expr CONS START_BLOCK Expr END_BLOCK { $$ = eth_ast_binop(ETH_CONS, $1, $4); LOC($$, @$); }
-
   | Expr MOD Expr { $$ = eth_ast_binop(ETH_MOD , $1, $3); LOC($$, @$); }
-  | Expr MOD KEEP_BLOCK Expr { $$ = eth_ast_binop(ETH_MOD , $1, $4); LOC($$, @$); }
-  | Expr MOD START_BLOCK Expr END_BLOCK { $$ = eth_ast_binop(ETH_MOD , $1, $4); LOC($$, @$); }
-
   | Expr '^' Expr { $$ = eth_ast_binop(ETH_POW , $1, $3); LOC($$, @$); }
-  | Expr '^' KEEP_BLOCK Expr { $$ = eth_ast_binop(ETH_POW , $1, $4); LOC($$, @$); }
-  | Expr '^' START_BLOCK Expr END_BLOCK { $$ = eth_ast_binop(ETH_POW , $1, $4); LOC($$, @$); }
-
   | Expr LAND Expr { $$ = eth_ast_binop(ETH_LAND, $1, $3); LOC($$, @$); }
-  | Expr LAND KEEP_BLOCK Expr { $$ = eth_ast_binop(ETH_LAND, $1, $4); LOC($$, @$); }
-  | Expr LAND START_BLOCK Expr END_BLOCK { $$ = eth_ast_binop(ETH_LAND, $1, $4); LOC($$, @$); }
-
   | Expr LOR Expr { $$ = eth_ast_binop(ETH_LOR , $1, $3); LOC($$, @$); }
-  | Expr LOR KEEP_BLOCK Expr { $$ = eth_ast_binop(ETH_LOR , $1, $4); LOC($$, @$); }
-  | Expr LOR START_BLOCK Expr END_BLOCK { $$ = eth_ast_binop(ETH_LOR , $1, $4); LOC($$, @$); }
-
   | Expr LXOR Expr { $$ = eth_ast_binop(ETH_LXOR, $1, $3); LOC($$, @$); }
-  | Expr LXOR KEEP_BLOCK Expr { $$ = eth_ast_binop(ETH_LXOR, $1, $4); LOC($$, @$); }
-  | Expr LXOR START_BLOCK Expr END_BLOCK { $$ = eth_ast_binop(ETH_LXOR, $1, $4); LOC($$, @$); }
-
   | Expr LSHL Expr { $$ = eth_ast_binop(ETH_LSHL, $1, $3); LOC($$, @$); }
-  | Expr LSHL KEEP_BLOCK Expr { $$ = eth_ast_binop(ETH_LSHL, $1, $4); LOC($$, @$); }
-  | Expr LSHL START_BLOCK Expr END_BLOCK { $$ = eth_ast_binop(ETH_LSHL, $1, $4); LOC($$, @$); }
-
   | Expr LSHR Expr { $$ = eth_ast_binop(ETH_LSHR, $1, $3); LOC($$, @$); }
-  | Expr LSHR KEEP_BLOCK  Expr { $$ = eth_ast_binop(ETH_LSHR, $1, $4); LOC($$, @$); }
-  | Expr LSHR START_BLOCK  Expr END_BLOCK { $$ = eth_ast_binop(ETH_LSHR, $1, $4); LOC($$, @$); }
-
   | Expr ASHL Expr { $$ = eth_ast_binop(ETH_ASHL, $1, $3); LOC($$, @$); }
-  | Expr ASHL KEEP_BLOCK  Expr { $$ = eth_ast_binop(ETH_ASHL, $1, $4); LOC($$, @$); }
-  | Expr ASHL START_BLOCK  Expr END_BLOCK { $$ = eth_ast_binop(ETH_ASHL, $1, $4); LOC($$, @$); }
-
   | Expr ASHR Expr { $$ = eth_ast_binop(ETH_ASHR, $1, $3); LOC($$, @$); }
-  | Expr ASHR KEEP_BLOCK Expr { $$ = eth_ast_binop(ETH_ASHR, $1, $4); LOC($$, @$); }
-  | Expr ASHR START_BLOCK Expr END_BLOCK { $$ = eth_ast_binop(ETH_ASHR, $1, $4); LOC($$, @$); }
-
   | Expr ISNOT Expr { $$ = eth_ast_unop(ETH_NOT, eth_ast_binop(ETH_IS, $1, $3)); LOC($$, @$); }
-  | Expr ISNOT KEEP_BLOCK Expr { $$ = eth_ast_unop(ETH_NOT, eth_ast_binop(ETH_IS, $1, $4)); LOC($$, @$); }
-  | Expr ISNOT START_BLOCK Expr END_BLOCK { $$ = eth_ast_unop(ETH_NOT, eth_ast_binop(ETH_IS, $1, $4)); LOC($$, @$); }
-
   | Expr NOTEQUAL Expr { $$ = eth_ast_unop(ETH_NOT, eth_ast_binop(ETH_EQUAL, $1, $3)); LOC($$, @$); }
-  | Expr NOTEQUAL KEEP_BLOCK Expr { $$ = eth_ast_unop(ETH_NOT, eth_ast_binop(ETH_EQUAL, $1, $4)); LOC($$, @$); }
-  | Expr NOTEQUAL START_BLOCK Expr END_BLOCK { $$ = eth_ast_unop(ETH_NOT, eth_ast_binop(ETH_EQUAL, $1, $4)); LOC($$, @$); }
-
-  /*| Expr COMPOSE Expr {*/
-    /*eth_ast *args[] = { $1, $3 };*/
-    /*eth_ast *fn = eth_ast_ident("∘");*/
-    /*$$ = eth_ast_apply(fn, args, 2);*/
-    /*LOC($$, @$);*/
-  /*}*/
 
   | Expr PPLUS Expr { eth_ast *args[] = { $1, $3 }; eth_ast *fn = eth_ast_ident("++"); $$ = eth_ast_apply(fn, args, 2); LOC($$, @$); }
-  | Expr PPLUS KEEP_BLOCK Expr { eth_ast *args[] = { $1, $4 }; eth_ast *fn = eth_ast_ident("++"); $$ = eth_ast_apply(fn, args, 2); LOC($$, @$); }
-  | Expr PPLUS START_BLOCK Expr END_BLOCK { eth_ast *args[] = { $1, $4 }; eth_ast *fn = eth_ast_ident("++"); $$ = eth_ast_apply(fn, args, 2); LOC($$, @$); }
-
   | Expr EQ_TILD Expr { eth_ast *args[] = { $1, $3 }; eth_ast *fn = eth_ast_ident("=~"); $$ = eth_ast_apply(fn, args, 2); LOC($$, @$); }
-  | Expr EQ_TILD KEEP_BLOCK Expr { eth_ast *args[] = { $1, $4 }; eth_ast *fn = eth_ast_ident("=~"); $$ = eth_ast_apply(fn, args, 2); LOC($$, @$); }
-  | Expr EQ_TILD START_BLOCK Expr END_BLOCK { eth_ast *args[] = { $1, $4 }; eth_ast *fn = eth_ast_ident("=~"); $$ = eth_ast_apply(fn, args, 2); LOC($$, @$); }
-
   | Expr DDOT Expr { char *fields[] = { "l", "r" }; eth_ast *vals[] = { $1, $3 }; $$ = eth_ast_make_record(eth_rangelr_type, fields, vals, 2); }
   | Expr DDDOT { char *fields[] = { "l" }; eth_ast *vals[] = { $1 }; $$ = eth_ast_make_record(eth_rangel_type, fields, vals, 1); }
   | DDDOT Expr { char *fields[] = { "r" }; eth_ast *vals[] = { $2 }; $$ = eth_ast_make_record(eth_ranger_type, fields, vals, 1); }
-
   | '-' Expr %prec UMINUS { $$ = eth_ast_binop(ETH_SUB, eth_ast_cval(eth_num(0)), $2); LOC($$, @$); }
   | '+' Expr %prec UPLUS { $$ = eth_ast_binop(ETH_ADD, eth_ast_cval(eth_num(0)), $2); LOC($$, @$); }
 
@@ -690,144 +473,48 @@ Expr
   | LNOT Expr { $$ = eth_ast_unop(ETH_LNOT, $2); LOC($$, @$); }
 
   | Expr USROP Expr { eth_ast *args[] = { $1, $3 }; eth_ast *fn = eth_ast_ident($2); $$ = eth_ast_apply(fn, args, 2); LOC($$, @$); free($2); }
-  | Expr USROP KEEP_BLOCK Expr { eth_ast *args[] = { $1, $4 }; eth_ast *fn = eth_ast_ident($2); $$ = eth_ast_apply(fn, args, 2); LOC($$, @$); free($2); }
-  | Expr USROP START_BLOCK Expr END_BLOCK { eth_ast *args[] = { $1, $4 }; eth_ast *fn = eth_ast_ident($2); $$ = eth_ast_apply(fn, args, 2); LOC($$, @$); free($2); }
-
-  /*| Expr PIPE Expr { if ($3->tag == ETH_AST_APPLY) { $$ = $3; eth_ast_append_arg($$, $1); } else $$ = eth_ast_apply($3, &$1, 1); LOC($$, @$); }*/
-  /*| Expr PIPE KEEP_BLOCK Expr { if ($4->tag == ETH_AST_APPLY) { $$ = $4; eth_ast_append_arg($$, $1); } else $$ = eth_ast_apply($4, &$1, 1); LOC($$, @$); }*/
-  /*| Expr PIPE START_BLOCK Stmt END_BLOCK { if ($4->tag == ETH_AST_APPLY) { $$ = $4; eth_ast_append_arg($$, $1); } else $$ = eth_ast_apply($4, &$1, 1); LOC($$, @$); }*/
-
-  /*| Expr PIPE Expr { if ($3->tag == ETH_AST_APPLY) { $$ = $3; eth_ast_append_arg($$, $1); } else $$ = eth_ast_apply($3, &$1, 1); LOC($$, @$); }*/
 
   | SYMBOL ASSIGN Expr { $$ = eth_ast_assign($1, $3); free($1); LOC($$, @$); }
-  | SYMBOL ASSIGN KEEP_BLOCK Expr { $$ = eth_ast_assign($1, $4); free($1); LOC($$, @$); }
-  | SYMBOL ASSIGN START_BLOCK Expr END_BLOCK { $$ = eth_ast_assign($1, $4); free($1); LOC($$, @$); }
-;
 
-Stmt
-  : Expr
+  | IF Expr THEN Expr ELSE Expr %prec ELSE { $$ = eth_ast_if($2, $4, $6); LOC($$, @$); }
+  | IF Expr THEN Expr %prec TERNARY { $$ = eth_ast_if($2, $4, eth_ast_cval(eth_nil)); LOC($$, @$); }
 
-  | IF Stmt MaybeKeepBlock THEN Stmt ELSE StmtOrBlock {
-    $$ = eth_ast_if($2, $5, $7);
-    LOC($$, @$);
-  }
-  | IF Stmt MaybeKeepBlock THEN StmtOrBlock KEEP_BLOCK ELSE StmtOrBlock {
-    $$ = eth_ast_if($2, $5, $8);
-    LOC($$, @$);
-  }
+  | IFLET Pattern '=' Expr THEN Expr ELSE Expr %prec ELSE { $$ = eth_ast_match($2, $4, $6, $8); LOC($$, @$); }
+  | IFLET Pattern '=' Expr THEN Expr %prec TERNARY { $$ = eth_ast_match($2, $4, $6, eth_ast_cval(eth_nil)); LOC($$, @$); }
 
-  | UNLESS Stmt MaybeKeepBlock THEN StmtOrBlock {
-    $$ = eth_ast_if($2, eth_ast_cval(eth_nil), $5);
-    LOC($$, @$);
-  }
-  | WHEN Stmt MaybeKeepBlock THEN StmtOrBlock {
-    $$ = eth_ast_if($2, $5, eth_ast_cval(eth_nil));
-    LOC($$, @$);
-  }
-
-  | IFLET Pattern '=' StmtOrBlock MaybeKeepBlock THEN Stmt ELSE StmtOrBlock {
-    $$ = eth_ast_match($2, $4, $7, $9);
-    LOC($$, @$);
-  }
-  | IFLET Pattern '=' StmtOrBlock MaybeKeepBlock THEN StmtOrBlock KEEP_BLOCK ELSE StmtOrBlock {
-    $$ = eth_ast_match($2, $4, $7, $10);
-    LOC($$, @$);
-  }
-
-  | WHENLET Pattern '=' StmtOrBlock MaybeKeepBlock THEN StmtOrBlock {
-    $$ = eth_ast_match($2, $4, $7, eth_ast_cval(eth_nil));
-    LOC($$, @$);
-  }
-
-  | LET Binds IN Stmt {
+  | LET Binds IN Expr {
     $$ = eth_ast_let($2.pats.data, $2.vals.data, $2.pats.len, $4);
     cod_vec_destroy($2.pats);
     cod_vec_destroy($2.vals);
     LOC($$, @$);
   }
-  | LET Binds IN KEEP_BLOCK StmtSeq {
-    $$ = eth_ast_let($2.pats.data, $2.vals.data, $2.pats.len, $5);
-    cod_vec_destroy($2.pats);
-    cod_vec_destroy($2.vals);
-    LOC($$, @$);
-  }
-  | LET Binds KEEP_BLOCK IN KEEP_BLOCK StmtSeq {
-    $$ = eth_ast_let($2.pats.data, $2.vals.data, $2.pats.len, $6);
-    cod_vec_destroy($2.pats);
-    cod_vec_destroy($2.vals);
-    LOC($$, @$);
-  }
 
-  | LET REC Binds IN Stmt {
+  | LET REC Binds IN Expr {
     $$ = eth_ast_letrec($3.pats.data, $3.vals.data, $3.pats.len, $5);
     cod_vec_destroy($3.pats);
     cod_vec_destroy($3.vals);
     LOC($$, @$);
   }
-  | LET REC Binds IN KEEP_BLOCK StmtSeq {
-    $$ = eth_ast_letrec($3.pats.data, $3.vals.data, $3.pats.len, $6);
-    cod_vec_destroy($3.pats);
-    cod_vec_destroy($3.vals);
-    LOC($$, @$);
-  }
-  | LET REC Binds KEEP_BLOCK IN KEEP_BLOCK StmtSeq {
-    $$ = eth_ast_letrec($3.pats.data, $3.vals.data, $3.pats.len, $7);
-    cod_vec_destroy($3.pats);
-    cod_vec_destroy($3.vals);
-    LOC($$, @$);
-  }
 
+  | TRY Expr WITH Pattern RARROW Expr %prec TRY { $$ = eth_ast_try($4, $2, $6, 1); LOC($$, @$); }
 
-
-  | DO SYMBOL LoopArgs '=' StmtOrBlock {
-    eth_ast_pattern *ident = eth_ast_ident_pattern($2);
-    eth_ast *loop = eth_ast_fn_with_patterns($3.pats.data, $3.pats.len, $5);
-    eth_ast *runloop = eth_ast_apply(eth_ast_ident($2), $3.vals.data, $3.vals.len);
-    $$ = eth_ast_letrec(&ident, &loop, 1, runloop);
-    /*LOC($$, @$);*/
-
-    free($2);
-    cod_vec_destroy($3.pats);
-    cod_vec_destroy($3.vals);
-  }
-
-  | TRY Stmt WITH Pattern RARROW StmtOrBlock {
-    $$ = eth_ast_try($4, $2, $6, 1);
-    LOC($$, @$);
-  }
-  | TRY StmtOrBlock KEEP_BLOCK WITH Pattern RARROW StmtOrBlock {
-    $$ = eth_ast_try($5, $2, $7, 1);
-    LOC($$, @$);
-  }
-
-  | LAZY Stmt {
-    eth_t lazy = eth_get_builtin(SCANROOT, "__make_lazy");
-    assert(lazy);
-    eth_ast *thunk = eth_ast_fn(NULL, 0, $2);
-    $$ = eth_ast_apply(eth_ast_cval(lazy), &thunk, 1);
-  }
-  | LAZY Block {
+  | LAZY Expr {
     eth_t lazy = eth_get_builtin(SCANROOT, "__make_lazy");
     assert(lazy);
     eth_ast *thunk = eth_ast_fn(NULL, 0, $2);
     $$ = eth_ast_apply(eth_ast_cval(lazy), &thunk, 1);
   }
 
-  | FN FnArgs RARROW StmtOrBlock {
+  | FN FnArgs RARROW Expr {
     $$ = eth_ast_fn_with_patterns($2.data, $2.len, $4);
     cod_vec_destroy($2);
     LOC($$, @$);
   }
 
-  | Stmt PIPE Stmt { if ($3->tag == ETH_AST_APPLY) { $$ = $3; eth_ast_append_arg($$, $1); } else $$ = eth_ast_apply($3, &$1, 1); LOC($$, @$); }
-  /*| Stmt PIPE KEEP_BLOCK Stmt { if ($4->tag == ETH_AST_APPLY) { $$ = $4; eth_ast_append_arg($$, $1); } else $$ = eth_ast_apply($4, &$1, 1); LOC($$, @$); }*/
-  | Stmt PIPE START_BLOCK Stmt END_BLOCK { if ($4->tag == ETH_AST_APPLY) { $$ = $4; eth_ast_append_arg($$, $1); } else $$ = eth_ast_apply($4, &$1, 1); LOC($$, @$); }
+  | Expr PIPE Expr { if ($3->tag == ETH_AST_APPLY) { $$ = $3; eth_ast_append_arg($$, $1); } else $$ = eth_ast_apply($3, &$1, 1); LOC($$, @$); }
+  | Expr '$' Expr { if ($1->tag == ETH_AST_APPLY) { $$ = $1; eth_ast_append_arg($$, $3); } else $$ = eth_ast_apply($1, &$3, 1); LOC($$, @$); }
 
-  | Expr '$' Stmt { if ($1->tag == ETH_AST_APPLY) { $$ = $1; eth_ast_append_arg($$, $3); } else $$ = eth_ast_apply($1, &$3, 1); LOC($$, @$); }
-  /*| Expr '$' StmtOrBlock { if ($1->tag == ETH_AST_APPLY) { $$ = $1; eth_ast_append_arg($$, $3); } else $$ = eth_ast_apply($1, &$3, 1); LOC($$, @$); }*/
-  /*| Expr '$' KEEP_BLOCK Stmt { if ($1->tag == ETH_AST_APPLY) { $$ = $1; eth_ast_append_arg($$, $4); } else $$ = eth_ast_apply($1, &$4, 1); LOC($$, @$); }*/
-
-  | Attribute OPEN Atom IN StmtOrSeq {
+  | Attribute OPEN Atom IN Expr {
     eth_ast *rhs;
     if ($3->tag == ETH_AST_CVAL and $3->cval.val->type == eth_string_type)
     {
@@ -842,7 +529,7 @@ Stmt
   }
 
 
-  | Attribute IMPORT String IN StmtOrSeq {
+  | Attribute IMPORT String IN Expr {
     cod_vec_push($3, 0);
     eth_ast *require = eth_ast_cval(eth_get_builtin(SCANROOT, "__require"));
     eth_ast_pattern *lhs = eth_ast_ident_pattern($3.data);
@@ -852,7 +539,7 @@ Stmt
     $3.data = NULL;
     $$ = eth_ast_let(&lhs, &rhs, 1, $5);
   }
-  | Attribute IMPORT Expr AS SYMBOL IN StmtOrSeq {
+  | Attribute IMPORT Expr AS SYMBOL IN Expr {
     eth_ast *rhs;
     if ($3->tag == ETH_AST_CVAL and $3->cval.val->type == eth_string_type)
     {
@@ -867,25 +554,12 @@ Stmt
     $$ = eth_ast_let(&lhs, &rhs, 1, $7);
   }
 
-  | RETURN Stmt {
-    $$ = eth_ast_return($2);
-    LOC($$, @$);
-  }
+  | RETURN Expr { $$ = eth_ast_return($2); LOC($$, @$); }
+
 ;
 
 Ident
   : SYMBOL
-  | CAPSYMBOL '.' Ident {
-    int len1 = strlen($1);
-    int len2 = strlen($3);
-    $$ = malloc(len1 + 1 + len2 + 1);
-    memcpy($$, $1, len1);
-    $$[len1] = '.';
-    memcpy($$ + len1 + 1, $3, len2);
-    $$[len1 + 1 + len2] = 0;
-    free($1);
-    free($3);
-  }
 ;
 
 Args
@@ -897,28 +571,6 @@ Args
     $$ = $1;
     cod_vec_push($$, $2);
   }
-  | START_BLOCK ArgsAux END_BLOCK { $$ = $2; }
-  | Args START_BLOCK ArgsAux END_BLOCK {
-    $$ = $1;
-    for (size_t i = 0; i < $3.len; ++i)
-      cod_vec_push($$, $3.data[i]);
-    cod_vec_destroy($3);
-  }
-;
-
-ArgsAux
-  : Atom {
-    cod_vec_init($$);
-    cod_vec_push($$, $1);
-  }
-  | ArgsAux KEEP_BLOCK Atom {
-    $$ = $1;
-    cod_vec_push($$, $3);
-  }
-  | ArgsAux Atom {
-    $$ = $1;
-    cod_vec_push($$, $2);
-  }
 ;
 
 FnArgs
@@ -926,18 +578,6 @@ FnArgs
   | FnArgs AtomicPattern {
     $$ = $1;
     cod_vec_push($$, $2);
-  }
-;
-
-LoopArgs
-  : {
-    cod_vec_init($$.pats);
-    cod_vec_init($$.vals);
-  }
-  | LoopArgs AtomicPattern ':' Atom {
-    $$ = $1;
-    cod_vec_push($$.pats, $2);
-    cod_vec_push($$.vals, $4);
   }
 ;
 
@@ -953,19 +593,10 @@ Binds
     cod_vec_push($$.pats, $3.pat);
     cod_vec_push($$.vals, $3.val);
   }
-  | Binds KEEP_BLOCK AND Bind {
-    $$ = $1;
-    cod_vec_push($$.pats, $4.pat);
-    cod_vec_push($$.vals, $4.val);
-  }
 ;
 
-Block: START_BLOCK StmtSeq END_BLOCK { $$ = $2; }
-
-StmtOrBlock: Stmt | Block;
-
 Bind
-  : Pattern '=' StmtOrBlock {
+  : Pattern '=' Expr {
     $$.pat = $1;
     $$.val = $3;
     if ($1->tag == ETH_AST_PATTERN_IDENT &&
@@ -977,7 +608,7 @@ Bind
       $$.val = eth_ast_apply(eth_ast_cval(mkref), p, 1);
     }
   }
-  | Attribute SYMBOL FnArgs AtomicPattern '=' StmtOrBlock {
+  | Attribute SYMBOL FnArgs AtomicPattern '=' Expr {
     $$.pat = eth_ast_ident_pattern($2);
     eth_attr *attr = eth_create_attr($1);
     if (g_filename)
@@ -988,7 +619,7 @@ Bind
     free($2);
     cod_vec_destroy($3);
   }
-  | Attribute SYMBOL '!' '=' StmtOrBlock {
+  | Attribute SYMBOL '!' '=' Expr {
     $$.pat = eth_ast_ident_pattern($2);
     eth_attr *attr = eth_create_attr($1);
     if (g_filename)
@@ -1249,28 +880,22 @@ RecordPattern
 ;
 
 List
-  : StmtSeq {
+  : Expr {
     cod_vec_init($$);
     cod_vec_push($$, $1);
   }
-  | List ',' StmtSeq {
+  | List ',' Expr {
     $$ = $1;
     cod_vec_push($$, $3);
   }
 ;
 
 Record
-  : SYMBOL '=' StmtOrBlock {
+  : SYMBOL '=' Expr {
     cod_vec_init($$.keys);
     cod_vec_init($$.vals);
     cod_vec_push($$.keys, $1);
     cod_vec_push($$.vals, $3);
-  }
-  | START_BLOCK SYMBOL '=' StmtOrBlock END_BLOCK {
-    cod_vec_init($$.keys);
-    cod_vec_init($$.vals);
-    cod_vec_push($$.keys, $2);
-    cod_vec_push($$.vals, $4);
   }
   | SYMBOL {
     cod_vec_init($$.keys);
@@ -1278,13 +903,7 @@ Record
     cod_vec_push($$.keys, $1);
     cod_vec_push($$.vals, eth_ast_ident($1));
   }
-  | START_BLOCK SYMBOL END_BLOCK {
-    cod_vec_init($$.keys);
-    cod_vec_init($$.vals);
-    cod_vec_push($$.keys, $2);
-    cod_vec_push($$.vals, eth_ast_ident($2));
-  }
-  | Record ',' SYMBOL '=' StmtOrBlock {
+  | Record ',' SYMBOL '=' Expr {
     $$ = $1;
     cod_vec_push($$.keys, $3);
     cod_vec_push($$.vals, $5);

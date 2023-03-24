@@ -71,5 +71,6 @@ let tests = [
 in
 
 let (nok, nfail) = @(require 'test').run [(nil, tests)] in
-exit 1 when nfail > 0;
+if nfail > 0 then
+  exit 1
 

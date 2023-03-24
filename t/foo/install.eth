@@ -10,5 +10,5 @@ let pub post_install! =
   print "CLEANUP FOO"
 in
 
-()
+nil
 

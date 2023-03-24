@@ -70,7 +70,7 @@ let pub odd?  x = x mod 2 == 1 in
 let compose_va f g =
   let rec aux x =
     if function? x then
-      fn y -> aux (x y)
+      (fn y -> aux (x y))
     else f x
   in
   aux g
@@ -114,16 +114,17 @@ let pub record = lazy
     let pairs =
       pairs
       |> mapi (curry id)
-      |> sort $ (i, (a, _)) (j, (b, _)) ->
+      |> sort ((i, (a, _)) (j, (b, _)) ->
           let cmp = strcmp a b in
           if cmp < 0 then true
           else if cmp == 0 then i < j
           else false
+      )
       |> map second
     in
 
     -- remove duplicate keys (leave the latest one) and construct a record
-    do loop l:pairs acc:[] =
+    let rec loop l acc =
       if let x :: xs = l then
         if acc is [] then
           -- accumulate first kv-pair
@@ -136,6 +137,9 @@ let pub record = lazy
           loop xs (x :: acc)
       else
         __record acc
+    in
+    
+    loop pairs []
 in
 
 
@@ -191,4 +195,4 @@ let pub failure () = raise `failure in
 let pub invalid_argument () = raise `invalid_argument in
 let pub type_error () = raise `type_error in
 
-()
+nil

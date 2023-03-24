@@ -121,7 +121,7 @@ in
 let pub linspace from to n =
   let {fma} = @(require 'math') in
   let dx = (to - from) / (n - 1) in
-  unfold_left (i -> (i - 1, fma dx i from) when i >= 0) (n - 1)
+  unfold_left (i -> if i >= 0 then (i - 1, fma dx i from)) (n - 1)
 in
 
 
@@ -148,16 +148,18 @@ let pub zip f ltup = rev $ rev_zip f ltup in
 let pub fold_zip = __fold_zip in
 
 let rec pub iter f xs =
-  when let x::xs = xs then
-    f x
+  if let x::xs = xs then (
+    f x;
     iter f xs
+  )
 in
 
 let rec pub iteri f xs =
   let rec loop i xs =
-    when let x::xs = xs then
+    if let x::xs = xs then (
       f i x;
       loop (i + 1) xs f
+    )
   in
   loop 0 xs
 in
@@ -201,7 +203,7 @@ let pub fold_left f z xs =
 
     fold_left (z -> x -> z) z [x] -> z
 
-  |help}
+  |help};
   let rec loop xs acc =
     if let x::xs = xs then
       loop xs (f acc x)
@@ -241,7 +243,7 @@ in
 
 let pub reduce_left f xs =
   if let x::xs = xs then fold_left f x xs
-  else invalid_argument ()
+  else invalid_argument nil
 in
 
 let pub reduce_left' f xs =
@@ -260,7 +262,7 @@ in
 
 let pub reduce_right f xs =
   if let x::(_::_ as xs) = xs then f x (reduce_right_aux f xs)
-  else invalid_argument ()
+  else invalid_argument nil
 in
 
 let pub reduce_right' f xs =
@@ -374,7 +376,7 @@ in
 
 let pub find p xs =
   if let `some x = find_opt p xs then x
-  else failure ()
+  else failure nil
 in
 
 let pub index_opt p xs =
@@ -389,7 +391,7 @@ in
 
 let pub index p xs =
   if let `some i = index_opt p xs then i
-  else failure ()
+  else failure nil
 in
 
 --let rec pub maximum cmp xs =
@@ -398,7 +400,7 @@ in
     --else
       --let select x y = if cmp x y then x else y in
       --fold_left select x xs
-  --else invalid_argument ()
+  --else invalid_argument nil
 --in
 --let rec pub minimum cmp xs =
   --if let x :: xs = xs then
@@ -406,7 +408,7 @@ in
     --else
       --let select x y = if cmp x y then x else y in
       --fold_left select x xs
-  --else invalid_argument ()
+  --else invalid_argument nil
 --in
 
 let pub partition p xs =
@@ -455,13 +457,13 @@ let rec pub assoc_opt x l =
     if let (k, v) = kv then
       if k eq x then `some v
       else assoc_opt x l
-    else invalid_argument ()
+    else invalid_argument nil
   else false
 in
 
 let pub assoc k l =
   if let `some v = assoc_opt k l then v
-  else failure ()
+  else failure nil
 in
 
 let rec pub assq_opt x l =
@@ -469,22 +471,22 @@ let rec pub assq_opt x l =
     if let (k, v) = kv then
       if k is x then `some v
       else assq_opt x l
-    else invalid_argument ()
+    else invalid_argument nil
   else false
 in
 
 let pub assq k l =
   if let `some v = assq_opt k l then v
-  else failure ()
+  else failure nil
 in
 
 
 let rec pub transpose xs =
   if let xs :: xss = xs then
     if let x :: xs = xs then
-      let f l = when let hd::_ = l then `some hd in
+      let f l = if let hd::_ = l then `some hd in
       let head = x :: filter_map f xss in
-      let f l = when let _::tl = l then `some tl in
+      let f l = if let _::tl = l then `some tl in
       let tail = transpose (xs :: filter_map f xss) in
       head :: tail
     else transpose xss
@@ -496,4 +498,4 @@ let pub get l k = car $ drop k l in
 
 let pub list = list in -- not to hide the builtin by module name
 
-()
+nil

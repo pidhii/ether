@@ -248,7 +248,8 @@ destroy_ast_node(eth_ast *ast)
     case ETH_AST_IF:
       eth_unref_ast(ast->iff.cond);
       eth_unref_ast(ast->iff.then);
-      eth_unref_ast(ast->iff.els);
+      if (ast->iff.els)
+        eth_unref_ast(ast->iff.els);
       break;
 
     case ETH_AST_SEQ:
@@ -288,7 +289,8 @@ destroy_ast_node(eth_ast *ast)
       eth_unref_ast_pattern(ast->match.pat);
       eth_unref_ast(ast->match.expr);
       eth_unref_ast(ast->match.thenbr);
-      eth_unref_ast(ast->match.elsebr);
+      if (ast->match.elsebr)
+        eth_unref_ast(ast->match.elsebr);
       break;
 
     case ETH_AST_AND:
@@ -436,7 +438,8 @@ eth_ast_if(eth_ast *cond, eth_ast *then, eth_ast *els)
   eth_ast *ast = create_ast_node(ETH_AST_IF);
   eth_ref_ast(ast->iff.cond = cond);
   eth_ref_ast(ast->iff.then = then);
-  eth_ref_ast(ast->iff.els  = els );
+  if ((ast->iff.els = els))
+    eth_ref_ast(ast->iff.els);
   return ast;
 }
 
@@ -552,7 +555,8 @@ eth_ast_match(eth_ast_pattern *pat, eth_ast *expr, eth_ast *thenbr,
   eth_ref_ast_pattern(pat);
   eth_ref_ast(ast->match.expr = expr);
   eth_ref_ast(ast->match.thenbr = thenbr);
-  eth_ref_ast(ast->match.elsebr = elsebr);
+  if ((ast->match.elsebr = elsebr))
+    eth_ref_ast(ast->match.elsebr);
   ast->match.toplvl = ETH_TOPLVL_NONE;
   return ast;
 }

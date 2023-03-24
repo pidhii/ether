@@ -51,7 +51,7 @@ let string = @(require "string") in
 let pub fopen = __open in
 
 let pub read_line! = read_line_of stdin in
-let pub read_line_opt! = try `some read_line!  with `end_of_file -> false in
+let pub read_line_opt! = try `some read_line! with `end_of_file -> false in
 let pub read_line_of_opt file = try `some (read_line_of file) with `end_of_file -> false in
 
 let pub read = read_of stdin in
@@ -86,4 +86,4 @@ let pub shell cmd =
   else raise `failure
 in
 
-()
+nil

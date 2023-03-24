@@ -2,4 +2,4 @@
 pub open 'list' in
 pub open 'string' in
 
-()
+nil
