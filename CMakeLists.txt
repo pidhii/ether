@@ -30,6 +30,8 @@ option (ENABLE_ARB "Build an Arb-module" YES)
 option (ENABLE_JSON "Build a Json-module" YES)
 # ------------------------------ Dev-Options -----------------------------------
 option (DISABLE_BUILTINS "Disable all builtins" OFF)
+# ---------------------------------- Misc --------------------------------------
+option (WITH_VALGRIND "Enable valgrind support" ON)
 
 
 ################################################################################
@@ -87,6 +89,7 @@ ExternalProject_Add(eco
     ${CMAKE_COMMAND} -DCMAKE_INSTALL_PREFIX=${ECO_TMP_INSTALL_DIR}
                      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
                      -DBUILD_TESTS=OFF
+                     -DWITH_VALGRIND=${WITH_VALGRIND}
                      -S${ECO_REPOSITORY_DIR}
                      -B${ECO_BUILD_DIR}
   BUILD_COMMAND
