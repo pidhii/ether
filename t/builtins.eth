@@ -1,205 +1,223 @@
 
-let math_tests =
-  let {*} = @(require 'math') in
+let math_tests = {
+  open 'math'
   [
-    ("even?", fn -> even? 0 && even? 2 && not even? 3),
-    ("odd?", fn -> not odd? 0 && odd? 1 && not odd? 2 && odd? 3),
-    ("min", fn -> min 1 2 == 1),
-    ("max", fn -> max 1 2 == 2),
-    ("minmax", fn -> minmax 2 1 eq (1, 2)),
+    #("even?", fn() even?(0) && even?(2) && not even?(3)),
+    #("odd?", fn() not odd?(0) && odd?(1) && not odd?(2) && odd?(3)),
+    #("min", fn() min(1, 2) == 1),
+    #("max", fn() max(1, 2) == 2),
+    #("minmax", fn() minmax(2, 1) eq #(1, 2)),
   ]
-in
+}
 
-let string_tests =
-  let {*} = @(require 'string') in
-  let list = @(require 'list') in
+let string_tests = {
+  open 'string'
+  import 'list'
   [
-    ("cat", fn -> cat ["a", "b", "c"] eq "abc"),
-    ("join", fn -> join "," ["a", "b", "c"] eq "a,b,c"),
-    ("malloc", fn -> strlen (malloc 10) == 10),
-    ("calloc", fn -> calloc 10 eq make_string 10 "\0"),
-    ("make_string", fn -> make_string 10 "@" eq "@@@@@@@@@@" && make_string 2 "" eq "\0\0"),
+    #("cat", fn() cat(["a", "b", "c"]) eq "abc"),
+    #("join", fn() join(",", ["a", "b", "c"]) eq "a,b,c"),
+    #("malloc", fn() strlen(malloc(10)) == 10),
+    #("calloc", fn() calloc(10) eq make_string(10, "\0")),
+    #("make_string", fn() make_string(10, "@") eq "@@@@@@@@@@" && make_string(2, "") eq "\0\0"),
 
-    ("strlen", fn -> strlen "1234" == 4),
-    ("to_upper", fn -> to_upper "AbcD" eq "ABCD"),
-    ("to_lower", fn -> to_lower "AbcD" eq "abcd"),
-    ("chr", fn -> chr 0x61 eq "a"),
-    ("ord", fn -> ord "a" eq 0x61),
-    ("to_number", fn ->
-      list.all? (x -> x == 42) [
-        to_number "42",
-        to_number " 42 ",
-        to_number "0x2A"
-      ]
+    #("strlen", fn() strlen("1234") == 4),
+    #("to_upper", fn() to_upper("AbcD") eq "ABCD"),
+    #("to_lower", fn() to_lower("AbcD") eq "abcd"),
+    #("chr", fn() chr(0x61) eq "a"),
+    #("ord", fn() ord("a") eq 0x61),
+    #("to_number", fn()
+      list.all?(fn(x) x == 42, [
+        to_number("42"),
+        to_number(" 42 "),
+        to_number("0x2A")
+      ])
     ),
-    ("to_symbol", fn ->
-      to_symbol "Foo" is `Foo && to_symbol " Foo " not eq `Foo),
+    #("to_symbol", fn()
+      to_symbol("Foo") is `Foo && to_symbol(" Foo ") not eq `Foo),
 
-    ("chomp", fn -> chomp "asd\n\n" eq "asd" && chomp "asd" eq "asd"),
-    ("chop", fn -> chop "asd" eq "as" && chop "" eq ""),
-    ("trim", fn -> trim "\t\n\v asdf \v\t\n " eq "asdf" && trim "" eq ""),
+    #("chomp", fn() chomp("asd\n\n") eq "asd" && chomp("asd") eq "asd"),
+    #("chop", fn() chop("asd") eq "as" && chop("") eq ""),
+    #("trim", fn() trim("\t\n\v asdf \v\t\n ") eq "asdf" && trim("") eq ""),
 
-    ("substr", fn ->
-      let str = "Hello World!" in
-      list.all? id [
-        substr (2, 3) str eq "llo",
-        substr (6...) str eq "World!",
-        substr (...4) str eq "Hello",
-        substr (4..6) str eq "o W"
-      ]
-    ),
+    #("substr", fn() {
+      let str = "Hello World!"
+      list.all?(id, [
+        substr(#(2, 3), str) eq "llo",
+        substr(6..*, str) eq "World!",
+        substr(*..4, str) eq "Hello",
+        substr(4..6, str) eq "o W"
+      ])
+    }),
 
-    ("strcmp", fn -> strcmp "asdf" "asdf" == 0),
-    ("strcasecmp", fn -> strcasecmp "asdf" "ASdF" == 0),
+    #("strcmp", fn() strcmp("asdf", "asdf") == 0),
+    #("strcasecmp", fn() strcasecmp("asdf", "ASdF") == 0),
 
-    ("strstr", fn ->
-      strstr "45" "123456" eq (3, 3+2) && strstr /[3-5]+/ "123456" eq (2, 2+3)),
+    #("strstr", fn() strstr("45", "123456") eq #(3, 3+2)
+                 && strstr( /[3-5]+/, "123456") eq #(2, 2+3)),
 
-    ("match", fn -> match /[^^]\K(\w+)\s+(\w)/ "a bu c" eq ["bu c", "bu", "c"]),
-    ("split", fn -> split /\s+/ "asd asdf asdf " eq ["asd", "asdf", "asdf", ""]),
-    ("gsub", fn -> gsub /\s+/ (const "-") "a   s f  f f   " eq "a-s-f-f-f-"),
+    #("match", fn() match( /[^^]\K(\w+)\s+(\w)/, "a bu c") eq ["bu c", "bu", "c"]),
+    #("split", fn() split( /\s+/, "asd asdf asdf ") eq ["asd", "asdf", "asdf", ""]),
+    #("gsub", fn() gsub( /\s+/, const("-"), "a   s f  f f   ") eq "a-s-f-f-f-"),
   ]
-in
+}
 
 let regexp_tests = [
-    ("=~", fn -> "as foo so do bar" =~ /foo/),
-  ]
-in
+  #("=~", fn() "as foo so do bar" =~ /foo/),
+]
 
-let list_tests =
-  let {*} = @(require 'list') in
-  [ ("fold_map", fn -> fold_map (fn z x -> (x + z, x)) 0 (range (1..3)) eq [1, 3, 5])
-  , ("init", fn -> init 3 id eq [0, 1, 2])
-  , ("unfold_left", fn -> unfold_left (fn i -> if i < 3 then (i+1, i)) 1 eq [2, 1])
-  , ("unfold_right", fn -> unfold_right (fn i -> if i < 3 then (i, i+1)) 1 eq [1, 2])
-  , ("range", fn -> range (0..9) eq [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
-  , ("linspace", fn -> linspace 1 10 10 eq [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-  , ("rev_append", fn -> rev_append [`a, `b, `c] `d eq `c::`b::`a::`d)
-  , ("rev", fn -> rev [`a, `b, `c] eq [`c, `b, `a])
-  , ("append", fn -> append [`a, `b, `c] `d eq `a::`b::`c::`d)
-  , ("flatten", fn -> flatten [[`a, `b], [`c, `d], [`e, `f]] eq [`a, `b, `c, `d, `e, `f])
-  , ("len", fn -> len [1, 2, 3, 4, 5] == 5 && len [] == 0)
-  , ("rev_map", fn -> rev_map ((+) 1) [1, 2, 3] eq [4, 3, 2])
-  , ("map", fn -> map ((+) 1) [1, 2, 3] eq [2, 3, 4])
-  , ("rev_mapi", fn -> rev_mapi (+) [1, 2, 3] eq [5, 3, 1])
-  , ("mapi", fn -> mapi (+) [1, 2, 3] eq [1, 3, 5])
-  , ("rev_map2", fn -> rev_map2 (-) [1, 2, 3] [2, 1, 0] eq [3, 1, -1])
-  , ("map2", fn -> map2 (-) [1, 2, 3] [2, 1, 0] eq [-1, 1, 3])
-  , ("rev_flat_map", fn -> rev_flat_map (fn x -> range (1..x-1)) [1, 2, 3] eq [2, 1, 1])
-  , ("flat_map", fn -> flat_map (fn x -> range (1..x-1)) [1, 2, 3] eq [1, 1, 2])
-  , ("rev_filter_map", fn ->
-      let f x = if even? x then `some (x + x) in
-      rev_filter_map f [1, 2, 3, 4] eq [8, 4])
-  , ("filter_map", fn ->
-      let f x = if even? x then `some (x + x) in
-      filter_map f [1, 2, 3, 4] eq [4, 8])
-  , ("fold_left", fn -> fold_left (-) 0 [1, 2, 3] == -6)
-  , ("fold_right", fn -> fold_right (-) 0 [1, 2, 3] == 2)
-  , ("reduce_left", fn -> reduce_left (-) [0, 1, 2, 3] == -6)
-  , ("reduce_right", fn -> reduce_right (-) [1, 2, 3, 0] == 2)
-  , ("reduce_left'", fn -> reduce_left' raise [0] == 0)
-  , ("reduce_right'", fn -> reduce_right' raise [1] == 1)
-  , ("rev_scan_left", fn -> rev_scan_left (-) 0 [1, 2, 3] eq [-6, -3, -1])
-  , ("scan_left", fn -> scan_left (-) 0 [1, 2, 3] eq [-1, -3, -6])
-  , ("scan_right", fn -> scan_right (-) 0 [1, 2, 3] eq [2, -1, 3])
-  , ("rev_take", fn -> rev_take 3 [1, 2, 3, 4, 5] eq [3, 2, 1])
-  , ("take", fn -> take 3 [1, 2, 3, 4, 5] eq [1, 2, 3])
-  , ("drop", fn -> drop 3 [1, 2, 3, 4, 5] eq [4, 5])
-  , ("all?", fn -> all? even? [2, 4, 6] && not all? odd? [1, 8] && all? id [])
-  , ("any?", fn -> any? even? [1, 4, 3] && not any? odd? [2, 8] && not any? id [])
-  , ("member?", fn -> member? 3 [1, 2, 3, 4] && not member? 3 [1, 2, 4])
-  , ("memq?", fn -> memq? `c [`a, `b, `c, `d] && not memq? `c [`a, `b, `d])
-  , ("rev_filter", fn -> rev_filter odd? [1, 2, 3] eq [3, 1])
-  , ("filter", fn -> filter odd? [1, 2, 3] eq [1, 3])
-  , ("remove", fn -> remove even? [1, 2, 3, 4] eq [1, 3, 4])
-  , ("insert", fn -> insert (<) 3 [1, 2, 4, 5] eq [1, 2, 3, 4, 5])
-  , ("find", fn ->
-      let t1 = find even? [1, 2, 3] eq 2 in
-      let t2 = not find_opt even? [1, 3] in
-      t1 && t2)
-  , ("index", fn ->
-      let t1 = index even? [1, 2, 3] eq 1 in
-      let t2 = not index_opt even? [1, 3] in
-      t1 && t2)
-  , ("partition", fn -> partition odd? [1, 2, 3] eq ([1, 3], [2]))
-  , ("merge", fn -> merge (<) [2, 4, 5] [1, 3, 5, 6] eq [1, 2, 3, 4, 5, 5, 6])
-  , ("sort", fn -> sort (<) [1, 4, 7, 4, 3, 2, 5] eq [1, 2, 3, 4, 4, 5, 7])
-  , ("assoc", fn ->
-      let t1 = assoc "b" [("a", 1), ("b", 2), ("c", 3)] eq 2 in
-      let t2 = not assoc_opt "b" [("a", 1), ("c", 3)] in
-      t1 && t2)
-  , ("assq", fn ->
-      let t1 = assq `b [(`a, 1), (`b, 2), (`c, 3)] eq 2 in
-      let t2 = not assq_opt `b [(`a, 1), (`c, 3)] in
-      t1 && t2)
-  , ("transpose", fn ->
-      let t1 = transpose [[1,2,3],[4,5,6]] eq [[1,4],[2,5],[3,6]]
-      and t2 = transpose [[10,11],[20],[],[30,31,32]] eq [[10,20,30],[11,31],[32]] in
-      t1 && t2)
-  , ("get", fn -> get [0,1,2,3] 2 == 2)
-  ]
-in
-
-let vector_tests =
-  let vector = @(require 'vector') in
-  let v = vector.of_list [1, 2, 3] in
-  [ ("of_list", fn -> let {get} = vector in (get v 0, get v 1, get v 2) eq (1, 2, 3))
-  , ("back", fn -> vector.back v eq 3)
-  , ("front", fn -> vector.front v eq 1)
-  , ("push", fn -> vector.back (vector.push v 42) eq 42 && vector.back v eq 3)
-  ]
-in
-
-let io_tests =
-  let io = @(require 'io') in
+let list_tests = {
+  open 'list'
   [
-    ("open_string_in", fn ->
-      let str = "1 + 1" in
-      let stream = open_string_in str in
-      io.read_line_of stream eq str),
+    #("fold_map", fn() fold_map(fn(z, x) #(x + z, x), 0, range(1..3)) eq [1, 3, 5])
+    #("init", fn() init(3, id) eq [0, 1, 2])
+    #("unfold_left", fn() unfold_left(fn(i) if i < 3 then #(i+1, i), 1) eq [2, 1])
+    #("unfold_right", fn() unfold_right(fn(i) if i < 3 then #(i, i+1), 1) eq [1, 2])
+    #("range", fn() range(0..9) eq [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    #("linspace", fn() linspace(1, 10, 10) eq [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    #("rev_append", fn() rev_append([`a, `b, `c], `d) eq `c::`b::`a::`d)
+    #("rev", fn() rev([`a, `b, `c]) eq [`c, `b, `a])
+    #("append", fn() append([`a, `b, `c], `d) eq `a::`b::`c::`d)
+    #("flatten", fn() flatten([[`a, `b], [`c, `d], [`e, `f]]) eq [`a, `b, `c, `d, `e, `f])
+    #("len", fn() len([1, 2, 3, 4, 5]) == 5 && len([]) == 0)
+    #("rev_map", fn() rev_map((+)(1), [1, 2, 3]) eq [4, 3, 2])
+    #("map", fn() map((+)(1), [1, 2, 3]) eq [2, 3, 4])
+    #("rev_mapi", fn() rev_mapi((+), [1, 2, 3]) eq [5, 3, 1])
+    #("mapi", fn() mapi((+), [1, 2, 3]) eq [1, 3, 5])
+    #("rev_map2", fn() rev_map2((-), [1, 2, 3], [2, 1, 0]) eq [3, 1, 0-1])
+    #("map2", fn() map2((-), [1, 2, 3], [2, 1, 0]) eq [0-1, 1, 3])
+    #("rev_flat_map", fn() rev_flat_map(fn(x) range(1..x-1), [1, 2, 3]) eq [2, 1, 1])
+    #("flat_map", fn() flat_map(fn(x) range(1..x-1), [1, 2, 3]) eq [1, 1, 2])
+    #("rev_filter_map", fn() {
+      let f(x) { if even?(x) then `some(x + x) }
+      rev_filter_map(f, [1, 2, 3, 4]) eq [8, 4]
+    })
+    #("filter_map", fn() {
+      let f(x) { if even?(x) then `some(x + x) }
+      filter_map(f, [1, 2, 3, 4]) eq [4, 8]
+    })
+    #("fold_left", fn() fold_left((-), 0, [1, 2, 3]) == 0-6)
+    #("fold_right", fn() fold_right((-), 0, [1, 2, 3]) == 2)
+    #("reduce_left", fn() reduce_left((-), [0, 1, 2, 3]) == 0-6)
+    #("reduce_right", fn() reduce_right((-), [1, 2, 3, 0]) == 2)
+    #("reduce_left'", fn() reduce_left'(raise, [0]) == 0)
+    #("reduce_right'", fn() reduce_right'(raise, [1]) == 1)
+    #("rev_scan_left", fn() rev_scan_left((-), 0, [1, 2, 3]) eq [0-6, 0-3, 0-1])
+    #("scan_left", fn() scan_left((-), 0, [1, 2, 3]) eq [0-1, 0-3, 0-6])
+    #("scan_right", fn() scan_right((-), 0, [1, 2, 3]) eq [2, 0-1, 3])
+    #("rev_take", fn() rev_take(3, [1, 2, 3, 4, 5]) eq [3, 2, 1])
+    #("take", fn() take(3, [1, 2, 3, 4, 5]) eq [1, 2, 3])
+    #("drop", fn() drop(3, [1, 2, 3, 4, 5]) eq [4, 5])
+    #("all?", fn() all?(even?, [2, 4, 6]) && not all?(odd?, [1, 8]) && all?(id, []))
+    #("any?", fn() any?(even?, [1, 4, 3]) && not any?(odd?, [2, 8]) && not any?(id, []))
+    #("member?", fn() member?(3, [1, 2, 3, 4]) && not member?(3, [1, 2, 4]))
+    #("memq?", fn() memq?(`c, [`a, `b, `c, `d]) && not memq?(`c, [`a, `b, `d]))
+    #("rev_filter", fn() rev_filter(odd?, [1, 2, 3]) eq [3, 1])
+    #("filter", fn() filter(odd?, [1, 2, 3]) eq [1, 3])
+    #("remove", fn() remove(even?, [1, 2, 3, 4]) eq [1, 3, 4])
+    #("insert", fn() insert((<), 3, [1, 2, 4, 5]) eq [1, 2, 3, 4, 5])
+    #("find", fn() {
+      let t1 = find(even?, [1, 2, 3]) eq 2
+      let t2 = not find_opt(even?, [1, 3])
+      t1 && t2
+    })
+    #("index", fn() {
+      let t1 = index(even?, [1, 2, 3]) eq 1
+      let t2 = not index_opt(even?, [1, 3])
+      t1 && t2
+    })
+    #("partition", fn() partition(odd?, [1, 2, 3]) eq #([1, 3], [2]))
+    #("merge", fn() merge((<), [2, 4, 5], [1, 3, 5, 6]) eq [1, 2, 3, 4, 5, 5, 6])
+    #("sort", fn() sort((<), [1, 4, 7, 4, 3, 2, 5]) eq [1, 2, 3, 4, 4, 5, 7])
+    #("assoc", fn() {
+      let t1 = assoc("b", [#("a", 1), #("b", 2), #("c", 3)]) eq 2
+      let t2 = not assoc_opt("b", [#("a", 1), #("c", 3)])
+      t1 && t2
+    })
+    #("assq", fn() {
+      let t1 = assq(`b, [#(`a, 1), #(`b, 2), #(`c, 3)]) eq 2
+      let t2 = not assq_opt(`b, [#(`a, 1), #(`c, 3)])
+      t1 && t2
+    })
+    #("transpose", fn() {
+      let t1 = transpose([[1,2,3],[4,5,6]]) eq [[1,4],[2,5],[3,6]]
+      and t2 = transpose([[10,11],[20],[],[30,31,32]]) eq [[10,20,30],[11,31],[32]]
+      t1 && t2
+    })
+    #("get", fn() get([0,1,2,3], 2) == 2)
   ]
-in
+}
+
+let vector_tests = {
+  import 'vector'
+  let v = vector.of_list([1, 2, 3])
+  [
+    #("of_list", fn() {
+      let #{get} = vector
+      return #(get(v, 0), get(v, 1), get(v, 2)) eq #(1, 2, 3)
+    })
+    #("back", fn() vector.back(v) eq 3)
+    #("front", fn() vector.front(v) eq 1)
+    #("push", fn() vector.back(vector.push(v, 42)) eq 42 && vector.back(v) eq 3)
+  ]
+}
+
+let io_tests = {
+  import 'io'
+  [
+    #("open_string_in", fn() {
+      let str = "1 + 1"
+      let stream = open_string_in(str)
+      io.read_line_of(stream) eq str
+    }),
+  ]
+}
 
 let load_tests =
-  [ ("load_string", fn ->
-      let str = "let pub foo = 42 in 1 + 1" in
-      load_string str eq (2, [("foo",42)]))
-  , ("create_env:load_string", fn ->
-      let env = create_env [("a", 1), ("b", 2)] in
-      env:load_string "a + b" eq (3, nil))
+  [
+    #("load_string", fn() {
+      let str = "let pub foo = 42\n1 + 1"
+      load_string(str) eq #(2, [#("foo",42)])
+    })
+    #("create_env:load_string", fn() {
+      let env = create_env([#("a", 1), #("b", 2)])
+      env:load_string("a + b") eq #(3, nil)
+    })
   ]
-in
 
 
-let misc_tests =
-  let {*} = @(require 'list') in
-  [ ("record", fn ->
-      let r = {a='a', b='b'} in
-      r eq record (list r))
-  , ("merge records", fn ->
-      let r1 = {a='a1', b='b1'} in
-      let r2 = {b='b2', c='c2'} in
-      record (append (list r1) (list r2)) eq {a='a1', b='b2', c='c2'})
+let misc_tests = {
+  open 'list'
+  [
+    #("record", fn() {
+      let r = #{a='a', b='b'}
+      r eq record(list(r))
+    })
+    #("merge records", fn() {
+      let r1 = #{a='a1', b='b1'}
+      let r2 = #{b='b2', c='c2'}
+      record(append(list(r1), list(r2))) eq #{a='a1', b='b2', c='c2'}
+    })
   ]
-in
+}
 
-let sumres (nok, nfail) (nok', nfail') =
-  (nok + nok', nfail + nfail')
-in
-let res = (0, 0) in
+let sumres(#(nok, nfail), #(nok', nfail')) {
+  #(nok + nok', nfail + nfail')
+}
 
-let (nok, nfail) =
-  @(require 'test').run
-    [ ("math", math_tests)
-    , ("string", string_tests)
-    , ("regexp", regexp_tests)
-    , ("list", list_tests)
-    , ("vector", vector_tests)
-    , ("io", io_tests)
-    , ("load", load_tests)
-    , ("misc", misc_tests)
-    ]
-in
+let res = #(0, 0)
+
+let #(nok, nfail) =
+  require('test').run([
+    #("math", math_tests)
+    #("string", string_tests)
+    #("regexp", regexp_tests)
+    #("list", list_tests)
+    #("vector", vector_tests)
+    #("io", io_tests)
+    #("load", load_tests)
+    #("misc", misc_tests)
+  ])
+
 if nfail > 0 then
-  exit 1
+  exit(1)
 

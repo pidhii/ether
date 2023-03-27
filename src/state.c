@@ -6,6 +6,7 @@
 
 #define ETH_NEW_CPU_STACK_NPAG 1
 
+// FIXME stack overflow not detected
 eth_state*
 eth_create_initial_state(int cpu_stack_npag, eco_entry_point_t entry)
 {

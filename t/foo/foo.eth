@@ -1,6 +1,5 @@
 
-let pub foo! =
-  print "foo!"
-in
+let pub foo() {
+  print("foo!")
+}
 
-nil

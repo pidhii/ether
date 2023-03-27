@@ -1,53 +1,54 @@
 #!/bin/env ether
 
-open 'std' in
-import 'io' in
-import 'cmdarg' in
+open 'std'
+import 'io'
+import 'cmdarg'
 
 
-let print_help! =
-  let argv0 = car command_line in
-  print "usage: {argv0} -g [<opath>] [-n <n=1000000>]       (1)"
-  print "       {argv0} [-n <n>] <ipath1> [<ipath2> ...]    (2)"
-  print ""
-  print "1. Generate a list of \e[4mn\e[0m numbers and write it to \e[4mopath\e[0m."
-  print ""
-  print "2. Read \e[4mn\e[0m numbers from \e[4mipath1\e[0m and sort them. Repeat for each supplied input file."
-  print ""
-in
+let print_help() {
+  let argv0 = car(command_line)
+  print("usage: {argv0} -g [<opath>] [-n <n=1000000>]       (1)")
+  print("       {argv0} [-n <n>] <ipath1> [<ipath2> ...]    (2)")
+  print("")
+  print("1. Generate a list of \e[4mn\e[0m numbers and write it to \e[4mopath\e[0m.")
+  print("")
+  print("2. Read \e[4mn\e[0m numbers from \e[4mipath1\e[0m and sort them. Repeat for each supplied input file.")
+  print("")
+}
 
 
-let opts, args =
+let #(opts, args) = {
   let options =
     [
-      { name = ["h"], val = `h, has_arg = false },
-      { name = ["g"], val = `g, has_arg = false },
-      { name = ["o"], val = `o, has_arg = true },
-      { name = ["n"], val = `n, has_arg = true, arg_pat = \[[:digit:]]+/ },
+      #{ name = ["h"], val = `h, has_arg = false },
+      #{ name = ["g"], val = `g, has_arg = false },
+      #{ name = ["o"], val = `o, has_arg = true },
+      #{ name = ["n"], val = `n, has_arg = true, arg_pat = /[[:digit:]]+/ },
     ]
-  in
-  cmdarg.get options (cdr command_line)
-in
+  cmdarg.get(options, cdr(command_line))
+}
 
-if (opts is [] && args is []) || assq_opt `h opts then
-  print_help!
+if {opts is [] && args is []} || assq_opt(`h, opts) then
+  print_help()
 
-else if assq_opt `g opts then
-  let ofile = open_out (assq `o opts) or stdout in
-  let n = (assq `n opts | to_number) or 1_000_000 in
-  range (1..n) |> iter $ _ -> print_to ofile rand!
-  close ofile
+else if assq_opt(`g, opts) then {
+  let ofile = open_out(assq(`o, opts)) or stdout
+  let n = {assq(`n, opts) |> to_number} or 1_000_000
+  range(1..n) |> iter (fn(_) print_to(ofile, rand()))
+  close(ofile)
+}
 
-else
-  let n = `some (assq `n opts |> to_number) or false in
-  args |> iter $ input_path ->
+else {
+  let n = `some(assq(`n, opts) |> to_number) or false
+  args |> iter(fn(input_path) {
     let l =
-      open_in input_path
+      open_in(input_path)
       |> io.read_file
       |> chomp
-      |> split \\n/
-      |> map to_number
-    in
-    let l = if let `some n = n then take n l else l in
-    sort (<) l
+      |> split( /\n/)
+      |> map(to_number)
+    let l = if let `some(n) = n then take(n, l) else l
+    sort((<), l)
+  })
+}
 

@@ -1,14 +1,13 @@
 
-let pub name = "Foo" in
-let pub main = "foo.eth" in
+let pub name = "Foo"
+let pub main = "foo.eth"
 
-let pub build! =
-  print "BUILDING FOO"
-in
+let pub build() {
+  print("BUILDING FOO")
+}
 
-let pub post_install! =
-  print "CLEANUP FOO"
-in
+let pub post_install() {
+  print("CLEANUP FOO")
+}
 
-nil
 

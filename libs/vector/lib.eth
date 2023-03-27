@@ -1,19 +1,18 @@
 
-let pub empty = of_list [] in
+let pub empty = of_list([])
 
 -- TODO: optimize
-let pub init n f =
-  let rec loop i acc =
+let pub init(n, f) {
+  let rec loop(i, acc) {
     if i < n then
-      loop (i + 1) (push acc (f i))
+      loop(i + 1, push(acc, f(i)))
     else acc
-  in
-  loop 0 empty
-in
+  }
+  loop(0, empty)
+}
 
 -- TODO: optimize
-let pub make n x =
-  init n (const x)
-in
+let pub make(n, x) {
+  init(n, const(x))
+}
 
-nil

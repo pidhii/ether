@@ -1,23 +1,23 @@
 
-let {*} = @(require 'os') in
+open 'os'
 
-let [_, dope, testDir] = command_line in
-chdir testDir;
+let [_ dope testDir] = command_line
+chdir(testDir)
 
-system "echo ether: `which ether`";
-print "dope: {dope}";
-system "echo pwd: $PWD";
-let fail! =
-  system "ether {dope} uninstall foo &>/dev/null";
-  system "rm -rf foo/.git &>/dev/null";
-  exit 1
-in
+system("echo ether: `which ether`")
+print("dope: {dope}")
+system("echo pwd: $PWD")
+let fail() {
+  system("ether {dope} uninstall foo &>/dev/null")
+  system("rm -rf foo/.git &>/dev/null")
+  exit(1)
+}
 
-system "cd foo && git init && git add . && git commit -m 'Test' && git tag '2.2.8'";
+system("cd foo && git init && git add . && git commit -m 'Test' && git tag '2.2.8'")
 
-system "{dope} install ./foo" == 0 || fail!;
-system "{dope} uninstall foo" == 0 || fail!;
-system "{dope} install ./foo" == 0 || fail!;
-system "{dope} uninstall foo" == 0 || fail!;
+system("{dope} install ./foo") == 0 || fail()
+system("{dope} uninstall foo") == 0 || fail()
+system("{dope} install ./foo") == 0 || fail()
+system("{dope} uninstall foo") == 0 || fail()
 
-system "rm -rf foo/.git &>/dev/null"
+system("rm -rf foo/.git &>/dev/null")

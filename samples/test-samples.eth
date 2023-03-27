@@ -1,39 +1,37 @@
 
-let {*} = @(require 'os') in
-let {*} = @(require 'io') in
-let {*} = @(require 'list') in
-let {*} = @(require 'string') in
+open 'os'
+open 'io'
+open 'list'
+open 'string'
 
-chdir (get command_line 1);
+chdir(get(command_line, 1))
 
-let test_mergesort! =
-  let origlist = [1,9,4,5,7,6,8,2,3] in
+let test_mergesort() {
+  let origlist = [1 9 4 5 7 6 8 2 3]
   let ret =
     origlist
-    |> map (format "%d")
-    |> join "\n"
-    |> (x -> shell {q|ether ./mergesort.eth <<<'{x}' | grep "Sorted list"|q})
-    |> match /\[.+\]/
+    |> map(format("%d"))
+    |> join("\n")
+    |> {fn(x) shell({q|ether ./mergesort.eth <<<'{x}' | grep "Sorted list"|q})}
+    |> match( /\[.+\]/)
     |> car
-  in
 
   let correct =
-    sort (<) origlist
-    |> map (format "%d")
-    |> join ","
-    |> format "[%d]"
-  in
+    sort((<), origlist)
+    |> map(format("%d"))
+    |> join(",")
+    |> format("[%d]")
 
   assert ret eq correct
-in
+}
 
-let test_basics! =
-  assert system "ether ./basics.eth &>/dev/null" == 0
-in
+let test_basics() {
+  assert system("ether ./basics.eth &>/dev/null") == 0
+}
 
-test_basics!;
-print "> 'test_basics` succeed";
+test_basics()
+print("> 'test_basics` succeed")
 
-test_mergesort!;
-print "> 'test_mergesort` succeed"
+test_mergesort()
+print("> 'test_mergesort` succeed")
 

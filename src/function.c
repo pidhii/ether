@@ -249,8 +249,9 @@ _eth_partial_apply(eth_function *fn, int narg)
         return tmp_f;
       else
       {
+        /*eth_trace("tried to apply to `~w`", tmp_f);*/
         eth_drop(tmp_f);
-        return eth_exn(eth_sym("Apply_error"));
+        return eth_exn(eth_sym("apply_error"));
       }
     }
 

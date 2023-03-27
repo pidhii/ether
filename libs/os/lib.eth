@@ -1,5 +1,5 @@
 
-let {*} = @(require 'string') in
+open 'string'
 
 --------------------------------------------------------------------------------
 -- Functions:
@@ -11,18 +11,18 @@ let {*} = @(require 'string') in
 -- Values:
 -- * f_ok, r_ok, w_ok, x_ok
 
-let pub f_ok = __f_ok in
-let pub r_ok = __r_ok in
-let pub w_ok = __w_ok in
-let pub x_ok = __x_ok in
+let pub F_OK = __f_ok
+let pub R_OK = __r_ok
+let pub W_OK = __w_ok
+let pub X_OK = __x_ok
 
-let pub o_cloexec = __o_cloexec in
-let pub o_direct = __o_direct in
-let pub o_nonblock = __o_nonblock in
+let pub O_CLOEXEC = __o_cloexec
+let pub O_DIRECT = __o_direct
+let pub O_NONBLOCK = __o_nonblock
 
-let pub chdir = __chdir in
+let pub chdir = __chdir
 
-let pub access =
+let pub access = {
   {help|
   = Os.access
 
@@ -34,31 +34,32 @@ let pub access =
   The function shall chek the file named by  the  pathname  (possibly  relative)
   _path_ for acessibility according to the bit pattern specified in _amode_.
 
-  The value of _amode_  is either the bitwise-inclusive OR of \`r_ok`, \`w_ok`, \`x_ok` or existence test, \`f_ok`.
+  The value of _amode_  is either the bitwise-inclusive OR of \`R_OK`, \`W_OK`, \`X_OK` or existence test, \`F_OK`.
 
   See also man(3) access for complete documentation.
-  |help};
+  |help}
   __access
-in
+}
 
-let pub getcwd = __getcwd in
+let pub getcwd = __getcwd
 
-let pub getenv = __getenv in
-let pub setenv x =
-  if let name, value, overwrite? = x then
-    __setenv name value overwrite?
-  else
-    let name = x in
-    fn value -> __setenv name value true
-in
+let pub getenv = __getenv
+let pub setenv(x) {
+  if let #(name value overwrite?) = x then
+    __setenv(name, value, overwrite?)
+  else {
+    let name = x
+    fn(value) __setenv(name, value, true)
+  }
+}
 
-let pub realpath path =
-  if substr path (0 .. 1) path eq "~/" or false
-  then __realpath (getenv "HOME" ++ substr (1...) path)
-  else __realpath path
-in
+let pub realpath(path) {
+  if {substr(path, 0 .. 1, path) eq "~/"} or false
+  then __realpath(getenv("HOME") ++ substr(1..*, path))
+  else __realpath(path)
+}
 
-let pub mkdtemp =
+let pub mkdtemp = {
   {help|
   = Os.mkdtemp
 
@@ -72,16 +73,15 @@ let pub mkdtemp =
 
   ==== ARGUMENTS
   - _emplate-string_: Template path for the directory ending with six 'X' characters.
-  |help};
+  |help}
   __mkdtemp
-in
+}
 
-let pub fork = __fork in
-let pub waitpid = __waitpid in
+let pub fork = __fork
+let pub waitpid = __waitpid
 
-let pub pipe = __pipe in
-let pub pipe2 = __pipe2 in
+let pub pipe = __pipe
+let pub pipe2 = __pipe2
 
-let pub fileno = __fileno in
+let pub fileno = __fileno
 
-nil

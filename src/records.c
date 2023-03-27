@@ -134,6 +134,7 @@ write_tuple(eth_type *type, eth_t x, FILE *stream)
 {
   int n = type->nfields;
   eth_tuple *tup = ETH_TUPLE(x);
+  putc('#', stream);
   putc('(', stream);
   for (int i = 0; i < n; ++i)
   {
@@ -213,6 +214,7 @@ write_record(eth_type *type, eth_t x, FILE *stream)
 {
   int n = type->nfields;
   eth_tuple *tup = ETH_TUPLE(x);
+  putc('#', stream);
   putc('{', stream);
   for (int i = 0; i < n; ++i)
   {

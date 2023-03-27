@@ -53,7 +53,7 @@ static void
 write_variant(eth_type *type, eth_t x, FILE *file)
 {
   char *tag = type->clos;
-  eth_fprintf(file, "`%s ~w", tag, eth_var_val(x));
+  eth_fprintf(file, "`%s(~w)", tag, eth_var_val(x));
 }
 
 static bool

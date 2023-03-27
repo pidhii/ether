@@ -1,52 +1,50 @@
 
-let {*} = @(require 'list') in
-let {*} = @(require 'io') in
+open 'list'
+open 'io'
 
-let test_sample =
-  let do_test name thunk =
-    printf "- %d " name;
-    try
-      if thunk! then (
-        printf "\x1b[38;5;2;1m✓\x1b[0m\n";
-        return true;
-      )
-      else (
-        printf "\x1b[38;5;1;1m✗\x1b[0m\n";
-        return false;
-      )
-    with e -> (printf "\x1b[38;5;1;1m✗ (%w)\x1b[0m\n" e; false)
-  in
+let test_sample = {
+  let do_test(name, thunk) {
+    printf("- %d ", name)
+    try {
+      if thunk() then {
+        printf("\x1b[38;5;2;1m✓\x1b[0m\n")
+        return true
+      }
+      else {
+        printf("\x1b[38;5;1;1m✗\x1b[0m\n")
+        return false
+      }
+    }
+    with e -> {
+      printf("\x1b[38;5;1;1m✗ (%w)\x1b[0m\n", e)
+      return false
+    }
+  }
 
-  let rec loop xs nok nfail =
-    if let (name,thunk)::xs = xs then
-      if do_test name thunk
-      then loop xs (nok+1) nfail
-      else loop xs nok (nfail+1)
-    else return (nok, nfail)
-  in
+  fold_left(fn(#(nok, nfail), #(name, thunk)) {
+    if do_test(name, thunk)
+    then #(nok+1, nfail)
+    else #(nok, nfail+1)
+  }, #(0, 0))
+}
 
-  fn tests -> loop tests 0 0
-in
+let sumres(#(nok, nfail), #(nok', nfail')) {
+  #(nok + nok', nfail + nfail')
+}
 
-
-let sumres (nok, nfail) (nok', nfail') =
-  (nok + nok', nfail + nfail')
-in
-
-let pub run samples =
-  let do_sample res (title, tlist) =
-    print "";
+let pub run(samples) {
+  let do_sample(res, #(title, tlist)) {
+    print("")
     if title is not nil then
-      printf "\x1b[1mTest %d\x1b[0m\n" title;
-    sumres res (test_sample tlist);
-  in
+      printf("\x1b[1mTest %d\x1b[0m\n", title)
+    sumres(res, test_sample(tlist))
+  }
 
-  let (nok, nfail) as res = fold_left do_sample (0, 0) samples in
-  print "";
-  printf "\x1b[1mSummary\x1b[0m\n";
-  printf "- succeed: \x1b[38;5;2;1m%d\x1b[0m\n" nok;
-  printf "- failed: \x1b[38;5;1;1m%d\x1b[0m\n" nfail;
+  let #(nok, nfail) as res = fold_left(do_sample, #(0, 0), samples)
+  print("")
+  printf("\x1b[1mSummary\x1b[0m\n")
+  printf("- succeed: \x1b[38;5;2;1m%d\x1b[0m\n", nok)
+  printf("- failed: \x1b[38;5;1;1m%d\x1b[0m\n", nfail)
   res
-in
+}
 
-nil

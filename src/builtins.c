@@ -1309,7 +1309,7 @@ _make_initial_state(void)
   eth_args args = eth_start(1);
   eth_t entry = eth_arg2(args, eth_function_type);
 
-  eth_state *state = eth_create_initial_state(1, _co_entry_point);
+  eth_state *state = eth_create_initial_state(2, _co_entry_point);
   eth_t sobj = _make_state_obj(state, entry, true);
 
   eth_return(args, sobj);
@@ -1412,7 +1412,7 @@ eth_create_builtins(eth_root *root)
   eth_define(mod, "__assign", eth_create_proc(_assign, 2, NULL, NULL));
 
   eth_define(mod, "__make_usertype", eth_create_proc(_make_usertype, 3, NULL, NULL));
-  eth_define(mod, "#", eth_create_proc(_send, 2, NULL, NULL));
+  eth_define(mod, "%", eth_create_proc(_send, 2, NULL, NULL));
 
 #if COROUTINES
   eth_define(mod, "__switch_state", eth_create_proc(_switch_state, 3, NULL, NULL));

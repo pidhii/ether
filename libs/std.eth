@@ -1,5 +1,4 @@
 
-pub open 'list' in
-pub open 'string' in
+pub open 'list'
+pub open 'string'
 
-nil

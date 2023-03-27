@@ -1,8 +1,8 @@
 
-let pub some x = `some x
+let pub some(x) = `some(x)
 let pub none = false
 
-let pub some? x = x is of `some _
+let pub some?(x) = x is of `some(_)
 
 let pub map f opt =
   if let `some x = opt then f x
@@ -15,8 +15,8 @@ let pub unwrap x =
 let pub unwrap_or xopt y =
   if let `some x = xopt then x else y
 
-let pub (&&) x y =
-  if let `some _ = x then y else false
+--let pub (&&) x y =
+  --if let `some _ = x then y else false
 
-let pub (||) x y =
-  if let `some _ = x then x else y
+--let pub (||) x y =
+  --if let `some _ = x then x else y

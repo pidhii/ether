@@ -86,7 +86,7 @@ filename(FILE *fp)
 %x STRING
 %x REGEXP
 
-OPCHR    [-+%^.$:!<>*/=&|∘~]
+OPCHR    [-+^.$:!<>*/=&|∘~%]
 OPERATOR {OPCHR}+|mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|eq|not|lnot
 
 %%
@@ -273,7 +273,6 @@ inf                                 |
 open   { return OPEN; }
 import { return IMPORT; }
 rec    { return REC; }
-in     { return IN; }
 if     { return IF; }
 then   { return THEN; }
 (";"[[:space:]]*)?else   { return ELSE; }
@@ -282,8 +281,6 @@ try    { return TRY; }
 with   { return WITH; }
 or     { return OR; }
 do     { return DO; }
-case   { return CASE; }
-of     { return OF; }
 lazy   { return LAZY; }
 assert { return ASSERT; }
 return { return RETURN; }
@@ -325,6 +322,7 @@ __deprecated { return DEPRECATED; }
 "*"|"/" |
 ","     |
 ";"     { return yytext[0]; }
+%       { return '%'; }
 "->"    { return RARROW; }
 "∘"     { return COMPOSE; }
 "::"    { return CONS; }
@@ -335,6 +333,7 @@ __deprecated { return DEPRECATED; }
 "=~"    { return EQ_TILD; }
 is      { return IS; }
 is[ \t\n]+not { return ISNOT; }
+is[[:space:]]+of { return ISOF; }
 eq      { return EQUAL; }
 not[ \t\n]+eq { return NOTEQUAL; }
 "<-"    { return LARROW; }
@@ -352,6 +351,8 @@ not     { return NOT; }
 lnot    { return LNOT; }
 "++"    { return PPLUS; }
 ".."    { return DDOT; }
+"..*"   { return DDDOTR; }
+"*.."   { return DDDOTL; }
 "..."   { return DDDOT; }
 ":="   { return ASSIGN; }
 

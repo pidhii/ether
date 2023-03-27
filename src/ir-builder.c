@@ -1016,7 +1016,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         eth_t key = eth_sym(ast->access.field);
         if (eth_unlikely(not eth_is_plain(rec->type)))
         {
-          eth_warning("undefined field acess (not a plain type)");
+          eth_warning("undefined field acess (not a plain type: ~w)", rec);
           *e = 1;
           eth_print_location(ast->loc, stderr);
           eth_drop_ir_node(expr);
