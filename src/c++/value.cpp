@@ -11,7 +11,7 @@ eth::value::operator [] (size_t i) const
 {
   if (not is_tuple())
     throw type_exn {"not a tuple"};
-  if (i >= eth_tuple_size(m_ptr->type))
+  if (i >= eth_struct_size(m_ptr->type))
     throw runtime_exn {"touple-index index out of bounds"};
   return value {eth_tup_get(m_ptr, i)};
 }

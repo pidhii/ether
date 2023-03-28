@@ -440,9 +440,10 @@ struct eth_field {
 typedef struct eth_field eth_field;
 
 #define ETH_TFLAG_PLAIN     0x01
-#define ETH_TFLAG_TUPLE     (ETH_TFLAG_PLAIN  | 1 << 1)
-#define ETH_TFLAG_RECORD    (ETH_TFLAG_PLAIN  | 1 << 2)
+#define ETH_TFLAG_RECORD    (ETH_TFLAG_PLAIN  | 1 << 1)
+#define ETH_TFLAG_TUPLE     (ETH_TFLAG_RECORD | 1 << 2)
 #define ETH_TFLAG_VARIANT   (ETH_TFLAG_PLAIN  | 1 << 3)
+#define ETH_TFLAG_EXTTUPLE  (ETH_TFLAG_TUPLE  | 1 << 4)
 #define ETH_TFLAG_EXTRECORD (ETH_TFLAG_RECORD | 1 << 4)
 
 struct eth_type {
@@ -503,6 +504,12 @@ static inline bool
 eth_is_like_record(eth_type *type)
 {
   return (type->flag & ETH_TFLAG_RECORD) == ETH_TFLAG_RECORD;
+}
+
+static inline bool
+eth_is_like_tuple(eth_type *type)
+{
+  return (type->flag & ETH_TFLAG_TUPLE) == ETH_TFLAG_TUPLE;
 }
 
 static inline bool
@@ -1051,6 +1058,10 @@ eth_is_proper_list(eth_t l)
 extern
 eth_type *eth_symbol_type;
 
+#define ETH_NORDSYMS 20
+extern
+eth_t eth_ordsyms[ETH_NORDSYMS];
+
 eth_t
 eth_create_symbol(const char *str);
 #define eth_sym eth_create_symbol
@@ -1103,8 +1114,8 @@ eth_get_variant_value(eth_t x)
 typedef struct {
   eth_header header;
   eth_t data[];
-} eth_tuple;
-#define ETH_TUPLE(x) ((eth_tuple*)(x))
+} eth_struct;
+#define ETH_TUPLE(x) ((eth_struct*)(x))
 #define eth_tup_get(x, i) (ETH_TUPLE(x)->data[i])
 
 eth_type*
@@ -1119,7 +1130,7 @@ eth_create_tuple_2(eth_t _1, eth_t _2)
   static eth_type *type = NULL;
   if (eth_unlikely(type == NULL))
     type = eth_tuple_type(2);
-  eth_tuple *tup = (eth_tuple*)eth_alloc_h2();
+  eth_struct *tup = (eth_struct*)eth_alloc_h2();
   eth_init_header(tup, type);
   eth_ref(tup->data[0] = _1);
   eth_ref(tup->data[1] = _2);
@@ -1133,7 +1144,7 @@ eth_create_tuple_3(eth_t _1, eth_t _2, eth_t _3)
   static eth_type *type = NULL;
   if (eth_unlikely(type == NULL))
     type = eth_tuple_type(3);
-  eth_tuple *tup = (eth_tuple*)eth_alloc_h3();
+  eth_struct *tup = (eth_struct*)eth_alloc_h3();
   eth_init_header(tup, type);
   eth_ref(tup->data[0] = _1);
   eth_ref(tup->data[1] = _2);
@@ -1148,7 +1159,7 @@ eth_create_tuple_4(eth_t _1, eth_t _2, eth_t _3, eth_t _4)
   static eth_type *type = NULL;
   if (eth_unlikely(type == NULL))
     type = eth_tuple_type(4);
-  eth_tuple *tup = (eth_tuple*)eth_alloc_h4();
+  eth_struct *tup = (eth_struct*)eth_alloc_h4();
   eth_init_header(tup, type);
   eth_ref(tup->data[0] = _1);
   eth_ref(tup->data[1] = _2);
@@ -1164,7 +1175,7 @@ eth_create_tuple_5(eth_t _1, eth_t _2, eth_t _3, eth_t _4, eth_t _5)
   static eth_type *type = NULL;
   if (eth_unlikely(type == NULL))
     type = eth_tuple_type(5);
-  eth_tuple *tup = (eth_tuple*)eth_alloc_h5();
+  eth_struct *tup = (eth_struct*)eth_alloc_h5();
   eth_init_header(tup, type);
   eth_ref(tup->data[0] = _1);
   eth_ref(tup->data[1] = _2);
@@ -1181,7 +1192,7 @@ eth_create_tuple_6(eth_t _1, eth_t _2, eth_t _3, eth_t _4, eth_t _5, eth_t _6)
   static eth_type *type = NULL;
   if (eth_unlikely(type == NULL))
     type = eth_tuple_type(6);
-  eth_tuple *tup = (eth_tuple*)eth_alloc_h6();
+  eth_struct *tup = (eth_struct*)eth_alloc_h6();
   eth_init_header(tup, type);
   eth_ref(tup->data[0] = _1);
   eth_ref(tup->data[1] = _2);
@@ -1198,13 +1209,7 @@ eth_create_tuple_n(eth_type *type, eth_t const data[]);
 #define eth_tupn eth_create_tuple_n
 
 static inline int __attribute__((pure))
-eth_tuple_size(const eth_type *type)
-{
-  return type->nfields;
-}
-
-static inline int __attribute__((pure))
-eth_record_size(const eth_type *type)
+eth_struct_size(const eth_type *type)
 {
   return type->nfields;
 }

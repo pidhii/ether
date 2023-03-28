@@ -26,23 +26,18 @@ ETH_MODULE("ether:record")
 
 
 static
-cod_hash_map *g_tuptab;
-
-static
 cod_hash_map *g_rectab;
 
 
 void
 _eth_init_record_types(void)
 {
-  g_tuptab = cod_hash_map_new(0);
   g_rectab = cod_hash_map_new(0);
 }
 
 void
 _eth_cleanup_record_types(void)
 {
-  cod_hash_map_delete(g_tuptab, (void*)eth_destroy_type);
   cod_hash_map_delete(g_rectab, (void*)eth_destroy_type);
 }
 
@@ -50,7 +45,7 @@ void
 eth_destroy_record_h1(eth_type *type, eth_t x)
 {
   assert(type->flag & ETH_TFLAG_PLAIN);
-  eth_tuple *tup = ETH_TUPLE(x);
+  eth_struct *tup = ETH_TUPLE(x);
   eth_unref(tup->data[0]);
   eth_free_h1(tup);
 }
@@ -59,7 +54,7 @@ void
 eth_destroy_record_h2(eth_type *type, eth_t x)
 {
   assert(type->flag & ETH_TFLAG_PLAIN);
-  eth_tuple *tup = ETH_TUPLE(x);
+  eth_struct *tup = ETH_TUPLE(x);
   eth_unref(tup->data[0]);
   eth_unref(tup->data[1]);
   eth_free_h2(tup);
@@ -69,7 +64,7 @@ void
 eth_destroy_record_h3(eth_type *type, eth_t x)
 {
   assert(type->flag & ETH_TFLAG_PLAIN);
-  eth_tuple *tup = ETH_TUPLE(x);
+  eth_struct *tup = ETH_TUPLE(x);
   eth_unref(tup->data[0]);
   eth_unref(tup->data[1]);
   eth_unref(tup->data[2]);
@@ -80,7 +75,7 @@ void
 eth_destroy_record_h4(eth_type *type, eth_t x)
 {
   assert(type->flag & ETH_TFLAG_PLAIN);
-  eth_tuple *tup = ETH_TUPLE(x);
+  eth_struct *tup = ETH_TUPLE(x);
   eth_unref(tup->data[0]);
   eth_unref(tup->data[1]);
   eth_unref(tup->data[2]);
@@ -92,7 +87,7 @@ void
 eth_destroy_record_h5(eth_type *type, eth_t x)
 {
   assert(type->flag & ETH_TFLAG_PLAIN);
-  eth_tuple *tup = ETH_TUPLE(x);
+  eth_struct *tup = ETH_TUPLE(x);
   eth_unref(tup->data[0]);
   eth_unref(tup->data[1]);
   eth_unref(tup->data[2]);
@@ -105,7 +100,7 @@ void
 eth_destroy_record_h6(eth_type *type, eth_t x)
 {
   assert(type->flag & ETH_TFLAG_PLAIN);
-  eth_tuple *tup = ETH_TUPLE(x);
+  eth_struct *tup = ETH_TUPLE(x);
   eth_unref(tup->data[0]);
   eth_unref(tup->data[1]);
   eth_unref(tup->data[2]);
@@ -123,7 +118,7 @@ eth_destroy_record_hn(eth_type *type, eth_t x)
     eth_error("invalid free for record %s (%d fields)", type->name, type->nfields);
   }
   assert(type->flag & ETH_TFLAG_PLAIN);
-  eth_tuple *tup = ETH_TUPLE(x);
+  eth_struct *tup = ETH_TUPLE(x);
   for (int i = 0; i < type->nfields; ++i)
     eth_unref(tup->data[i]);
   free(tup);
@@ -133,7 +128,7 @@ static void
 write_tuple(eth_type *type, eth_t x, FILE *stream)
 {
   int n = type->nfields;
-  eth_tuple *tup = ETH_TUPLE(x);
+  eth_struct *tup = ETH_TUPLE(x);
   putc('#', stream);
   putc('(', stream);
   for (int i = 0; i < n; ++i)
@@ -144,10 +139,32 @@ write_tuple(eth_type *type, eth_t x, FILE *stream)
   putc(')', stream);
 }
 
-static bool
-record_equal(eth_type *type, eth_t x, eth_t y)
+static void
+write_record(eth_type *type, eth_t x, FILE *stream)
 {
-  int n = eth_record_size(type);
+  if (eth_is_like_tuple(type))
+  {
+    write_tuple(type, x, stream);
+  }
+  else
+  {
+    int n = type->nfields;
+    eth_struct *tup = ETH_TUPLE(x);
+    putc('#', stream);
+    putc('{', stream);
+    for (int i = 0; i < n; ++i)
+    {
+      if (i > 0) putc(',', stream);
+      eth_fprintf(stream, "%s=~w", type->fields[i].name, tup->data[i]);
+    }
+    putc('}', stream);
+  }
+}
+
+static bool
+struct_equal(eth_type *type, eth_t x, eth_t y)
+{
+  int n = eth_struct_size(type);
   while (n--)
   {
     if (not eth_equal(eth_tup_get(x, n), eth_tup_get(y, n)))
@@ -159,69 +176,11 @@ record_equal(eth_type *type, eth_t x, eth_t y)
 eth_type*
 eth_tuple_type(size_t n)
 {
-  assert(n > 1);
-
-  char key[22];
-  sprintf(key, "%ju", n);
-
-  cod_hash_map_elt *elt;
-  if ((elt = cod_hash_map_find(g_tuptab, key, n)))
-  {
-    return elt->val;
-  }
-  else
-  {
-    char name[n+3];
-    name[0] = '(';
-    for (size_t i = 0; i < n; ++i)
-      name[i+1] = ',';
-    name[n+1] = ')';
-    name[n+2] = 0;
-
-    char *fields[n];
-    ptrdiff_t offs[n];
-    for (size_t i = 0; i < n; ++i)
-    {
-      fields[i] = malloc(22);
-      sprintf(fields[i], "_%ju", i+1);
-      offs[i] = offsetof(eth_tuple, data[i]);
-    }
-    eth_type *type = eth_create_struct_type(name, fields, offs, n);
-    for (size_t i = 0; i < n; free(fields[i++]));
-
-    switch (n)
-    {
-      case 2:  type->destroy = eth_destroy_record_h2; break;
-      case 3:  type->destroy = eth_destroy_record_h3; break;
-      case 4:  type->destroy = eth_destroy_record_h4; break;
-      case 5:  type->destroy = eth_destroy_record_h5; break;
-      case 6:  type->destroy = eth_destroy_record_h6; break;
-      default: type->destroy = eth_destroy_record_hn; break;
-    }
-    type->write = write_tuple;
-    type->equal = record_equal;
-    type->flag = ETH_TFLAG_TUPLE;
-
-    int ok = cod_hash_map_insert(g_tuptab, key, n, type, NULL);
-    assert(ok);
-    return type;
-  }
-}
-
-
-static void
-write_record(eth_type *type, eth_t x, FILE *stream)
-{
-  int n = type->nfields;
-  eth_tuple *tup = ETH_TUPLE(x);
-  putc('#', stream);
-  putc('{', stream);
-  for (int i = 0; i < n; ++i)
-  {
-    if (i > 0) putc(',', stream);
-    eth_fprintf(stream, "%s=~w", type->fields[i].name, tup->data[i]);
-  }
-  putc('}', stream);
+  char *keys[n];
+  for (size_t i = 0; i < n; ++i)
+    keys[i] = (char*)eth_get_symbol_cstr(eth_ordsyms[i+1]);
+  eth_type *ret = eth_record_type(keys, n);
+  return ret;
 }
 
 // TODO: this looks ugly
@@ -249,6 +208,16 @@ eth_record_type(char *const fields[], size_t n)
   }
   qsort(arr, n, sizeof(info), cmp);
 
+  bool istuple = true;
+  for (size_t i = 0; i < n; ++i)
+  {
+    if (strcmp(arr[i].str, eth_get_symbol_cstr(eth_ordsyms[i+1])) != 0)
+    {
+      istuple = false;
+      break;
+    }
+  }
+
   char *sortedfields[n];
   ptrdiff_t offsets[n];
   char totstr[totlen + 2];
@@ -259,7 +228,7 @@ eth_record_type(char *const fields[], size_t n)
   for (size_t i = 0; i < n; ++i)
   {
     sortedfields[i] = (char*)arr[i].str;
-    offsets[i] = offsetof(eth_tuple, data[i]);
+    offsets[i] = offsetof(eth_struct, data[i]);
 
     if (i > 0) *p++ = ',';
     int len = strlen(arr[i].str);
@@ -278,7 +247,6 @@ eth_record_type(char *const fields[], size_t n)
   }
   else
   {
-    eth_debug("new record-type: %s", totstr);
     eth_type *type = eth_create_struct_type(totstr, sortedfields, offsets, n);
     switch (n)
     {
@@ -290,9 +258,9 @@ eth_record_type(char *const fields[], size_t n)
       case 6:  type->destroy = eth_destroy_record_h6; break;
       default: type->destroy = eth_destroy_record_hn; break;
     }
-    type->flag = ETH_TFLAG_RECORD;
+    type->flag = istuple ? ETH_TFLAG_TUPLE : ETH_TFLAG_RECORD;
     type->write = write_record;
-    type->equal = record_equal;
+    type->equal = struct_equal;
 
     int ok = cod_hash_map_insert(g_rectab, totstr, hash, type, NULL);
     assert(ok);
@@ -316,7 +284,7 @@ eth_create_tuple_n(eth_type *type, eth_t const data[])
     case 6: return eth_tup6(data[0], data[1], data[2], data[3], data[4], data[5]); break;
     default:
     {
-      eth_tuple *tup = malloc(sizeof(eth_tuple) + sizeof(eth_t) * n);
+      eth_struct *tup = malloc(sizeof(eth_struct) + sizeof(eth_t) * n);
       eth_init_header(tup, type);
       for (int i = 0; i < n; ++i)
         eth_ref(tup->data[i] = data[i]);
@@ -331,7 +299,7 @@ eth_create_record(eth_type *type, eth_t const data[])
   assert(eth_is_plain(type));
   int n = type->nfields;
   assert(n > 0);
-  eth_tuple *rec;
+  eth_struct *rec;
   switch (n)
   {
     case 1:  rec = eth_alloc_h1(); break;
@@ -340,7 +308,7 @@ eth_create_record(eth_type *type, eth_t const data[])
     case 4:  rec = eth_alloc_h4(); break;
     case 5:  rec = eth_alloc_h5(); break;
     case 6:  rec = eth_alloc_h6(); break;
-    default: rec = malloc(sizeof(eth_tuple) + sizeof(eth_t) * n);
+    default: rec = malloc(sizeof(eth_struct) + sizeof(eth_t) * n);
   }
   eth_init_header(rec, type);
   for (int i = 0; i < n; ++i)

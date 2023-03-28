@@ -145,7 +145,7 @@ _rev_zip(void)
   if (eth_unlikely(not eth_is_tuple(ltup->type)))
     eth_throw(args, eth_type_error());
 
-  const int n = eth_tuple_size(ltup->type);
+  const int n = eth_struct_size(ltup->type);
   eth_t it[n];
   for (int i = 0; i < n; ++i)
   {
@@ -198,7 +198,7 @@ _fold_zip(void)
   if (eth_unlikely(not eth_is_tuple(ltup->type)))
     eth_throw(args, eth_type_error());
 
-  const int n = eth_tuple_size(ltup->type);
+  const int n = eth_struct_size(ltup->type);
   eth_t it[n];
   for (int i = 0; i < n; ++i)
   {

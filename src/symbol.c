@@ -37,6 +37,8 @@ typedef struct {
 static
 cod_hash_map *g_symtab;
 
+eth_t eth_ordsyms[ETH_NORDSYMS];
+
 static void
 destroy_symbol(void *ptr)
 {
@@ -56,6 +58,36 @@ write_symbol(eth_type *type, eth_t x, FILE *stream)
   fprintf(stream, "`%s", sym->str);
 }
 
+static void
+_eth_make_ordered_symbols(void)
+{
+  symbol *osyms[ETH_NORDSYMS];
+
+  for (int i = 0; i < ETH_NORDSYMS; ++i)
+    osyms[i] = malloc(sizeof(symbol));
+  int cmp(const void *p1, const void *p2)
+  { return p1 - p2; }
+  qsort(osyms, ETH_NORDSYMS, sizeof(symbol*), cmp);
+
+  char buf[42];
+  for (int i = 0; i < ETH_NORDSYMS; ++i)
+  {
+    symbol *sym = osyms[i];
+    sprintf(buf, "_%d", i);
+
+    eth_hash_t hash =
+      cod_halfsiphash(eth_get_siphash_key(), (void*)buf, strlen(buf));
+
+    eth_init_header(sym, eth_symbol_type);
+    sym->header.rc = 1;
+    sym->hash = hash;
+    sym->str = strdup(buf);
+    sym->len = strlen(buf);
+    cod_hash_map_insert_drain(g_symtab, sym->str, hash, sym, NULL);
+    eth_ordsyms[i] = ETH(sym);
+  }
+}
+
 void
 _eth_init_symbol_type(void)
 {
@@ -63,6 +95,8 @@ _eth_init_symbol_type(void)
 
   eth_symbol_type = eth_create_type("symbol");
   eth_symbol_type->write = write_symbol;
+
+  _eth_make_ordered_symbols();
 }
 
 void

@@ -313,7 +313,7 @@ build_record_star(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc,
     return NULL;
   }
 
-  int n = eth_record_size(record->type);
+  int n = eth_struct_size(record->type);
   for (int i = n - 1; i >= 0; --i)
   {
     const char *key = record->type->fields[i].name;

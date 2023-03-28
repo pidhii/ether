@@ -512,7 +512,7 @@ _print_to(void)
 
   if (eth_is_tuple(x->type))
   {
-    for (int i = 0; i < eth_tuple_size(x->type); ++i)
+    for (int i = 0; i < eth_struct_size(x->type); ++i)
     {
       if (i > 0) putc('\t', eth_get_file_stream(file));
       eth_display(eth_tup_get(x, i), eth_get_file_stream(file));
@@ -929,7 +929,7 @@ _list(void)
   }
   else if (eth_is_tuple(x->type))
   {
-    int n = eth_tuple_size(x->type);
+    int n = eth_struct_size(x->type);
     eth_t acc = eth_nil;
     for (int i = n - 1; i >= 0; --i)
       acc = eth_cons(eth_tup_get(x, i), acc);
@@ -938,7 +938,7 @@ _list(void)
   }
   else if (eth_is_record(x->type))
   {
-    int n = eth_record_size(x->type);
+    int n = eth_struct_size(x->type);
     eth_t acc = eth_nil;
     for (int i = n - 1; i >= 0; --i)
     {
@@ -1138,12 +1138,17 @@ _make_usertype(void)
   eth_t temp = eth_arg(args);
   eth_t methods = eth_arg(args);
 
-  if (not eth_is_record(temp->type))
+  int tflag = 0;
+  if (eth_is_record(temp->type))
+    tflag = ETH_TFLAG_EXTRECORD;
+  else if (eth_is_tuple(temp->type))
+    tflag = ETH_TFLAG_EXTTUPLE;
+  else
     eth_throw(args, eth_invalid_argument());
 
   eth_type* newtype = eth_create_struct_type2(eth_str_cstr(name),
       temp->type->fields, temp->type->nfields);
-  newtype->flag = ETH_TFLAG_EXTRECORD;
+  newtype->flag = tflag;
   newtype->destroy = _usertype_destroy;
   usertype_data *data = malloc(sizeof(usertype_data));
   data->orig_destroy = temp->type->destroy;
@@ -1178,7 +1183,7 @@ _make_usertype(void)
     case 4:  ret = eth_alloc_h4(); break;
     case 5:  ret = eth_alloc_h5(); break;
     case 6:  ret = eth_alloc_h6(); break;
-    default: ret = malloc(sizeof(eth_tuple) + sizeof(eth_t) * n);
+    default: ret = malloc(sizeof(eth_struct) + sizeof(eth_t) * n);
   }
 
   eth_init_header(ret, newtype);

@@ -732,7 +732,7 @@ AtomicPattern
   | '['']' { $$ = eth_ast_constant_pattern(eth_nil); }
   | '{' ExprPattern '}' { $$ = $2; }
   | '#' '(' PatternList  ')' {
-    if ($3.len <= 1)
+    if ($3.len < 1)
     {
       eth_error("invalid tuple");
       eth_location *loc = location(&@$);
@@ -740,7 +740,7 @@ AtomicPattern
       eth_drop_location(loc);
       abort();
     }
-    eth_type *type = eth_tuple_type($3.len);
+
     int n = $3.len;
     char fieldsbuf[n][22];
     char *fields[n];
@@ -749,7 +749,9 @@ AtomicPattern
       fields[i] = fieldsbuf[i];
       sprintf(fields[i], "_%d", i+1);
     }
-    $$ = eth_ast_unpack_pattern(type, fields, $3.data, n);
+    $$ = eth_ast_record_pattern(fields, $3.data, n);
+
+    cod_vec_destroy($3);
   }
   | '#' '{' RecordPattern '}' {
     $$ = eth_ast_record_pattern($3.keys.data, $3.vals.data, $3.keys.len);

@@ -503,7 +503,7 @@ eth_vm(eth_bytecode *bc)
         uint64_t *vids = ip->mkrcrd.vids;
         int n = type->nfields;
         assert(n > 0);
-        eth_tuple *rec;
+        eth_struct *rec;
         switch (n)
         {
           case 1:  rec = eth_alloc_h1(); break;
@@ -512,7 +512,7 @@ eth_vm(eth_bytecode *bc)
           case 4:  rec = eth_alloc_h4(); break;
           case 5:  rec = eth_alloc_h5(); break;
           case 6:  rec = eth_alloc_h6(); break;
-          default: rec = malloc(sizeof(eth_tuple) + sizeof(eth_t) * n);
+          default: rec = malloc(sizeof(eth_struct) + sizeof(eth_t) * n);
         }
         eth_init_header(rec, type);
         for (int i = 0; i < n; ++i)
@@ -532,7 +532,7 @@ eth_vm(eth_bytecode *bc)
           const int n = type->nfields;
           assert(n > 0);
           const int N = ip->updtrcrd.n;
-          eth_tuple *rec;
+          eth_struct *rec;
           switch (n)
           {
             case 1:  rec = eth_alloc_h1(); break;
@@ -541,7 +541,7 @@ eth_vm(eth_bytecode *bc)
             case 4:  rec = eth_alloc_h4(); break;
             case 5:  rec = eth_alloc_h5(); break;
             case 6:  rec = eth_alloc_h6(); break;
-            default: rec = malloc(sizeof(eth_tuple) + sizeof(eth_t) * n);
+            default: rec = malloc(sizeof(eth_struct) + sizeof(eth_t) * n);
           }
           int I = 0;
           size_t id = ip->updtrcrd.ids[I];
