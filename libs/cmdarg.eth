@@ -3,20 +3,20 @@ open 'string'
 
 let get_options(cfg, os) {
 
-  let cfg = cfg |> flat_map(fn(optcfg)
+  let cfg = cfg |> flat_map(fn optcfg ->
     if pair?(optcfg.name)
-    then map(fn(name) #{optcfg with name}, optcfg.name)
+    then map(fn name -> #{optcfg with name}, optcfg.name)
     else [optcfg]
   )
 
-  let cfg = cfg|> map (fn(optcfg)
+  let cfg = cfg|> map (fn optcfg ->
     if optcfg is of #{arg_pat}
     then optcfg
     else record(#('arg_pat' /.*/) :: list(optcfg))
   )
 
   let get_rules(opt) {
-    try find(fn(#{name}) name eq opt, cfg)
+    try find(fn #{name} -> name eq opt, cfg)
     with `failure -> raise(`undefined_option)
   }
 

@@ -49,7 +49,7 @@ let pub setenv(x) {
     __setenv(name, value, overwrite?)
   else {
     let name = x
-    fn(value) __setenv(name, value, true)
+    fn value -> __setenv(name, value, true)
   }
 }
 

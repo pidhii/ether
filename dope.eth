@@ -176,16 +176,16 @@ let default_db_path = module_path ++ "/__db.eth"
 let load_db_from(path) {
   let mut modlist = if exist?(path) then first(load(path)) else []
   #{
-    get_modlist = fn(_) modlist
-  , get_path = fn(_) path
-  , get_module_opt = fn(_, name) {
-      find_opt(fn(#{name = name'}) strcasecmp(name, name') == 0, modlist)
+    get_modlist = fn _ -> modlist
+  , get_path = fn _ -> path
+  , get_module_opt = fn _ name -> {
+      find_opt(fn #{name = name'} -> strcasecmp(name, name') == 0, modlist)
     }
-  , remove = fn (_, name) {
-      modlist := remove(fn(#{name = name'}) strcasecmp(name', name) == 0, modlist)
+  , remove = fn _ name -> {
+      modlist := remove(fn #{name = name'} -> strcasecmp(name', name) == 0, modlist)
     }
-  , add = fn(_, entry) modlist := entry :: modlist
-  , update = fn(_) {
+  , add = fn _ entry -> modlist := entry :: modlist
+  , update = fn _ -> {
       let dbfile = open_out(path)
       write_to(dbfile, format("%w\n", modlist))
     }
@@ -208,15 +208,15 @@ let git = {
     else
       refs
       |> split( /\n/)
-      |> map(fn(line) line =~ /refs\/tags\/(.+)/)
+      |> map(fn line -> line =~ /refs\/tags\/(.+)/)
       -- Decode version-tags into major, minor and a patch.
-      |> filter_map(fn(tag)
+      |> filter_map(fn tag ->
           if let _ :: version = match( /([0-9]+)\.([0-9]+)\.([0-9]+)/, tag) then {
             `some(#(tag, map(to_number, version)))
           }
       )
       -- Sort versions.
-      |> sort(fn(#(_, a), #(_, b)) {
+      |> sort(fn #(_, a), #(_, b) -> {
           let rec loop(xs, ys) {
             if let x :: xs' = xs then
               if let y :: ys' = ys then
@@ -269,7 +269,7 @@ let search_repositories(tgt_name) {
     shell("curl -s 'https://api.github.com/search/repositories?q={tgt_name}'")
     |> json.parse
   -- Remove items with name mismatch
-  items |> filter(fn(#{name}) name eq tgt_name)
+  items |> filter(fn #{name} -> name eq tgt_name)
 }
 
 -----------------------------------[ Misc ]-------------------------------------
@@ -336,7 +336,7 @@ let build_and_install(#{conf modentry db dir args overwrite}) {
 
   -- Build (if build-hook is speciefied)
   if let `some(build) = build then {
-    do_in(dir, fn() {
+    do_in(dir, fn -> {
       info("building module {name}")
       build()
     })
@@ -348,7 +348,7 @@ let build_and_install(#{conf modentry db dir args overwrite}) {
   let moddir = module_path ++ "/" ++ name
   mkdir(moddir)
   -- Copy module sources
-  main::files |> iter(fn(file) copy(dir ++ "/" ++ file, moddir ++ "/" ++ file))
+  main::files |> iter(fn file -> copy(dir ++ "/" ++ file, moddir ++ "/" ++ file))
 
   info("module is ready for use")
 
@@ -359,7 +359,7 @@ let build_and_install(#{conf modentry db dir args overwrite}) {
     create_symlink(moddir ++ "/" ++ main, mainpath)
 
   if let `some(post_install) = post_install then
-    do_in(dir, fn() {
+    do_in(dir, fn -> {
       info("running post-install hooks")
       post_install()
     })
@@ -382,7 +382,7 @@ let fetch(#{repo_url version}) {
 -- Clone repository to a temporary directory. There we will build it and
 -- probably install.
 let install(#{db repo_url version args overwrite}) {
-  do_in_tempdir(fn() {
+  do_in_tempdir(fn -> {
     info("fetching '{repo_url}' ({version})")
     let repo_dir = fetch(#{repo_url version})
     info("installing {version}")
@@ -435,8 +435,8 @@ let list_modules() {
       --info "module \e[1m{name}\e[21m:"
       info("module \e[1m{name}:")
       list(modentry)
-      |> filter(fn(#(k _)) k not eq "name")
-      |> iter(fn (#(k v)) info("- \e[4m{k}\e[24m: {v}"))
+      |> filter(fn #(k _) -> k not eq "name")
+      |> iter(fn #(k v) -> info("- \e[4m{k}\e[24m: {v}"))
       false
     }
     fold_left(f, true, db)
@@ -445,7 +445,7 @@ let list_modules() {
 
 
 let select_opt(strs) {
-  let strsstr = strs |> map(fn(s) "'{s}'") |> join(' ')
+  let strsstr = strs |> map(fn s -> "'{s}'") |> join(' ')
   let ans = shell({sh|
     select x in {strsstr} Cancel;
     do test -n "$x" && break; done
@@ -484,9 +484,9 @@ let resolve_repository_url(url) {
       else {
         -- Multiple matches. Have to select only a single one of these.
         info("multiple repositories match the name, select one to install:")
-        let repo_names = map(fn(#{full_name}) full_name, github_matches)
+        let repo_names = map(fn #{full_name} -> full_name, github_matches)
         if let `some(ans) = select_opt(repo_names) then {
-          let #{clone_url} = find(fn(x) x.full_name eq ans, github_matches)
+          let #{clone_url} = find(fn x -> x.full_name eq ans, github_matches)
           return clone_url
         }
         else {
@@ -710,7 +710,7 @@ let commands =
       handle(command_line) {
         let modlist = load_db_from(default_db_path):get_modlist
         let cnt =
-          fold_left(fn(cnt, #{name, version = local_version, repository = repo_url}) {
+          fold_left(fn cnt #{name, version = local_version, repository = repo_url} -> {
             write_to(stdout, paint(" checking \e[1m{name}\e[22m ... "))
             flush(stdout)
             if let #{info_mesg} = check_update(#{name local_version repo_url})
@@ -736,7 +736,7 @@ let commands =
           let db = load_db_from(default_db_path)
           if args eq [] then {
             -- Update all modules.
-            db:get_modlist |> iter(fn(#{name, version = local_version, repository = repo_url}) {
+            db:get_modlist |> iter(fn #{name, version = local_version, repository = repo_url} -> {
               write_to(stdout, paint(" checking \e[1m{name}\e[22m ... "))
               flush(stdout)
               if let #{new_version info_mesg} =
@@ -784,7 +784,7 @@ let commands =
   ]
 
 let find_command_opt(name) {
-  find_opt(fn(#{keys}) member?(name, keys), commands)
+  find_opt(fn #{keys} -> member?(name, keys), commands)
 }
 
 let main() {
@@ -793,11 +793,11 @@ let main() {
   else {
     error("undefined command: '{cmd}'")
 
-    let possible_commands = flat_map(fn(#{keys}) keys, commands)
+    let possible_commands = flat_map(fn #{keys} -> keys, commands)
     let cands =
       possible_commands
-      |> rev_map(fn(str) #(str, fuzzy_cmp(str, cmd)))
-      |> sort (fn(#(_ a), #(_ b)) a < b)
+      |> rev_map(fn str -> #(str, fuzzy_cmp(str, cmd)))
+      |> sort (fn #(_ a), #(_ b) -> a < b)
     info("did you mean '\e[1m{first(car(cands))}\e[22m'?")
 
     info("see `{basename(dopepath)} help` for avaliable commands")

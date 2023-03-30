@@ -54,9 +54,9 @@ let pub third(#{_3 = x}) { x }
 let pub id(x) { x }
 
 let pub flip(f, x, y) { f(y, x) }
-let pub const(x) { fn(_) x }
-let pub curry(f) { fn(x, y) f (x, y) }
-let pub uncurry(f) { fn(#(x, y)) f(x, y) }
+let pub const(x) { fn _ -> x }
+let pub curry(f) { fn x y -> f (x, y) }
+let pub uncurry(f) { fn #(x y) -> f(x, y) }
 
 -- Sequences
 --let pub index seq idx =
@@ -70,7 +70,7 @@ let pub odd?(x) { x mod 2 == 1 }
 let compose_va(f, g) {
   let rec aux(x) {
     if function?(x) then
-      fn(y) aux(x(y))
+      fn y -> aux(x(y))
     else f(x)
   }
   aux(g)
@@ -86,9 +86,9 @@ let pub require = __require
 let pub create_env(defs) {
   #{
     defs
-  , load = fn(#{defs}, path) __load(path, defs)
-  , load_stream = fn(#{defs}, file) __load_stream(file, defs)
-  , load_string = fn(#{defs}, str) __load_stream(__open_string(str), defs)
+  , load = fn #{defs} path -> __load(path, defs)
+  , load_stream = fn #{defs} file -> __load_stream(file, defs)
+  , load_string = fn #{defs} str -> __load_stream(__open_string(str), defs)
   }
 }
 let pub load(path) { __load(path, []) }
@@ -111,12 +111,12 @@ let pub __fmt(l) {
 let pub record = lazy {
   let #{strcmp} = require('string')
   let #{sort, mapi, map} = require('list')
-  fn (pairs) {
+  fn pairs -> {
     -- sort pairs
     let sortedPairs =
       pairs
       |> mapi((,))
-      |> sort(fn(#(i, #(a, _)) as lhs, #(j, #(b, _)) as rhs) {
+      |> sort(fn #(i, #(a, _)) as lhs, #(j, #(b, _)) as rhs -> {
         let cmp = strcmp(a, b)
         if cmp < 0 then true
         else if cmp == 0 then i < j

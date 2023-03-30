@@ -46,6 +46,15 @@ void yyerror(void *locp, eth_scanner *yyscanner, const char *what);
 static eth_location*
 location(void *locp_ptr);
 
+#define MESSAGE(type, l, fmt, ...) \
+  do { \
+    eth_##type(fmt, ##__VA_ARGS__); \
+    eth_location *loc = location(&(l)); \
+    eth_print_location_opt(loc, stderr, ETH_LOPT_FILE); \
+    eth_drop_location(loc); \
+  } while (0)
+    
+
 static eth_ast*
 dummy_ast()
 { return eth_ast_cval(eth_nil); }
@@ -245,7 +254,6 @@ _create_attr(int aflag, void *locpp)
 %type<bind> Bind
 %type<integer> Attribute
 %type<astvec> Args
-%type<patvec> FnArgs
 %type<charvec> String
 %type<ast> FmtString FmtStringAux
 %type<ast> RegExp
@@ -498,9 +506,15 @@ Expr
     $$ = eth_ast_apply(eth_ast_cval(lazy), &thunk, 1);
   }
 
-  | FN '(' FnArgs ')' Expr %prec FN {
+  | FN '(' PatternList ')' Expr %prec FN {
+    MESSAGE(warning, @$, "deprecated syntax: `fn (<args>) <expr>`");
     $$ = eth_ast_fn_with_patterns($3.data, $3.len, $5);
     cod_vec_destroy($3);
+    LOC($$, @$);
+  }
+  | FN PatternList RARROW Expr %prec FN {
+    $$ = eth_ast_fn_with_patterns($2.data, $2.len, $4);
+    cod_vec_destroy($2);
     LOC($$, @$);
   }
 
@@ -577,18 +591,6 @@ Args
   }
 ;
 
-FnArgs
-  : { cod_vec_init($$); }
-  | ExprPattern {
-    cod_vec_init($$);
-    cod_vec_push($$, $1);
-  }
-  | FnArgs ',' ExprPattern {
-    $$ = $1;
-    cod_vec_push($$, $3);
-  }
-;
-
 Binds
   : Bind {
     cod_vec_init($$.pats);
@@ -616,7 +618,7 @@ Bind
       $$.val = eth_ast_apply(eth_ast_cval(mkref), p, 1);
     }
   }
-  | Attribute SYMBOL '(' FnArgs ')' '{' ExprSeq '}' {
+  | Attribute SYMBOL '(' PatternList ')' '{' ExprSeq '}' {
     $$.pat = eth_ast_ident_pattern($2);
     eth_attr *attr = eth_create_attr($1);
     if (g_filename)
@@ -826,10 +828,7 @@ ExprPattern
 ;
 
 PatternList
-  : ExprPattern {
-    cod_vec_init($$);
-    cod_vec_push($$, $1);
-  }
+  : { cod_vec_init($$); }
   | PatternList ExprPattern {
     $$ = $1;
     cod_vec_push($$, $2);
@@ -896,7 +895,7 @@ Record
     cod_vec_push($$.keys, $1);
     cod_vec_push($$.vals, $3);
   }
-  | SYMBOL '(' FnArgs ')' Expr {
+  | SYMBOL '(' PatternList ')' Expr {
     cod_vec_init($$.keys);
     cod_vec_init($$.vals);
 
@@ -922,7 +921,7 @@ Record
     cod_vec_push($$.keys, $2);
     cod_vec_push($$.vals, eth_ast_ident($2));
   }
-  | Record SYMBOL '(' FnArgs ')' Expr {
+  | Record SYMBOL '(' PatternList ')' Expr {
     $$ = $1;
 
     eth_ast *fn = eth_ast_fn_with_patterns($4.data, $4.len, $6);

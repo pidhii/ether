@@ -122,7 +122,7 @@ let pub range(from .. to) {
 let pub linspace(from, to, n) {
   let #{fma} = @(require('math'))
   let dx = {to - from} / {n - 1}
-  unfold_left(fn(i) if i >= 0 then #(i - 1, fma(dx, i, from)), n - 1)
+  unfold_left(fn i -> if i >= 0 then #(i - 1, fma(dx, i, from)), n - 1)
 }
 
 let pub rev(xs) { rev_append(xs, nil) }
@@ -302,7 +302,7 @@ let pub rev_take = {
     }
     else acc
   }
-  fn(n, xs) loop(n, xs, [])
+  fn n xs -> loop(n, xs, [])
 }
 
 let rec pub take(n, xs) {
@@ -445,7 +445,7 @@ let split_by_half = {
     }
     else #(acc, slow)
   }
-  fn(xs) loop(xs, xs, [])
+  fn xs -> loop(xs, xs, [])
 }
 
 let rec pub sort(cmp, xs) {

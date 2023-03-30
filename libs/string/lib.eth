@@ -44,7 +44,7 @@ let pub join(sep, xs) {
   if xs is nil then ""
   else if let hd::[] = xs then hd
   else if let hd::tl = xs then
-    list.fold_left(fn(x, y) cat([x, sep, y]), hd, tl)
+    list.fold_left(fn x y -> cat([x, sep, y]), hd, tl)
   else invalid_argument(nil)
 }
 let pub to_upper = __to_upper
