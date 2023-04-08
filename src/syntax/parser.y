@@ -323,17 +323,39 @@ Atom
     cod_vec_destroy($5.keys);
   }
 
+  | Atom '(' Args ')' %prec APPLY {
+    if ($1->tag == ETH_AST_CVAL and
+        $1->cval.val->type == eth_symbol_type)
+    {
+      // FIXME
+      eth_type *type = eth_variant_type(eth_sym_cstr($1->cval.val));
+      char *_0 = "_0";
+      $$ = eth_ast_make_record(type, &_0, &$3.data[0], 1);
+      eth_drop_ast($1);
+      cod_vec_destroy($3);
+      LOC($$, @$);
+    }
+    else
+    {
+      $$ = eth_ast_apply($1, $3.data, $3.len);
+      LOC($$, @$);
+      cod_vec_destroy($3);
+    }
+  }
+
   | Atom '.' SYMBOL {
     $$ = eth_ast_access($1, $3);
     LOC($$, @$);
     free($3);
   }
-  | Atom ':' SYMBOL {
+  | Atom ':' SYMBOL '(' Args ')' %prec APPLY {
     eth_ast *access = eth_ast_access($1, $3);
-    LOC(access, @$);
-    $$ = eth_ast_apply(access, &$1, 1);
+    LOC(access, @2);
+    cod_vec_insert($5, $1, 0);
+    $$ = eth_ast_apply(access, $5.data, $5.len);
     LOC($$, @$);
     free($3);
+    cod_vec_destroy($5);
   }
   | Atom '%' SYMBOL {
     eth_ast *send = eth_ast_cval(eth_get_builtin(SCANROOT, "%"));
@@ -356,26 +378,6 @@ Atom
   }
   | FmtString
   | RegExp
-
-  | Atom '(' Args ')' %prec APPLY {
-    if ($1->tag == ETH_AST_CVAL and
-        $1->cval.val->type == eth_symbol_type)
-    {
-      // FIXME
-      eth_type *type = eth_variant_type(eth_sym_cstr($1->cval.val));
-      char *_0 = "_0";
-      $$ = eth_ast_make_record(type, &_0, &$3.data[0], 1);
-      eth_drop_ast($1);
-      cod_vec_destroy($3);
-      LOC($$, @$);
-    }
-    else
-    {
-      $$ = eth_ast_apply($1, $3.data, $3.len);
-      LOC($$, @$);
-      cod_vec_destroy($3);
-    }
-  }
 
   | '{' ExprSeq '}' { $$ = $2; }
 ;

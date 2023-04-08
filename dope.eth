@@ -176,16 +176,16 @@ let default_db_path = module_path ++ "/__db.eth"
 let load_db_from(path) {
   let mut modlist = if exist?(path) then first(load(path)) else []
   #{
-    get_modlist = fn _ -> modlist
-  , get_path = fn _ -> path
-  , get_module_opt = fn _ name -> {
+    get_modlist(self) { modlist }
+    get_path(self) { path }
+    get_module_opt(self, name) {
       find_opt(fn #{name = name'} -> strcasecmp(name, name') == 0, modlist)
     }
-  , remove = fn _ name -> {
+    remove(self, name) {
       modlist := remove(fn #{name = name'} -> strcasecmp(name', name) == 0, modlist)
     }
-  , add = fn _ entry -> modlist := entry :: modlist
-  , update = fn _ -> {
+    add(self, entry) { modlist := entry :: modlist }
+    update(self) {
       let dbfile = open_out(path)
       write_to(dbfile, format("%w\n", modlist))
     }
@@ -310,7 +310,7 @@ let uninstall(#{db, modname}) {
     -- Update registry
     info("updating registry")
     db:remove(modname)
-    db:update
+    db:update()
   }
   else {
     error("no such module")
@@ -424,7 +424,7 @@ let check_update(#{name local_version repo_url}) {
 
 
 let list_modules() {
-  let db = load_db_from(default_db_path):get_modlist
+  let db = load_db_from(default_db_path):get_modlist()
   if db is [] then
     info("no installed modules")
   else {
@@ -676,7 +676,7 @@ let commands =
             -- Update registry
             info("updating registry")
             db:add(modentry)
-            db:update
+            db:update()
           }
           else { -- let url :: modargs = agrs
             error("missing module-directory path")
@@ -708,7 +708,7 @@ let commands =
     #{
       keys = ['check-updates']
       handle(command_line) {
-        let modlist = load_db_from(default_db_path):get_modlist
+        let modlist = load_db_from(default_db_path):get_modlist()
         let cnt =
           fold_left(fn cnt #{name, version = local_version, repository = repo_url} -> {
             write_to(stdout, paint(" checking \e[1m{name}\e[22m ... "))
@@ -736,7 +736,7 @@ let commands =
           let db = load_db_from(default_db_path)
           if args eq [] then {
             -- Update all modules.
-            db:get_modlist |> iter(fn #{name, version = local_version, repository = repo_url} -> {
+            db:get_modlist() |> iter(fn #{name, version = local_version, repository = repo_url} -> {
               write_to(stdout, paint(" checking \e[1m{name}\e[22m ... "))
               flush(stdout)
               if let #{new_version info_mesg} =
@@ -751,7 +751,7 @@ let commands =
                 info("updating registry")
                 db:remove(name)
                 db:add(modentry)
-                db:update
+                db:update()
               }
               else {
                 write_to(stdout, "\e[2K\r")
@@ -771,7 +771,7 @@ let commands =
                 info("updating registry")
                 db:remove(name)
                 db:add(modentry)
-                db:update
+                db:update()
               }
               else
                 info("already using the latest version of '{name}'")
