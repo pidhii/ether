@@ -1115,8 +1115,17 @@ typedef struct {
 static void
 _usertype_destroy(eth_type *type, eth_t x)
 {
+  eth_use_symbol(__destroy);
+
   usertype_data *data = type->clos;
+
+  eth_ref(x);
+  eth_t r = eth_eval_method(type->methods, __destroy, x);
+  if (r) eth_drop(r);
+  eth_dec(x);
+
   data->orig_destroy(type, x);
+
   if (--data->rc == 0)
     eth_destroy_type(type);
 }

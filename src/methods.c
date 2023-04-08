@@ -147,7 +147,7 @@ eth_eval_method(eth_methods *ms, eth_t sym, eth_t self)
     int idx = find_in_stab(ms->stab, ms->n, id);
     if (eth_unlikely(idx >= ms->n))
     {
-      eth_warning("no such method (~w)", sym);
+      eth_debug("no such method (~w)", sym);
       return NULL;
     }
     else
