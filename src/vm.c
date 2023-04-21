@@ -97,6 +97,7 @@ eth_vm(eth_bytecode *bc)
     [ETH_OPC_LOAD     ] = &&INSN_LOAD,
     [ETH_OPC_LOADRCRD ] = &&INSN_LOADRCRD,
     [ETH_OPC_LOADRCRD1] = &&INSN_LOADRCRD1,
+    [ETH_OPC_ACCESS   ] = &&INSN_ACCESS,
     [ETH_OPC_SETEXN   ] = &&INSN_SETEXN,
     [ETH_OPC_GETEXN   ] = &&INSN_GETEXN,
     [ETH_OPC_MKRCRD   ] = &&INSN_MKRCRD,
@@ -482,6 +483,35 @@ eth_vm(eth_bytecode *bc)
           else
             r[ip->loadrcrd1.out] = eth_tup_get(x, i);
         }
+        FAST_DISPATCH_NEXT();
+      }
+
+      OP(ACCESS)
+      {
+        eth_t x = r[ip->access.vid];
+        eth_type *restrict xtype = x->type;
+        if (eth_likely(eth_is_like_record(xtype)))
+        {
+          size_t *restrict ids = xtype->fieldids;
+          const int n = xtype->nfields;
+          const size_t id = ip->access.fld;
+          int i;
+          ids[n] = id;
+          for (i = 0; true; ++i)
+          {
+            if (ids[i] == id)
+              break;
+          }
+          if (i == n)
+            // not found => alternative or NIL
+            r[ip->access.out] = ip->access.alt < 0 ? eth_nil : r[ip->access.alt];
+          else
+            r[ip->access.out] = eth_tup_get(x, i);
+        }
+        else
+          // alternative or NIL
+          r[ip->access.out] = ip->access.alt < 0 ? eth_nil : r[ip->access.alt];
+
         FAST_DISPATCH_NEXT();
       }
 

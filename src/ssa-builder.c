@@ -1264,6 +1264,18 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
       }
     }
 
+    case ETH_IR_ACCESS:
+    {
+      // XXX add exception handling
+      int src = build(bldr, tape, ir->access.expr, false, e);
+      int alt = ir->access.alt ? build(bldr, tape, ir->access.alt, false, e):-1;
+      int out = new_val(bldr, RC_RULES_DEFAULT);
+      eth_insn *insn = eth_insn_access(out, src, ir->access.fld, alt);
+      bldr->ssavinfo[out]->creatloc = insn;
+      eth_write_insn(tape, insn);
+      return out;
+    }
+
     case ETH_IR_MKRCRD:
     {
       int n = ir->mkrcrd.type->nfields;
@@ -1374,6 +1386,10 @@ is_using(eth_insn *insn, int vid)
         }
       }
       return insn->iff.cond == vid;
+
+    case ETH_INSN_ACCESS:
+      return insn->access.src == vid
+          or insn->access.alt == vid;
 
     case ETH_INSN_TRY:
       return false;

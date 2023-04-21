@@ -665,6 +665,36 @@ build_fn(ir_builder *bldr, eth_ast *fnast, char *scpvarnams[], int nscpvars,
 }
 
 static eth_ir_node*
+try_resolve_ident(ir_builder *bldr, const char *str, eth_location *loc)
+{
+  eth_var var;
+  if (not require_var(bldr, str, &var))
+    return NULL;
+
+  if (var.attr && var.attr->flag & ETH_ATTR_DEPRECATED)
+  {
+    eth_warning("use of deprecated variable, '%s'", str);
+    if (loc)
+      eth_print_location_opt(loc, stderr, ETH_LOPT_FILE);
+  }
+
+  if (var.cval)
+  {
+    return eth_ir_cval(var.cval);
+  }
+  else if (var.attr && var.attr->flag & ETH_ATTR_MUT)
+  {
+    eth_t deref = eth_get_builtin(bldr->root, "__dereference");
+    eth_ir_node *args[] = { eth_ir_var(var.vid) };
+    return eth_ir_apply(eth_ir_cval(deref), args, 1);
+  }
+  else
+  {
+    return eth_ir_var(var.vid);
+  }
+}
+
+static eth_ir_node*
 build(ir_builder *bldr, eth_ast *ast, int *e)
 {
   switch (ast->tag)
@@ -1001,8 +1031,6 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
      *   MATCH <expr> WTIH { <field> = *tmp* }
      *   THEN *tmp*
      *   ELSE THROW Type_error
-     *
-     * TODO: remove this AST-node; this conversion should be done in parser
      */
     case ETH_AST_ACCESS:
     {
@@ -1014,39 +1042,78 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       {
         eth_t rec = expr->cval.val;
         eth_t key = eth_sym(ast->access.field);
-        if (eth_unlikely(not eth_is_plain(rec->type)))
+        if (not eth_is_plain(rec->type))
         {
-          eth_warning("undefined field acess (not a plain type: ~w)", rec);
-          *e = 1;
-          eth_print_location(ast->loc, stderr);
-          eth_drop_ir_node(expr);
-          return eth_ir_error();
+          if (not ast->access.lookoutside)
+          { // cant access non-plane type
+            eth_warning("undefined field acess (not a plain type: ~w)", rec);
+            *e = 1;
+            eth_print_location(ast->loc, stderr);
+            eth_drop_ir_node(expr);
+            return eth_ir_error();
+          }
+          else
+          { // handle alternative
+            eth_ir_node *alt = try_resolve_ident(bldr, ast->access.field, ast->loc);
+            if (alt)
+            {
+              eth_drop_ir_node(expr);
+              return alt;
+            }
+            else
+            {
+              eth_warning("undefined field acess (not a plain type: ~w, alternative not found)", rec);
+              *e = 1;
+              eth_print_location(ast->loc, stderr);
+              eth_drop_ir_node(expr);
+              return eth_ir_error();
+            }
+          }
         }
+        // perform compile-time access
         int fieldid = eth_get_field_by_id(rec->type, eth_get_symbol_id(key));
         if (fieldid == rec->type->nfields)
-        {
-          eth_warning("no field '~d' in ~w", key, rec);
-          *e = 1;
-          eth_print_location(ast->loc, stderr);
-          eth_drop_ir_node(expr);
-          return eth_ir_error();
+        { // field not found
+          if (not ast->access.lookoutside)
+          {
+            eth_warning("no field '~d' in ~w", key, rec);
+            *e = 1;
+            eth_print_location(ast->loc, stderr);
+            eth_drop_ir_node(expr);
+            return eth_ir_error();
+          }
+          else
+          { // handle alternative
+            eth_ir_node *alt = try_resolve_ident(bldr, ast->access.field, ast->loc);
+            if (alt)
+            {
+              eth_drop_ir_node(expr);
+              return alt;
+            }
+            else
+            {
+              eth_warning("no field '~d' in ~w (alternative not found)", key, rec);
+              *e = 1;
+              eth_print_location(ast->loc, stderr);
+              eth_drop_ir_node(expr);
+              return eth_ir_error();
+            }
+          }
         }
-        eth_drop_ir_node(expr);
-        return eth_ir_cval(eth_tup_get(rec, fieldid));
+        else
+        { // all good
+          eth_drop_ir_node(expr);
+          return eth_ir_cval(eth_tup_get(rec, fieldid));
+        }
       }
       else
-      {
-        size_t fid = eth_get_symbol_id(eth_sym(ast->access.field));
-        int tmpvar = new_vid(bldr);
-        eth_ir_pattern *tmp = eth_ir_ident_pattern(tmpvar);
-        eth_ir_pattern *pat = eth_ir_record_pattern(new_vid(bldr), &fid, &tmp, 1);
-        // --
-        eth_ir_node *exn = eth_ir_cval(eth_exn(access_error));
-        eth_set_ir_location(exn, ast->loc);
-        // --
-        eth_ir_node *throw = eth_ir_throw(exn);
-        eth_set_ir_location(throw, ast->loc);
-        eth_ir_node *ret = eth_ir_match(pat, expr, eth_ir_var(tmpvar), throw);
+      { // run-time access
+        uintptr_t fld = eth_get_symbol_id(eth_sym(ast->access.field));
+        eth_ir_node *alt = ast->access.lookoutside
+                         ? try_resolve_ident(bldr, ast->access.field, ast->loc)
+                         : NULL;
+
+        eth_ir_node *ret = eth_ir_access(expr, fld, alt);
         eth_set_ir_location(ret, ast->loc);
         return ret;
       }

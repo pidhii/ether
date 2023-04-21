@@ -2032,7 +2032,7 @@ struct eth_ast {
              eth_toplvl_flag toplvl; }
       match;
     struct { eth_ast *lhs, *rhs; } scand, scor;
-    struct { eth_ast *expr; char *field; } access;
+    struct { eth_ast *expr, *alt; char *field; bool lookoutside; } access;
     struct { eth_ast_pattern *pat; eth_ast *trybr, *catchbr; int likely;
              bool _check_exit; }
       try;
@@ -2125,7 +2125,7 @@ eth_ast* __attribute__((malloc))
 eth_ast_or(eth_ast *lhs, eth_ast *rhs);
 
 eth_ast* __attribute__((malloc))
-eth_ast_access(eth_ast *expr, const char *field);
+eth_ast_access(eth_ast *expr, const char *field, bool lookoutside);
 
 eth_ast* __attribute__((malloc))
 eth_ast_try(eth_ast_pattern *pat, eth_ast *try, eth_ast *catch, int likely);
@@ -2234,6 +2234,7 @@ typedef enum {
   ETH_IR_UNOP,
   ETH_IR_FN,
   ETH_IR_MATCH,
+  ETH_IR_ACCESS,
   ETH_IR_LETREC,
   ETH_IR_MULTIMATCH,
   ETH_IR_MKRCRD,
@@ -2284,6 +2285,7 @@ struct eth_ir_node {
     struct { eth_ir_pattern *pat; eth_ir_node *expr, *thenbr, *elsebr;
              eth_toplvl_flag toplvl; int likely; }
       match;
+    struct { eth_ir_node *expr, *alt; uint64_t fld; } access;
     struct { eth_type *type; eth_ir_node **fields; } mkrcrd;
     struct { eth_ir_node *src, **fields; size_t *ids; int n; } update;
     struct { eth_ir_node *exn; } throw;
@@ -2339,6 +2341,9 @@ eth_ir_fn(int arity, int *caps, int *capvars, int ncap, int *scpvars_local,
 eth_ir_node* __attribute__((malloc))
 eth_ir_match(eth_ir_pattern *pat, eth_ir_node *expr, eth_ir_node *thenbr,
     eth_ir_node *elsebr);
+
+eth_ir_node* __attribute__((malloc))
+eth_ir_access(eth_ir_node *expr, uint64_t fld, eth_ir_node *alt);
 
 eth_ir_node* __attribute__((malloc))
 eth_ir_letrec(int *varids, eth_ir_node **exprs, int nvars, eth_ir_node *body);
@@ -2696,6 +2701,7 @@ typedef enum {
   ETH_INSN_APPLYTC,
   ETH_INSN_LOOP,
   ETH_INSN_IF,
+  ETH_INSN_ACCESS,
   ETH_INSN_MOV,
   ETH_INSN_REF,
   ETH_INSN_DEC,
@@ -2743,6 +2749,7 @@ struct eth_insn {
       };
       eth_toplvl_flag toplvl;
     } iff;
+    struct { int src, alt /* -1 if no alternative */; uint64_t fld; } access;
     struct { eth_binop op; int lhs, rhs; } binop;
     struct { eth_unop op; int vid; } unop;
     struct { int arity, *caps, ncap; eth_ast *ast; eth_ir *ir; eth_ssa *ssa; }
@@ -2796,6 +2803,9 @@ eth_insn_if_match(int out, int cond, eth_ssa_pattern *pat, eth_insn *thenbr,
 eth_insn*
 eth_insn_if_update(int out, int src, int *vids, size_t *ids, int n,
     eth_insn *thenbr, eth_insn *elsebr);
+
+eth_insn*
+eth_insn_access(int out, int src, uint64_t fld, int alt /* -1 if no alternative */);
 
 eth_insn* __attribute__((malloc))
 eth_insn_mov(int out, int vid);
@@ -2988,6 +2998,7 @@ typedef enum {
   ETH_OPC_LOAD,
   ETH_OPC_LOADRCRD,
   ETH_OPC_LOADRCRD1,
+  ETH_OPC_ACCESS,
 
   ETH_OPC_SETEXN,
   ETH_OPC_GETEXN,
@@ -3051,6 +3062,7 @@ struct eth_bc_insn {
     // TODO: flatten vids
     struct { uint32_t src, n; uint64_t *vids; size_t *ids; } loadrcrd;
     struct { uint64_t out, vid; size_t id; } loadrcrd1;
+    struct { uint64_t fld; uint16_t out, vid; int32_t alt; } access;
 
     struct { uint64_t vid; } setexn;
     struct { uint64_t out; } getexn;

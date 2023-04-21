@@ -192,6 +192,12 @@ destroy_ir_node(eth_ir_node *node)
       eth_unref_ir_node(node->match.elsebr);
       break;
 
+    case ETH_IR_ACCESS:
+      eth_unref_ir_node(node->access.expr);
+      if (node->access.alt)
+        eth_unref_ir_node(node->access.alt);
+      break;
+
     case ETH_IR_LETREC:
       free(node->letrec.varids);
       for (int i = 0; i < node->letrec.nvars; ++i)
@@ -371,6 +377,19 @@ eth_ir_match(eth_ir_pattern *pat, eth_ir_node *expr, eth_ir_node *thenbr,
   eth_ref_ir_node(node->match.elsebr = elsebr);
   node->match.toplvl = ETH_TOPLVL_NONE;
   node->match.likely = 0;
+  return node;
+}
+
+eth_ir_node*
+eth_ir_access(eth_ir_node *expr, uint64_t fld, eth_ir_node *alt)
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_ACCESS);
+  eth_ref_ir_node(node->access.expr = expr);
+  node->access.fld = fld;
+  if (alt)
+    eth_ref_ir_node(node->access.alt = alt);
+  else
+    node->access.alt = NULL;
   return node;
 }
 
