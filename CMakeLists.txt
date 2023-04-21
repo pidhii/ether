@@ -98,6 +98,8 @@ ExternalProject_Add(eco
   INSTALL_COMMAND
     make -C ${ECO_BUILD_DIR} install)
 set (ECO_A "${ECO_TMP_INSTALL_DIR}/lib/libeco.a")
+set (ECO_SO "${ECO_TMP_INSTALL_DIR}/lib/libeco.so")
+install (FILES ${ECO_A} ${ECO_SO} DESTINATION lib)
 
 ################################################################################
 #                                SOURCE FILES
