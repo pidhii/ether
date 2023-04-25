@@ -300,7 +300,7 @@ __deprecated { return DEPRECATED; }
 "["|"]" { return yytext[0]; }
 
 "("({OPERATOR}|","+)")"     {
-  char *buf = malloc(yyleng - 2 + 1);
+  char *buf = eth_malloc(yyleng - 2 + 1);
   strncpy(buf, yytext + 1, yyleng - 2);
   buf[yyleng - 2] = 0;
   yylval->string = buf;

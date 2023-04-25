@@ -74,11 +74,11 @@ struct eth_module {
 eth_module*
 eth_create_module(const char *name, const char *dir)
 {
-  eth_module *mod = malloc(sizeof(eth_module));
+  eth_module *mod = eth_malloc(sizeof(eth_module));
   mod->name = name ? strdup(name) : strdup("<unnamed-module>");
   mod->ndefs = 0;
   mod->defscap = 0x10;
-  mod->defs = malloc(sizeof(eth_def) * mod->defscap);
+  mod->defs = eth_malloc(sizeof(eth_def) * mod->defscap);
   mod->env = eth_create_empty_env();
   mod->memroot = NULL;
   mod->mempath = NULL;

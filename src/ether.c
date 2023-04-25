@@ -153,7 +153,7 @@ eth_init(void *argv)
                 "may fail to resolve installed modules");
   }
 
-  _main_arg_stack = malloc(ETH_STACK_SIZE);
+  _main_arg_stack = eth_malloc(ETH_STACK_SIZE);
   // move SP to the end of the allocated memory
   eth_sp = (eth_t*)((uintptr_t)_main_arg_stack + ETH_STACK_SIZE);
   // and allign it at <ptr-size> bytes

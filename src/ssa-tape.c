@@ -22,7 +22,7 @@
 eth_ssa_tape*
 eth_create_ssa_tape_at(eth_insn *at)
 {
-  eth_ssa_tape *tape = malloc(sizeof(eth_ssa_tape));
+  eth_ssa_tape *tape = eth_malloc(sizeof(eth_ssa_tape));
   tape->head = tape->point = at;
   return tape;
 }

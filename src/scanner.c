@@ -47,7 +47,7 @@ eth_create_scanner(eth_root *root, FILE *stream)
   yylex_init(&scan);
   yyset_in(stream, scan);
 
-  eth_scanner_data *data = malloc(sizeof(eth_scanner_data));
+  eth_scanner_data *data = eth_malloc(sizeof(eth_scanner_data));
   data->root = root;
   cod_vec_init(data->primtoks);
   cod_vec_init(data->fmtbracecnt);

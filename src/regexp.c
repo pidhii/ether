@@ -75,7 +75,7 @@ eth_create_regexp(const char *pat, int opts, const char **eptr, int *eoffs)
     eth_debug("PCRE-compile failed: %s", eptr);
     return NULL;
   }
-  eth_regexp *regexp = malloc(sizeof(eth_regexp));
+  eth_regexp *regexp = eth_malloc(sizeof(eth_regexp));
   eth_init_header(regexp, eth_regexp_type);
   regexp->re = re;
   regexp->extra = NULL;

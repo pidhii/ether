@@ -16,7 +16,7 @@
 #include "ether/ether.h"
 
 #if defined(ETH_DEBUG_MODE)
-# warning Using malloc instead of uniform allocators.
+# warning Using eth_malloc instead of uniform allocators.
 # define ALLOCATOR(n)                                  \
   static                                               \
   struct cod_ualloc_h##n g_allocator_h##n;             \
@@ -24,7 +24,7 @@
   void*                                                \
   eth_alloc_h##n()                                     \
   {                                                    \
-    return malloc(sizeof(struct h##n));                \
+    return eth_malloc(sizeof(struct h##n));                \
   }                                                    \
                                                        \
   void                                                 \

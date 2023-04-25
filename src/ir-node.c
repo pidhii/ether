@@ -22,7 +22,7 @@
 eth_ir_pattern*
 eth_ir_dummy_pattern(void)
 {
-  eth_ir_pattern *pat = malloc(sizeof(eth_ir_pattern));
+  eth_ir_pattern *pat = eth_malloc(sizeof(eth_ir_pattern));
   pat->tag = ETH_PATTERN_DUMMY;
   return pat;
 }
@@ -30,7 +30,7 @@ eth_ir_dummy_pattern(void)
 eth_ir_pattern*
 eth_ir_ident_pattern(int varid)
 {
-  eth_ir_pattern *pat = malloc(sizeof(eth_ir_pattern));
+  eth_ir_pattern *pat = eth_malloc(sizeof(eth_ir_pattern));
   pat->tag = ETH_PATTERN_IDENT;
   pat->ident.varid = varid;
   return pat;
@@ -40,12 +40,12 @@ eth_ir_pattern*
 eth_ir_unpack_pattern(int varid, eth_type *type, int offs[],
     eth_ir_pattern *pats[], int n)
 {
-  eth_ir_pattern *pat = malloc(sizeof(eth_ir_pattern));
+  eth_ir_pattern *pat = eth_malloc(sizeof(eth_ir_pattern));
   pat->tag = ETH_PATTERN_UNPACK;
   pat->unpack.varid = varid;
   pat->unpack.type = type;
-  pat->unpack.offs = malloc(sizeof(int) * n);
-  pat->unpack.subpats = malloc(sizeof(eth_ir_pattern*) * n);
+  pat->unpack.offs = eth_malloc(sizeof(int) * n);
+  pat->unpack.subpats = eth_malloc(sizeof(eth_ir_pattern*) * n);
   pat->unpack.n = n;
   memcpy(pat->unpack.offs, offs, sizeof(int) * n);
   memcpy(pat->unpack.subpats, pats, sizeof(eth_ir_pattern*) * n);
@@ -55,7 +55,7 @@ eth_ir_unpack_pattern(int varid, eth_type *type, int offs[],
 eth_ir_pattern*
 eth_ir_constant_pattern(eth_t val)
 {
-  eth_ir_pattern *pat = malloc(sizeof(eth_ir_pattern));
+  eth_ir_pattern *pat = eth_malloc(sizeof(eth_ir_pattern));
   pat->tag = ETH_PATTERN_CONSTANT;
   eth_ref(pat->constant.val = val);
   return pat;
@@ -65,11 +65,11 @@ eth_ir_pattern*
 eth_ir_record_pattern(int varid, size_t const ids[],
     eth_ir_pattern *const pats[], int n)
 {
-  eth_ir_pattern *pat = malloc(sizeof(eth_ir_pattern));
+  eth_ir_pattern *pat = eth_malloc(sizeof(eth_ir_pattern));
   pat->tag = ETH_PATTERN_RECORD;
   pat->record.varid = varid;
-  pat->record.ids = malloc(sizeof(size_t) * n);
-  pat->record.subpats = malloc(sizeof(eth_ir_pattern*) * n);
+  pat->record.ids = eth_malloc(sizeof(size_t) * n);
+  pat->record.subpats = eth_malloc(sizeof(eth_ir_pattern*) * n);
   pat->record.n = n;
   memcpy(pat->record.ids, ids, sizeof(size_t) * n);
   memcpy(pat->record.subpats, pats, sizeof(eth_ir_pattern*) * n);
@@ -112,7 +112,7 @@ eth_destroy_ir_pattern(eth_ir_pattern *pat)
 static inline eth_ir_node*
 create_ir_node(eth_ir_tag tag)
 {
-  eth_ir_node *node = malloc(sizeof(eth_ir_node));
+  eth_ir_node *node = eth_malloc(sizeof(eth_ir_node));
   node->rc = 0;
   node->tag = tag;
   node->loc = NULL;
@@ -290,7 +290,7 @@ eth_ir_apply(eth_ir_node *fn, eth_ir_node *const *args, int nargs)
   eth_ir_node *node = create_ir_node(ETH_IR_APPLY);
   eth_ref_ir_node(node->apply.fn = fn);
   node->apply.nargs = nargs;
-  node->apply.args = malloc(sizeof(eth_ir_node*) * nargs);
+  node->apply.args = eth_malloc(sizeof(eth_ir_node*) * nargs);
   for (int i = 0; i < nargs; ++i)
     eth_ref_ir_node(node->apply.args[i] = args[i]);
   return node;
@@ -353,12 +353,12 @@ eth_ir_fn(int arity, int *caps, int *capvars, int ncap, int *scpvars_local,
 {
   eth_ir_node *node = create_ir_node(ETH_IR_FN);
   node->fn.arity = arity;
-  node->fn.caps = malloc(sizeof(int) * ncap);
+  node->fn.caps = eth_malloc(sizeof(int) * ncap);
   memcpy(node->fn.caps, caps, sizeof(int) * ncap);
-  node->fn.capvars = malloc(sizeof(int) * ncap);
+  node->fn.capvars = eth_malloc(sizeof(int) * ncap);
   memcpy(node->fn.capvars, capvars, sizeof(int) * ncap);
   node->fn.ncap = ncap;
-  node->fn.scpvars_local = malloc(sizeof(int) * nscpvars);
+  node->fn.scpvars_local = eth_malloc(sizeof(int) * nscpvars);
   memcpy(node->fn.scpvars_local, scpvars_local, sizeof(int) * nscpvars);
   node->fn.nscpvars = nscpvars;
   eth_ref_ir(node->fn.body = body);
@@ -397,9 +397,9 @@ eth_ir_node*
 eth_ir_letrec(int *varids, eth_ir_node **exprs, int nvars, eth_ir_node *body)
 {
   eth_ir_node *node = create_ir_node(ETH_IR_LETREC);
-  node->letrec.varids = malloc(sizeof(int) * nvars);
+  node->letrec.varids = eth_malloc(sizeof(int) * nvars);
   memcpy(node->letrec.varids, varids, sizeof(int) * nvars);
-  node->letrec.exprs = malloc(sizeof(eth_ir_node*) * nvars);
+  node->letrec.exprs = eth_malloc(sizeof(eth_ir_node*) * nvars);
   for (int i = 0; i < nvars; ++i)
     eth_ref_ir_node(node->letrec.exprs[i] = exprs[i]);
   node->letrec.nvars = nvars;
@@ -434,7 +434,7 @@ eth_ir_mkrcrd(eth_type *type, eth_ir_node *const fields[])
 {
   eth_ir_node *node = create_ir_node(ETH_IR_MKRCRD);
   node->mkrcrd.type = type;
-  node->mkrcrd.fields = malloc(sizeof(eth_ir_node*) * type->nfields);
+  node->mkrcrd.fields = eth_malloc(sizeof(eth_ir_node*) * type->nfields);
   for (int i = 0; i < type->nfields; ++i)
     eth_ref_ir_node(node->mkrcrd.fields[i] = fields[i]);
   return node;
@@ -447,8 +447,8 @@ eth_ir_update(eth_ir_node *src, eth_ir_node *const fields[], size_t const ids[],
   eth_ir_node *node = create_ir_node(ETH_IR_UPDATE);
   eth_ref_ir_node(node->update.src = src);
   node->update.n = n;
-  node->update.fields = malloc(sizeof(eth_ir_node*) * n);
-  node->update.ids = malloc(sizeof(size_t) * n);
+  node->update.fields = eth_malloc(sizeof(eth_ir_node*) * n);
+  node->update.ids = eth_malloc(sizeof(size_t) * n);
   for (int i = 0; i < n; ++i)
   {
     eth_ref_ir_node(node->update.fields[i] = fields[i]);
@@ -477,15 +477,15 @@ eth_ir_match_table*
 eth_create_ir_match_table(eth_ir_pattern **const tab[],
     eth_ir_node *const exprs[], int h, int w)
 {
-  eth_ir_match_table *table = malloc(sizeof(eth_ir_match_table));
-  table->tab = malloc(sizeof(eth_ir_pattern*) * h);
+  eth_ir_match_table *table = eth_malloc(sizeof(eth_ir_match_table));
+  table->tab = eth_malloc(sizeof(eth_ir_pattern*) * h);
   for (int i = 0; i < h; ++i)
   {
-    table->tab[i] = malloc(sizeof(eth_ir_pattern*) * w);
+    table->tab[i] = eth_malloc(sizeof(eth_ir_pattern*) * w);
     for (int j = 0; j < w; ++j)
       table->tab[i][j] = tab[i][j];
   }
-  table->exprs = malloc(sizeof(eth_ir_node*) * h);
+  table->exprs = eth_malloc(sizeof(eth_ir_node*) * h);
   for (int i = 0; i < h; ++i)
     eth_ref_ir_node(table->exprs[i] = exprs[i]);
   table->w = w;
@@ -514,7 +514,7 @@ eth_ir_multimatch(eth_ir_match_table *table, eth_ir_node *const exprs[])
 {
   eth_ir_node *node = create_ir_node(ETH_IR_MULTIMATCH);
   node->multimatch.table = table;
-  node->multimatch.exprs = malloc(sizeof(eth_ir_node*) * table->w);
+  node->multimatch.exprs = eth_malloc(sizeof(eth_ir_node*) * table->w);
   for (int i = 0; i < table->w; ++i)
     eth_ref_ir_node(node->multimatch.exprs[i] = exprs[i]);
   return node;

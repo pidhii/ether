@@ -51,10 +51,10 @@ _eth_init_exception_type(void)
 eth_t
 eth_create_exception(eth_t what)
 {
-  eth_exception *exn = malloc(sizeof(eth_exception));
+  eth_exception *exn = eth_malloc(sizeof(eth_exception));
   eth_init_header(exn, eth_exception_type);
   eth_ref(exn->what = what);
-  exn->trace = malloc(0);
+  exn->trace = eth_malloc(0);
   exn->tracelen = 0;
   return ETH(exn);
 }

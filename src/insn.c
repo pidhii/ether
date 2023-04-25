@@ -22,7 +22,7 @@
 eth_ssa_pattern*
 eth_ssa_dummy_pattern(void)
 {
-  eth_ssa_pattern *pat = malloc(sizeof(eth_ssa_pattern));
+  eth_ssa_pattern *pat = eth_malloc(sizeof(eth_ssa_pattern));
   pat->tag = ETH_PATTERN_DUMMY;
   return pat;
 }
@@ -30,7 +30,7 @@ eth_ssa_dummy_pattern(void)
 eth_ssa_pattern*
 eth_ssa_ident_pattern(int vid)
 {
-  eth_ssa_pattern *pat = malloc(sizeof(eth_ssa_pattern));
+  eth_ssa_pattern *pat = eth_malloc(sizeof(eth_ssa_pattern));
   pat->tag = ETH_PATTERN_IDENT;
   pat->ident.vid = vid;
   return pat;
@@ -39,7 +39,7 @@ eth_ssa_ident_pattern(int vid)
 eth_ssa_pattern*
 eth_ssa_constant_pattern(eth_t val, eth_test_op testop, bool dotest)
 {
-  eth_ssa_pattern *pat = malloc(sizeof(eth_ssa_pattern));
+  eth_ssa_pattern *pat = eth_malloc(sizeof(eth_ssa_pattern));
   pat->tag = ETH_PATTERN_CONSTANT;
   eth_ref(pat->constant.val = val);
   pat->constant.testop = testop;
@@ -51,12 +51,12 @@ eth_ssa_pattern*
 eth_ssa_unpack_pattern(eth_type *type, int const offs[], int const vids[],
     eth_ssa_pattern *const pats[], int n, bool dotest)
 {
-  eth_ssa_pattern *pat = malloc(sizeof(eth_ssa_pattern));
+  eth_ssa_pattern *pat = eth_malloc(sizeof(eth_ssa_pattern));
   pat->tag = ETH_PATTERN_UNPACK;
   pat->unpack.type = type;
-  pat->unpack.offs = malloc(sizeof(int) * n);
-  pat->unpack.vids = malloc(sizeof(int) * n);
-  pat->unpack.subpat = malloc(sizeof(eth_ssa_pattern*) * n);
+  pat->unpack.offs = eth_malloc(sizeof(int) * n);
+  pat->unpack.vids = eth_malloc(sizeof(int) * n);
+  pat->unpack.subpat = eth_malloc(sizeof(eth_ssa_pattern*) * n);
   pat->unpack.n = n;
   pat->unpack.dotest = dotest;
   memcpy(pat->unpack.offs, offs, sizeof(int) * n);
@@ -69,11 +69,11 @@ eth_ssa_pattern*
 eth_ssa_record_pattern(size_t const ids[], int const vids[],
     eth_ssa_pattern *const pats[], int n)
 {
-  eth_ssa_pattern *pat = malloc(sizeof(eth_ssa_pattern));
+  eth_ssa_pattern *pat = eth_malloc(sizeof(eth_ssa_pattern));
   pat->tag = ETH_PATTERN_RECORD;
-  pat->record.ids = malloc(sizeof(size_t) * n);
-  pat->record.vids = malloc(sizeof(int) * n);
-  pat->record.subpat = malloc(sizeof(eth_ssa_pattern*) * n);
+  pat->record.ids = eth_malloc(sizeof(size_t) * n);
+  pat->record.vids = eth_malloc(sizeof(int) * n);
+  pat->record.subpat = eth_malloc(sizeof(eth_ssa_pattern*) * n);
   pat->record.n = n;
   pat->record.dotest = true;
   memcpy(pat->record.ids, ids, sizeof(size_t) * n);
@@ -119,7 +119,7 @@ eth_destroy_ssa_pattern(eth_ssa_pattern *pat)
 static eth_insn*
 create_insn(eth_insn_tag tag)
 {
-  eth_insn *insn = malloc(sizeof(eth_insn));
+  eth_insn *insn = eth_malloc(sizeof(eth_insn));
   insn->tag = tag;
   insn->out = -1;
   insn->next = NULL;
@@ -239,7 +239,7 @@ create_apply(eth_insn_tag tag, int out, int fn, const int *args, int nargs)
   eth_insn *insn = create_insn(tag);
   insn->apply.fn = fn;
   insn->apply.nargs = nargs;
-  insn->apply.args = malloc(sizeof(int) * nargs);
+  insn->apply.args = eth_malloc(sizeof(int) * nargs);
   memcpy(insn->apply.args, args, sizeof(int) * nargs);
   insn->out = out;
   return insn;
@@ -262,7 +262,7 @@ eth_insn_loop(const int args[], int nargs)
 {
   eth_insn *insn = create_insn(ETH_INSN_LOOP);
   insn->loop.nargs = nargs;
-  insn->loop.args = malloc(sizeof(int) * nargs);
+  insn->loop.args = eth_malloc(sizeof(int) * nargs);
   memcpy(insn->loop.args, args, sizeof(int) * nargs);
   return insn;
 }
@@ -308,9 +308,9 @@ eth_insn_if_update(int out, int src, int *vids, size_t *ids, int n,
 {
   eth_insn *insn = eth_insn_if(out, src, thenbr, elsebr);
   insn->iff.test = ETH_TEST_UPDATE;
-  insn->iff.update.vids = malloc(sizeof(int) * n);
+  insn->iff.update.vids = eth_malloc(sizeof(int) * n);
   memcpy(insn->iff.update.vids, vids, sizeof(int) * n);
-  insn->iff.update.ids = malloc(sizeof(size_t) * n);
+  insn->iff.update.ids = eth_malloc(sizeof(size_t) * n);
   memcpy(insn->iff.update.ids, ids, sizeof(size_t) * n);
   insn->iff.update.n = n;
   return insn;
@@ -404,7 +404,7 @@ eth_insn_fn(int out, int arity, int *caps, int ncap, eth_ast *ast, eth_ir *ir,
   eth_insn *insn = create_insn(ETH_INSN_FN);
   insn->out = out;
   insn->fn.arity = arity;
-  insn->fn.caps = malloc(sizeof(int) * ncap);
+  insn->fn.caps = eth_malloc(sizeof(int) * ncap);
   insn->fn.ncap = ncap;
   insn->fn.ast = ast;
   insn->fn.ir = ir;
@@ -420,7 +420,7 @@ eth_insn*
 eth_insn_pop(int const vids[], int n)
 {
   eth_insn *insn = create_insn(ETH_INSN_POP);
-  insn->pop.vids = malloc(sizeof(int) * n);
+  insn->pop.vids = eth_malloc(sizeof(int) * n);
   insn->pop.n = n;
   memcpy(insn->pop.vids, vids, sizeof(int) * n);
   return insn;
@@ -430,7 +430,7 @@ eth_insn*
 eth_insn_cap(int const vids[], int n)
 {
   eth_insn *insn = create_insn(ETH_INSN_CAP);
-  insn->cap.vids = malloc(sizeof(int) * n);
+  insn->cap.vids = eth_malloc(sizeof(int) * n);
   insn->cap.n = n;
   memcpy(insn->cap.vids, vids, sizeof(int) * n);
   return insn;
@@ -440,7 +440,7 @@ eth_insn*
 eth_insn_ldscp(int const vids[], int n)
 {
   eth_insn *insn = create_insn(ETH_INSN_LDSCP);
-  insn->ldscp.vids = malloc(sizeof(int) * n);
+  insn->ldscp.vids = eth_malloc(sizeof(int) * n);
   insn->ldscp.n = n;
   memcpy(insn->ldscp.vids, vids, sizeof(int) * n);
   return insn;
@@ -450,7 +450,7 @@ eth_insn*
 eth_insn_mkscp(int *clos, int nclos)
 {
   eth_insn *insn = create_insn(ETH_INSN_MKSCP);
-  insn->mkscp.clos = malloc(sizeof(int) * nclos);
+  insn->mkscp.clos = eth_malloc(sizeof(int) * nclos);
   insn->mkscp.nclos = nclos;
   memcpy(insn->mkscp.clos, clos, sizeof(int) * nclos);
   return insn;
@@ -492,7 +492,7 @@ eth_insn_mkrcrd(int out, int const vids[], eth_type *type)
   eth_insn *insn = create_insn(ETH_INSN_MKRCRD);
   insn->out = out;
   int n = type->nfields;
-  insn->mkrcrd.vids = malloc(sizeof(int) * n);
+  insn->mkrcrd.vids = eth_malloc(sizeof(int) * n);
   memcpy(insn->mkrcrd.vids, vids, sizeof(int) * n);
   insn->mkrcrd.type = type;
   return insn;

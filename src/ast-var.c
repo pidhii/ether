@@ -46,7 +46,7 @@ destroy_var(eth_var *var)
 eth_var_list*
 eth_create_var_list(void)
 {
-  eth_var_list *lst = malloc(sizeof(eth_var_list));
+  eth_var_list *lst = eth_malloc(sizeof(eth_var_list));
   lst->len = 0;
   lst->head = NULL;
   return lst;

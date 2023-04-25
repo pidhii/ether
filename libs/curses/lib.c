@@ -44,7 +44,7 @@ eth_type *window_type;
 static eth_t
 create_window(WINDOW *cwin)
 {
-  window *win = malloc(sizeof(window));
+  window *win = eth_malloc(sizeof(window));
   eth_init_header(win, window_type);
   win->cwin = cwin;
   return ETH(win);
@@ -290,7 +290,7 @@ _mvwgetnstr(void)
     eth_throw(args, eth_type_error());
 
   int n = eth_num_val(len);
-  char *buf = malloc(n + 1);
+  char *buf = eth_malloc(n + 1);
   if (mvwgetnstr(get_cwin(win), eth_num_val(y), eth_num_val(x), buf, n) == ERR)
   {
     free(buf);
@@ -307,7 +307,7 @@ _wgetnstr(void)
   eth_t len = eth_arg2(args, eth_number_type);
 
   int n = eth_num_val(len);
-  char *buf = malloc(n + 1);
+  char *buf = eth_malloc(n + 1);
   if (wgetnstr(get_cwin(win), buf, n) == ERR)
   {
     free(buf);

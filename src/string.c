@@ -83,7 +83,7 @@ _eth_init_strings(void)
 
   for (int i = 0; i < 256; ++i)
   {
-    char *s = malloc(2);
+    char *s = eth_malloc(2);
     s[0] = i;
     s[1] = '\0';
     g_chars[i] = eth_create_string_from_ptr2(s, 1);
@@ -102,7 +102,7 @@ _eth_cleanup_strings(void)
 eth_t
 eth_create_string_from_ptr2(char *cstr, int len)
 {
-  eth_string *str = malloc(sizeof(eth_string));
+  eth_string *str = eth_malloc(sizeof(eth_string));
   eth_init_header(str, eth_string_type);
   str->len = len;
   str->cstr = cstr;
@@ -119,7 +119,7 @@ eth_t
 eth_create_string(const char *cstr)
 {
   int len = strlen(cstr);
-  char *mystr = malloc(len + 1);
+  char *mystr = eth_malloc(len + 1);
   memcpy(mystr, cstr, len + 1);
   return eth_create_string_from_ptr2(mystr, len);
 }
@@ -127,7 +127,7 @@ eth_create_string(const char *cstr)
 eth_t
 eth_create_string2(const char *str, int len)
 {
-  char *mystr = malloc(len + 1);
+  char *mystr = eth_malloc(len + 1);
   memcpy(mystr, str, len);
   mystr[len] = 0;
   return eth_create_string_from_ptr2(mystr, len);

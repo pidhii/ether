@@ -24,8 +24,8 @@ ETH_MODULE("scp")
 eth_scp*
 eth_create_scp(eth_function **fns, int nfns)
 {
-  eth_scp *scp = malloc(sizeof(eth_scp));
-  scp->fns = malloc(sizeof(eth_function*) * nfns);
+  eth_scp *scp = eth_malloc(sizeof(eth_scp));
+  scp->fns = eth_malloc(sizeof(eth_function*) * nfns);
   scp->nfns = nfns;
   scp->rc = nfns;
   memcpy(scp->fns, fns, sizeof(eth_function*) * nfns);

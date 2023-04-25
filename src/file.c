@@ -129,7 +129,7 @@ eth_open(const char *path, const char *mod)
   FILE *stream = fopen(path, mod);
   if (stream == NULL)
     return NULL;
-  file *f = malloc(sizeof(file));
+  file *f = eth_malloc(sizeof(file));
   init_file(f);
   f->stream = stream;
   f->flag = OPEN;
@@ -142,7 +142,7 @@ eth_open_fd(int fd, const char *mod)
   FILE *stream = fdopen(fd, mod);
   if (stream == NULL)
     return NULL;
-  file *f = malloc(sizeof(file));
+  file *f = eth_malloc(sizeof(file));
   init_file(f);
   f->stream = stream;
   f->flag = OPEN;
@@ -152,7 +152,7 @@ eth_open_fd(int fd, const char *mod)
 eth_t
 eth_open_stream(FILE *stream)
 {
-  file *f = malloc(sizeof(file));
+  file *f = eth_malloc(sizeof(file));
   init_file(f);
   f->stream = stream;
   f->flag = OPEN;
@@ -165,7 +165,7 @@ eth_open_pipe(const char *command, const char *mod)
   FILE *stream = popen(command, mod);
   if (stream == NULL)
     return NULL;
-  file *f = malloc(sizeof(file));
+  file *f = eth_malloc(sizeof(file));
   init_file(f);
   f->stream = stream;
   f->flag = OPEN | PIPE;

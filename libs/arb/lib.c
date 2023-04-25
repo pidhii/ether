@@ -60,7 +60,7 @@ init_arb_type(void)
 static eth_t
 create_arb()
 {
-  eth_arb *arb = malloc(sizeof(eth_arb));
+  eth_arb *arb = eth_malloc(sizeof(eth_arb));
   eth_init_header(arb, eth_arb_type);
   arb_init(ARB(arb));
   return ETH(arb);

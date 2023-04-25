@@ -24,7 +24,7 @@ ETH_MODULE("ether:ir")
 eth_ir*
 eth_create_ir(eth_ir_node *body, int nvars)
 {
-  eth_ir *ir = malloc(sizeof(eth_ir));
+  eth_ir *ir = eth_malloc(sizeof(eth_ir));
   ir->rc = 0;
   eth_ref_ir_node(ir->body = body);
   ir->nvars = nvars;

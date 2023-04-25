@@ -27,7 +27,7 @@ eth_type* eth_function_type;
 eth_source*
 eth_create_source(eth_ast *ast, eth_ir *ir, eth_ssa *ssa)
 {
-  eth_source *src = malloc(sizeof(eth_source));
+  eth_source *src = eth_malloc(sizeof(eth_source));
   src->rc = 0;
   eth_ref_ast(src->ast = ast);
   eth_ref_ir(src->ir = ir);
@@ -120,7 +120,7 @@ _eth_init_function_type(void)
   eth_function_type->destroy = function_destroy;
 }
 
-static inline eth_function* __attribute__((malloc))
+static inline eth_function* __attribute__((eth_malloc))
 create_function(void)
 {
   eth_function *func = eth_alloc_h6();
@@ -266,7 +266,7 @@ _eth_partial_apply(eth_function *fn, int narg)
   else
   {
     size_t datasz = sizeof(curry_data) + sizeof(eth_t) * narg;
-    curry_data *data = datasz <= ETH_H6_SIZE ? eth_alloc_h6() : malloc(datasz);
+    curry_data *data = datasz <= ETH_H6_SIZE ? eth_alloc_h6() : eth_malloc(datasz);
     eth_ref(data->f = ETH(fn));
     data->n = narg;
     for (int i = 0; i < narg; ++i)

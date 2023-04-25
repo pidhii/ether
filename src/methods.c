@@ -51,7 +51,7 @@ sort_stab(method *stab, int n)
 eth_methods*
 eth_create_methods()
 {
-  eth_methods *ms = malloc(sizeof(eth_methods));
+  eth_methods *ms = eth_malloc(sizeof(eth_methods));
   ms->n = 0;
   return ms;
 }
@@ -115,7 +115,7 @@ eth_add_method(eth_methods *ms, eth_t sym, eth_method_cb cb, void *data,
       // copy stab to ltab
       for (int i = 0; i < ETH_METHOD_STAB_SIZE; ++i)
       {
-        method *m = malloc(sizeof(method));
+        method *m = eth_malloc(sizeof(method));
         *m = ms->stab[i];
         cod_hash_map_insert(ltab, (void*)sym, id, m, NULL);
       }
@@ -127,7 +127,7 @@ eth_add_method(eth_methods *ms, eth_t sym, eth_method_cb cb, void *data,
       eth_warning("method '~w` already present, won't update", sym);
       return false;
     }
-    method *m = malloc(sizeof(method));
+    method *m = eth_malloc(sizeof(method));
     m->id = id;
     m->cb = cb;
     m->data = data;

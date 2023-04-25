@@ -145,7 +145,7 @@ let pub record = lazy {
 }
 
 let pub object(typespec) {
-  let typename = typespec.name or "object"
+  let typename = if let #{name} = typespec then name else "object"
   let base = typespec.base
   let methods = if let #{methods} = typespec then list(methods) else []
   __make_usertype(typename, base, methods)

@@ -284,7 +284,7 @@ eth_create_tuple_n(eth_type *type, eth_t const data[])
     case 6: return eth_tup6(data[0], data[1], data[2], data[3], data[4], data[5]); break;
     default:
     {
-      eth_struct *tup = malloc(sizeof(eth_struct) + sizeof(eth_t) * n);
+      eth_struct *tup = eth_malloc(sizeof(eth_struct) + sizeof(eth_t) * n);
       eth_init_header(tup, type);
       for (int i = 0; i < n; ++i)
         eth_ref(tup->data[i] = data[i]);
@@ -308,7 +308,7 @@ eth_create_record(eth_type *type, eth_t const data[])
     case 4:  rec = eth_alloc_h4(); break;
     case 5:  rec = eth_alloc_h5(); break;
     case 6:  rec = eth_alloc_h6(); break;
-    default: rec = malloc(sizeof(eth_struct) + sizeof(eth_t) * n);
+    default: rec = eth_malloc(sizeof(eth_struct) + sizeof(eth_t) * n);
   }
   eth_init_header(rec, type);
   for (int i = 0; i < n; ++i)

@@ -32,7 +32,7 @@ _malloc(void)
     return eth_exn(eth_type_error());
   }
   int len = eth_num_val(n);
-  char *str = malloc(len + 1);
+  char *str = eth_malloc(len + 1);
   str[len] = '\0';
   eth_drop(n);
   return eth_create_string_from_ptr2(str, len);
@@ -71,7 +71,7 @@ _make(void)
   }
   else
   {
-    str = malloc(len + 1);
+    str = eth_malloc(len + 1);
     memset(str, c, len);
     str[len] = '\0';
   }
@@ -111,7 +111,7 @@ _to_upper(void)
   }
   else
   {
-    char *buf = malloc(len + 1);
+    char *buf = eth_malloc(len + 1);
     for (int i = 0; i < len; ++i)
       buf[i] = toupper(s[i]);
     buf[len] = '\0';
@@ -138,7 +138,7 @@ _to_lower(void)
   }
   else
   {
-    char *buf = malloc(len + 1);
+    char *buf = eth_malloc(len + 1);
     for (int i = 0; i < len; ++i)
       buf[i] = tolower(s[i]);
     buf[len] = '\0';

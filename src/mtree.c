@@ -23,8 +23,8 @@ eth_init_mtree_case(eth_mtree_case *c, const eth_type *type, const int offs[],
     const int ssavids[], int n, eth_mtree *tree)
 {
   c->type = type;
-  c->offs = malloc(sizeof(int) * n);
-  c->ssavids = malloc(sizeof(int) * n);
+  c->offs = eth_malloc(sizeof(int) * n);
+  c->ssavids = eth_malloc(sizeof(int) * n);
   c->n = n;
   c->tree = tree;
   memcpy(c->offs, offs, sizeof(int) * n);
@@ -56,7 +56,7 @@ eth_cleanup_mtree_ccase(eth_mtree_ccase *c)
 eth_mtree*
 eth_create_fail(void)
 {
-  eth_mtree *t = malloc(sizeof(eth_mtree));
+  eth_mtree *t = eth_malloc(sizeof(eth_mtree));
   t->tag = ETH_MTREE_FAIL;
   return t;
 }
@@ -64,7 +64,7 @@ eth_create_fail(void)
 eth_mtree*
 eth_create_leaf(eth_insn *body)
 {
-  eth_mtree *t = malloc(sizeof(eth_mtree));
+  eth_mtree *t = eth_malloc(sizeof(eth_mtree));
   t->tag = ETH_MTREE_LEAF;
   t->leaf = body;
   return t;
@@ -74,10 +74,10 @@ eth_mtree*
 eth_create_switch(int ssavid, const eth_mtree_case cases[], int ncases,
     eth_mtree *dflt)
 {
-  eth_mtree *t = malloc(sizeof(eth_mtree));
+  eth_mtree *t = eth_malloc(sizeof(eth_mtree));
   t->tag = ETH_MTREE_SWITCH;
   t->swtch.ssavid = ssavid;
-  t->swtch.cases = malloc(sizeof(eth_mtree_case) * ncases);
+  t->swtch.cases = eth_malloc(sizeof(eth_mtree_case) * ncases);
   t->swtch.ncases = ncases;
   memcpy(t->swtch.cases, cases, sizeof(eth_mtree_case) * ncases);
   t->swtch.dflt = dflt;
@@ -88,10 +88,10 @@ eth_mtree*
 eth_create_cswitch(int ssavid, const eth_mtree_ccase cases[], int ncases,
     eth_mtree *dflt)
 {
-  eth_mtree *t = malloc(sizeof(eth_mtree));
+  eth_mtree *t = eth_malloc(sizeof(eth_mtree));
   t->tag = ETH_MTREE_CSWITCH;
   t->cswtch.ssavid = ssavid;
-  t->cswtch.cases = malloc(sizeof(eth_mtree_ccase) * ncases);
+  t->cswtch.cases = eth_malloc(sizeof(eth_mtree_ccase) * ncases);
   t->cswtch.ncases = ncases;
   memcpy(t->cswtch.cases, cases, sizeof(eth_mtree_ccase) * ncases);
   t->cswtch.dflt = dflt;

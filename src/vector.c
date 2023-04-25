@@ -382,7 +382,7 @@ _eth_init_vector_type(void)
 static vector*
 create_vector(void)
 {
-  vector *vec = malloc(sizeof(vector));
+  vector *vec = eth_malloc(sizeof(vector));
   eth_init_header(vec, eth_vector_type);
   init_tree(&vec->tree);
   vec->tailsize = 0;
@@ -393,7 +393,7 @@ create_vector(void)
 static vector*
 copy_vector(vector *vec)
 {
-  vector *newvec = malloc(sizeof(vector));
+  vector *newvec = eth_malloc(sizeof(vector));
   eth_init_header(newvec, eth_vector_type);
   // copy tree
   newvec->tree = vec->tree;

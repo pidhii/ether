@@ -42,7 +42,7 @@ _strcat(void)
   const char *xstr = eth_str_cstr(x);
   const char *ystr = eth_str_cstr(y);
 
-  char *str = malloc(xlen + ylen + 1);
+  char *str = eth_malloc(xlen + ylen + 1);
   memcpy(str, xstr, xlen);
   memcpy(str + xlen, ystr, ylen + 1);
 
@@ -634,7 +634,7 @@ _format(void)
   }
   else
   {
-    format_data *data = malloc(sizeof(format_data));
+    format_data *data = eth_malloc(sizeof(format_data));
     eth_ref(data->fmt = fmt);
     data->file = NULL;
     data->n = n;
@@ -1023,7 +1023,7 @@ _shell(void)
   cod_vec_init(parts);
   while (true)
   {
-    void *buf = malloc(256 + sizeof(int));
+    void *buf = eth_malloc(256 + sizeof(int));
     char *str = buf;
 
     int nrd = fread(str, 1, 256, input);
@@ -1159,7 +1159,7 @@ _make_usertype(void)
       temp->type->fields, temp->type->nfields);
   newtype->flag = tflag;
   newtype->destroy = _usertype_destroy;
-  usertype_data *data = malloc(sizeof(usertype_data));
+  usertype_data *data = eth_malloc(sizeof(usertype_data));
   data->orig_destroy = temp->type->destroy;
   data->rc = 1;
   newtype->clos = data;
@@ -1192,7 +1192,7 @@ _make_usertype(void)
     case 4:  ret = eth_alloc_h4(); break;
     case 5:  ret = eth_alloc_h5(); break;
     case 6:  ret = eth_alloc_h6(); break;
-    default: ret = malloc(sizeof(eth_struct) + sizeof(eth_t) * n);
+    default: ret = eth_malloc(sizeof(eth_struct) + sizeof(eth_t) * n);
   }
 
   eth_init_header(ret, newtype);
@@ -1237,7 +1237,7 @@ typedef struct _state_obj {
 static eth_t
 _make_state_obj(eth_state *state, eth_t entry, bool full_destroy_state)
 {
-  _state_obj *sobj = malloc(sizeof(_state_obj));
+  _state_obj *sobj = eth_malloc(sizeof(_state_obj));
   memset(sobj, 0, sizeof(_state_obj));
   eth_init_header(ETH(sobj), _state_obj_type);
   sobj->state = state;
@@ -1351,7 +1351,7 @@ eth_create_builtins(eth_root *root)
   _state_obj_type = eth_create_type("coroutine");
   _state_obj_type->destroy = _destroy_state_obj;
 
-  eth_state *initial_state = malloc(sizeof(eth_state));
+  eth_state *initial_state = eth_malloc(sizeof(eth_state));
   memset(initial_state, 0, sizeof(eth_state));
   eth_t initial_sobj = _make_state_obj(initial_state, NULL, false);
 

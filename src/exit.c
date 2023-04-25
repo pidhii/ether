@@ -38,7 +38,7 @@ _eth_init_exit_type(void)
 eth_t
 eth_create_exit_object(int status)
 {
-  eth_exit_object *e = malloc(sizeof(eth_exit_object));
+  eth_exit_object *e = eth_malloc(sizeof(eth_exit_object));
   eth_init_header(e, eth_exit_type);
   e->status = status;
   return ETH(e);

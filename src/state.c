@@ -10,14 +10,14 @@
 eth_state*
 eth_create_initial_state(int cpu_stack_npag, eco_entry_point_t entry)
 {
-  eth_state *s = malloc(sizeof(eth_state));
+  eth_state *s = eth_malloc(sizeof(eth_state));
   memset(s, 0, sizeof(eth_state));
 
   // new cpu stack
   eco_allocate_guarded_stack(cpu_stack_npag, &s->cpustack);
 
   // new arg stack
-  s->astack = malloc(ETH_STACK_SIZE);
+  s->astack = eth_malloc(ETH_STACK_SIZE);
   eth_t *asb = (eth_t*)((uintptr_t)s->astack + ETH_STACK_SIZE);
   asb = (eth_t*)((uintptr_t)asb & ~(sizeof(void*)-1));
   size_t ass = (uintptr_t)asb - (uintptr_t)s->astack;

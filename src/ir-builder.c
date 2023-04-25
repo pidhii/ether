@@ -45,7 +45,7 @@ typedef struct ir_builder {
 static ir_builder*
 create_ir_builder(ir_builder *parent)
 {
-  ir_builder *bldr = malloc(sizeof(ir_builder));
+  ir_builder *bldr = eth_malloc(sizeof(ir_builder));
   bldr->parent = parent;
   bldr->mod = NULL;
   bldr->root = parent ? parent->root : NULL;

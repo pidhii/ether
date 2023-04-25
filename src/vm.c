@@ -385,7 +385,7 @@ eth_vm(eth_bytecode *bc)
       OP(FN)
       {
         size_t ncap = ip->fn.data->ncap;
-        eth_t *cap = malloc(sizeof(eth_t) * ncap);
+        eth_t *cap = eth_malloc(sizeof(eth_t) * ncap);
         for (size_t i = 0; i < ncap; ++i)
           cap[i] = r[ip->fn.data->caps[i]];
         eth_t fn = eth_create_clos(ip->fn.data->src, ip->fn.data->bc, cap, ncap,
@@ -542,7 +542,7 @@ eth_vm(eth_bytecode *bc)
           case 4:  rec = eth_alloc_h4(); break;
           case 5:  rec = eth_alloc_h5(); break;
           case 6:  rec = eth_alloc_h6(); break;
-          default: rec = malloc(sizeof(eth_struct) + sizeof(eth_t) * n);
+          default: rec = eth_malloc(sizeof(eth_struct) + sizeof(eth_t) * n);
         }
         eth_init_header(rec, type);
         for (int i = 0; i < n; ++i)
@@ -571,7 +571,7 @@ eth_vm(eth_bytecode *bc)
             case 4:  rec = eth_alloc_h4(); break;
             case 5:  rec = eth_alloc_h5(); break;
             case 6:  rec = eth_alloc_h6(); break;
-            default: rec = malloc(sizeof(eth_struct) + sizeof(eth_t) * n);
+            default: rec = eth_malloc(sizeof(eth_struct) + sizeof(eth_t) * n);
           }
           int I = 0;
           size_t id = ip->updtrcrd.ids[I];

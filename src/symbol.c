@@ -64,7 +64,7 @@ _eth_make_ordered_symbols(void)
   symbol *osyms[ETH_NORDSYMS];
 
   for (int i = 0; i < ETH_NORDSYMS; ++i)
-    osyms[i] = malloc(sizeof(symbol));
+    osyms[i] = eth_malloc(sizeof(symbol));
   int cmp(const void *p1, const void *p2)
   { return p1 - p2; }
   qsort(osyms, ETH_NORDSYMS, sizeof(symbol*), cmp);
@@ -120,7 +120,7 @@ eth_create_symbol(const char *str)
   }
   else
   {
-    symbol *sym = malloc(sizeof(symbol));
+    symbol *sym = eth_malloc(sizeof(symbol));
     eth_init_header(sym, eth_symbol_type);
     sym->header.rc = 1;
     sym->hash = hash;

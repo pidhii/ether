@@ -84,7 +84,7 @@ _read_of(void)
 
   FILE *stream = eth_get_file_stream(file);
   size_t size = eth_num_val(n);
-  char *buf = malloc(size + 1);
+  char *buf = eth_malloc(size + 1);
   size_t nrd = fread(buf, 1, size, stream);
   if (nrd == 0)
   {
@@ -197,7 +197,7 @@ _read_file(void)
   fseek(stream, start, SEEK_SET);
   if (errno) goto error;
 
-  char *buf = malloc(end - start + 1);
+  char *buf = eth_malloc(end - start + 1);
   size_t nrd = fread(buf, 1, end - start, stream);
   if (nrd == 0)
   {
@@ -279,7 +279,7 @@ _printf(void)
   }
   else
   {
-    format_data *data = malloc(sizeof(format_data));
+    format_data *data = eth_malloc(sizeof(format_data));
     data->fmt = fmt;
     data->file = file;
     data->n = n;

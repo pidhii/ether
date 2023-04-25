@@ -99,14 +99,14 @@ typedef struct {
 static bc_builder*
 create_bc_builder(int nvals, int ntries)
 {
-  bc_builder *bldr = malloc(sizeof(bc_builder));
+  bc_builder *bldr = eth_malloc(sizeof(bc_builder));
   bldr->len = 0;
   bldr->cap = 0x40;
-  bldr->arr = malloc(sizeof(eth_bc_insn) * bldr->cap);
+  bldr->arr = eth_malloc(sizeof(eth_bc_insn) * bldr->cap);
   cod_vec_init(bldr->deff);
   cod_vec_init(bldr->cchjmps);
-  bldr->catches = malloc(sizeof(int) * ntries);
-  bldr->vmap = malloc(sizeof(int) * nvals);
+  bldr->catches = eth_malloc(sizeof(int) * ntries);
+  bldr->vmap = eth_malloc(sizeof(int) * nvals);
   for (int i = 0; i < nvals; bldr->vmap[i++] = -1);
   bldr->regcnt = 0;
   bldr->entrypoint = -1;
@@ -165,7 +165,7 @@ write_push(bc_builder *bldr, int *vids, int n)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_PUSH;
-  insn->push.vids = malloc(sizeof(size_t) * n);
+  insn->push.vids = eth_malloc(sizeof(size_t) * n);
   for (int i = 0; i < n; ++i)
     insn->push.vids[i] = vids[i];
   insn->push.n = n;
@@ -208,7 +208,7 @@ write_loop(bc_builder *bldr, ptrdiff_t offs, const int args[], int n)
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_LOOP;
   insn->loop.offs = offs;
-  insn->loop.vids = malloc(sizeof(uint64_t) * n);
+  insn->loop.vids = eth_malloc(sizeof(uint64_t) * n);
   insn->loop.n = n;
   for (int i = 0; i < n; ++i)
     insn->loop.vids[i] = args[i];
@@ -366,7 +366,7 @@ write_fn(bc_builder *bldr, int out, int arity, eth_source *src, eth_bytecode *bc
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_FN;
   insn->fn.out = out;
-  insn->fn.data = malloc(sizeof(insn->fn.data[0]) + sizeof(int) * ncap);
+  insn->fn.data = eth_malloc(sizeof(insn->fn.data[0]) + sizeof(int) * ncap);
   insn->fn.data->arity = arity;
   insn->fn.data->src = src;
   insn->fn.data->bc = bc;
@@ -402,8 +402,8 @@ write_mkscp(bc_builder *bldr, int *clos, int nclos)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_MKSCP;
-  insn->mkscp.data = malloc(sizeof *insn->mkscp.data);
-  insn->mkscp.data->clos = malloc(sizeof(size_t) * nclos);
+  insn->mkscp.data = eth_malloc(sizeof *insn->mkscp.data);
+  insn->mkscp.data->clos = eth_malloc(sizeof(size_t) * nclos);
   insn->mkscp.data->nclos = nclos;
   for (int i = 0; i < nclos; ++i)
     insn->mkscp.data->clos[i] = clos[i];
@@ -426,8 +426,8 @@ write_loadrcrd(bc_builder *bldr, size_t *ids, int *vids, int n, int src)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_LOADRCRD;
-  insn->loadrcrd.ids = malloc(sizeof(size_t) * n);
-  insn->loadrcrd.vids = malloc(sizeof(uint64_t) * n);
+  insn->loadrcrd.ids = eth_malloc(sizeof(size_t) * n);
+  insn->loadrcrd.vids = eth_malloc(sizeof(uint64_t) * n);
   insn->loadrcrd.n = n;
   insn->loadrcrd.src = src;
   for (int i = 0; i < n; ++i)
@@ -475,7 +475,7 @@ write_mkrcrd(bc_builder *bldr, int out, int const vids[], eth_type *type)
   insn->opc = ETH_OPC_MKRCRD;
   insn->mkrcrd.out = out;
   insn->mkrcrd.type = type;
-  insn->mkrcrd.vids = malloc(sizeof(uint64_t) * n);
+  insn->mkrcrd.vids = eth_malloc(sizeof(uint64_t) * n);
   for (int i = 0; i < n; ++i)
     insn->mkrcrd.vids[i] = vids[i];
   return bldr->len - 1;
@@ -490,8 +490,8 @@ write_updtrcrd(bc_builder *bldr, int out, int src, int const vids[],
   insn->updtrcrd.out = out;
   insn->updtrcrd.src = src;
   insn->updtrcrd.n = n;
-  insn->updtrcrd.vids = malloc(sizeof(uint64_t) * n);
-  insn->updtrcrd.ids = malloc(sizeof(size_t) * n);
+  insn->updtrcrd.vids = eth_malloc(sizeof(uint64_t) * n);
+  insn->updtrcrd.ids = eth_malloc(sizeof(size_t) * n);
   for (int i = 0; i < n; ++i)
   {
     insn->updtrcrd.vids[i] = vids[i];
@@ -1035,7 +1035,7 @@ eth_build_bytecode(eth_ssa *ssa, int nargs)
     bldr->arr[jmp->pos].jmp.offs = bldr->catches[jmp->tryid] - jmp->pos;;
   }
 
-  eth_bytecode *bc = malloc(sizeof(eth_bytecode));
+  eth_bytecode *bc = eth_malloc(sizeof(eth_bytecode));
   bc->rc = 0;
   bc->nreg = ssa->nvals;
   bc->nargs = nargs;

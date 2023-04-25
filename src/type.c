@@ -44,7 +44,7 @@ cast_error(eth_type* type, eth_t x)
 static eth_type*
 create_type(const char *name, int nfields)
 {
-  eth_type *type = malloc(sizeof(eth_type) + sizeof(size_t) * (nfields + 1));
+  eth_type *type = eth_malloc(sizeof(eth_type) + sizeof(size_t) * (nfields + 1));
   type->name = strdup(name);
   type->destroy = default_destroy;
   type->write = eth_default_write;
@@ -71,7 +71,7 @@ eth_create_struct_type(const char *name, char *const *fields,
     ptrdiff_t const *offs, int n)
 {
   eth_type *type = create_type(name, n);
-  type->fields = malloc(sizeof(eth_field) * n);
+  type->fields = eth_malloc(sizeof(eth_field) * n);
   type->nfields = n;
   for (int i = 0; i < n; ++i)
   {
@@ -86,7 +86,7 @@ eth_type*
 eth_create_struct_type2(const char *name, const eth_field *fields, int n)
 {
   eth_type *type = create_type(name, n);
-  type->fields = malloc(sizeof(eth_field) * n);
+  type->fields = eth_malloc(sizeof(eth_field) * n);
   type->nfields = n;
   for (int i = 0; i < n; ++i)
   {

@@ -44,7 +44,7 @@ struct eth_env {
 eth_env*
 eth_create_empty_env(void)
 {
-  eth_env *env = malloc(sizeof(eth_env));
+  eth_env *env = eth_malloc(sizeof(eth_env));
   cod_vec_init(env->modpath);
   return env;
 }

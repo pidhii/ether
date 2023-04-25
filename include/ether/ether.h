@@ -52,6 +52,8 @@ extern "C" {
 
 #endif
 
+#define eth_malloc malloc
+
 
 typedef int16_t eth_sshort_t;
 typedef uint16_t eth_short_t;
@@ -347,7 +349,7 @@ eth_reserve_c_stack(ssize_t size)
 //                          header + 1 dword
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 #define ETH_H1_SIZE (sizeof(eth_header) + sizeof(eth_dword_t) * 1)
-void* __attribute__((malloc))
+void*
 eth_alloc_h1(void);
 
 void
@@ -357,7 +359,7 @@ eth_free_h1(void *ptr);
 //                          header + 2 dwords
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 #define ETH_H2_SIZE (sizeof(eth_header) + sizeof(eth_dword_t) * 2)
-void* __attribute__((malloc))
+void*
 eth_alloc_h2(void);
 
 void
@@ -367,7 +369,7 @@ eth_free_h2(void *ptr);
 //                          header + 3 dwords
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 #define ETH_H3_SIZE (sizeof(eth_header) + sizeof(eth_dword_t) * 3)
-void* __attribute__((malloc))
+void*
 eth_alloc_h3(void);
 
 void
@@ -377,7 +379,7 @@ eth_free_h3(void *ptr);
 //                          header + 4 dwords
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 #define ETH_H4_SIZE (sizeof(eth_header) + sizeof(eth_dword_t) * 4)
-void* __attribute__((malloc))
+void*
 eth_alloc_h4(void);
 
 void
@@ -387,7 +389,7 @@ eth_free_h4(void *ptr);
 //                          header + 5 dwords
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 #define ETH_H5_SIZE (sizeof(eth_header) + sizeof(eth_dword_t) * 5)
-void* __attribute__((malloc))
+void*
 eth_alloc_h5(void);
 
 void
@@ -398,7 +400,7 @@ eth_free_h5(void *ptr);
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 #define ETH_H6_SIZE (sizeof(eth_header) + sizeof(eth_dword_t) * 6)
 
-void* __attribute__((malloc))
+void*
 eth_alloc_h6(void);
 
 void
@@ -472,10 +474,10 @@ eth_default_write(eth_type *type, eth_t x, FILE *out);
 eth_t
 eth_cast_id(eth_type *type, eth_t x);
 
-eth_type* __attribute__((malloc))
+eth_type*
 eth_create_type(const char *name);
 
-eth_type* __attribute__((malloc))
+eth_type*
 eth_create_struct_type(const char *name, char *const *fields,
     ptrdiff_t const *offs, int n);
 
@@ -675,7 +677,7 @@ typedef struct {
 #define eth_num_val(x) (ETH_NUMBER(x)->val)
 
 /** @brief Create a number object. */
-inline static eth_t __attribute__((malloc))
+inline static eth_t
 eth_create_number(eth_number_t val)
 {
   eth_number *num = (eth_number*)eth_alloc_h2();
@@ -787,14 +789,14 @@ struct eth_function {
 #define ETH_FUNCTION(x) ((eth_function*)(x))
 
 
-eth_t __attribute__((malloc))
+eth_t
 eth_create_proc(eth_t (*f)(void), int n, void *data, void (*dtor)(void*), ...);
 #define eth_proc(...) eth_create_proc(__VA_ARGS__, 0, 0, 0)
 
-eth_t __attribute__((malloc))
+eth_t
 eth_create_clos(eth_source *src, eth_bytecode *bc, eth_t *cap, int ncap, int arity);
 
-eth_t __attribute__((malloc))
+eth_t
 eth_create_dummy_func(int arity);
 
 void
@@ -847,7 +849,7 @@ typedef struct {
 #define ETH_EXCEPTION(x) ((eth_exception*)(x))
 #define eth_what(x) (ETH_EXCEPTION(x)->what)
 
-eth_t __attribute__((malloc))
+eth_t
 eth_create_exception(eth_t what);
 #define eth_exn eth_create_exception
 
@@ -888,17 +890,17 @@ typedef struct {
 #define eth_str_cstr(x) (ETH_STRING(x)->cstr)
 #define eth_str_len(x)  (ETH_STRING(x)->len)
 
-eth_t __attribute__((malloc))
+eth_t
 eth_create_string(const char *cstr);
 #define eth_str eth_create_string
 
-eth_t __attribute__((malloc))
+eth_t
 eth_create_string2(const char *str, int len);
 
-eth_t __attribute__((malloc))
+eth_t
 eth_create_string_from_ptr(char *cstr);
 
-eth_t __attribute__((malloc))
+eth_t
 eth_create_string_from_ptr2(char *cstr, int len);
 
 eth_t
@@ -998,7 +1000,7 @@ eth_set_cdr(eth_t p, eth_t x)
   return ETH_PAIR(p)->cdr = x;
 }
 
-static inline eth_t __attribute__((malloc))
+static inline eth_t
 eth_cons_noref(eth_t car, eth_t cdr)
 {
   eth_pair *pair = (eth_pair*)eth_alloc_h2();
@@ -1008,7 +1010,7 @@ eth_cons_noref(eth_t car, eth_t cdr)
   return ETH(pair);
 }
 
-static inline eth_t __attribute__((malloc))
+static inline eth_t
 eth_cons(eth_t car, eth_t cdr)
 {
   eth_pair *pair = (eth_pair*)eth_alloc_h2();
@@ -1124,7 +1126,7 @@ eth_tuple_type(size_t n);
 eth_type*
 eth_record_type(char *const fields[], size_t n);
 
-static inline eth_t __attribute__((malloc))
+static inline eth_t
 eth_create_tuple_2(eth_t _1, eth_t _2)
 {
   static eth_type *type = NULL;
@@ -1138,7 +1140,7 @@ eth_create_tuple_2(eth_t _1, eth_t _2)
 }
 #define eth_tup2 eth_create_tuple_2
 
-static inline eth_t __attribute__((malloc))
+static inline eth_t
 eth_create_tuple_3(eth_t _1, eth_t _2, eth_t _3)
 {
   static eth_type *type = NULL;
@@ -1153,7 +1155,7 @@ eth_create_tuple_3(eth_t _1, eth_t _2, eth_t _3)
 }
 #define eth_tup3 eth_create_tuple_3
 
-static inline eth_t __attribute__((malloc))
+static inline eth_t
 eth_create_tuple_4(eth_t _1, eth_t _2, eth_t _3, eth_t _4)
 {
   static eth_type *type = NULL;
@@ -1169,7 +1171,7 @@ eth_create_tuple_4(eth_t _1, eth_t _2, eth_t _3, eth_t _4)
 }
 #define eth_tup4 eth_create_tuple_4
 
-static inline eth_t __attribute__((malloc))
+static inline eth_t
 eth_create_tuple_5(eth_t _1, eth_t _2, eth_t _3, eth_t _4, eth_t _5)
 {
   static eth_type *type = NULL;
@@ -1186,7 +1188,7 @@ eth_create_tuple_5(eth_t _1, eth_t _2, eth_t _3, eth_t _4, eth_t _5)
 }
 #define eth_tup5 eth_create_tuple_5
 
-static inline eth_t __attribute__((malloc))
+static inline eth_t
 eth_create_tuple_6(eth_t _1, eth_t _2, eth_t _3, eth_t _4, eth_t _5, eth_t _6)
 {
   static eth_type *type = NULL;
@@ -1204,7 +1206,7 @@ eth_create_tuple_6(eth_t _1, eth_t _2, eth_t _3, eth_t _4, eth_t _5, eth_t _6)
 }
 #define eth_tup6 eth_create_tuple_6
 
-eth_t __attribute__((malloc))
+eth_t
 eth_create_tuple_n(eth_type *type, eth_t const data[]);
 #define eth_tupn eth_create_tuple_n
 
@@ -1214,10 +1216,10 @@ eth_struct_size(const eth_type *type)
   return type->nfields;
 }
 
-eth_t __attribute__((malloc))
+eth_t
 eth_create_record(eth_type *type, eth_t const data[]);
 
-eth_t __attribute__((malloc))
+eth_t
 eth_record(char *const keys[], eth_t const vals[], int n);
 
 void
@@ -1496,7 +1498,7 @@ eth_drop_attr(eth_attr *attr);
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 /** @name Root environment
  * @{ */
-eth_root* __attribute__((malloc))
+eth_root*
 eth_create_root(void);
 
 void
@@ -1553,7 +1555,7 @@ typedef struct {
   eth_attr *attr;
 } eth_def;
 
-eth_module* __attribute__((malloc))
+eth_module*
 eth_create_module(const char *name, const char *dir);
 
 void
@@ -1611,7 +1613,7 @@ eth_add_exit_handle(eth_module *mod, void (*cb)(void*), void *data);
  * @brief The thing managing modules.
  * @{ */
 /** @brief Create new empty environment. */
-eth_env* __attribute__((malloc))
+eth_env*
 eth_create_empty_env(void);
 
 /**
@@ -1627,7 +1629,7 @@ eth_create_empty_env(void);
  * the corresponding path wont be added. Thus in this case this function is
  * equivalent to the eth_create_empty_env().
  */
-eth_env* __attribute__((malloc))
+eth_env*
 eth_create_env(void);
 
 /** @brief Destroy environemnt. */
@@ -2060,25 +2062,25 @@ eth_drop_ast(eth_ast *ast);
 void
 eth_set_ast_location(eth_ast *ast, eth_location *loc);
 
-eth_ast* __attribute__((malloc))
+eth_ast*
 eth_ast_cval(eth_t val);
 
-eth_ast* __attribute__((malloc))
+eth_ast*
 eth_ast_ident(const char *ident);
 
-eth_ast* __attribute__((malloc))
+eth_ast*
 eth_ast_apply(eth_ast *fn, eth_ast *const *args, int nargs);
 
 void
 eth_ast_append_arg(eth_ast *apply, eth_ast *arg);
 
-eth_ast* __attribute__((malloc))
+eth_ast*
 eth_ast_if(eth_ast *cond, eth_ast *then, eth_ast *els);
 
-eth_ast* __attribute__((malloc))
+eth_ast*
 eth_ast_seq(eth_ast *e1, eth_ast *e2);
 
-eth_ast* __attribute__((malloc))
+eth_ast*
 eth_ast_let(eth_ast_pattern *const pats[], eth_ast *const *vals, int n,
     eth_ast *body);
 
@@ -2090,7 +2092,7 @@ eth_set_let_expr(eth_ast *let, eth_ast *expr)
   let->let.body = expr;
 }
 
-eth_ast* __attribute__((malloc))
+eth_ast*
 eth_ast_letrec(eth_ast_pattern *const pats[], eth_ast *const *vals, int n,
     eth_ast *body);
 
@@ -2102,32 +2104,32 @@ eth_set_letrec_expr(eth_ast *let, eth_ast *expr)
   let->let.body = expr;
 }
 
-eth_ast* __attribute__((malloc))
+eth_ast*
 eth_ast_binop(eth_binop op, eth_ast *lhs, eth_ast *rhs);
 
-eth_ast* __attribute__((malloc))
+eth_ast*
 eth_ast_unop(eth_unop op, eth_ast *expr);
 
-eth_ast* __attribute__((malloc))
+eth_ast*
 eth_ast_fn(char **args, int arity, eth_ast *body);
 
 eth_ast*
 eth_ast_fn_with_patterns(eth_ast_pattern *const args[], int arity, eth_ast *body);
 
-eth_ast* __attribute__((malloc))
+eth_ast*
 eth_ast_match(eth_ast_pattern *pat, eth_ast *expr, eth_ast *thenbr,
     eth_ast *elsebr);
 
-eth_ast* __attribute__((malloc))
+eth_ast*
 eth_ast_and(eth_ast *lhs, eth_ast *rhs);
 
-eth_ast* __attribute__((malloc))
+eth_ast*
 eth_ast_or(eth_ast *lhs, eth_ast *rhs);
 
-eth_ast* __attribute__((malloc))
+eth_ast*
 eth_ast_access(eth_ast *expr, const char *field, bool lookoutside);
 
-eth_ast* __attribute__((malloc))
+eth_ast*
 eth_ast_try(eth_ast_pattern *pat, eth_ast *try, eth_ast *catch, int likely);
 
 eth_ast*
@@ -2163,10 +2165,10 @@ eth_ast_to_pattern(eth_ast *ast);
 typedef struct eth_scanner eth_scanner;
 typedef struct eth_scanner_data eth_scanner_data;
 
-eth_scanner* __attribute__((malloc))
+eth_scanner*
 eth_create_scanner(eth_root *root, FILE *stream);
 
-eth_scanner* __attribute__((malloc))
+eth_scanner*
 eth_create_repl_scanner(eth_root *root, FILE *stream);
 
 bool
@@ -2181,7 +2183,7 @@ eth_get_scanner_input(eth_scanner *scan);
 eth_scanner_data*
 eth_get_scanner_data(eth_scanner *scan);
 
-eth_ast* __attribute__((malloc))
+eth_ast*
 eth_parse(eth_root *root, FILE *stream);
 
 /** @} AST */
@@ -2307,45 +2309,45 @@ eth_drop_ir_node(eth_ir_node *node);
 void
 eth_set_ir_location(eth_ir_node *node, eth_location *loc);
 
-eth_ir_node* __attribute__((malloc))
+eth_ir_node*
 eth_ir_error(void);
 
-eth_ir_node* __attribute__((malloc))
+eth_ir_node*
 eth_ir_cval(eth_t val);
 
-eth_ir_node* __attribute__((malloc))
+eth_ir_node*
 eth_ir_var(int vid);
 
-eth_ir_node* __attribute__((malloc))
+eth_ir_node*
 eth_ir_apply(eth_ir_node *fn, eth_ir_node *const *args, int nargs);
 
-eth_ir_node* __attribute__((malloc))
+eth_ir_node*
 eth_ir_if(eth_ir_node *cond, eth_ir_node *thenbr, eth_ir_node *elsebr);
 
-eth_ir_node* __attribute__((malloc))
+eth_ir_node*
 eth_ir_try(int exnvar, eth_ir_node *trybr, eth_ir_node *catchbr, int likely);
 
-eth_ir_node* __attribute__((malloc))
+eth_ir_node*
 eth_ir_seq(eth_ir_node *e1, eth_ir_node *e2);
 
-eth_ir_node* __attribute__((malloc))
+eth_ir_node*
 eth_ir_binop(eth_binop op, eth_ir_node *lhs, eth_ir_node *rhs);
 
-eth_ir_node* __attribute__((malloc))
+eth_ir_node*
 eth_ir_unop(eth_unop op, eth_ir_node *expr);
 
-eth_ir_node* __attribute__((malloc))
+eth_ir_node*
 eth_ir_fn(int arity, int *caps, int *capvars, int ncap, int *scpvars_local,
     int nscpvars, eth_ir *body, eth_ast *ast);
 
-eth_ir_node* __attribute__((malloc))
+eth_ir_node*
 eth_ir_match(eth_ir_pattern *pat, eth_ir_node *expr, eth_ir_node *thenbr,
     eth_ir_node *elsebr);
 
-eth_ir_node* __attribute__((malloc))
+eth_ir_node*
 eth_ir_access(eth_ir_node *expr, uint64_t fld, eth_ir_node *alt);
 
-eth_ir_node* __attribute__((malloc))
+eth_ir_node*
 eth_ir_letrec(int *varids, eth_ir_node **exprs, int nvars, eth_ir_node *body);
 
 eth_ir_node*
@@ -2394,7 +2396,7 @@ struct eth_ir {
   int nspecs;
 };
 
-eth_ir* __attribute__((malloc))
+eth_ir*
 eth_create_ir(eth_ir_node *body, int nvars);
 
 void
@@ -2456,7 +2458,7 @@ struct eth_var_list {
 /*
  * Create new list for variables.
  */
-eth_var_list* __attribute__((malloc))
+eth_var_list*
 eth_create_var_list(void);
 
 /*
@@ -2468,13 +2470,13 @@ eth_destroy_var_list(eth_var_list *lst);
 /*
  * Add variable on top of the list.
  */
-eth_var* __attribute__((malloc))
+eth_var*
 eth_prepend_var(eth_var_list *lst, eth_var_cfg cfg);
 
 /*
  * Add variable at the end of the list.
  */
-eth_var* __attribute__((malloc))
+eth_var*
 eth_append_var(eth_var_list *lst, eth_var_cfg cfg);
 
 /*
@@ -2552,10 +2554,10 @@ struct eth_ssa_pattern {
 eth_ssa_pattern*
 eth_ssa_dummy_pattern(void);
 
-eth_ssa_pattern* __attribute__((malloc))
+eth_ssa_pattern*
 eth_ssa_ident_pattern(int vid);
 
-eth_ssa_pattern* __attribute__((malloc))
+eth_ssa_pattern*
 eth_ssa_unpack_pattern(eth_type *type, int const offs[], int const vids[],
     eth_ssa_pattern *const pats[], int n, bool dotest);
 
@@ -2774,29 +2776,29 @@ eth_destroy_insn(eth_insn *insn);
 void
 eth_destroy_insn_list(eth_insn *head);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_nop(void);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_cval(int out, eth_t val);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_apply(int out, int fn, const int *args, int nargs);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_applytc(int out, int fn, const int *args, int nargs);
 
 eth_insn*
 eth_insn_loop(const int args[], int nargs);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_if(int out, int cond, eth_insn *thenbr, eth_insn *elsebr);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_if_test_type(int out, int cond, eth_type *type, eth_insn *thenbr,
     eth_insn *elsebr);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_if_match(int out, int cond, eth_ssa_pattern *pat, eth_insn *thenbr,
     eth_insn *elsebr);
 
@@ -2807,56 +2809,56 @@ eth_insn_if_update(int out, int src, int *vids, size_t *ids, int n,
 eth_insn*
 eth_insn_access(int out, int src, uint64_t fld, int alt /* -1 if no alternative */);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_mov(int out, int vid);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_ref(int vid);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_dec(int vid);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_unref(int vid);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_drop(int vid);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_ret(int vid);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_binop(eth_binop op, int out, int lhs, int rhs);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_unop(eth_unop op, int out, int vid);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_fn(int out, int arity, int *caps, int ncap, eth_ast *ast, eth_ir *ir,
     eth_ssa *ssa);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_pop(int const vids[], int n);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_cap(int const vids[], int n);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_ldscp(int const vids[], int n);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_mkscp(int *clos, int nclos);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_catch(int tryid, int vid);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_try(int out, int id, eth_insn *trybr, eth_insn *catchbr);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_getexn(int out);
 
-eth_insn* __attribute__((malloc))
+eth_insn*
 eth_insn_mkrcrd(int out, int const vids[], eth_type *type);
 
 void
@@ -2871,10 +2873,10 @@ struct eth_ssa_tape {
   eth_insn *point;
 };
 
-eth_ssa_tape* __attribute__((malloc))
+eth_ssa_tape*
 eth_create_ssa_tape(void);
 
-eth_ssa_tape* __attribute__((malloc))
+eth_ssa_tape*
 eth_create_ssa_tape_at(eth_insn *at);
 
 void
@@ -3083,7 +3085,7 @@ struct eth_bytecode {
   eth_bc_insn *code;
 };
 
-eth_bytecode* __attribute__((malloc))
+eth_bytecode*
 eth_build_bytecode(eth_ssa *ssa, int nargs);
 
 void

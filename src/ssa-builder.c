@@ -154,14 +154,14 @@ typedef struct {
 static ssa_builder*
 create_ssa_builder(int nirvars)
 {
-  ssa_builder *bldr = malloc(sizeof(ssa_builder));
+  ssa_builder *bldr = eth_malloc(sizeof(ssa_builder));
   bldr->nirvars = nirvars;
-  bldr->irvinfo = malloc(sizeof(ir_variable_info*) * nirvars);
+  bldr->irvinfo = eth_malloc(sizeof(ir_variable_info*) * nirvars);
   for (int i = 0; i < nirvars; ++i)
     bldr->irvinfo[i] = create_empty_ir_variable_info();
   bldr->nssavals = 0;
   bldr->vicap = 0x40;
-  bldr->ssavinfo = malloc(sizeof(ssa_value_info*) * bldr->vicap);
+  bldr->ssavinfo = eth_malloc(sizeof(ssa_value_info*) * bldr->vicap);
   cod_vec_init(bldr->movs);
   bldr->testexn = true;
   bldr->ntries = 0;
@@ -309,7 +309,7 @@ trace_mov(ssa_builder *bldr, eth_insn *insn)
 static eth_ssa*
 create_ssa(eth_insn *body, int nvals, int ntries)
 {
-  eth_ssa *ssa = malloc(sizeof(eth_ssa));
+  eth_ssa *ssa = eth_malloc(sizeof(eth_ssa));
   ssa->rc = 0;
   ssa->nvals = nvals;
   ssa->ntries = ntries;
@@ -1579,9 +1579,9 @@ typedef struct {
 static kill_info*
 create_kill_info(int nvals)
 {
-  kill_info *kinfo = malloc(sizeof(kill_info));
+  kill_info *kinfo = eth_malloc(sizeof(kill_info));
   kinfo->nvals = nvals;
-  kinfo->vals = malloc(sizeof(kinfo->vals[0]) * nvals);
+  kinfo->vals = eth_malloc(sizeof(kinfo->vals[0]) * nvals);
   for (int i = 0; i < nvals; ++i)
     cod_vec_init(kinfo->vals[i].killers);
   return kinfo;
@@ -2204,7 +2204,7 @@ eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
         tlvltape = eth_create_ssa_tape_at(lastinsn);
 
       int n = defs->n;
-      module_info *data = malloc(sizeof(module_info));
+      module_info *data = eth_malloc(sizeof(module_info));
       data->ndefs = n;
 
       eth_t mkmod = eth_create_proc(make_module, n + 1, data, (void*)free);

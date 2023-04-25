@@ -47,7 +47,7 @@ struct eth_root {
 eth_root*
 eth_create_root(void)
 {
-  eth_root *root = malloc(sizeof(eth_root));
+  eth_root *root = eth_malloc(sizeof(eth_root));
   root->pathmap = cod_hash_map_new(0);
   root->env = eth_create_env();
   root->destroying = false;
@@ -105,7 +105,7 @@ eth_memorize_module(eth_root *root, const char *path, eth_module *mod)
   }
 
   // create new module-entry
-  eth_module_entry *ent = malloc(sizeof(eth_module_entry));
+  eth_module_entry *ent = eth_malloc(sizeof(eth_module_entry));
   ent->mod = mod;
   ent->dl = NULL;
   ent->flag = 0;

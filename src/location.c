@@ -28,7 +28,7 @@ ETH_MODULE("ether:location")
 eth_location*
 eth_create_location(int fl, int fc, int ll, int lc, const char *path)
 {
-  eth_location *loc = malloc(sizeof(eth_location));
+  eth_location *loc = eth_malloc(sizeof(eth_location));
   loc->rc = 0;
   loc->fl = fl;
   loc->fc = fc;
