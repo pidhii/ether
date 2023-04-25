@@ -456,7 +456,6 @@ struct eth_type {
   void (*display)(eth_type *type, eth_t x, FILE *out);
   bool (*equal)(eth_type *type, eth_t x, eth_t y);
   void (*notify_copy)(eth_type *type, eth_t newx, eth_t oldx);
-  eth_methods *methods;
 
   uint8_t flag;
 

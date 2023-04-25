@@ -53,7 +53,7 @@ location(void *locp_ptr);
     eth_print_location_opt(loc, stderr, ETH_LOPT_FILE); \
     eth_drop_location(loc); \
   } while (0)
-    
+
 
 static eth_ast*
 dummy_ast()
@@ -207,7 +207,7 @@ _create_attr(int aflag, void *locpp)
 %nonassoc DEFINED
 %nonassoc OPEN IMPORT
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-%right RARROW 
+%right RARROW
 %right LET REC AND ASSERT
 %nonassoc RETURN
 %left LAZY
@@ -356,13 +356,6 @@ Atom
     LOC($$, @$);
     free($3);
     cod_vec_destroy($5);
-  }
-  | Atom '%' SYMBOL {
-    eth_ast *send = eth_ast_cval(eth_get_builtin(SCANROOT, "%"));
-    eth_ast *p[2] = { $1, eth_ast_cval(eth_create_symbol($3)) };
-    $$ = eth_ast_apply(send, p, 2);
-    LOC($$, @$);
-    free($3);
   }
 
   | '@' '(' Expr ')' { $$ = eth_ast_evmac($3); LOC($$, @$); }
