@@ -26,7 +26,6 @@ option (BUILD_STATIC_LIBRARY "Build static library \"ether.a\"" ON)
 option (BUILD_CPPAPI_SHARED_LIBRARY "Build shared library \"ether.so\"" ON)
 option (BUILD_CPPAPI_STATIC_LIBRARY "Build static library \"ether.a\"" ON)
 # -------------------------------- Modules ------------------------------------
-option (ENABLE_ARB "Build an Arb-module" YES)
 option (ENABLE_JSON "Build a Json-module" YES)
 # ------------------------------ Dev-Options -----------------------------------
 option (DISABLE_BUILTINS "Disable all builtins" OFF)
