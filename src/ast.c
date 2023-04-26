@@ -580,12 +580,11 @@ eth_ast_or(eth_ast *lhs, eth_ast *rhs)
 }
 
 eth_ast*
-eth_ast_access(eth_ast *expr, const char *field, bool lookoutside)
+eth_ast_access(eth_ast *expr, const char *field)
 {
   eth_ast *ast = create_ast_node(ETH_AST_ACCESS);
   eth_ref_ast(ast->access.expr = expr);
   ast->access.field = strdup(field);
-  ast->access.lookoutside = lookoutside;
   return ast;
 }
 

@@ -503,14 +503,12 @@ eth_vm(eth_bytecode *bc)
               break;
           }
           if (i == n)
-            // not found => alternative or NIL
-            r[ip->access.out] = ip->access.alt < 0 ? eth_nil : r[ip->access.alt];
+            r[ip->access.out] = eth_nil;
           else
             r[ip->access.out] = eth_tup_get(x, i);
         }
         else
-          // alternative or NIL
-          r[ip->access.out] = ip->access.alt < 0 ? eth_nil : r[ip->access.alt];
+          r[ip->access.out] = eth_nil;
 
         FAST_DISPATCH_NEXT();
       }

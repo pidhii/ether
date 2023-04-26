@@ -467,6 +467,28 @@ struct eth_type {
   size_t fieldids[];
 };
 
+//typedef struct eth_value eth_value;
+
+//enum eth_type_tag {
+  //ETH_TYPE_NUMBER,
+  //ETH_TYPE_SYMBOL,
+  //ETH_TYPE_STRING,
+  //ETH_TYPE_PAIR,
+  //ETH_TYPE_VECTOR,
+//};
+
+//struct eth_value {
+  //uint32_t type_tag;
+  //uint32_t rc;
+  //union {
+    //long double num;
+    //char *sym;
+    //char *str;
+    //struct { eth_value *car, *cdr; } pair;
+
+  //};
+//};
+
 void
 eth_default_write(eth_type *type, eth_t x, FILE *out);
 
@@ -2033,7 +2055,7 @@ struct eth_ast {
              eth_toplvl_flag toplvl; }
       match;
     struct { eth_ast *lhs, *rhs; } scand, scor;
-    struct { eth_ast *expr, *alt; char *field; bool lookoutside; } access;
+    struct { eth_ast *expr, *alt; char *field; } access;
     struct { eth_ast_pattern *pat; eth_ast *trybr, *catchbr; int likely;
              bool _check_exit; }
       try;
@@ -2126,7 +2148,7 @@ eth_ast*
 eth_ast_or(eth_ast *lhs, eth_ast *rhs);
 
 eth_ast*
-eth_ast_access(eth_ast *expr, const char *field, bool lookoutside);
+eth_ast_access(eth_ast *expr, const char *field);
 
 eth_ast*
 eth_ast_try(eth_ast_pattern *pat, eth_ast *try, eth_ast *catch, int likely);
@@ -2286,7 +2308,7 @@ struct eth_ir_node {
     struct { eth_ir_pattern *pat; eth_ir_node *expr, *thenbr, *elsebr;
              eth_toplvl_flag toplvl; int likely; }
       match;
-    struct { eth_ir_node *expr, *alt; uint64_t fld; } access;
+    struct { eth_ir_node *expr; uint64_t fld; } access;
     struct { eth_type *type; eth_ir_node **fields; } mkrcrd;
     struct { eth_ir_node *src, **fields; size_t *ids; int n; } update;
     struct { eth_ir_node *exn; } throw;
@@ -2344,7 +2366,7 @@ eth_ir_match(eth_ir_pattern *pat, eth_ir_node *expr, eth_ir_node *thenbr,
     eth_ir_node *elsebr);
 
 eth_ir_node*
-eth_ir_access(eth_ir_node *expr, uint64_t fld, eth_ir_node *alt);
+eth_ir_access(eth_ir_node *expr, uint64_t fld);
 
 eth_ir_node*
 eth_ir_letrec(int *varids, eth_ir_node **exprs, int nvars, eth_ir_node *body);
@@ -2750,7 +2772,7 @@ struct eth_insn {
       };
       eth_toplvl_flag toplvl;
     } iff;
-    struct { int src, alt /* -1 if no alternative */; uint64_t fld; } access;
+    struct { int src; uint64_t fld; } access;
     struct { eth_binop op; int lhs, rhs; } binop;
     struct { eth_unop op; int vid; } unop;
     struct { int arity, *caps, ncap; eth_ast *ast; eth_ir *ir; eth_ssa *ssa; }
@@ -2806,7 +2828,7 @@ eth_insn_if_update(int out, int src, int *vids, size_t *ids, int n,
     eth_insn *thenbr, eth_insn *elsebr);
 
 eth_insn*
-eth_insn_access(int out, int src, uint64_t fld, int alt /* -1 if no alternative */);
+eth_insn_access(int out, int src, uint64_t fld);
 
 eth_insn*
 eth_insn_mov(int out, int vid);
@@ -3063,7 +3085,7 @@ struct eth_bc_insn {
     // TODO: flatten vids
     struct { uint32_t src, n; uint64_t *vids; size_t *ids; } loadrcrd;
     struct { uint64_t out, vid; size_t id; } loadrcrd1;
-    struct { uint64_t fld; uint16_t out, vid; int32_t alt; } access;
+    struct { uint64_t fld; uint32_t out, vid; } access;
 
     struct { uint64_t vid; } setexn;
     struct { uint64_t out; } getexn;

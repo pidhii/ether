@@ -344,12 +344,12 @@ Atom
   }
 
   | Atom '.' SYMBOL {
-    $$ = eth_ast_access($1, $3, false);
+    $$ = eth_ast_access($1, $3);
     LOC($$, @$);
     free($3);
   }
   | Atom ':' SYMBOL '(' Args ')' %prec APPLY {
-    eth_ast *access = eth_ast_access($1, $3, true);
+    eth_ast *access = eth_ast_access($1, $3);
     LOC(access, @2);
     cod_vec_insert($5, $1, 0);
     $$ = eth_ast_apply(access, $5.data, $5.len);

@@ -194,8 +194,6 @@ destroy_ir_node(eth_ir_node *node)
 
     case ETH_IR_ACCESS:
       eth_unref_ir_node(node->access.expr);
-      if (node->access.alt)
-        eth_unref_ir_node(node->access.alt);
       break;
 
     case ETH_IR_LETREC:
@@ -381,15 +379,11 @@ eth_ir_match(eth_ir_pattern *pat, eth_ir_node *expr, eth_ir_node *thenbr,
 }
 
 eth_ir_node*
-eth_ir_access(eth_ir_node *expr, uint64_t fld, eth_ir_node *alt)
+eth_ir_access(eth_ir_node *expr, uint64_t fld)
 {
   eth_ir_node *node = create_ir_node(ETH_IR_ACCESS);
   eth_ref_ir_node(node->access.expr = expr);
   node->access.fld = fld;
-  if (alt)
-    eth_ref_ir_node(node->access.alt = alt);
-  else
-    node->access.alt = NULL;
   return node;
 }
 

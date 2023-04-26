@@ -257,13 +257,12 @@ write_testequal(bc_builder *bldr, int vid, eth_t cval)
 }
 
 static int
-write_access(bc_builder *bldr, int out, int vid, uint64_t fld, int alt)
+write_access(bc_builder *bldr, int out, int vid, uint64_t fld)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_ACCESS;
   insn->access.out = out;
   insn->access.vid = vid;
-  insn->access.alt = alt;
   insn->access.fld = fld;
   return bldr->len -1;
 }
@@ -817,9 +816,8 @@ end_if:
 
       case ETH_INSN_ACCESS:
       {
-        int alt = ip->access.alt < 0 ? -1 : get_reg(bldr, ip->access.alt);
         write_access(bldr, new_reg(bldr, ip->out), get_reg(bldr, ip->access.src),
-                     ip->access.fld, alt);
+                     ip->access.fld);
         break;
       }
 

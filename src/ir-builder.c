@@ -1044,61 +1044,22 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         eth_t key = eth_sym(ast->access.field);
         if (not eth_is_plain(rec->type))
         {
-          if (not ast->access.lookoutside)
-          { // cant access non-plane type
-            eth_warning("undefined field acess (not a plain type: ~w)", rec);
-            *e = 1;
-            eth_print_location(ast->loc, stderr);
-            eth_drop_ir_node(expr);
-            return eth_ir_error();
-          }
-          else
-          { // handle alternative
-            eth_ir_node *alt = try_resolve_ident(bldr, ast->access.field, ast->loc);
-            if (alt)
-            {
-              eth_drop_ir_node(expr);
-              return alt;
-            }
-            else
-            {
-              eth_warning("undefined field acess (not a plain type: ~w, alternative not found)", rec);
-              *e = 1;
-              eth_print_location(ast->loc, stderr);
-              eth_drop_ir_node(expr);
-              return eth_ir_error();
-            }
-          }
+          // cant access non-plane type
+          eth_warning("undefined field acess (not a plain type: ~w)", rec);
+          *e = 1;
+          eth_print_location(ast->loc, stderr);
+          eth_drop_ir_node(expr);
+          return eth_ir_error();
         }
         // perform compile-time access
         int fieldid = eth_get_field_by_id(rec->type, eth_get_symbol_id(key));
         if (fieldid == rec->type->nfields)
         { // field not found
-          if (not ast->access.lookoutside)
-          {
-            eth_warning("no field '~d' in ~w", key, rec);
-            *e = 1;
-            eth_print_location(ast->loc, stderr);
-            eth_drop_ir_node(expr);
-            return eth_ir_error();
-          }
-          else
-          { // handle alternative
-            eth_ir_node *alt = try_resolve_ident(bldr, ast->access.field, ast->loc);
-            if (alt)
-            {
-              eth_drop_ir_node(expr);
-              return alt;
-            }
-            else
-            {
-              eth_warning("no field '~d' in ~w (alternative not found)", key, rec);
-              *e = 1;
-              eth_print_location(ast->loc, stderr);
-              eth_drop_ir_node(expr);
-              return eth_ir_error();
-            }
-          }
+          eth_warning("no field '~d' in ~w", key, rec);
+          *e = 1;
+          eth_print_location(ast->loc, stderr);
+          eth_drop_ir_node(expr);
+          return eth_ir_error();
         }
         else
         { // all good
@@ -1109,11 +1070,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       else
       { // run-time access
         uintptr_t fld = eth_get_symbol_id(eth_sym(ast->access.field));
-        eth_ir_node *alt = ast->access.lookoutside
-                         ? try_resolve_ident(bldr, ast->access.field, ast->loc)
-                         : NULL;
-
-        eth_ir_node *ret = eth_ir_access(expr, fld, alt);
+        eth_ir_node *ret = eth_ir_access(expr, fld);
         eth_set_ir_location(ret, ast->loc);
         return ret;
       }
