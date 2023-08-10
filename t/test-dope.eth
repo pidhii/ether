@@ -2,6 +2,8 @@
 open 'os'
 
 let [_ dope testDir] = command_line
+let dope = realpath(dope)
+let testDir = realpath(testDir)
 chdir(testDir)
 
 system("echo ether: `which ether`")

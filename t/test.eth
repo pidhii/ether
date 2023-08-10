@@ -21,7 +21,7 @@ let test_sample = {
     }
   }
 
-  fold_left(fn(#(nok, nfail), #(name, thunk)) {
+  fold_left(fn #(nok, nfail) #(name, thunk) -> {
     if do_test(name, thunk)
     then #(nok+1, nfail)
     else #(nok, nfail+1)

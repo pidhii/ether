@@ -34,13 +34,13 @@ if {opts is [] && args is []} || assq_opt(`h, opts) then
 else if assq_opt(`g, opts) then {
   let ofile = open_out(assq(`o, opts)) or stdout
   let n = {assq(`n, opts) |> to_number} or 1_000_000
-  range(1..n) |> iter (fn(_) print_to(ofile, rand()))
+  range(1..n) |> iter (fn _ -> print_to(ofile, rand()))
   close(ofile)
 }
 
 else {
   let n = `some(assq(`n, opts) |> to_number) or false
-  args |> iter(fn(input_path) {
+  args |> iter(fn input_path -> {
     let l =
       open_in(input_path)
       |> io.read_file
