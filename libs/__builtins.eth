@@ -86,9 +86,9 @@ let pub require = __require
 let pub create_env(defs) {
   #{
     defs
-  , load = fn #{defs} path -> __load(path, defs)
-  , load_stream = fn #{defs} file -> __load_stream(file, defs)
-  , load_string = fn #{defs} str -> __load_stream(__open_string(str), defs)
+    load(#{defs}, path) { __load(path, defs) }
+    load_stream(#{defs}, file) { __load_stream(file, defs) }
+    load_string(#{defs}, str) { __load_stream(__open_string(str), defs) }
   }
 }
 let pub load(path) { __load(path, []) }
