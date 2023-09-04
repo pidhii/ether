@@ -42,10 +42,11 @@ cast_error(eth_type* type, eth_t x)
 }
 
 static eth_type*
-create_type(const char *name, int nfields)
+create_type(const char *name, const char *tag, int nfields)
 {
   eth_type *type = eth_malloc(sizeof(eth_type) + sizeof(size_t) * (nfields + 1));
   type->name = strdup(name);
+  type->tag = NULL;
   type->destroy = default_destroy;
   type->write = eth_default_write;
   type->display = default_display;
@@ -60,31 +61,16 @@ create_type(const char *name, int nfields)
 }
 
 eth_type*
-eth_create_type(const char *name)
+eth_create_tagged_type(const char *name, const char *tag)
 {
-  return create_type(name, 0);
+  return create_type(name, tag, 0);
 }
 
 eth_type*
-eth_create_struct_type(const char *name, char *const *fields,
-    ptrdiff_t const *offs, int n)
+eth_create_tagged_struct_type(const char *name, const char *tag,
+                              const eth_field *fields, int n)
 {
-  eth_type *type = create_type(name, n);
-  type->fields = eth_malloc(sizeof(eth_field) * n);
-  type->nfields = n;
-  for (int i = 0; i < n; ++i)
-  {
-    type->fields[i].name = strdup(fields[i]);
-    type->fields[i].offs = offs[i];
-    type->fieldids[i] = eth_get_symbol_id(eth_sym(fields[i]));
-  }
-  return type;
-}
-
-eth_type*
-eth_create_struct_type2(const char *name, const eth_field *fields, int n)
-{
-  eth_type *type = create_type(name, n);
+  eth_type *type = create_type(name, tag, n);
   type->fields = eth_malloc(sizeof(eth_field) * n);
   type->nfields = n;
   for (int i = 0; i < n; ++i)

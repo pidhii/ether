@@ -12,7 +12,7 @@ let test_mergesort() {
     origlist
     |> map(format("%d"))
     |> join("\n")
-    |> {fn(x) shell({q|ether ./mergesort.eth <<<'{x}' | grep "Sorted list"|q})}
+    |> {fn x -> shell({q|ether ./mergesort.eth <<<'{x}' | grep "Sorted list"|q})}
     |> match( /\[.+\]/)
     |> car
 

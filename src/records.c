@@ -42,86 +42,13 @@ _eth_cleanup_record_types(void)
 }
 
 void
-eth_destroy_record_h1(eth_type *type, eth_t x)
+eth_destroy_record(eth_type *type, eth_t x)
 {
-  assert(type->flag & ETH_TFLAG_PLAIN);
-  eth_struct *tup = ETH_TUPLE(x);
-  eth_unref(tup->data[0]);
-  eth_free_h1(tup);
-}
-
-void
-eth_destroy_record_h2(eth_type *type, eth_t x)
-{
-  assert(type->flag & ETH_TFLAG_PLAIN);
-  eth_struct *tup = ETH_TUPLE(x);
-  eth_unref(tup->data[0]);
-  eth_unref(tup->data[1]);
-  eth_free_h2(tup);
-}
-
-void
-eth_destroy_record_h3(eth_type *type, eth_t x)
-{
-  assert(type->flag & ETH_TFLAG_PLAIN);
-  eth_struct *tup = ETH_TUPLE(x);
-  eth_unref(tup->data[0]);
-  eth_unref(tup->data[1]);
-  eth_unref(tup->data[2]);
-  eth_free_h3(tup);
-}
-
-void
-eth_destroy_record_h4(eth_type *type, eth_t x)
-{
-  assert(type->flag & ETH_TFLAG_PLAIN);
-  eth_struct *tup = ETH_TUPLE(x);
-  eth_unref(tup->data[0]);
-  eth_unref(tup->data[1]);
-  eth_unref(tup->data[2]);
-  eth_unref(tup->data[3]);
-  eth_free_h4(tup);
-}
-
-void
-eth_destroy_record_h5(eth_type *type, eth_t x)
-{
-  assert(type->flag & ETH_TFLAG_PLAIN);
-  eth_struct *tup = ETH_TUPLE(x);
-  eth_unref(tup->data[0]);
-  eth_unref(tup->data[1]);
-  eth_unref(tup->data[2]);
-  eth_unref(tup->data[3]);
-  eth_unref(tup->data[4]);
-  eth_free_h5(tup);
-}
-
-void
-eth_destroy_record_h6(eth_type *type, eth_t x)
-{
-  assert(type->flag & ETH_TFLAG_PLAIN);
-  eth_struct *tup = ETH_TUPLE(x);
-  eth_unref(tup->data[0]);
-  eth_unref(tup->data[1]);
-  eth_unref(tup->data[2]);
-  eth_unref(tup->data[3]);
-  eth_unref(tup->data[4]);
-  eth_unref(tup->data[5]);
-  eth_free_h6(tup);
-}
-
-void
-eth_destroy_record_hn(eth_type *type, eth_t x)
-{
-  if (eth_unlikely(type->nfields <= 6))
-  {
-    eth_error("invalid free for record %s (%d fields)", type->name, type->nfields);
-  }
   assert(type->flag & ETH_TFLAG_PLAIN);
   eth_struct *tup = ETH_TUPLE(x);
   for (int i = 0; i < type->nfields; ++i)
     eth_unref(tup->data[i]);
-  free(tup);
+  eth_free(tup, sizeof(eth_struct) + sizeof(eth_t)*type->nfields);
 }
 
 static void
@@ -218,8 +145,7 @@ eth_record_type(char *const fields[], size_t n)
     }
   }
 
-  char *sortedfields[n];
-  ptrdiff_t offsets[n];
+  eth_field sortedfields[n];
   char totstr[totlen + 2];
   totstr[0] = 0;
   char *p = totstr;
@@ -227,8 +153,8 @@ eth_record_type(char *const fields[], size_t n)
   *p++ = '{';
   for (size_t i = 0; i < n; ++i)
   {
-    sortedfields[i] = (char*)arr[i].str;
-    offsets[i] = offsetof(eth_struct, data[i]);
+    sortedfields[i].name = (char*)arr[i].str;
+    sortedfields[i].offs = offsetof(eth_struct, data[i]);
 
     if (i > 0) *p++ = ',';
     int len = strlen(arr[i].str);
@@ -247,17 +173,8 @@ eth_record_type(char *const fields[], size_t n)
   }
   else
   {
-    eth_type *type = eth_create_struct_type(totstr, sortedfields, offsets, n);
-    switch (n)
-    {
-      case 1:  type->destroy = eth_destroy_record_h1; break;
-      case 2:  type->destroy = eth_destroy_record_h2; break;
-      case 3:  type->destroy = eth_destroy_record_h3; break;
-      case 4:  type->destroy = eth_destroy_record_h4; break;
-      case 5:  type->destroy = eth_destroy_record_h5; break;
-      case 6:  type->destroy = eth_destroy_record_h6; break;
-      default: type->destroy = eth_destroy_record_hn; break;
-    }
+    eth_type *type = eth_create_struct_type(totstr, sortedfields, n);
+    type->destroy = eth_destroy_record;
     type->flag = istuple ? ETH_TFLAG_TUPLE : ETH_TFLAG_RECORD;
     type->write = write_record;
     type->equal = struct_equal;
@@ -299,17 +216,7 @@ eth_create_record(eth_type *type, eth_t const data[])
   assert(eth_is_plain(type));
   int n = type->nfields;
   assert(n > 0);
-  eth_struct *rec;
-  switch (n)
-  {
-    case 1:  rec = eth_alloc_h1(); break;
-    case 2:  rec = eth_alloc_h2(); break;
-    case 3:  rec = eth_alloc_h3(); break;
-    case 4:  rec = eth_alloc_h4(); break;
-    case 5:  rec = eth_alloc_h5(); break;
-    case 6:  rec = eth_alloc_h6(); break;
-    default: rec = eth_malloc(sizeof(eth_struct) + sizeof(eth_t) * n);
-  }
+  eth_struct *rec = eth_alloc(sizeof(eth_struct) + sizeof(eth_t)*n);
   eth_init_header(rec, type);
   for (int i = 0; i < n; ++i)
     eth_ref(rec->data[i] = data[i]);

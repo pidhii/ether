@@ -31,7 +31,7 @@ void
 _eth_init_exit_type(void)
 {
   // use struct-type to enable pattern-matching
-  eth_exit_type = eth_create_struct_type("exit-object", NULL, NULL, 0);
+  eth_exit_type = eth_create_struct_type("exit-object", NULL, 0);
   eth_exit_type->destroy = destroy_exit_object;
 }
 

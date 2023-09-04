@@ -78,7 +78,7 @@ print(map(increment, [1 2 3]))
 
 
 -- Closures/lambda functions
-print(map(fn(x) x^2, [1 2 3]))
+print(map(fn x -> x^2, [1 2 3]))
 
 
 -- Pattern matching
@@ -111,7 +111,7 @@ print(info.login eq login) --> true
 -- `|>` is a "pipe"-operator from OCaml: `x |> f` is equivalent to `f x`
 -- `()` is a synonim for `nil`.
 open 'list'
-range(1 .. 100) |> iter $ fn(i) {
+range(1 .. 100) |> iter $ fn i -> {
   if i mod 3 == 0 then print("FIZZ")
   else if i mod 5 == 0 then print("BUZZ")
   else print(i)

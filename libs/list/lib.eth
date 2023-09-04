@@ -249,7 +249,7 @@ let pub reduce_left'(f, xs) {
 
 let reduce_right_aux(f) {
   let rec aux(xs) {
-    if let x::{_::_ as xs} = xs then
+    if let x::(_::_ as xs) = xs then
       f(x, aux(xs))
     else car(xs)
   }
@@ -257,13 +257,13 @@ let reduce_right_aux(f) {
 }
 
 let pub reduce_right(f, xs) {
-  if let x::{_::_ as xs} = xs then
+  if let x::(_::_ as xs) = xs then
     f(x, reduce_right_aux(f, xs))
   else invalid_argument(nil)
 }
 
 let pub reduce_right'(f, xs) {
-  if let x::{_::_ as xs} = xs then f(x, reduce_right_aux(f, xs))
+  if let x::(_::_ as xs) = xs then f(x, reduce_right_aux(f, xs))
   else { let [x] = xs return x }
 }
 

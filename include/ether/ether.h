@@ -24,6 +24,7 @@
 #include <limits.h>
 #include <stdint.h>
 #include <float.h>
+#include <stdlib.h>
 
 #include "eco/eco.h"
 
@@ -343,6 +344,19 @@ eth_reserve_c_stack(ssize_t size)
   return cpu_sp > eth_cpu_se;
 }
 
+#define ETH_RC_MAX UINT32_MAX
+struct eth_header {
+  eth_type *type;
+#if defined(ETH_OBJECT_FLAGS)
+  uint8_t flags:4;
+  eth_dword_t rc:60;
+#else
+  eth_dword_t rc;
+#endif
+};
+#define ETH(x) ((eth_t)(x))
+
+
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                             ALLOCATORS
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -406,6 +420,39 @@ eth_alloc_h6(void);
 void
 eth_free_h6(void *ptr);
 
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                      generic allocation for objects
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+static inline void*
+eth_alloc(size_t size /* bytes */)
+{
+  switch (size)
+  {
+    case ETH_H1_SIZE: return eth_alloc_h1();
+    case ETH_H2_SIZE: return eth_alloc_h2();
+    case ETH_H3_SIZE: return eth_alloc_h3();
+    case ETH_H4_SIZE: return eth_alloc_h4();
+    case ETH_H5_SIZE: return eth_alloc_h5();
+    case ETH_H6_SIZE: return eth_alloc_h6();
+    default: return malloc(size);
+  }
+}
+
+static inline void
+eth_free(void *ptr, size_t size /* bytes */)
+{
+  switch (size)
+  {
+    case ETH_H1_SIZE: return eth_free_h1(ptr);
+    case ETH_H2_SIZE: return eth_free_h2(ptr);
+    case ETH_H3_SIZE: return eth_free_h3(ptr);
+    case ETH_H4_SIZE: return eth_free_h4(ptr);
+    case ETH_H5_SIZE: return eth_free_h5(ptr);
+    case ETH_H6_SIZE: return eth_free_h6(ptr);
+    default: return free(ptr);
+  }
+}
+
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                              METHODS
@@ -435,11 +482,10 @@ eth_eval_method(eth_methods *ms, eth_t sym, eth_t self);
  * @{ */
 
 /** @ingroup Type */
-struct eth_field {
+typedef struct eth_field {
   char *name; /**< @brief Field name */
   ptrdiff_t offs; /**< @brief Field offset. @todo ...offset from what? */
-};
-typedef struct eth_field eth_field;
+} eth_field;
 
 #define ETH_TFLAG_PLAIN     0x01
 #define ETH_TFLAG_RECORD    (ETH_TFLAG_PLAIN  | 1 << 1)
@@ -450,6 +496,7 @@ typedef struct eth_field eth_field;
 
 struct eth_type {
   char *name;
+  char *tag;
   void (*destroy)(eth_type *type, eth_t x);
 
   void (*write)(eth_type *type, eth_t x, FILE *out);
@@ -496,14 +543,21 @@ eth_t
 eth_cast_id(eth_type *type, eth_t x);
 
 eth_type*
-eth_create_type(const char *name);
+eth_create_tagged_type(const char *name, const char *tag);
+
+static inline eth_type*
+eth_create_type(const char *name)
+{
+  return eth_create_tagged_type(name, NULL);
+}
 
 eth_type*
-eth_create_struct_type(const char *name, char *const *fields,
-    ptrdiff_t const *offs, int n);
+eth_create_tagged_struct_type(const char *name, const char *tag,
+                              const eth_field *fields, int n);
 
-eth_type*
-eth_create_struct_type2(const char *name, const eth_field *fields, int n);
+static inline eth_type*
+eth_create_struct_type(const char *name, const eth_field *fields, int n)
+{ return eth_create_tagged_struct_type(name, NULL, fields, n); }
 
 static inline bool
 eth_is_plain(eth_type *type)
@@ -578,18 +632,6 @@ eth_equal(eth_t x, eth_t y);
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                             OBJECT HEADER
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-#define ETH_RC_MAX UINT32_MAX
-struct eth_header {
-  eth_type *type;
-#if defined(ETH_OBJECT_FLAGS)
-  uint8_t flags:4;
-  eth_dword_t rc:60;
-#else
-  eth_dword_t rc;
-#endif
-};
-#define ETH(x) ((eth_t)(x))
-
 static inline void
 eth_init_header(void *ptr, eth_type *type)
 {

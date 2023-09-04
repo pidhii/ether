@@ -77,9 +77,11 @@ pair_equal(eth_type *type, eth_t x, eth_t y)
 void
 _eth_init_pair_type(void)
 {
-  char *fields[] = { "car", "cdr" };
-  ptrdiff_t offs[] = { offsetof(eth_pair, car), offsetof(eth_pair, cdr) };
-  eth_pair_type = eth_create_struct_type("pair", fields, offs, 2);
+  eth_field fields[] = {
+    { "car", offsetof(eth_pair, car) },
+    { "cdr", offsetof(eth_pair, cdr) }
+  };
+  eth_pair_type = eth_create_struct_type("pair", fields, 2);
   eth_pair_type->destroy = destroy_pair;
   eth_pair_type->write = write_pair;
   eth_pair_type->equal = pair_equal;

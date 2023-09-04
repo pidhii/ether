@@ -23,6 +23,120 @@
 ETH_MODULE("ether:vm")
 
 
+static inline bool
+_updtrcrd(eth_t *restrict r, int out, int src, const size_t *iids,
+          const size_t *vids, const int N)
+{
+  eth_t const x = r[src];
+  eth_type *restrict const type = x->type;
+  bool test = eth_is_like_record(type);
+  if (eth_likely(test))
+  {
+    size_t *restrict const ids = type->fieldids;
+    const int n = type->nfields;
+    assert(n > 0);
+    eth_struct *rec = eth_alloc(sizeof(eth_struct) + sizeof(eth_t)*n);
+    int I = 0;
+    size_t id = iids[I];
+    int i;
+    ids[n] = id;
+    for (i = 0; true; ++i)
+    {
+      if (ids[i] == id)
+      {
+        if (eth_unlikely(i == n))
+        { // field not found => type error
+          test = 0;
+          for (i = n - 1; i >= 0; --i)
+            eth_dec(rec->data[i]);
+          eth_free(rec, sizeof(eth_struct) + sizeof(eth_t)*n);
+          break;
+        }
+        else
+        {
+          // update ith field for the new record
+          eth_ref(rec->data[i] = r[vids[I++]]);
+          if (I == N)
+          { // all requested fields are updated
+            // => copy remaining fields and were done
+            for (i += 1; i < n; ++i)
+              eth_ref(rec->data[i] = eth_tup_get(x, i));
+            eth_init_header(rec, type);
+            if (type->notify_copy)
+              type->notify_copy(type, ETH(rec), x);
+            eth_ref(ETH(rec)); // due to PHI-semantics
+            r[out] = ETH(rec);
+            break;
+          }
+          id = iids[I];
+          ids[n] = id;
+        }
+      }
+      else
+        // copy ith field from the original record
+        eth_ref(rec->data[i] = eth_tup_get(x, i));
+    }
+  }
+  return test;
+}
+
+static inline bool
+_updtrcrd2(eth_t *restrict r, int out, int src, const size_t *iids,
+          eth_t *vals, const int N)
+{
+  eth_t const x = r[src];
+  eth_type *restrict const type = x->type;
+  bool test = eth_is_like_record(type);
+  if (eth_likely(test))
+  {
+    size_t *restrict const ids = type->fieldids;
+    const int n = type->nfields;
+    assert(n > 0);
+    eth_struct *rec = eth_alloc(sizeof(eth_struct) + sizeof(eth_t)*n);
+    int I = 0;
+    size_t id = iids[I];
+    int i;
+    ids[n] = id;
+    for (i = 0; true; ++i)
+    {
+      if (ids[i] == id)
+      {
+        if (eth_unlikely(i == n))
+        { // field not found => type error
+          test = 0;
+          for (i = n - 1; i >= 0; --i)
+            eth_dec(rec->data[i]);
+          eth_free(rec, sizeof(eth_struct) + sizeof(eth_t)*n);
+          break;
+        }
+        else
+        {
+          // update ith field for the new record
+          eth_ref(rec->data[i] = vals[I++]);
+          if (I == N)
+          { // all requested fields are updated
+            // => copy remaining fields and were done
+            for (i += 1; i < n; ++i)
+              eth_ref(rec->data[i] = eth_tup_get(x, i));
+            eth_init_header(rec, type);
+            if (type->notify_copy)
+              type->notify_copy(type, ETH(rec), x);
+            eth_ref(ETH(rec)); // due to PHI-semantics
+            r[out] = ETH(rec);
+            break;
+          }
+          id = iids[I];
+          ids[n] = id;
+        }
+      }
+      else
+        // copy ith field from the original record
+        eth_ref(rec->data[i] = eth_tup_get(x, i));
+    }
+  }
+  return test;
+}
+
 eth_t
 eth_vm(eth_bytecode *bc)
 {
@@ -161,16 +275,28 @@ eth_vm(eth_bytecode *bc)
       OP(APPLY)
       {
         eth_t fn = r[ip->apply.fn];
-        if (eth_unlikely(fn->type != eth_function_type))
+        if (fn->type == eth_function_type)
+        {
+          r[ip->apply.out] = eth_apply(fn, nstack);
+          nstack = 0;
+        }
+        else if (eth_is_record(fn->type))
+        {
+          const int n = nstack;
+          test = _updtrcrd2(r, ip->apply.out, ip->apply.fn,
+                            (const size_t*)eth_ordsyms, eth_sp, n);
+          if (not test)
+            eth_unimplemented();
+          eth_pop_stack(n);
+          nstack = 0;
+        }
+        else
         {
           for (int i = 0; i < nstack; eth_ref(eth_sp[i++]));
           for (int i = 0; i < nstack; eth_unref(eth_sp[i++]));
           r[ip->apply.out] = eth_exn(eth_sym("apply_error"));
           nstack = 0;
-          FAST_DISPATCH_NEXT();
         }
-        r[ip->apply.out] = eth_apply(fn, nstack);
-        nstack = 0;
         FAST_DISPATCH_NEXT();
       }
 
@@ -178,32 +304,43 @@ eth_vm(eth_bytecode *bc)
       OP(APPLYTC)
       {
         eth_t fn = r[ip->apply.fn];
-        if (eth_unlikely(fn->type != eth_function_type))
+        if (fn->type == eth_function_type)
+        {
+          eth_function *restrict func = ETH_FUNCTION(fn);
+          if (func->islam && func->clos.bc->nreg <= nreg && func->arity == nstack)
+          {
+            bc = func->clos.bc;
+            ip = func->clos.bc->code;
+            eth_this = func;
+            nargs = nstack;
+            nstack = 0;
+            PREDICT(POP);
+            FAST_DISPATCH();
+          }
+          else
+          {
+            r[ip->apply.out] = eth_apply(fn, nstack);
+            nstack = 0;
+          }
+        }
+        else if (eth_is_record(fn->type))
+        {
+          const int n = nstack;
+          test = _updtrcrd2(r, ip->apply.out, ip->apply.fn,
+                            (const size_t*)eth_ordsyms, eth_sp, n);
+          if (not test)
+            eth_unimplemented();
+          eth_pop_stack(n);
+          nstack = 0;
+        }
+        else
         {
           for (int i = 0; i < nstack; eth_ref(eth_sp[i]));
           for (int i = 0; i < nstack; eth_unref(eth_sp[i]));
           r[ip->apply.out] = eth_exn(eth_sym("apply_error"));
           nstack = 0;
-          FAST_DISPATCH_NEXT();
         }
-
-        eth_function *restrict func = ETH_FUNCTION(fn);
-        if (func->islam && func->clos.bc->nreg <= nreg && func->arity == nstack)
-        {
-          bc = func->clos.bc;
-          ip = func->clos.bc->code;
-          eth_this = func;
-          nargs = nstack;
-          nstack = 0;
-          PREDICT(POP);
-          FAST_DISPATCH();
-        }
-        else
-        {
-          r[ip->apply.out] = eth_apply(fn, nstack);
-          nstack = 0;
-          FAST_DISPATCH_NEXT();
-        }
+        FAST_DISPATCH_NEXT();
       }
 
       OP(TEST)
@@ -531,17 +668,7 @@ eth_vm(eth_bytecode *bc)
         uint64_t *vids = ip->mkrcrd.vids;
         int n = type->nfields;
         assert(n > 0);
-        eth_struct *rec;
-        switch (n)
-        {
-          case 1:  rec = eth_alloc_h1(); break;
-          case 2:  rec = eth_alloc_h2(); break;
-          case 3:  rec = eth_alloc_h3(); break;
-          case 4:  rec = eth_alloc_h4(); break;
-          case 5:  rec = eth_alloc_h5(); break;
-          case 6:  rec = eth_alloc_h6(); break;
-          default: rec = eth_malloc(sizeof(eth_struct) + sizeof(eth_t) * n);
-        }
+        eth_struct *rec = eth_alloc(sizeof(eth_struct) + sizeof(eth_t) * n);
         eth_init_header(rec, type);
         for (int i = 0; i < n; ++i)
           rec->data[i] = r[vids[i]];
@@ -551,76 +678,8 @@ eth_vm(eth_bytecode *bc)
 
       OP(UPDTRCRD)
       {
-        eth_t const x = r[ip->updtrcrd.src];
-        eth_type *restrict const type = x->type;
-        test = eth_is_like_record(type);
-        if (eth_likely(test))
-        {
-          size_t *restrict const ids = type->fieldids;
-          const int n = type->nfields;
-          assert(n > 0);
-          const int N = ip->updtrcrd.n;
-          eth_struct *rec;
-          switch (n)
-          {
-            case 1:  rec = eth_alloc_h1(); break;
-            case 2:  rec = eth_alloc_h2(); break;
-            case 3:  rec = eth_alloc_h3(); break;
-            case 4:  rec = eth_alloc_h4(); break;
-            case 5:  rec = eth_alloc_h5(); break;
-            case 6:  rec = eth_alloc_h6(); break;
-            default: rec = eth_malloc(sizeof(eth_struct) + sizeof(eth_t) * n);
-          }
-          int I = 0;
-          size_t id = ip->updtrcrd.ids[I];
-          int i;
-          ids[n] = id;
-          for (i = 0; true; ++i)
-          {
-            if (ids[i] == id)
-            {
-              if (eth_unlikely(i == n))
-              { // field not found => type error
-                test = 0;
-                for (i = n - 1; i >= 0; --i)
-                  eth_dec(rec->data[i]);
-                switch (n)
-                {
-                  case 1:  eth_free_h1(rec); break;
-                  case 2:  eth_free_h2(rec); break;
-                  case 3:  eth_free_h3(rec); break;
-                  case 4:  eth_free_h4(rec); break;
-                  case 5:  eth_free_h5(rec); break;
-                  case 6:  eth_free_h6(rec); break;
-                  default: free(rec);
-                }
-                break;
-              }
-              else
-              {
-                // update ith field for the new record
-                eth_ref(rec->data[i] = r[ip->updtrcrd.vids[I++]]);
-                if (I == N)
-                { // all requested fields are updated
-                  // => copy remaining fields and were done
-                  for (i += 1; i < n; ++i)
-                    eth_ref(rec->data[i] = eth_tup_get(x, i));
-                  eth_init_header(rec, type);
-                  if (type->notify_copy)
-                    type->notify_copy(type, ETH(rec), x);
-                  eth_ref(ETH(rec)); // due to PHI-semantics
-                  r[ip->updtrcrd.out] = ETH(rec);
-                  break;
-                }
-                id = ip->updtrcrd.ids[I];
-                ids[n] = id;
-              }
-            }
-            else
-              // copy ith field from the original record
-              eth_ref(rec->data[i] = eth_tup_get(x, i));
-          }
-        }
+        test = _updtrcrd(r, ip->updtrcrd.out, ip->updtrcrd.src, ip->updtrcrd.ids,
+                         ip->updtrcrd.vids, ip->updtrcrd.n);
         FAST_DISPATCH_NEXT();
       }
     }

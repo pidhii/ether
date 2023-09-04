@@ -73,15 +73,19 @@ ranger_equal(eth_type *type, eth_t x, eth_t y)
 void
 _eth_init_range_types(void)
 {
-  char *fieldslr[] = { "l", "r" };
-  char *fieldsl[] = { "l" };
-  char *fieldsr[] = { "r" };
-  ptrdiff_t offslr[] = { offsetof(eth_rangelr, l), offsetof(eth_rangelr, r) };
-  ptrdiff_t offsl[] = { offsetof(eth_rangel, l) };
-  ptrdiff_t offsr[] = { offsetof(eth_ranger, r) };
-  eth_rangelr_type = eth_create_struct_type("rangelr", fieldslr, offslr, 2);
-  eth_rangel_type = eth_create_struct_type("rangel", fieldsl, offsl, 1);
-  eth_ranger_type = eth_create_struct_type("ranger", fieldsr, offsr, 1);
+  eth_field fieldslr[] = {
+    { "l", offsetof(eth_rangelr, l) },
+    { "r", offsetof(eth_rangelr, r) },
+  };
+  eth_field fieldsl[] = {
+    { "l", offsetof(eth_rangel, l) }
+  };
+  eth_field fieldsr[] = {
+    { "r", offsetof(eth_ranger, r) }
+  };
+  eth_rangelr_type = eth_create_struct_type("rangelr", fieldslr, 2);
+  eth_rangel_type = eth_create_struct_type("rangel", fieldsl, 1);
+  eth_ranger_type = eth_create_struct_type("ranger", fieldsr, 1);
   eth_rangelr_type->destroy = destroy_lr;
   eth_rangel_type->destroy = destroy_l;
   eth_ranger_type->destroy = destroy_r;

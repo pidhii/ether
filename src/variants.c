@@ -75,9 +75,10 @@ eth_variant_type(const char *tag)
   }
   else
   {
-    char *_0 = "_0";
-    ptrdiff_t offs = offsetof(eth_variant, val);
-    eth_type *type = eth_create_struct_type("variant", &_0, &offs, 1);
+    eth_field field[] = {
+      { "_0", offsetof(eth_variant, val) }
+    };
+    eth_type *type = eth_create_struct_type("variant", field, 1);
     type->destroy = destroy_variant;
     type->write = write_variant;
     type->equal = variant_equal;
