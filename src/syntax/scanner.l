@@ -272,6 +272,7 @@ inf                                 |
 }
 
 
+struct { return STRUCT; }
 open   { return OPEN; }
 import { return IMPORT; }
 rec    { return REC; }

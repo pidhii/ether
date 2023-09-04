@@ -187,6 +187,7 @@ _create_attr(int aflag, void *locpp)
 // =============================================================================
 %token START_REPL UNDEFINED
 %token START_FORMAT END_FORMAT
+%token STRUCT
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %token<number> NUMBER
 %token<string> SYMBOL CAPSYMBOL
@@ -196,7 +197,6 @@ _create_attr(int aflag, void *locpp)
 %token START_REGEXP
 %token<integer> END_REGEXP
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-%left WTF
 %right ';'
 %right FN
 %nonassoc AS
@@ -309,6 +309,13 @@ Atom
     $$ = eth_ast_make_record(eth_tuple_type(n), fields, $3.data, n);
     cod_vec_destroy($3);
   }
+  | STRUCT '{' Record '}' {
+    eth_type *type = eth_record_type($3.keys.data, $3.keys.len);
+    $$ = eth_ast_make_record(type, $3.keys.data, $3.vals.data, $3.keys.len);
+    cod_vec_iter($3.keys, i, x, free(x));
+    cod_vec_destroy($3.keys);
+    cod_vec_destroy($3.vals);
+  }
   | '#' '{'  Record '}' {
     eth_type *type = eth_record_type($3.keys.data, $3.keys.len);
     $$ = eth_ast_make_record(type, $3.keys.data, $3.vals.data, $3.keys.len);
@@ -352,6 +359,12 @@ Atom
     cod_vec_destroy($2);
   }
 
+  | Atom '{' Record '}' %prec APPLY {
+    $$ = eth_ast_update($1, $3.vals.data, $3.keys.data, $3.vals.len);
+    cod_vec_destroy($3.vals);
+    cod_vec_iter($3.keys, i, x, free(x));
+    cod_vec_destroy($3.keys);
+  }
   | Atom '(' Args ')' %prec APPLY {
     if ($1->tag == ETH_AST_CVAL and
         $1->cval.val->type == eth_symbol_type)
@@ -801,6 +814,12 @@ AtomicPattern
     cod_vec_destroy($3);
   }
   | '#' '{' RecordPattern '}' {
+    $$ = eth_ast_record_pattern($3.keys.data, $3.vals.data, $3.keys.len);
+    cod_vec_iter($3.keys, i, x, free(x));
+    cod_vec_destroy($3.keys);
+    cod_vec_destroy($3.vals);
+  }
+  | STRUCT '{' RecordPattern '}' {
     $$ = eth_ast_record_pattern($3.keys.data, $3.vals.data, $3.keys.len);
     cod_vec_iter($3.keys, i, x, free(x));
     cod_vec_destroy($3.keys);
