@@ -107,7 +107,7 @@ let do_in_tempdir(thunk) {
 
 
 let rec confirm?(x) {
-  if let #(prompt1, prompt2) = x then {
+  if let (prompt1, prompt2) = x then {
     let rec loop(ans) {
       if ans =~ /[Yy](es)?/ then true
       else if ans =~ /[Nn]o?/ then false
@@ -116,7 +116,7 @@ let rec confirm?(x) {
     loop(input(prompt1))
   }
   else
-    confirm?(#(x, paint(" try again (yes/no): ")))
+    confirm?((x, paint(" try again (yes/no): ")))
 }
 
 
@@ -143,26 +143,26 @@ let fuzzy_cmp(a, b) {
   let getmem(i, j, mem) { vector.get(mem, i-1 + lena * {j-1}) }
   let setmem(i, j, x, mem) { vector.insert(mem, i-1 + lena * {j-1}, x) }
   -- Indicator function.
-  let ind(i, j) { if substr(#(i-1, 1), a) eq substr(#(j-1, 1), b) then 0 else 1 }
+  let ind(i, j) { if substr((i-1, 1), a) eq substr((j-1, 1), b) then 0 else 1 }
   -- Levenshtein distance function.
   let rec distance(i, j, mem) {
     if min(i, j) == 0 then
-      #(max(i, j), mem)
+      (max(i, j), mem)
     else {
       let dist = getmem(i, j, mem)
       if dist then
         -- Already computed.
-        return #(dist, mem)
+        return (dist, mem)
       else {
         -- Honestly compute it.
-        let #(dist, mem) = {
-          let #(dist1, mem) = distance(i-1, j, mem)
-          let #(dist2, mem) = distance(i, j-1, mem)
-          let #(dist3, mem) = distance(i-1, j-1, mem)
+        let (dist, mem) = {
+          let (dist1, mem) = distance(i-1, j, mem)
+          let (dist2, mem) = distance(i, j-1, mem)
+          let (dist3, mem) = distance(i-1, j-1, mem)
           --(reduce_left min [dist1 + 1, dist2 + 1, dist3 + ind i j], mem) -- original
           #(reduce_left(min, [dist1, dist2, dist3 + ind(i, j) - 1]), mem) -- mine
         }
-        return #(dist, setmem(i, j, dist, mem))
+        return (dist, setmem(i, j, dist, mem))
       }
     }
   }
@@ -179,10 +179,10 @@ let load_db_from(path) {
     get_modlist(self) { modlist }
     get_path(self) { path }
     get_module_opt(self, name) {
-      find_opt(fn #{name = name'} -> strcasecmp(name, name') == 0, modlist)
+      find_opt(fn {name = name'} -> strcasecmp(name, name') == 0, modlist)
     }
     remove(self, name) {
-      modlist := remove(fn #{name = name'} -> strcasecmp(name', name) == 0, modlist)
+      modlist := remove(fn {name = name'} -> strcasecmp(name', name) == 0, modlist)
     }
     add(self, entry) { modlist := entry :: modlist }
     update(self) {
@@ -207,16 +207,16 @@ let git = {
     if refs eq "" then []
     else
       refs
-      |> split( /\n/)
+      |> split(/\n/)
       |> map(fn line -> line =~ /refs\/tags\/(.+)/)
       -- Decode version-tags into major, minor and a patch.
       |> filter_map(fn tag ->
-          if let _ :: version = match( /([0-9]+)\.([0-9]+)\.([0-9]+)/, tag) then {
-            `some(#(tag, map(to_number, version)))
+          if let _ :: version = match(/([0-9]+)\.([0-9]+)\.([0-9]+)/, tag) then {
+            `some((tag, map(to_number, version)))
           }
       )
       -- Sort versions.
-      |> sort(fn #(_, a), #(_, b) -> {
+      |> sort(fn (_, a), (_, b) -> {
           let rec loop(xs, ys) {
             if let x :: xs' = xs then
               if let y :: ys' = ys then
@@ -236,7 +236,7 @@ let git = {
     commit
   }
 
-  let clone(#{url dir version}) {
+  let clone({url dir version}) {
     if not exist?(url) then
       require_network()
 
@@ -265,18 +265,18 @@ let git = {
 --------------------------------[ GitHub-API ]----------------------------------
 let search_repositories(tgt_name) {
   require_network()
-  let #{items} =
+  let {items} =
     shell("curl -s 'https://api.github.com/search/repositories?q={tgt_name}'")
     |> json.parse
   -- Remove items with name mismatch
-  items |> filter(fn #{name} -> name eq tgt_name)
+  items |> filter(fn {name} -> name eq tgt_name)
 }
 
 -----------------------------------[ Misc ]-------------------------------------
 let load_config(dir, args) {
-  let #(_, conf) =
+  let (_, conf) =
     try {
-      let env = create_env([#("command_line", args), #("root", dir)])
+      let env = create_env([("command_line", args), ("root", dir)])
       let install_cfg = dir ++ "/install.eth"
       env:load(install_cfg)
     }
@@ -302,8 +302,8 @@ let empty_db_entry = #{
   version = nil,
 }
 
-let uninstall(#{db, modname}) {
-  if let `some(#{install_dir}) = db:get_module_opt(modname) then {
+let uninstall({db, modname}) {
+  if let `some({install_dir}) = db:get_module_opt(modname) then {
     -- Remove module directory
     info("uninstalling module '{modname}'")
     unlink(install_dir)
@@ -318,7 +318,7 @@ let uninstall(#{db, modname}) {
   }
 }
 
-let build_and_install(#{conf modentry db dir args overwrite}) {
+let build_and_install({conf modentry db dir args overwrite}) {
   let #{name files main build post_install} = conf
 
   -- Check if module name is unique
@@ -372,7 +372,7 @@ let build_and_install(#{conf modentry db dir args overwrite}) {
   }
 }
 
-let fetch(#{repo_url version}) {
+let fetch({repo_url version}) {
   let repo_dir = "repo_dir"
   try git.clone(#{url = repo_url, dir = repo_dir, version})
   with `git_failure(what) -> fatal_error(what)
@@ -381,7 +381,7 @@ let fetch(#{repo_url version}) {
 
 -- Clone repository to a temporary directory. There we will build it and
 -- probably install.
-let install(#{db repo_url version args overwrite}) {
+let install({db repo_url version args overwrite}) {
   do_in_tempdir(fn -> {
     info("fetching '{repo_url}' ({version})")
     let repo_dir = fetch(#{repo_url version})
@@ -393,7 +393,7 @@ let install(#{db repo_url version args overwrite}) {
 }
 
 
-let check_update(#{name local_version repo_url}) {
+let check_update({name local_version repo_url}) {
   if not exist?(repo_url) then
     require_network()
   let remote_versions = git.list_versions(repo_url)
@@ -431,12 +431,12 @@ let list_modules() {
     let f(isfirst, modentry) {
       if not isfirst then
         print("")
-      let #{name} = modentry
+      let {name} = modentry
       --info "module \e[1m{name}\e[21m:"
       info("module \e[1m{name}:")
       list(modentry)
-      |> filter(fn #(k _) -> k not eq "name")
-      |> iter(fn #(k v) -> info("- \e[4m{k}\e[24m: {v}"))
+      |> filter(fn (k _) -> k not eq "name")
+      |> iter(fn (k v) -> info("- \e[4m{k}\e[24m: {v}"))
       false
     }
     fold_left(f, true, db)
@@ -484,9 +484,9 @@ let resolve_repository_url(url) {
       else {
         -- Multiple matches. Have to select only a single one of these.
         info("multiple repositories match the name, select one to install:")
-        let repo_names = map(fn #{full_name} -> full_name, github_matches)
+        let repo_names = map(fn {full_name} -> full_name, github_matches)
         if let `some(ans) = select_opt(repo_names) then {
-          let #{clone_url} = find(fn x -> x.full_name eq ans, github_matches)
+          let {clone_url} = find(fn x -> x.full_name eq ans, github_matches)
           return clone_url
         }
         else {
@@ -608,7 +608,7 @@ let commands =
           #{ name = "help", val = "help", has_arg = false }
           #{ name = "h", val = "help", has_arg = false }
         ]
-        let #(opts _) = cmdarg.get(options, command_line)
+        let (opts _) = cmdarg.get(options, command_line)
 
         if assoc_opt("help", opts) then help_help()
         else if assoc_opt("dev", opts) then help_dev()
@@ -628,7 +628,7 @@ let commands =
           #{ name = ["h", "help"], val = "help", has_arg = false }
           #{ name = "latest", val = "latest", has_arg = false }
         ]
-        let #(opts args) = cmdarg.get(options, command_line)
+        let (opts args) = cmdarg.get(options, command_line)
 
         if assoc_opt("help", opts) then
           install_help()
@@ -694,7 +694,7 @@ let commands =
           #{ name = "help", val = "help", has_arg = false }
           #{ name = "h", val = "help", has_arg = false }
         ]
-        let #(opts args) = cmdarg.get(options, command_line)
+        let (opts args) = cmdarg.get(options, command_line)
 
         if assoc_opt("help", opts) then
           die("unimplemented")
@@ -710,10 +710,10 @@ let commands =
       handle(command_line) {
         let modlist = load_db_from(default_db_path):get_modlist()
         let cnt =
-          fold_left(fn cnt #{name, version = local_version, repository = repo_url} -> {
+          fold_left(fn cnt {name, version = local_version, repository = repo_url} -> {
             write_to(stdout, paint(" checking \e[1m{name}\e[22m ... "))
             flush(stdout)
-            if let #{info_mesg} = check_update(#{name local_version repo_url})
+            if let {info_mesg} = check_update(#{name local_version repo_url})
             then { write_to(stdout, "\e[2K\r") info(info_mesg) cnt + 1 }
             else { write_to(stdout, "\e[2K\r") cnt }
           }, 0, modlist)
@@ -729,17 +729,17 @@ let commands =
           #{ name = "help", val = "help", has_arg = false }
           #{ name = "h", val = "help", has_arg = false }
         ]
-        let #(opts args) = cmdarg.get(options, command_line)
+        let (opts args) = cmdarg.get(options, command_line)
         if assoc_opt("help", opts) then
           die("unimplemented")
         else {
           let db = load_db_from(default_db_path)
           if args eq [] then {
             -- Update all modules.
-            db:get_modlist() |> iter(fn #{name, version = local_version, repository = repo_url} -> {
+            db:get_modlist() |> iter(fn {name, version = local_version, repository = repo_url} -> {
               write_to(stdout, paint(" checking \e[1m{name}\e[22m ... "))
               flush(stdout)
-              if let #{new_version info_mesg} =
+              if let {new_version info_mesg} =
                       check_update(#{name local_version repo_url})
               then {
                 write_to(stdout, "\e[2K\r")
@@ -760,8 +760,8 @@ let commands =
           }
           else {
             let name::args = args
-            if let `some(#{repository version}) = db:get_module_opt(name) then
-              if let #{new_version} =
+            if let `some({repository version}) = db:get_module_opt(name) then
+              if let {new_version} =
                       check_update(#{name, local_version = version, repo_url = repository})
               then {
                 -- Install
@@ -784,20 +784,20 @@ let commands =
   ]
 
 let find_command_opt(name) {
-  find_opt(fn #{keys} -> member?(name, keys), commands)
+  find_opt(fn {keys} -> member?(name, keys), commands)
 }
 
 let main() {
-  if let `some(#{handle}) = find_command_opt(cmd) then
+  if let `some({handle}) = find_command_opt(cmd) then
     handle(command_line)
   else {
     error("undefined command: '{cmd}'")
 
-    let possible_commands = flat_map(fn #{keys} -> keys, commands)
+    let possible_commands = flat_map(fn {keys} -> keys, commands)
     let cands =
       possible_commands
-      |> rev_map(fn str -> #(str, fuzzy_cmp(str, cmd)))
-      |> sort (fn #(_ a), #(_ b) -> a < b)
+      |> rev_map(fn str -> (str, fuzzy_cmp(str, cmd)))
+      |> sort (fn (_ a), (_ b) -> a < b)
     info("did you mean '\e[1m{first(car(cands))}\e[22m'?")
 
     info("see `{basename(dopepath)} help` for avaliable commands")

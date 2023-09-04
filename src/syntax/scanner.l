@@ -154,7 +154,9 @@ fn              { return FN; }
   ENTER_STATE(STRING);
   return '"';
 }
-[[:space:]]+"/"/[^[:space:]] {
+[^[:alnum:]"']?"/"/[^[:space:]] {
+  if (yytext[0] != '/')
+    REJECT;
   ENTER_STATE(REGEXP);
   /*char *p = strchr(yytext, '/');*/
   /*yyless(p - yytext + 1);*/

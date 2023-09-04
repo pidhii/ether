@@ -243,6 +243,7 @@ _create_attr(int aflag, void *locpp)
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %left UMINUS UPLUS NOT LNOT
 %right COMPOSE
+%nonassoc GROUPING
 %nonassoc APPLY
 %left '.' ':' '%'
 
@@ -321,6 +322,34 @@ Atom
     cod_vec_destroy($5.vals);
     cod_vec_iter($5.keys, i, x, free(x));
     cod_vec_destroy($5.keys);
+  }
+
+  | '(' List ')' %prec GROUPING {
+    if ($2.len == 1)
+    {
+      $$ = $2.data[0];
+    }
+    else
+    {
+      int n = $2.len;
+      char fieldsbuf[n][22];
+      char *fields[n];
+      for (int i = 0; i < n; ++i)
+      {
+        fields[i] = fieldsbuf[i];
+        sprintf(fields[i], "_%d", i+1);
+      }
+      if ($2.len <= 1)
+      {
+        eth_error("invalid tuple");
+        eth_location *loc = location(&@$);
+        eth_print_location(loc, stderr);
+        eth_drop_location(loc);
+        abort();
+      }
+      $$ = eth_ast_make_record(eth_tuple_type(n), fields, $2.data, n);
+    }
+    cod_vec_destroy($2);
   }
 
   | Atom '(' Args ')' %prec APPLY {
@@ -501,12 +530,6 @@ Expr
     $$ = eth_ast_apply(eth_ast_cval(lazy), &thunk, 1);
   }
 
-  | FN '(' PatternList ')' Expr %prec FN {
-    MESSAGE(warning, @$, "deprecated syntax: `fn (<args>) <expr>`");
-    $$ = eth_ast_fn_with_patterns($3.data, $3.len, $5);
-    cod_vec_destroy($3);
-    LOC($$, @$);
-  }
   | FN PatternList RARROW Expr %prec FN {
     $$ = eth_ast_fn_with_patterns($2.data, $2.len, $4);
     cod_vec_destroy($2);
@@ -727,7 +750,34 @@ AtomicPattern
   }
   | NUMBER { $$ = eth_ast_constant_pattern(eth_create_number($1)); }
   | '['']' { $$ = eth_ast_constant_pattern(eth_nil); }
-  | '{' ExprPattern '}' { $$ = $2; }
+  | '(' PatternList ')' %prec GROUPING {
+    if ($2.len == 1)
+    {
+      $$ = $2.data[0];
+    }
+    else
+    {
+      if ($2.len < 1)
+      {
+        eth_error("invalid tuple");
+        eth_location *loc = location(&@$);
+        eth_print_location(loc, stderr);
+        eth_drop_location(loc);
+        abort();
+      }
+
+      int n = $2.len;
+      char fieldsbuf[n][22];
+      char *fields[n];
+      for (int i = 0; i < n; ++i)
+      {
+        fields[i] = fieldsbuf[i];
+        sprintf(fields[i], "_%d", i+1);
+      }
+      $$ = eth_ast_record_pattern(fields, $2.data, n);
+    }
+    cod_vec_destroy($2);
+  }
   | '#' '(' PatternList  ')' {
     if ($3.len < 1)
     {
@@ -755,6 +805,12 @@ AtomicPattern
     cod_vec_iter($3.keys, i, x, free(x));
     cod_vec_destroy($3.keys);
     cod_vec_destroy($3.vals);
+  }
+  | '{' RecordPattern '}' {
+    $$ = eth_ast_record_pattern($2.keys.data, $2.vals.data, $2.keys.len);
+    cod_vec_iter($2.keys, i, x, free(x));
+    cod_vec_destroy($2.keys);
+    cod_vec_destroy($2.vals);
   }
   | '#' '{' Attribute '*' '}' {
     $$ = eth_ast_record_star_pattern();
