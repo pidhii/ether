@@ -28,6 +28,8 @@ ETH_MODULE("ether:record")
 static
 cod_hash_map *g_rectab;
 
+static
+cod_vec(eth_type*) g_unque_types;
 
 void
 _eth_init_record_types(void)
@@ -39,6 +41,9 @@ void
 _eth_cleanup_record_types(void)
 {
   cod_hash_map_delete(g_rectab, (void*)eth_destroy_type);
+  for (size_t i = 0; i < g_unque_types.len; ++i)
+    eth_destroy_type(g_unque_types.data[i]);
+  cod_vec_destroy(g_unque_types);
 }
 
 void
@@ -110,22 +115,18 @@ eth_tuple_type(size_t n)
   return ret;
 }
 
-// TODO: this looks ugly
-eth_type*
-eth_record_type(char *const fields[], size_t n)
+typedef struct { const char *str; size_t id; } info;
+static void
+study(char *const fields[], size_t n, info fldinfo[], size_t *namelen)
 {
-  assert(n > 0);
-
-  typedef struct { const char *str; size_t id; } info;
-  info arr[n];
-  size_t totlen = 0;
+  *namelen = 0;
   for (size_t i = 0; i < n; ++i)
   {
-    arr[i].str = fields[i];
-    arr[i].id = eth_get_symbol_id(eth_sym(fields[i]));
-    totlen += strlen(fields[i]);
+    fldinfo[i].str = fields[i];
+    fldinfo[i].id = eth_get_symbol_id(eth_sym(fields[i]));
+    *namelen += strlen(fields[i]);
   }
-  totlen += n + 1;
+  *namelen += n + 2;
 
   int cmp(const void *p1, const void *p2)
   {
@@ -133,56 +134,102 @@ eth_record_type(char *const fields[], size_t n)
     const info *i2 = p2;
     return i1->id - i2->id;
   }
-  qsort(arr, n, sizeof(info), cmp);
+  qsort(fldinfo, n, sizeof(info), cmp);
+}
 
-  bool istuple = true;
+static bool
+is_tuple(const info fldinfo[], size_t n)
+{
   for (size_t i = 0; i < n; ++i)
   {
-    if (strcmp(arr[i].str, eth_get_symbol_cstr(eth_ordsyms[i+1])) != 0)
-    {
-      istuple = false;
-      break;
-    }
+    if (strcmp(fldinfo[i].str, eth_get_symbol_cstr(eth_ordsyms[i+1])) != 0)
+      return false;
   }
+  return true;
+}
 
-  eth_field sortedfields[n];
-  char totstr[totlen + 2];
-  totstr[0] = 0;
-  char *p = totstr;
+static void
+generate_name(const info fldinfo[], size_t n, char *name)
+{
+  char *p = name;
+  *p = 0;
   // ---
   *p++ = '{';
   for (size_t i = 0; i < n; ++i)
   {
-    sortedfields[i].name = (char*)arr[i].str;
-    sortedfields[i].offs = offsetof(eth_struct, data[i]);
-
     if (i > 0) *p++ = ',';
-    int len = strlen(arr[i].str);
-    memcpy(p, arr[i].str, len);
+    int len = strlen(fldinfo[i].str);
+    memcpy(p, fldinfo[i].str, len);
     p += len;
   }
   *p++ = '}';
   *p++ = '\0';
-  // ---
+}
+
+static void
+make_fields(const info fldinfo[], size_t n, eth_field fields[])
+{
+  for (size_t i = 0; i < n; ++i)
+  {
+    fields[i].name = (char*)fldinfo[i].str;
+    fields[i].offs = offsetof(eth_struct, data[i]);
+  }
+}
+
+static eth_type*
+record_type(char *const fldnames[], size_t n, bool unique)
+{
+  assert(n > 0);
+
+  info arr[n];
+  size_t totlen;
+  study(fldnames, n, arr, &totlen);
+
+  bool istuple = is_tuple(arr, n);
+
+  char totstr[totlen + 1];
+  generate_name(arr, n, totstr);
+
+  eth_field fields[n];
+  make_fields(arr, n, fields);
+
   eth_hash_t hash = cod_halfsiphash(eth_get_siphash_key(), (void*)totstr, totlen);
 
-  cod_hash_map_elt *elt;
-  if ((elt = cod_hash_map_find(g_rectab, totstr, hash)))
+  if (not unique)
   {
-    return elt->val;
+    cod_hash_map_elt *elt;
+    if ((elt = cod_hash_map_find(g_rectab, totstr, hash)))
+      return elt->val;
   }
+
+  eth_type *type = eth_create_struct_type(totstr, fields, n);
+  type->destroy = eth_destroy_record;
+  type->flag = istuple ? ETH_TFLAG_TUPLE : ETH_TFLAG_RECORD;
+  type->write = write_record;
+  type->equal = struct_equal;
+
+  if (unique)
+    cod_vec_push(g_unque_types, type);
   else
   {
-    eth_type *type = eth_create_struct_type(totstr, sortedfields, n);
-    type->destroy = eth_destroy_record;
-    type->flag = istuple ? ETH_TFLAG_TUPLE : ETH_TFLAG_RECORD;
-    type->write = write_record;
-    type->equal = struct_equal;
-
     int ok = cod_hash_map_insert(g_rectab, totstr, hash, type, NULL);
     assert(ok);
-    return type;
   }
+
+  return type;
+}
+
+// TODO: this looks ugly
+eth_type*
+eth_record_type(char *const fields[], size_t n)
+{
+  return record_type(fields, n, false);
+}
+
+eth_type*
+eth_unique_record_type(char *const fields[], size_t n)
+{
+  return record_type(fields, n, true);
 }
 
 

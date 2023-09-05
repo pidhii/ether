@@ -514,28 +514,6 @@ struct eth_type {
   size_t fieldids[];
 };
 
-//typedef struct eth_value eth_value;
-
-//enum eth_type_tag {
-  //ETH_TYPE_NUMBER,
-  //ETH_TYPE_SYMBOL,
-  //ETH_TYPE_STRING,
-  //ETH_TYPE_PAIR,
-  //ETH_TYPE_VECTOR,
-//};
-
-//struct eth_value {
-  //uint32_t type_tag;
-  //uint32_t rc;
-  //union {
-    //long double num;
-    //char *sym;
-    //char *str;
-    //struct { eth_value *car, *cdr; } pair;
-
-  //};
-//};
-
 void
 eth_default_write(eth_type *type, eth_t x, FILE *out);
 
@@ -1188,6 +1166,9 @@ eth_tuple_type(size_t n);
 
 eth_type*
 eth_record_type(char *const fields[], size_t n);
+
+eth_type*
+eth_unique_record_type(char *const fields[], size_t n);
 
 static inline eth_t
 eth_create_tuple_2(eth_t _1, eth_t _2)

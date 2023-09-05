@@ -310,7 +310,7 @@ Atom
     cod_vec_destroy($3);
   }
   | STRUCT '{' Record '}' {
-    eth_type *type = eth_record_type($3.keys.data, $3.keys.len);
+    eth_type *type = eth_unique_record_type($3.keys.data, $3.keys.len);
     $$ = eth_ast_make_record(type, $3.keys.data, $3.vals.data, $3.keys.len);
     cod_vec_iter($3.keys, i, x, free(x));
     cod_vec_destroy($3.keys);
@@ -432,44 +432,6 @@ Expr
   }
 
   | ASSERT Expr { $$ = eth_ast_assert($2); }
-
-  /*| Form RARROW Expr {*/
-    /*if ($1->tag == ETH_AST_APPLY)*/
-    /*{*/
-      /*int n = 1 + $1->apply.nargs;*/
-      /*cod_vec(eth_ast_pattern*) pats;*/
-      /*cod_vec_init_with_cap(pats, n);*/
-      /*cod_vec_push(pats, eth_ast_to_pattern($1->apply.fn));*/
-      /*for (int i = 1; i < n; ++i)*/
-        /*cod_vec_push(pats, eth_ast_to_pattern($1->apply.args[i-1]));*/
-
-      /*[> check if all expressions successfully converted <]*/
-      /*bool failed = false;*/
-      /*cod_vec_iter(pats, i, x, if (x == NULL) failed = true);*/
-
-      /*if (failed)*/
-      /*{*/
-        /*eth_error("can not convert AST-expression to a pattern");*/
-        /*abort();*/
-      /*}*/
-      /*$$ = eth_ast_fn_with_patterns(pats.data, n, $3);*/
-      /*cod_vec_destroy(pats);*/
-      /*eth_drop_ast($1);*/
-      /*LOC($$, @$);*/
-    /*}*/
-    /*else*/
-    /*{*/
-      /*eth_ast_pattern *pat = eth_ast_to_pattern($1);*/
-      /*if (pat == NULL)*/
-      /*{*/
-        /*eth_error("can not convert AST-expression to a pattern");*/
-        /*abort();*/
-      /*}*/
-      /*$$ = eth_ast_fn_with_patterns(&pat, 1, $3);*/
-      /*eth_drop_ast($1);*/
-      /*LOC($$, @$);*/
-    /*}*/
-  /*}*/
 
   | Expr OR Expr { $$ = eth_ast_try(NULL, $1, $3, 0); LOC($$, @$); }
   | Expr OPAND Expr { $$ = eth_ast_and($1, $3); LOC($$, @$); }

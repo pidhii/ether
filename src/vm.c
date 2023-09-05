@@ -280,11 +280,11 @@ eth_vm(eth_bytecode *bc)
           r[ip->apply.out] = eth_apply(fn, nstack);
           nstack = 0;
         }
-        else if (eth_is_record(fn->type))
+        else if (eth_is_like_record(fn->type))
         {
           const int n = nstack;
           test = _updtrcrd2(r, ip->apply.out, ip->apply.fn,
-                            (const size_t*)eth_ordsyms, eth_sp, n);
+                            (const size_t*)(eth_ordsyms+1), eth_sp, n);
           if (not test)
             eth_unimplemented();
           eth_pop_stack(n);
@@ -323,7 +323,7 @@ eth_vm(eth_bytecode *bc)
             nstack = 0;
           }
         }
-        else if (eth_is_record(fn->type))
+        else if (eth_is_like_record(fn->type))
         {
           const int n = nstack;
           test = _updtrcrd2(r, ip->apply.out, ip->apply.fn,
