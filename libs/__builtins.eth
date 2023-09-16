@@ -42,8 +42,8 @@ let pub ($)(f, x) { f(x) }
 let pub (|>)(x, f) { f(x) }
 
 -- Pairs
-let pub car(x :: _) { x }
-let pub cdr(_ :: x) { x }
+let pub car((x :: _)) { x }
+let pub cdr((_ :: x)) { x }
 
 -- Tuples
 let pub first(#{_1 = x}) { x }
@@ -188,3 +188,6 @@ let pub failure(nil) { raise(`failure) }
 let pub invalid_argument(nil) { raise(`invalid_argument) }
 let pub type_error(nil) { raise(`type_error) }
 
+
+
+pub struct Some { _1 = nil }

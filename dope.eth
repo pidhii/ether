@@ -36,42 +36,44 @@ let module_path = {
   else prefix ++ "/lib/ether"
 }
 
+pub struct SystemError { _1 = nil }
+
 -- Checks whether a file exists in the file system
 let exist?(path) {
-  try access(path, F_OK)
-  with `system_error(`ENOENT) -> false
+  try access(path, f_ok)
+  with SystemError(`ENOENT) -> false
 }
 
 let mkdir(path) {
   if system("mkdir -vp '{path}'") != 0 then
-    raise(`system_error)
+    raise(SystemError)
 }
 
 let copy(src, dst) {
   if system("cp -rv '{src}' '{dst}'") != 0 then
-    raise(`system_error)
+    raise(SystemError)
 }
 
 let create_symlink(src, dst) {
   if system("ln -vs '{src}' '{dst}'") != 0 then
-    raise(`system_error)
+    raise(SystemError)
 }
 
 let unlink(path) {
   if system("rm -rfv '{path}'") != 0 then
-    raise(`system_error)
+    raise(SystemError)
 }
 
 let unlink_quite(path) {
   if system("rm -rf '{path}'") != 0 then
-    raise(`system_error)
+    raise(SystemError)
 }
 
 let utc_date() {
   let pipe = open_pipe_in("date -u +'%x %X'")
   let line = read_line_of(pipe)
   if close(pipe) != 0
-  then raise(`system_error)
+  then raise(SystemError)
   else chomp(line)
 }
 
@@ -106,17 +108,13 @@ let do_in_tempdir(thunk) {
 }
 
 
-let rec confirm?(x) {
-  if let (prompt1, prompt2) = x then {
-    let rec loop(ans) {
-      if ans =~ /[Yy](es)?/ then true
-      else if ans =~ /[Nn]o?/ then false
-      else loop(input(prompt2))
-    }
-    loop(input(prompt1))
+let rec confirm?(prompt) {
+  let rec loop(ans) {
+    if ans =~ /[Yy](es)?/ then true
+    else if ans =~ /[Nn]o?/ then false
+    else loop(input(paint(" try again (yes/no): ")))
   }
-  else
-    confirm?((x, paint(" try again (yes/no): ")))
+  loop(input(prompt))
 }
 
 
@@ -127,7 +125,7 @@ let check_network() {
 let require_network() {
   if not check_network() then {
     error("no network connection")
-    raise(`failure)
+    failure(nil)
   }
 }
 
@@ -181,11 +179,11 @@ let load_db_from(path) {
     get_module_opt(self, name) {
       find_opt(fn {name = name'} -> strcasecmp(name, name') == 0, modlist)
     }
-    remove(self, name) {
+    remove_entry(self, name) {
       modlist := remove(fn {name = name'} -> strcasecmp(name', name) == 0, modlist)
     }
-    add(self, entry) { modlist := entry :: modlist }
-    update(self) {
+    add_entry(self, entry) { modlist := entry :: modlist }
+    write_to_disk(self) {
       let dbfile = open_out(path)
       write_to(dbfile, format("%w\n", modlist))
     }
@@ -193,6 +191,9 @@ let load_db_from(path) {
 }
 
 ---------------------------------[ Git-API ]------------------------------------
+struct Commit { _1 = nil }
+struct Tag { _1 = nil }
+
 let git = {
   let repository?(url) {
     if not exist?(url) then
@@ -212,7 +213,7 @@ let git = {
       -- Decode version-tags into major, minor and a patch.
       |> filter_map(fn tag ->
           if let _ :: version = match(/([0-9]+)\.([0-9]+)\.([0-9]+)/, tag) then {
-            `some((tag, map(to_number, version)))
+            Some((tag, map(to_number, version)))
           }
       )
       -- Sort versions.
@@ -248,12 +249,12 @@ let git = {
         raise $ `git_failure("checkout failed")
     }
 
-    if let `commit(commit) = version then {
+    if let Commit(commit) = version then {
       if shell("cd {dir}; git rev-parse HEAD") not eq commit then
         checkout(commit)
     }
     else {
-      let `tag(tag) = version
+      let Tag(tag) = version
       if shell("cd {dir}; git describe --tags") not eq tag then
         checkout(tag)
     }
@@ -282,7 +283,7 @@ let load_config(dir, args) {
     }
     with _ -> {
       error("failed to load install-script")
-      raise(`failure)
+      failure(nil)
     }
 
   #{
@@ -294,32 +295,32 @@ let load_config(dir, args) {
   }
 }
 
-let empty_db_entry = #{
-  name = nil,
-  date = nil,
-  install_dir = nil,
-  repository = nil,
-  version = nil,
+struct DBEntry {
+  name = nil
+  date = nil
+  install_dir = nil
+  repository = nil
+  version = nil
 }
 
 let uninstall({db, modname}) {
-  if let `some({install_dir}) = db:get_module_opt(modname) then {
+  if let Some({install_dir}) = db:get_module_opt(modname) then {
     -- Remove module directory
     info("uninstalling module '{modname}'")
     unlink(install_dir)
     -- Update registry
     info("updating registry")
-    db:remove(modname)
-    db:update()
+    db:remove_entry(modname)
+    db:write_to_disk()
   }
   else {
     error("no such module")
-    raise(`failure)
+    failure(nil)
   }
 }
 
 let build_and_install({conf modentry db dir args overwrite}) {
-  let #{name files main build post_install} = conf
+  let {name files main build post_install} = conf
 
   -- Check if module name is unique
   if db:get_module_opt(name) then {
@@ -330,12 +331,12 @@ let build_and_install({conf modentry db dir args overwrite}) {
     }
     else {
       error("module already present (will not overwrite)")
-      raise(`failure)
+      failure(nil)
     }
   }
 
   -- Build (if build-hook is speciefied)
-  if let `some(build) = build then {
+  if let Some(build) = build then {
     do_in(dir, fn -> {
       info("building module {name}")
       build()
@@ -358,24 +359,24 @@ let build_and_install({conf modentry db dir args overwrite}) {
   if not exist?(mainpath) then
     create_symlink(moddir ++ "/" ++ main, mainpath)
 
-  if let `some(post_install) = post_install then
+  if let Some(post_install) = post_install then
     do_in(dir, fn -> {
       info("running post-install hooks")
       post_install()
     })
 
-  #{
-    modentry with
-      name
-      date = utc_date() or "<undefined>",
-      install_dir = realpath(moddir) or "<undefined>",
+  #{modentry with
+    name
+    date = utc_date() or "<undefined>",
+    install_dir = realpath(moddir) or "<undefined>",
   }
 }
 
+struct GitFailure { _1 = nil }
 let fetch({repo_url version}) {
   let repo_dir = "repo_dir"
   try git.clone(#{url = repo_url, dir = repo_dir, version})
-  with `git_failure(what) -> fatal_error(what)
+  with GitFailure(what) -> fatal_error(what)
   repo_dir
 }
 
@@ -387,7 +388,7 @@ let install({db repo_url version args overwrite}) {
     let repo_dir = fetch(#{repo_url version})
     info("installing {version}")
     let conf = load_config(repo_dir, args)
-    let modentry = #{empty_db_entry with repository = repo_url, version}
+    let modentry = DBEntry {repository = repo_url, version}
     build_and_install(#{modentry, conf, db, dir = repo_dir, args, overwrite})
   })
 }
@@ -398,25 +399,25 @@ let check_update({name local_version repo_url}) {
     require_network()
   let remote_versions = git.list_versions(repo_url)
   if remote_versions is not [] then
-    if let `tag(local_version_tag) = local_version then {
+    if let Tag(local_version_tag) = local_version then {
       if local_version_tag not eq car(remote_versions) then
         #{
-          new_version = `tag(car(remote_versions))
+          new_version = Tag(car(remote_versions))
           info_mesg = "new version of \e[1m{name}\e[22m is available: {car(remote_versions)}"
         }
     }
     else {
       #{
-        new_version = `tag(car(remote_versions))
+        new_version = Tag(car(remote_versions))
         info_mesg = "release of \e[1m{name}\e[22m is now avaialble"
       }
     }
   else { -- remote_versions is []
-    let `commit(local_commit) = local_version
+    let Commit(local_commit) = local_version
     let remote_head = git.head_commit(repo_url)
     if local_commit not eq remote_head then
       #{
-        new_version = `commit(remote_head)
+        new_version = Commit(remote_head)
         info_mesg = "new commit of \e[1m{name}\e[22m is available: {remote_head}"
       }
   }
@@ -454,7 +455,7 @@ let select_opt(strs) {
 
   if ans eq "" || ans eq "Cancel"
   then false
-  else `some(ans)
+  else Some(ans)
 }
 
 let resolve_repository_url(url) {
@@ -485,7 +486,7 @@ let resolve_repository_url(url) {
         -- Multiple matches. Have to select only a single one of these.
         info("multiple repositories match the name, select one to install:")
         let repo_names = map(fn {full_name} -> full_name, github_matches)
-        if let `some(ans) = select_opt(repo_names) then {
+        if let Some(ans) = select_opt(repo_names) then {
           let {clone_url} = find(fn x -> x.full_name eq ans, github_matches)
           return clone_url
         }
@@ -643,7 +644,7 @@ let commands =
             -- commit in the repository.
             let version = {
               if assoc_opt("latest", opts) then
-                `commit(git.head_commit(repo_url))
+                Commit(git.head_commit(repo_url))
               else {
                 let versions = git.list_versions(repo_url) or []
                 if versions is [] then {
@@ -651,7 +652,7 @@ let commands =
                   -- if user accepts it.
                   info("module does not have any releases")
                   if confirm?(paint(" install from the latest commit (yes/no): ")) then
-                    `commit(git.head_commit(repo_url))
+                    Commit(git.head_commit(repo_url))
                   else {
                     info("exiting then")
                     exit(0)
@@ -663,7 +664,7 @@ let commands =
                   info("available versions of the module: {versions}")
                   let latest_tag = car(versions)
                   info("latest: {latest_tag}")
-                  `tag(latest_tag)
+                  Tag(latest_tag)
                 }
               }
             }
@@ -675,8 +676,8 @@ let commands =
 
             -- Update registry
             info("updating registry")
-            db:add(modentry)
-            db:update()
+            db:add_entry(modentry)
+            db:write_to_disk()
           }
           else { -- let url :: modargs = agrs
             error("missing module-directory path")
@@ -749,9 +750,9 @@ let commands =
                                          args = [], overwrite = true})
                 -- Update registry
                 info("updating registry")
-                db:remove(name)
-                db:add(modentry)
-                db:update()
+                db:remove_entry(name)
+                db:add_entry(modentry)
+                db:write_to_disk()
               }
               else {
                 write_to(stdout, "\e[2K\r")
@@ -760,7 +761,7 @@ let commands =
           }
           else {
             let name::args = args
-            if let `some({repository version}) = db:get_module_opt(name) then
+            if let Some {repository version} = db:get_module_opt(name) then
               if let {new_version} =
                       check_update(#{name, local_version = version, repo_url = repository})
               then {
@@ -769,8 +770,8 @@ let commands =
                                          version = new_version, overwrite = true})
                 -- Update registry
                 info("updating registry")
-                db:remove(name)
-                db:add(modentry)
+                db:remove_entry(name)
+                db:add_entry(modentry)
                 db:update()
               }
               else
@@ -788,7 +789,7 @@ let find_command_opt(name) {
 }
 
 let main() {
-  if let `some({handle}) = find_command_opt(cmd) then
+  if let Some({handle}) = find_command_opt(cmd) then
     handle(command_line)
   else {
     error("undefined command: '{cmd}'")
@@ -805,6 +806,6 @@ let main() {
   }
 }
 
-try main() with _ -> exit(1)
---main()
+--try main() with _ -> exit(1)
+main()
 

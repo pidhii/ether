@@ -361,11 +361,10 @@ _seek(void)
 static eth_t
 _flush(void)
 {
-  eth_use_variant(System_error);
   eth_args args = eth_start(1);
   eth_t file = eth_arg2(args, eth_file_type);
   if (fflush(eth_get_file_stream(file)) == EOF)
-    eth_throw(args, System_error(eth_str(eth_errno_to_str(errno))));
+    eth_throw(args, eth_system_error(errno));
   else
     eth_return(args, eth_nil);
 }

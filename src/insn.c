@@ -66,7 +66,7 @@ eth_ssa_unpack_pattern(eth_type *type, int const offs[], int const vids[],
 }
 
 eth_ssa_pattern*
-eth_ssa_record_pattern(size_t const ids[], int const vids[],
+eth_ssa_record_pattern(int proto, size_t const ids[], int const vids[],
     eth_ssa_pattern *const pats[], int n)
 {
   eth_ssa_pattern *pat = eth_malloc(sizeof(eth_ssa_pattern));
@@ -76,6 +76,7 @@ eth_ssa_record_pattern(size_t const ids[], int const vids[],
   pat->record.subpat = eth_malloc(sizeof(eth_ssa_pattern*) * n);
   pat->record.n = n;
   pat->record.dotest = true;
+  pat->record.proto = proto;
   memcpy(pat->record.ids, ids, sizeof(size_t) * n);
   memcpy(pat->record.vids, vids, sizeof(int) * n);
   memcpy(pat->record.subpat, pats, sizeof(eth_ssa_pattern*) * n);

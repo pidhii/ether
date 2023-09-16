@@ -490,7 +490,6 @@ typedef struct eth_field {
 #define ETH_TFLAG_PLAIN     0x01
 #define ETH_TFLAG_RECORD    (ETH_TFLAG_PLAIN  | 1 << 1)
 #define ETH_TFLAG_TUPLE     (ETH_TFLAG_RECORD | 1 << 2)
-#define ETH_TFLAG_VARIANT   (ETH_TFLAG_PLAIN  | 1 << 3)
 #define ETH_TFLAG_EXTTUPLE  (ETH_TFLAG_TUPLE  | 1 << 4)
 #define ETH_TFLAG_EXTRECORD (ETH_TFLAG_RECORD | 1 << 4)
 
@@ -565,12 +564,6 @@ static inline bool
 eth_is_like_tuple(eth_type *type)
 {
   return (type->flag & ETH_TFLAG_TUPLE) == ETH_TFLAG_TUPLE;
-}
-
-static inline bool
-eth_is_variant(eth_type *type)
-{
-  return type->flag == ETH_TFLAG_VARIANT;
 }
 
 eth_field* __attribute__((pure))
@@ -1122,34 +1115,6 @@ eth_get_symbol_cstr(eth_t x);
 eth_hash_t
 eth_get_symbol_hash(eth_t x);
 #define eth_sym_hash eth_get_symbol_hash
-
-// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-//                             variants
-// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-typedef struct {
-  eth_header header;
-  eth_t val;
-} eth_variant;
-#define ETH_VARIANT(x) ((eth_variant*)(x))
-#define eth_var_val(x) (ETH_VARIANT(x)->val)
-
-eth_type*
-eth_variant_type(const char *tag);
-
-eth_t
-eth_create_variant(eth_type *type, eth_t val);
-
-static inline const char* __attribute__((pure))
-eth_get_variant_tag(eth_t x)
-{
-  return (const char*)x->type->clos;
-}
-
-static inline eth_t __attribute__((pure))
-eth_get_variant_value(eth_t x)
-{
-  return ETH_VARIANT(x)->val;
-}
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                         records & tuples
@@ -1926,6 +1891,7 @@ struct eth_ast_pattern {
       eth_ast_pattern **subpats; /**< Nested patterns for fields */
       int n; /**< N fields */
       char *alias; /**< Alias */
+      eth_ast *proto; /**< Prototype */
     } record; /**< @brief Record destructuring pattern */
 
     struct { eth_attr *attr; char *alias; } recordstar;
@@ -1953,7 +1919,7 @@ eth_set_ident_attr(eth_ast_pattern *ident, eth_attr *attr);
 
 /**
  * In native syntax this pattern is used for matching with builtin compund types
- * like tupes, variants and pairs.
+ * like tupes and pairs.
  *
  * @see \ref ETH_PATTERN_UNPACK
  */
@@ -1973,7 +1939,8 @@ eth_ast_constant_pattern(eth_t cval);
  * @see \ref ETH_PATTERN_RECORD
  */
 eth_ast_pattern*
-eth_ast_record_pattern(char *const fields[], eth_ast_pattern *pats[], int n);
+eth_ast_record_pattern(eth_ast *proto, char *const fields[],
+    eth_ast_pattern *pats[], int n);
 
 eth_ast_pattern*
 eth_ast_record_star_pattern();
@@ -2244,7 +2211,8 @@ struct eth_ir_pattern {
     struct { eth_type *type; int n, *offs, varid; eth_ir_pattern **subpats; }
       unpack;
     struct { eth_t val; } constant;
-    struct { size_t *ids; int n, varid; eth_ir_pattern **subpats; } record;
+    struct { size_t *ids; int n, varid; eth_ir_node *proto;
+             eth_ir_pattern **subpats; } record;
   };
 };
 
@@ -2262,7 +2230,7 @@ eth_ir_pattern*
 eth_ir_constant_pattern(eth_t val);
 
 eth_ir_pattern*
-eth_ir_record_pattern(int varid, size_t const ids[],
+eth_ir_record_pattern(int varid, eth_ir_node *proto, size_t const ids[],
     eth_ir_pattern *const pats[], int n);
 
 void
@@ -2590,7 +2558,8 @@ struct eth_ssa_pattern {
              bool dotest; }
       unpack;
     struct { eth_t val; eth_test_op testop; bool dotest; } constant;
-    struct { size_t *ids; int *vids, n; eth_ssa_pattern **subpat; bool dotest; }
+    struct { size_t *ids; int *vids, n, proto; eth_ssa_pattern **subpat;
+             bool dotest; }
       record;
   };
 };
@@ -2609,7 +2578,7 @@ eth_ssa_pattern*
 eth_ssa_constant_pattern(eth_t val, eth_test_op testop, bool dotest);
 
 eth_ssa_pattern*
-eth_ssa_record_pattern(size_t const ids[], int const vids[],
+eth_ssa_record_pattern(int proto /* <0 for none */, size_t const ids[], int const vids[],
     eth_ssa_pattern *const pats[], int n);
 
 void
@@ -3106,8 +3075,8 @@ struct eth_bc_insn {
 
     struct { uint64_t out; uint32_t vid, offs; } load;
     // TODO: flatten vids
-    struct { uint32_t src, n; uint64_t *vids; size_t *ids; } loadrcrd;
-    struct { uint64_t out, vid; size_t id; } loadrcrd1;
+    struct { int16_t proto; uint16_t src, n; uint64_t *vids; size_t *ids; } loadrcrd;
+    struct { int16_t proto; uint16_t out, vid; size_t id; } loadrcrd1;
     struct { uint64_t fld; uint32_t out, vid; } access;
 
     struct { uint64_t vid; } setexn;
@@ -3261,17 +3230,6 @@ _eth_type_error(size_t n, size_t ntot)
     ident = eth_sym(sym);
 
 #define eth_use_symbol(ident) eth_use_symbol_as(ident, #ident)
-
-#define eth_use_variant_as(ident, var)          \
-  static eth_type *ident##_type;                \
-  if (eth_unlikely(ident##_type == NULL))       \
-    ident##_type = eth_variant_type(var);       \
-  eth_t ident(eth_t x)                          \
-  {                                             \
-    return eth_create_variant(ident##_type, x); \
-  }
-
-#define eth_use_variant(ident) eth_use_variant_as(ident, #ident)
 
 #define eth_use_tuple_as(ident, n) \
   static eth_type *ident;          \

@@ -15,6 +15,9 @@
  */
 #include "ether/ether.h"
 
+
+static eth_t Some;
+
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                  lists
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -239,8 +242,6 @@ _fold_zip(void)
 static eth_t
 _rev_filter_map(void)
 {
-  eth_use_variant(some)
-
   eth_args args = eth_start(2);
   const eth_t f = eth_arg2(args, eth_function_type);
   const eth_t l = eth_arg(args);
@@ -252,9 +253,9 @@ _rev_filter_map(void)
     eth_reserve_stack(1);
     eth_sp[0] = eth_car(it);
     const eth_t optv = eth_apply(f, 1);
-    if (optv->type == some_type)
+    if (optv->type == Some->type)
     {
-      eth_t v = eth_get_variant_value(optv);
+      eth_t v = eth_tup_get(optv, 0);
       acc = eth_cons(v, acc);
       eth_drop(optv);
     }
@@ -271,6 +272,8 @@ _rev_filter_map(void)
 int
 ether_module(eth_module *mod, eth_root *topenv)
 {
+  Some = eth_get_builtin(topenv, "Some");
+
   eth_define(mod, "__len", eth_create_proc(_length, 1, NULL, NULL));
   eth_define(mod, "__rev_append", eth_create_proc(_rev_append, 2, NULL, NULL));
   eth_define(mod, "__rev_map", eth_create_proc(_rev_map, 2, NULL, NULL));

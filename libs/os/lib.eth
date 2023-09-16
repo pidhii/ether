@@ -11,14 +11,14 @@ open 'string'
 -- Values:
 -- * f_ok, r_ok, w_ok, x_ok
 
-let pub F_OK = __f_ok
-let pub R_OK = __r_ok
-let pub W_OK = __w_ok
-let pub X_OK = __x_ok
+let pub f_ok = __f_ok
+let pub r_ok = __r_ok
+let pub w_ok = __w_ok
+let pub x_ok = __x_ok
 
-let pub O_CLOEXEC = __o_cloexec
-let pub O_DIRECT = __o_direct
-let pub O_NONBLOCK = __o_nonblock
+let pub o_cloexec = __o_cloexec
+let pub o_direct = __o_direct
+let pub o_nonblock = __o_nonblock
 
 let pub chdir = __chdir
 
@@ -34,7 +34,7 @@ let pub access = {
   The function shall chek the file named by  the  pathname  (possibly  relative)
   _path_ for acessibility according to the bit pattern specified in _amode_.
 
-  The value of _amode_  is either the bitwise-inclusive OR of \`R_OK`, \`W_OK`, \`X_OK` or existence test, \`F_OK`.
+  The value of _amode_  is either the bitwise-inclusive OR of \`r_ok`, \`w_ok`, \`x_ok` or existence test, \`f_ok`.
 
   See also man(3) access for complete documentation.
   |help}

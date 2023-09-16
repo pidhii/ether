@@ -1,6 +1,8 @@
 open 'list'
 open 'string'
 
+pub struct InvalidOptionArgument { _1 = nil }
+
 let get_options(cfg, os) {
 
   let cfg = cfg |> flat_map(fn optcfg ->
@@ -12,7 +14,7 @@ let get_options(cfg, os) {
   let cfg = cfg|> map (fn optcfg ->
     if optcfg is of #{arg_pat}
     then optcfg
-    else record(#('arg_pat' /.*/) :: list(optcfg))
+    else record(#('arg_pat', /.*/) :: list(optcfg))
   )
 
   let get_rules(opt) {
@@ -37,7 +39,7 @@ let get_options(cfg, os) {
         let arg = substr(brk+1..*, o)
         if arg =~ arg_pat then
           mainLoop(os, #(val, arg) :: kws, pos)
-        else raise(`invalid_option_argument(lopt))
+        else raise(InvalidOptionArgument(lopt))
       }
       else raise(`unexpected_argument)
     }
@@ -48,7 +50,7 @@ let get_options(cfg, os) {
         if let arg::os = os then
           if arg =~ arg_pat then
             mainLoop(os, #(val arg) :: kws, pos)
-          else raise(`invalid_option_argument(lopt))
+          else raise(InvalidOptionArgument(lopt))
         else raise(`missing_argument)
       else
         mainLoop(os, #(val true) :: kws, pos)
@@ -63,7 +65,7 @@ let get_options(cfg, os) {
         let arg = substr(2..*, o)
         if arg =~ arg_pat then
           mainLoop(os, #(val arg) :: kws, pos)
-        else raise(`invalid_option_argument(shopt))
+        else raise(InvalidOptionArgument(shopt))
       }
       else raise(`unexpected_argument)
     else
@@ -71,7 +73,7 @@ let get_options(cfg, os) {
         if let arg::os = os then
           if arg =~ arg_pat then
             mainLoop(os, #(val arg) :: kws, pos)
-          else raise(`invalid_option_argument(shopt))
+          else raise(InvalidOptionArgument(shopt))
         else raise(`missing_argument)
       else
         mainLoop(os, #(val true) :: kws, pos)

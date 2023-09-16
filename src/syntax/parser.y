@@ -265,6 +265,7 @@ _create_attr(int aflag, void *locpp)
 %type<boolean> MaybeComaDots
 %type<record> Record
 %type<record_pattern> RecordPattern
+%type<ast> Ident CapIdent
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %start Entry
 
@@ -276,8 +277,20 @@ Entry
   | START_REPL Expr { g_result = $2; }
 ;
 
+Ident
+  : SYMBOL { $$ = eth_ast_ident($1); free($1); }
+  | Ident '.' SYMBOL { $$ = eth_ast_access($1, $3); LOC($$, @$); free($3); }
+;
+
+CapIdent
+  : CAPSYMBOL { $$ = eth_ast_ident($1); free($1); }
+  | Ident '.' CAPSYMBOL { $$ = eth_ast_access($1, $3); LOC($$, @$); free($3); }
+;
+
 Atom
-  : SYMBOL { $$ = eth_ast_ident($1); free($1); LOC($$, @$); }
+  : Ident
+  | CapIdent
+  /*: SYMBOL { $$ = eth_ast_ident($1); free($1); LOC($$, @$); }*/
   /*| '(' Expr ')' { $$ = $2; }*/
   /*| Atom '!' { $$ = eth_ast_apply($1, NULL, 0); LOC($$, @$); }*/
 
@@ -309,14 +322,25 @@ Atom
     $$ = eth_ast_make_record(eth_tuple_type(n), fields, $3.data, n);
     cod_vec_destroy($3);
   }
-  | STRUCT '{' Record '}' {
-    eth_type *type = eth_unique_record_type($3.keys.data, $3.keys.len);
-    $$ = eth_ast_make_record(type, $3.keys.data, $3.vals.data, $3.keys.len);
-    cod_vec_iter($3.keys, i, x, free(x));
-    cod_vec_destroy($3.keys);
-    cod_vec_destroy($3.vals);
+  /*| STRUCT '{' Record '}' {*/
+    /*eth_type *type = eth_unique_record_type($3.keys.data, $3.keys.len);*/
+    /*$$ = eth_ast_make_record(type, $3.keys.data, $3.vals.data, $3.keys.len);*/
+    /*cod_vec_iter($3.keys, i, x, free(x));*/
+    /*cod_vec_destroy($3.keys);*/
+    /*cod_vec_destroy($3.vals);*/
+  /*}*/
+  | Attribute STRUCT CAPSYMBOL '{' Record '}' {
+    eth_type *type = eth_unique_record_type($5.keys.data, $5.keys.len);
+    eth_ast *struct_ast = eth_ast_make_record(type, $5.keys.data, $5.vals.data, $5.keys.len);
+    cod_vec_iter($5.keys, i, x, free(x));
+    cod_vec_destroy($5.keys);
+    cod_vec_destroy($5.vals);
+
+    eth_ast_pattern *p[] = { eth_ast_ident_pattern($3) };
+    eth_ref_attr(p[0]->ident.attr = eth_create_attr($1));
+    $$ = eth_ast_let(p, &struct_ast, 1, eth_ast_cval(eth_nil));
   }
-  | '#' '{'  Record '}' {
+  | '#' '{' Record '}' {
     eth_type *type = eth_record_type($3.keys.data, $3.keys.len);
     $$ = eth_ast_make_record(type, $3.keys.data, $3.vals.data, $3.keys.len);
     cod_vec_iter($3.keys, i, x, free(x));
@@ -359,36 +383,41 @@ Atom
     cod_vec_destroy($2);
   }
 
-  | Atom '{' Record '}' %prec APPLY {
+  | CapIdent '{' Record '}' %prec APPLY {
     $$ = eth_ast_update($1, $3.vals.data, $3.keys.data, $3.vals.len);
     cod_vec_destroy($3.vals);
     cod_vec_iter($3.keys, i, x, free(x));
     cod_vec_destroy($3.keys);
   }
+  | CapIdent '(' Args ')' %prec APPLY {
+    char *keys[$3.len];
+    char buf[42];
+    for (size_t i = 1; i <= $3.len; ++i)
+    {
+      sprintf(buf, "_%ju", i);
+      keys[i-1] = strdup(buf);
+    }
+    $$ = eth_ast_update($1, $3.data, keys, $3.len);
+    cod_vec_destroy($3);
+    for (size_t i = 0; i < $3.len; ++i)
+      free(keys[i]);
+  }
   | Atom '(' Args ')' %prec APPLY {
-    if ($1->tag == ETH_AST_CVAL and
-        $1->cval.val->type == eth_symbol_type)
-    {
-      // FIXME
-      eth_type *type = eth_variant_type(eth_sym_cstr($1->cval.val));
-      char *_0 = "_0";
-      $$ = eth_ast_make_record(type, &_0, &$3.data[0], 1);
-      eth_drop_ast($1);
-      cod_vec_destroy($3);
-      LOC($$, @$);
-    }
-    else
-    {
-      $$ = eth_ast_apply($1, $3.data, $3.len);
-      LOC($$, @$);
-      cod_vec_destroy($3);
-    }
+    $$ = eth_ast_apply($1, $3.data, $3.len);
+    LOC($$, @$);
+    cod_vec_destroy($3);
   }
 
   | Atom '.' SYMBOL {
     $$ = eth_ast_access($1, $3);
     LOC($$, @$);
     free($3);
+  }
+  | Atom '.' String {
+    cod_vec_push($3, 0);
+    $$ = eth_ast_access($1, $3.data);
+    LOC($$, @$);
+    cod_vec_destroy($3);
   }
   | Atom ':' SYMBOL '(' Args ')' %prec APPLY {
     eth_ast *access = eth_ast_access($1, $3);
@@ -403,7 +432,7 @@ Atom
   | '@' '(' Expr ')' { $$ = eth_ast_evmac($3); LOC($$, @$); }
 
   | '_' { $$ = eth_ast_ident("_"); }
-  | CAPSYMBOL { $$ = eth_ast_cval(eth_sym($1)); free($1); LOC($$, @$); }
+  /*| CAPSYMBOL { $$ = eth_ast_cval(eth_sym($1)); free($1); LOC($$, @$); }*/
   | NUMBER { $$ = eth_ast_cval(eth_create_number($1)); LOC($$, @$); }
   | CONST  { $$ = eth_ast_cval($1); LOC($$, @$); }
   | String {
@@ -716,7 +745,35 @@ AtomicPattern
     eth_ref_attr($$->ident.attr = attr);
     free($2);
   }
-  | CAPSYMBOL { $$ = eth_ast_constant_pattern(eth_sym($1)); free($1); }
+  | Attribute CAPSYMBOL {
+    $$ = eth_ast_ident_pattern($2);
+    eth_attr *attr = eth_create_attr($1);
+    if (g_filename)
+      eth_set_location(attr, location(&@$));
+    eth_ref_attr($$->ident.attr = attr);
+    free($2);
+  }
+  | Attribute CAPSYMBOL '{' RecordPattern '}' {
+    $$ = eth_ast_record_pattern(eth_ast_ident($2), $4.keys.data, $4.vals.data, $4.keys.len);
+    cod_vec_iter($4.keys, i, x, free(x));
+    cod_vec_destroy($4.keys);
+    cod_vec_destroy($4.vals);
+    free($2);
+  }
+  | Attribute CAPSYMBOL '(' PatternList ')' {
+    int n = $4.len;
+    char fieldsbuf[n][22];
+    char *fields[n];
+    for (int i = 0; i < n; ++i)
+    {
+      fields[i] = fieldsbuf[i];
+      sprintf(fields[i], "_%d", i+1);
+    }
+    $$ = eth_ast_record_pattern(eth_ast_ident($2), fields, $4.data, n);
+    cod_vec_destroy($4);
+    free($2);
+  }
+  /*| CAPSYMBOL { $$ = eth_ast_constant_pattern(eth_sym($1)); free($1); }*/
   | CONST { $$ = eth_ast_constant_pattern($1); }
   | String {
     cod_vec_push($1, 0);
@@ -749,7 +806,7 @@ AtomicPattern
         fields[i] = fieldsbuf[i];
         sprintf(fields[i], "_%d", i+1);
       }
-      $$ = eth_ast_record_pattern(fields, $2.data, n);
+      $$ = eth_ast_record_pattern(NULL, fields, $2.data, n);
     }
     cod_vec_destroy($2);
   }
@@ -771,24 +828,24 @@ AtomicPattern
       fields[i] = fieldsbuf[i];
       sprintf(fields[i], "_%d", i+1);
     }
-    $$ = eth_ast_record_pattern(fields, $3.data, n);
+    $$ = eth_ast_record_pattern(NULL, fields, $3.data, n);
 
     cod_vec_destroy($3);
   }
   | '#' '{' RecordPattern '}' {
-    $$ = eth_ast_record_pattern($3.keys.data, $3.vals.data, $3.keys.len);
+    $$ = eth_ast_record_pattern(NULL, $3.keys.data, $3.vals.data, $3.keys.len);
     cod_vec_iter($3.keys, i, x, free(x));
     cod_vec_destroy($3.keys);
     cod_vec_destroy($3.vals);
   }
   | STRUCT '{' RecordPattern '}' {
-    $$ = eth_ast_record_pattern($3.keys.data, $3.vals.data, $3.keys.len);
+    $$ = eth_ast_record_pattern(NULL, $3.keys.data, $3.vals.data, $3.keys.len);
     cod_vec_iter($3.keys, i, x, free(x));
     cod_vec_destroy($3.keys);
     cod_vec_destroy($3.vals);
   }
   | '{' RecordPattern '}' {
-    $$ = eth_ast_record_pattern($2.keys.data, $2.vals.data, $2.keys.len);
+    $$ = eth_ast_record_pattern(NULL, $2.keys.data, $2.vals.data, $2.keys.len);
     cod_vec_iter($2.keys, i, x, free(x));
     cod_vec_destroy($2.keys);
     cod_vec_destroy($2.vals);
@@ -815,14 +872,6 @@ AtomicPattern
     // ---
     cod_vec_destroy($2);
   }
-
-  | CAPSYMBOL '(' ExprPattern ')' {
-    eth_type *type = eth_variant_type($1);
-    char *_0 = "_0";
-    $$ = eth_ast_unpack_pattern(type, &_0, &$3, 1);
-    free($1);
-  }
-
 ;
 
 MaybeComaDots
@@ -921,48 +970,30 @@ List
 ;
 
 Record
-  : SYMBOL '=' Expr {
+  : {
     cod_vec_init($$.keys);
     cod_vec_init($$.vals);
-    cod_vec_push($$.keys, $1);
-    cod_vec_push($$.vals, $3);
   }
-  | SYMBOL '(' PatternList ')' Expr {
-    cod_vec_init($$.keys);
-    cod_vec_init($$.vals);
+  | SYMBOL '=' Expr Record {
+    $$ = $4;
+    cod_vec_insert($$.keys, $1, 0);
+    cod_vec_insert($$.vals, $3, 0);
+  }
+  | SYMBOL Record {
+    $$ = $2;
+    cod_vec_insert($$.keys, $1, 0);
+    cod_vec_insert($$.vals, eth_ast_ident($1), 0);
+  }
+  | SYMBOL '(' PatternList ')' Expr Record {
+    $$ = $6;
 
     eth_ast *fn = eth_ast_fn_with_patterns($3.data, $3.len, $5);
     cod_vec_destroy($3);
 
-    cod_vec_push($$.keys, $1);
-    cod_vec_push($$.vals, fn);
+    cod_vec_insert($$.keys, $1, 0);
+    cod_vec_insert($$.vals, fn, 0);
   }
-  | SYMBOL {
-    cod_vec_init($$.keys);
-    cod_vec_init($$.vals);
-    cod_vec_push($$.keys, $1);
-    cod_vec_push($$.vals, eth_ast_ident($1));
-  }
-  | Record SYMBOL '=' Expr {
-    $$ = $1;
-    cod_vec_push($$.keys, $2);
-    cod_vec_push($$.vals, $4);
-  }
-  | Record SYMBOL {
-    $$ = $1;
-    cod_vec_push($$.keys, $2);
-    cod_vec_push($$.vals, eth_ast_ident($2));
-  }
-  | Record SYMBOL '(' PatternList ')' Expr {
-    $$ = $1;
-
-    eth_ast *fn = eth_ast_fn_with_patterns($4.data, $4.len, $6);
-    cod_vec_destroy($4);
-
-    cod_vec_push($$.keys, $2);
-    cod_vec_push($$.vals, fn);
-  }
-  | Record ',' { $$ = $1; }
+  | ',' Record { $$ = $2; }
 ;
 
 %%

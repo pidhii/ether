@@ -370,20 +370,20 @@ let rec pub insert(cmp, x, ys) {
 
 let rec pub find_opt(p, xs) {
   if let x::xs = xs then
-    if p(x) then `some(x)
+    if p(x) then Some(x)
     else find_opt(p, xs)
   else false
 }
 
 let pub find(p, xs) {
-  if let `some(x) = find_opt(p, xs) then x
+  if let Some(x) = find_opt(p, xs) then x
   else failure(nil)
 }
 
 let pub index_opt(p, xs) {
   let rec loop(i, xs) {
     if let x::xs = xs then
-      if p(x) then `some(i)
+      if p(x) then Some(i)
       else loop(i+1, xs)
     else false
   }
@@ -391,7 +391,7 @@ let pub index_opt(p, xs) {
 }
 
 let pub index(p, xs) {
-  if let `some(i) = index_opt(p, xs) then i
+  if let Some(i) = index_opt(p, xs) then i
   else failure(nil)
 }
 
@@ -459,37 +459,37 @@ let rec pub sort(cmp, xs) {
 let rec pub assoc_opt(x, l) {
   if let kv::l = l then
     if let #(k, v) = kv then
-      if k eq x then `some(v)
+      if k eq x then Some(v)
       else assoc_opt(x, l)
     else invalid_argument(nil)
   else false
 }
 
 let pub assoc(k, l) {
-  if let `some(v) = assoc_opt(k, l) then v
+  if let Some(v) = assoc_opt(k, l) then v
   else failure(nil)
 }
 
 let rec pub assq_opt(x, l) {
   if let kv::l = l then
     if let #(k, v) = kv then
-      if k is x then `some(v)
+      if k is x then Some(v)
       else assq_opt(x, l)
     else invalid_argument(nil)
   else false
 }
 
 let pub assq(k, l) {
-  if let `some(v) = assq_opt(k, l) then v
+  if let Some(v) = assq_opt(k, l) then v
   else failure(nil)
 }
 
 let rec pub transpose(xs) {
   if let xs :: xss = xs then
     if let x :: xs = xs then {
-      let f(l) { if let hd::_ = l then `some(hd) }
+      let f(l) { if let hd::_ = l then Some(hd) }
       let head = x :: filter_map(f, xss)
-      let f(l) { if let _::tl = l then `some(tl) }
+      let f(l) { if let _::tl = l then Some(tl) }
       let tail = transpose(xs :: filter_map(f, xss))
       head :: tail
     }

@@ -86,11 +86,11 @@ let x :: xs = [1 2 3]
 print(#(x, xs))
 
 
--- Variants (tagged wrapper-types)
+-- ...
 let safe_div(x, y) {
-  if y != 0 then `some(x / y) else false
+  if y != 0 then Some(x / y) else false
 }
-let `some(x) = safe_div(1, 2)
+let Some(x) = safe_div(1, 2)
 print(x)
 
 

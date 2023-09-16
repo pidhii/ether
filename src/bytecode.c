@@ -421,7 +421,7 @@ write_load(bc_builder *bldr, int out, int vid, int offs)
 }
 
 static int
-write_loadrcrd(bc_builder *bldr, size_t *ids, int *vids, int n, int src)
+write_loadrcrd(bc_builder *bldr, int proto, size_t *ids, int *vids, int n, int src)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_LOADRCRD;
@@ -429,6 +429,7 @@ write_loadrcrd(bc_builder *bldr, size_t *ids, int *vids, int n, int src)
   insn->loadrcrd.vids = eth_malloc(sizeof(uint64_t) * n);
   insn->loadrcrd.n = n;
   insn->loadrcrd.src = src;
+  insn->loadrcrd.proto = proto;
   for (int i = 0; i < n; ++i)
   {
     insn->loadrcrd.ids[i] = ids[i];
@@ -438,13 +439,14 @@ write_loadrcrd(bc_builder *bldr, size_t *ids, int *vids, int n, int src)
 }
 
 static int
-write_loadrcrd1(bc_builder *bldr, int out, int vid, size_t id)
+write_loadrcrd1(bc_builder *bldr, int proto, int out, int vid, size_t id)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_LOADRCRD1;
   insn->loadrcrd1.out = out;
   insn->loadrcrd1.vid = vid;
   insn->loadrcrd1.id  = id;
+  insn->loadrcrd1.proto = proto;
   return bldr->len - 1;
 }
 
@@ -614,11 +616,15 @@ build_pattern(bc_builder *bldr, eth_ssa_pattern *pat, int expr, int_vec *jmps)
       for (int i = 0; i < n; ++i)
         oregs[i] = new_reg(bldr, pat->record.vids[i]);
 
+      int proto = -1;
+      if (pat->record.proto >= 0)
+        proto = get_reg(bldr, pat->record.proto);
+
       // only load non-reused fields
       if (n == 1)
-        write_loadrcrd1(bldr, oregs[0], expr, pat->record.ids[0]);
+        write_loadrcrd1(bldr, proto, oregs[0], expr, pat->record.ids[0]);
       else
-        write_loadrcrd(bldr, pat->record.ids, oregs, n, expr);
+        write_loadrcrd(bldr, proto, pat->record.ids, oregs, n, expr);
 
       if (pat->record.dotest)
       {

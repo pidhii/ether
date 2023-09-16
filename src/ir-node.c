@@ -62,7 +62,7 @@ eth_ir_constant_pattern(eth_t val)
 }
 
 eth_ir_pattern*
-eth_ir_record_pattern(int varid, size_t const ids[],
+eth_ir_record_pattern(int varid, eth_ir_node *proto, size_t const ids[],
     eth_ir_pattern *const pats[], int n)
 {
   eth_ir_pattern *pat = eth_malloc(sizeof(eth_ir_pattern));
@@ -71,6 +71,8 @@ eth_ir_record_pattern(int varid, size_t const ids[],
   pat->record.ids = eth_malloc(sizeof(size_t) * n);
   pat->record.subpats = eth_malloc(sizeof(eth_ir_pattern*) * n);
   pat->record.n = n;
+  if ((pat->record.proto = proto))
+    eth_ref_ir_node(proto);
   memcpy(pat->record.ids, ids, sizeof(size_t) * n);
   memcpy(pat->record.subpats, pats, sizeof(eth_ir_pattern*) * n);
   return pat;
@@ -102,6 +104,8 @@ eth_destroy_ir_pattern(eth_ir_pattern *pat)
       free(pat->record.ids);
       for (int i = 0; i < pat->record.n; ++i)
         eth_destroy_ir_pattern(pat->record.subpats[i]);
+      if (pat->record.proto)
+        eth_unref_ir_node(pat->record.proto);
       free(pat->record.subpats);
       break;
   }

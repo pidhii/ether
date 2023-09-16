@@ -88,11 +88,11 @@ let list_tests = {
     #("rev_flat_map", fn -> rev_flat_map(fn x -> range(1..x-1), [1, 2, 3]) eq [2, 1, 1])
     #("flat_map", fn -> flat_map(fn x -> range(1..x-1), [1, 2, 3]) eq [1, 1, 2])
     #("rev_filter_map", fn -> {
-      let f(x) { if even?(x) then `some(x + x) }
+      let f(x) { if even?(x) then Some(x + x) }
       rev_filter_map(f, [1, 2, 3, 4]) eq [8, 4]
     })
     #("filter_map", fn -> {
-      let f(x) { if even?(x) then `some(x + x) }
+      let f(x) { if even?(x) then Some(x + x) }
       filter_map(f, [1, 2, 3, 4]) eq [4, 8]
     })
     #("fold_left", fn -> fold_left((-), 0, [1, 2, 3]) == 0-6)

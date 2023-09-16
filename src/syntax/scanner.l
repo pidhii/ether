@@ -367,14 +367,20 @@ lnot    { return LNOT; }
   return USROP;
 }
 
-[_a-zA-Z][_a-zA-Z0-9]*['?]? {
+[_a-z][_a-zA-Z0-9]*['?]? {
   yylval->string = strdup(yytext);
   return SYMBOL;
 }
 
-`[_a-zA-Z0-9]* {
-  yylval->string = strdup(yytext+1);
+[A-Z][_a-zA-Z0-9]* {
+  yylval->string = strdup(yytext);
   return CAPSYMBOL;
+}
+
+
+`[_a-zA-Z0-9]* {
+  yylval->constant = eth_sym(yytext+1);
+  return CONST;
 }
 
 . {

@@ -74,13 +74,13 @@ let read_list(file) {
   -- we return in case of End_of_file exception. We only need it to be NOT the
   -- `Some _`-variant.
   let read_line_opt(file) {
-    try `some(io.read_line_of(file))
+    try Some(io.read_line_of(file))
     with `end_of_file -> nil
   }
 
   -- And here is the actual loop to read the list
   let rec loop(acc) {
-    if let `some(x) = read_line_opt(file) then
+    if let Some(x) = read_line_opt(file) then
       -- Note the `$`: this is an application operator from Haskell. The whole
       -- role of `$` is to have the lowest precedence of all operators
       loop(string.to_number(string.chomp(x)) :: acc)

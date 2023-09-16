@@ -563,7 +563,8 @@ eth_vm(eth_bytecode *bc)
       {
         eth_t x = r[ip->loadrcrd.src];
         eth_type *restrict type = x->type;
-        test = eth_is_like_record(type);
+        int proto = ip->loadrcrd.proto;
+        test = eth_is_like_record(type) and (proto < 0 or type == r[proto]->type);
         if (eth_likely(test))
         {
           size_t *restrict ids = type->fieldids;
@@ -602,7 +603,8 @@ eth_vm(eth_bytecode *bc)
       {
         eth_t x = r[ip->loadrcrd1.vid];
         eth_type *restrict type = x->type;
-        test = eth_is_plain(type);
+        int proto = ip->loadrcrd1.proto;
+        test = eth_is_plain(type) and (proto < 0 or type == r[proto]->type);
         if (eth_likely(test))
         {
           size_t *restrict ids = type->fieldids;

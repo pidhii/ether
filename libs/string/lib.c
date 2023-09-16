@@ -22,6 +22,8 @@
 #include <string.h>
 
 
+static eth_t Some;
+
 static eth_t
 _malloc(void)
 {
@@ -259,7 +261,6 @@ _cat(void)
 static eth_t
 _strstr_opt(void)
 {
-  eth_use_variant(some)
   eth_t x = *eth_sp++;
   eth_ref(x);
   eth_t y = *eth_sp++;
@@ -271,7 +272,14 @@ _strstr_opt(void)
     return eth_exn(eth_type_error());
   }
   char *p = strstr(eth_str_cstr(x), eth_str_cstr(y));
-  eth_t ret = p ? some(eth_num(p - eth_str_cstr(x))) : eth_false;
+  eth_t ret;
+  if (p)
+  {
+    eth_t val = eth_num(p - eth_str_cstr(x));
+    ret = eth_create_record(Some->type, &val);
+  }
+  else
+    ret = eth_false;
   eth_unref(x);
   eth_unref(y);
   return ret;
@@ -560,7 +568,6 @@ _rev_split(void)
 static eth_t
 _find_regexp(void)
 {
-  eth_use_variant(some)
   eth_use_symbol(regexp_error)
   eth_args args = eth_start(2);
   eth_t re = eth_arg2(args, eth_regexp_type);
@@ -629,6 +636,8 @@ _to_symbol(void)
 int
 ether_module(eth_module *mod, eth_root *topenv)
 {
+  Some = eth_get_builtin(topenv, "Some");
+
   eth_module *detail = eth_create_module("string.detail", NULL);
   eth_copy_module_path(eth_get_root_env(topenv), eth_get_env(detail));
 

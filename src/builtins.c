@@ -350,8 +350,6 @@ _filter_map(void)
 static eth_t
 _open(void)
 {
-  eth_use_variant(system_error);
-
   eth_args args = eth_start(2);
   eth_t path = eth_arg2(args, eth_string_type);
   eth_t mode = eth_arg2(args, eth_string_type);

@@ -119,7 +119,6 @@ class value {
   bool is_symbol() const noexcept { return m_ptr->type == eth_symbol_type; }
   bool is_function() const noexcept { return m_ptr->type == eth_function_type; }
   bool is_boolean() const noexcept { return m_ptr->type == eth_boolean_type; }
-  bool is_variant() const noexcept { return eth_is_variant(m_ptr->type); }
 
   bool is_nil() const noexcept { return m_ptr == eth_nil; }
   bool is_true() const noexcept { return m_ptr == eth_true; }
@@ -191,24 +190,6 @@ class value {
       throw type_exn {"not a pair"};
   }
 
-  value
-  tag() const
-  {
-    if (eth_likely(is_variant()))
-      return value {eth_get_variant_tag(m_ptr)};
-    else
-      throw type_exn {"not a pair"};
-  }
-
-  value
-  val() const
-  {
-    if (eth_likely(is_variant()))
-      return value {eth_get_variant_value(m_ptr)};
-    else
-      throw type_exn {"not a pair"};
-  }
-
   void*
   udata() const;
 
@@ -265,17 +246,6 @@ tuple(const value &a, const value &b, const value &c)
 inline value
 tuple(const value &a, const value &b, const value &c, const value &d)
 { return value {eth_tup4(a.ptr(), b.ptr(), c.ptr(), d.ptr())}; }
-
-inline value
-variant(const char *tag, const eth::value &val)
-{
-  eth_type *type = eth_variant_type(tag);
-  return value {eth_create_variant(type, val.ptr())};
-}
-
-inline value
-variant(const std::string &tag, const eth::value &val)
-{ return variant(tag.c_str(), val); }
 
 static value
 record(std::initializer_list<std::pair<std::string, eth::value>> pairs)

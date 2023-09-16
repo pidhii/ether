@@ -76,6 +76,9 @@ destroy_ir_builder(ir_builder *bldr)
 static eth_ir_node*
 build(ir_builder *bldr, eth_ast *ast, int *e);
 
+static eth_ir_node*
+build_with_toplvl(ir_builder *bldr, eth_ast *ast, int *e, bool savetop);
+
 static inline int
 new_vid(ir_builder *bldr)
 {
@@ -246,6 +249,7 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
     case ETH_AST_PATTERN_CONSTANT:
       return eth_ir_constant_pattern(pat->constant.val);
 
+    // TODO: handle prototype check when compile-time info on input is available
     case ETH_AST_PATTERN_RECORD:
     {
       // aliasing:
@@ -278,7 +282,11 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
         pats[i] = fields[i].pat;
       }
 
-      return eth_ir_record_pattern(alias, ids, pats, n);
+      eth_ir_node *proto = NULL;
+      if (pat->record.proto)
+        proto = build_with_toplvl(bldr, pat->record.proto, e, false);
+
+      return eth_ir_record_pattern(alias, proto, ids, pats, n);
     }
 
     case ETH_AST_PATTERN_RECORD_STAR:

@@ -204,9 +204,6 @@ eth_init(void *argv)
   extern void _eth_init_record_types(void);
   _eth_init_record_types();
 
-  extern void _eth_init_variant_types(void);
-  _eth_init_variant_types();
-
   extern void _eth_init_file_type(void);
   _eth_init_file_type();
 
@@ -246,9 +243,6 @@ eth_cleanup(void)
 
   extern void _eth_cleanup_record_types(void);
   _eth_cleanup_record_types();
-
-  extern void _eth_cleanup_variant_types(void);
-  _eth_cleanup_variant_types();
 
   extern void _eth_cleanup_alloc(void);
   _eth_cleanup_alloc();
@@ -308,8 +302,8 @@ eth_unop_name(eth_unop op)
 eth_t
 eth_system_error(int err)
 {
-  eth_use_variant(system_error)
-  return system_error(eth_sym(eth_errno_to_str(err)));
+  eth_use_symbol(system_error)
+  return system_error;
 }
 
 eth_t

@@ -530,8 +530,8 @@ combine_match_results(match_result a, match_result b)
  * @return SSA-pattern.
  */
 static eth_ssa_pattern*
-build_pattern(ssa_builder *bldr, const eth_ir_pattern *pat, int expr,
-    match_result *mchres, bool *e)
+build_pattern(ssa_builder *bldr, eth_ssa_tape *tape, const eth_ir_pattern *pat,
+    int expr, match_result *mchres, bool *e)
 {
   match_result dummy_mchres;
   if (mchres == NULL)
@@ -575,7 +575,7 @@ build_pattern(ssa_builder *bldr, const eth_ir_pattern *pat, int expr,
       {
         vids[i] = new_val(bldr, RC_RULES_DEFAULT);
         match_result submchres;
-        pats[i] = build_pattern(bldr, pat->unpack.subpats[i], vids[i],
+        pats[i] = build_pattern(bldr, tape, pat->unpack.subpats[i], vids[i],
             &submchres, e);
         mymchres = combine_match_results(mymchres, submchres);
       }
@@ -651,7 +651,7 @@ build_pattern(ssa_builder *bldr, const eth_ir_pattern *pat, int expr,
 
       match_result mymchres = MATCH_UNKNOWN;
 #if 1
-      if (bldr->ssavinfo[expr]->type)
+      if (pat->record.proto == NULL and bldr->ssavinfo[expr]->type)
       {
         eth_type *type = bldr->ssavinfo[expr]->type;
         int nmchfields = pat->record.n;
@@ -688,31 +688,36 @@ build_pattern(ssa_builder *bldr, const eth_ir_pattern *pat, int expr,
           {
             vids[i] = new_val(bldr, RC_RULES_DEFAULT);
             match_result submchres;
-            pats[i] = build_pattern(bldr, pat->record.subpats[i], vids[i],
+            pats[i] = build_pattern(bldr, tape, pat->record.subpats[i], vids[i],
                 &submchres, e);
             mymchres = combine_match_results(mymchres, submchres);
           }
 
           *mchres = mymchres;
           return eth_ssa_unpack_pattern(type, fieldoffs, vids, pats, nmchfields,
-              true);
+                                        true);
         }
       }
 #endif
 
 l_match_record_without_vinfo:
+      int proto = -1;
+      if (pat->record.proto)
+        proto = build(bldr, tape, pat->record.proto, false, e);
+
       eth_ssa_pattern *pats[pat->record.n];
       int vids[pat->record.n];
       for (int i = 0; i < pat->record.n; ++i)
       {
         vids[i] = new_val(bldr, RC_RULES_DEFAULT);
         match_result submchres;
-        pats[i] = build_pattern(bldr, pat->record.subpats[i], vids[i],
+        pats[i] = build_pattern(bldr, tape, pat->record.subpats[i], vids[i],
             &submchres, e);
         mymchres = combine_match_results(mymchres, submchres);
       }
       *mchres = mymchres;
-      return eth_ssa_record_pattern(pat->record.ids, vids, pats, pat->record.n);
+      return eth_ssa_record_pattern(proto, pat->record.ids, vids, pats,
+                                    pat->record.n);
     }
   }
 
@@ -1208,7 +1213,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
 
       if (ir->match.pat->tag == ETH_PATTERN_IDENT)
       { // optimize trivial identifier-match
-        eth_ssa_pattern *pat = build_pattern(bldr, ir->match.pat, expr, NULL, e);
+        eth_ssa_pattern *pat = build_pattern(bldr, tape, ir->match.pat, expr, NULL, e);
         eth_destroy_ssa_pattern(pat);
         return build(bldr, tape, ir->match.thenbr, istc, e);
       }
@@ -1218,7 +1223,7 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
         // --
         int n1 = bldr->nssavals;
         match_result mchres;
-        eth_ssa_pattern *pat = build_pattern(bldr, ir->match.pat, expr, &mchres, e);
+        eth_ssa_pattern *pat = build_pattern(bldr, tape, ir->match.pat, expr, &mchres, e);
         int n2 = bldr->nssavals;
         // --
         eth_ssa_tape *thentape = eth_create_ssa_tape();
@@ -1376,13 +1381,24 @@ is_using(eth_insn *insn, int vid)
       return false;
 
     case ETH_INSN_IF:
-      if (insn->iff.test == ETH_TEST_UPDATE)
+      switch (insn->iff.test)
       {
-        for (int i = 0; i < insn->iff.update.n; ++i)
-        {
-          if (insn->iff.update.vids[i] == vid)
+        case ETH_TEST_UPDATE:
+          for (int i = 0; i < insn->iff.update.n; ++i)
+          {
+            if (insn->iff.update.vids[i] == vid)
+              return true;
+          }
+          break;
+
+        case ETH_TEST_MATCH:
+          if (insn->iff.pat->tag == ETH_PATTERN_RECORD &&
+              vid == insn->iff.pat->record.proto)
             return true;
-        }
+          break;
+
+        default:
+          break;
       }
       return insn->iff.cond == vid;
 

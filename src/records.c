@@ -179,8 +179,6 @@ make_fields(const info fldinfo[], size_t n, eth_field fields[])
 static eth_type*
 record_type(char *const fldnames[], size_t n, bool unique)
 {
-  assert(n > 0);
-
   info arr[n];
   size_t totlen;
   study(fldnames, n, arr, &totlen);

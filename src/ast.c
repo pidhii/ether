@@ -73,7 +73,8 @@ eth_ast_unpack_pattern(eth_type *type, char *const fields[],
 }
 
 eth_ast_pattern*
-eth_ast_record_pattern(char *const fields[], eth_ast_pattern *pats[], int n)
+eth_ast_record_pattern(eth_ast *proto, char *const fields[],
+    eth_ast_pattern *pats[], int n)
 {
   eth_ast_pattern *pat = eth_malloc(sizeof(eth_ast_pattern));
   pat->rc = 0;
@@ -82,6 +83,8 @@ eth_ast_record_pattern(char *const fields[], eth_ast_pattern *pats[], int n)
   pat->record.subpats = eth_malloc(sizeof(eth_ast_pattern*) * n);
   pat->record.n = n;
   pat->record.alias = NULL;
+  if ((pat->record.proto = proto))
+    eth_ref_ast(proto);
   for (int i = 0; i < n; ++i)
   {
     pat->record.fields[i] = strdup(fields[i]);
@@ -180,6 +183,8 @@ destroy_ast_pattern(eth_ast_pattern *pat)
       free(pat->record.subpats);
       if (pat->record.alias)
         free(pat->record.alias);
+      if (pat->record.proto)
+        eth_unref_ast(pat->record.proto);
       break;
 
     case ETH_AST_PATTERN_RECORD_STAR:
@@ -772,7 +777,7 @@ ast_to_pattern(eth_ast *ast, bool *e)
       if (eth_is_tuple(ast->mkrcrd.type))
         return eth_ast_unpack_pattern(ast->mkrcrd.type, ast->mkrcrd.fields, fldpats, n);
       else if (eth_is_record(ast->mkrcrd.type))
-        return eth_ast_record_pattern(ast->mkrcrd.fields, fldpats, n);
+        return eth_ast_record_pattern(NULL, ast->mkrcrd.fields, fldpats, n);
       else
       {
         eth_error("undexpected type in record-AST");

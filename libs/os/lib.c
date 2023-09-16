@@ -27,23 +27,16 @@
 static eth_t
 _chdir(void)
 {
-  eth_use_variant(system_error)
-
   eth_args args = eth_start(1);
   eth_t path = eth_arg2(args, eth_string_type);
   if (chdir(eth_str_cstr(path)))
-  {
-    eth_t err = eth_sym(eth_errno_to_str(errno));
-    eth_throw(args, system_error(err));
-  }
+    eth_throw(args, eth_system_error(errno));
   eth_return(args, eth_nil);
 }
 
 static eth_t
 _access(void)
 {
-  eth_use_variant(system_error)
-
   eth_args args = eth_start(2);
   eth_t path = eth_arg2(args, eth_string_type);
   eth_t amode = eth_arg2(args, eth_number_type);
@@ -52,10 +45,7 @@ _access(void)
     if (errno == EACCES)
       eth_return(args, eth_false);
     else
-    {
-      eth_t err = eth_sym(eth_errno_to_str(errno));
-      eth_throw(args, system_error(err));
-    }
+      eth_throw(args, eth_system_error(errno));
   }
   eth_return(args, eth_true);
 }
@@ -99,22 +89,15 @@ _unsetenv(void)
 static eth_t
 _getcwd(void)
 {
-  eth_use_variant(system_error)
-
   char buf[PATH_MAX];
   if (not getcwd(buf, PATH_MAX))
-  {
-    eth_t err = eth_sym(eth_errno_to_str(errno));
-    return eth_exn(system_error(err));
-  }
+    return eth_exn(eth_system_error(errno));
   return eth_str(buf);
 }
 
 static eth_t
 _realpath(void)
 {
-  eth_use_variant(system_error)
-
   eth_args args = eth_start(1);
   eth_t path = eth_arg2(args, eth_string_type);
   char buf[PATH_MAX];
@@ -168,13 +151,9 @@ _waitpid(void)
 static eth_t
 _pipe(void)
 {
-  eth_use_variant(system_error);
-
   int fildes[2];
   if (pipe(fildes) < 0)
-  {
-    return eth_exn(system_error(eth_str(eth_errno_to_str(errno))));
-  }
+    return eth_exn(eth_system_error(errno));
   else
   {
     eth_t rx = eth_open_fd(fildes[0], "r");
@@ -186,16 +165,12 @@ _pipe(void)
 static eth_t
 _pipe2(void)
 {
-  eth_use_variant(system_error);
-
   eth_args args = eth_start(1);
   eth_t flags = eth_arg2(args, eth_number_type);
 
   int fildes[2];
   if (pipe2(fildes, eth_num_val(flags)) < 0)
-  {
-    eth_throw(args, system_error(eth_str(eth_errno_to_str(errno))));
-  }
+    eth_throw(args, eth_system_error(errno));
   else
   {
     eth_t rx = eth_open_fd(fildes[0], "r");

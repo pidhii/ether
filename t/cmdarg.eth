@@ -88,7 +88,7 @@ let tests = [
   }),
 ]
 
-let #(nok, nfail) = @(require('test')).run([#(nil, tests)])
+let #(nok, nfail) = require('test').run([#(nil, tests)])
 if nfail > 0 then
   exit(1)
 
