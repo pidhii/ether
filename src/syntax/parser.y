@@ -745,23 +745,23 @@ AtomicPattern
     eth_ref_attr($$->ident.attr = attr);
     free($2);
   }
-  | Attribute CAPSYMBOL {
-    $$ = eth_ast_ident_pattern($2);
-    eth_attr *attr = eth_create_attr($1);
-    if (g_filename)
-      eth_set_location(attr, location(&@$));
-    eth_ref_attr($$->ident.attr = attr);
-    free($2);
+  /*| Attribute CAPSYMBOL {*/
+    /*$$ = eth_ast_ident_pattern($2);*/
+    /*eth_attr *attr = eth_create_attr($1);*/
+    /*if (g_filename)*/
+      /*eth_set_location(attr, location(&@$));*/
+    /*eth_ref_attr($$->ident.attr = attr);*/
+    /*free($2);*/
+  /*}*/
+  | CAPSYMBOL '{' RecordPattern '}' {
+    $$ = eth_ast_record_pattern(eth_ast_ident($1), $3.keys.data, $3.vals.data, $3.keys.len);
+    cod_vec_iter($3.keys, i, x, free(x));
+    cod_vec_destroy($3.keys);
+    cod_vec_destroy($3.vals);
+    free($1);
   }
-  | Attribute CAPSYMBOL '{' RecordPattern '}' {
-    $$ = eth_ast_record_pattern(eth_ast_ident($2), $4.keys.data, $4.vals.data, $4.keys.len);
-    cod_vec_iter($4.keys, i, x, free(x));
-    cod_vec_destroy($4.keys);
-    cod_vec_destroy($4.vals);
-    free($2);
-  }
-  | Attribute CAPSYMBOL '(' PatternList ')' {
-    int n = $4.len;
+  | CAPSYMBOL '(' PatternList ')' {
+    int n = $3.len;
     char fieldsbuf[n][22];
     char *fields[n];
     for (int i = 0; i < n; ++i)
@@ -769,11 +769,14 @@ AtomicPattern
       fields[i] = fieldsbuf[i];
       sprintf(fields[i], "_%d", i+1);
     }
-    $$ = eth_ast_record_pattern(eth_ast_ident($2), fields, $4.data, n);
-    cod_vec_destroy($4);
-    free($2);
+    $$ = eth_ast_record_pattern(eth_ast_ident($1), fields, $3.data, n);
+    cod_vec_destroy($3);
+    free($1);
   }
-  /*| CAPSYMBOL { $$ = eth_ast_constant_pattern(eth_sym($1)); free($1); }*/
+  | CAPSYMBOL {
+    $$ = eth_ast_record_pattern(eth_ast_ident($1), NULL, NULL, 0);
+    free($1);
+  }
   | CONST { $$ = eth_ast_constant_pattern($1); }
   | String {
     cod_vec_push($1, 0);
@@ -838,12 +841,12 @@ AtomicPattern
     cod_vec_destroy($3.keys);
     cod_vec_destroy($3.vals);
   }
-  | STRUCT '{' RecordPattern '}' {
-    $$ = eth_ast_record_pattern(NULL, $3.keys.data, $3.vals.data, $3.keys.len);
-    cod_vec_iter($3.keys, i, x, free(x));
-    cod_vec_destroy($3.keys);
-    cod_vec_destroy($3.vals);
-  }
+  /*| STRUCT '{' RecordPattern '}' {*/
+    /*$$ = eth_ast_record_pattern(NULL, $3.keys.data, $3.vals.data, $3.keys.len);*/
+    /*cod_vec_iter($3.keys, i, x, free(x));*/
+    /*cod_vec_destroy($3.keys);*/
+    /*cod_vec_destroy($3.vals);*/
+  /*}*/
   | '{' RecordPattern '}' {
     $$ = eth_ast_record_pattern(NULL, $2.keys.data, $2.vals.data, $2.keys.len);
     cod_vec_iter($2.keys, i, x, free(x));

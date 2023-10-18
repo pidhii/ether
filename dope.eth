@@ -36,12 +36,10 @@ let module_path = {
   else prefix ++ "/lib/ether"
 }
 
-pub struct SystemError { _1 = nil }
-
 -- Checks whether a file exists in the file system
 let exist?(path) {
   try access(path, f_ok)
-  with SystemError(`ENOENT) -> false
+  with SystemError(errno) -> false
 }
 
 let mkdir(path) {
@@ -169,10 +167,18 @@ let fuzzy_cmp(a, b) {
 }
 
 --------------------------------[ Database ]------------------------------------
+struct Commit { _1 = nil }
+struct Tag { _1 = nil }
+
 let default_db_path = module_path ++ "/__db.eth"
 
 let load_db_from(path) {
-  let mut modlist = if exist?(path) then first(load(path)) else []
+  let mut modlist =
+    if exist?(path) then {
+      let env = create_env([('Commit' Commit) ('Tag' Tag)])
+      first(env:load(path))
+    }
+    else []
   #{
     get_modlist(self) { modlist }
     get_path(self) { path }
@@ -191,8 +197,7 @@ let load_db_from(path) {
 }
 
 ---------------------------------[ Git-API ]------------------------------------
-struct Commit { _1 = nil }
-struct Tag { _1 = nil }
+struct GitFailure { _1 = nil }
 
 let git = {
   let repository?(url) {
@@ -242,11 +247,11 @@ let git = {
       require_network()
 
     if system("git clone --progress '{url}' '{dir}'") != 0 then
-      raise $ `git_failure("git clone failed")
+      raise(GitFailure("git clone failed"))
 
     let checkout(what) {
       if system("cd {dir}; git checkout {what}") != 0 then
-        raise $ `git_failure("checkout failed")
+        raise(GitFailure("checkout failed"))
     }
 
     if let Commit(commit) = version then {
@@ -372,7 +377,6 @@ let build_and_install({conf modentry db dir args overwrite}) {
   }
 }
 
-struct GitFailure { _1 = nil }
 let fetch({repo_url version}) {
   let repo_dir = "repo_dir"
   try git.clone(#{url = repo_url, dir = repo_dir, version})

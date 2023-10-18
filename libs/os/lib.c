@@ -30,7 +30,7 @@ _chdir(void)
   eth_args args = eth_start(1);
   eth_t path = eth_arg2(args, eth_string_type);
   if (chdir(eth_str_cstr(path)))
-    eth_throw(args, eth_system_error(errno));
+    eth_throw(args, eth_num(errno));
   eth_return(args, eth_nil);
 }
 
@@ -45,7 +45,7 @@ _access(void)
     if (errno == EACCES)
       eth_return(args, eth_false);
     else
-      eth_throw(args, eth_system_error(errno));
+      eth_throw(args, eth_num(errno));
   }
   eth_return(args, eth_true);
 }
@@ -71,7 +71,7 @@ _setenv(void)
   eth_t overwrite = eth_arg(args);
   errno = 0;
   if (setenv(eth_str_cstr(name), eth_str_cstr(value), overwrite != eth_false))
-    eth_throw(args, eth_system_error(errno));
+    eth_throw(args, eth_num(errno));
   eth_return(args, eth_nil);
 }
 
@@ -82,7 +82,7 @@ _unsetenv(void)
   eth_t name = eth_arg2(args, eth_string_type);
   errno = 0;
   if (unsetenv(eth_str_cstr(name)))
-    eth_throw(args, eth_system_error(errno));
+    eth_throw(args, eth_num(errno));
   eth_return(args, eth_nil);
 }
 
@@ -91,7 +91,7 @@ _getcwd(void)
 {
   char buf[PATH_MAX];
   if (not getcwd(buf, PATH_MAX))
-    return eth_exn(eth_system_error(errno));
+    return eth_exn(eth_num(errno));
   return eth_str(buf);
 }
 
@@ -102,7 +102,7 @@ _realpath(void)
   eth_t path = eth_arg2(args, eth_string_type);
   char buf[PATH_MAX];
   if (not realpath(eth_str_cstr(path), buf))
-    eth_throw(args, eth_system_error(errno));
+    eth_throw(args, eth_num(errno));
   eth_return(args, eth_str(buf));
 }
 
@@ -123,7 +123,7 @@ static eth_t
 _fork(void)
 {
   int pid = fork();
-  return pid < 0 ? eth_exn(eth_system_error(errno)) : eth_num(pid);
+  return pid < 0 ? eth_exn(eth_num(errno)) : eth_num(pid);
 }
 
 // TODO: need some different structure for return value (dont return exit-status
@@ -139,7 +139,7 @@ _waitpid(void)
   int ret = waitpid(eth_num_val(pid), &wstatus, (int)eth_num_val(options));
   int err = errno;
   if (ret < 0)
-    eth_throw(args, eth_system_error(err));
+    eth_throw(args, eth_num(err));
   eth_t ret_wstatus;
   if (WIFEXITED(wstatus))
     ret_wstatus = eth_num(WEXITSTATUS(wstatus));
@@ -153,7 +153,7 @@ _pipe(void)
 {
   int fildes[2];
   if (pipe(fildes) < 0)
-    return eth_exn(eth_system_error(errno));
+    return eth_exn(eth_num(errno));
   else
   {
     eth_t rx = eth_open_fd(fildes[0], "r");
@@ -170,7 +170,7 @@ _pipe2(void)
 
   int fildes[2];
   if (pipe2(fildes, eth_num_val(flags)) < 0)
-    eth_throw(args, eth_system_error(errno));
+    eth_throw(args, eth_num(errno));
   else
   {
     eth_t rx = eth_open_fd(fildes[0], "r");
@@ -188,7 +188,7 @@ _fileno(void)
   int fd = fileno(eth_get_file_stream(file));
   int err = errno;
   if (fd < 0)
-    eth_throw(args, eth_system_error(err));
+    eth_throw(args, eth_num(err));
   else
     eth_return(args, eth_num(fd));
 }

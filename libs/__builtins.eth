@@ -191,3 +191,4 @@ let pub type_error(nil) { raise(`type_error) }
 
 
 pub struct Some { _1 = nil }
+pub struct SystemError { _1 = nil, _2 = "I am SystemError" }

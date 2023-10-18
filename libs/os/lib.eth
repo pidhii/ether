@@ -20,9 +20,12 @@ let pub o_cloexec = __o_cloexec
 let pub o_direct = __o_direct
 let pub o_nonblock = __o_nonblock
 
-let pub chdir = __chdir
+let pub chdir(dir) {
+  try __chdir(dir)
+  with errno -> raise(SystemError(errno))
+}
 
-let pub access = {
+let pub access(path, amode) {
   {help|
   = Os.access
 
@@ -38,28 +41,39 @@ let pub access = {
 
   See also man(3) access for complete documentation.
   |help}
-  __access
+  try __access(path, amode)
+  with errno -> raise(SystemError(errno))
+
 }
 
-let pub getcwd = __getcwd
+let pub getcwd() {
+  try __getcwd()
+  with errno -> raise(SystemError(errno))
+}
 
 let pub getenv = __getenv
-let pub setenv(x) {
-  if let #(name value overwrite?) = x then
-    __setenv(name, value, overwrite?)
-  else {
-    let name = x
-    fn value -> __setenv(name, value, true)
-  }
+
+let pub setenv(name, value, overwrite) {
+  try __setenv(name, value, overwrite)
+  with errno -> raise(SystemError(errno))
 }
 
-let pub realpath(path) {
+let pub unsetenv(name) {
+  try __unsetenv(name)
+  with errno -> raise(SystemError(errno))
+}
+
+let fix_path(path) {
   if {substr(path, 0 .. 1, path) eq "~/"} or false
-  then __realpath(getenv("HOME") ++ substr(1..*, path))
-  else __realpath(path)
+  then getenv("HOME") ++ substr(1..*, path)
+  else path
+}
+let pub realpath(path) {
+  try __realpath(fix_path(path))
+  with errno -> raise(SystemError(errno))
 }
 
-let pub mkdtemp = {
+let pub mkdtemp(temp) {
   {help|
   = Os.mkdtemp
 
@@ -74,14 +88,32 @@ let pub mkdtemp = {
   ==== ARGUMENTS
   - _emplate-string_: Template path for the directory ending with six 'X' characters.
   |help}
-  __mkdtemp
+  try __mkdtemp(temp)
+  with errno -> raise(SystemError(errno))
 }
 
-let pub fork = __fork
-let pub waitpid = __waitpid
+let pub fork() {
+  try __fork()
+  with errno -> raise(SystemError(errno))
+}
 
-let pub pipe = __pipe
-let pub pipe2 = __pipe2
+let pub waitpid(pid, opts) {
+  try __waitpid(pid, opts)
+  with errno -> raise(SystemError(errno))
+}
 
-let pub fileno = __fileno
+let pub pipe() {
+  try __pipe()
+  with errno -> raise(SystemError(errno))
+}
+
+let pub pipe2(flags) {
+  try __pipe2(flags)
+  with errno -> raise(SystemError(errno))
+}
+
+let pub fileno(file) {
+  try __fileno(file)
+  with errno -> raise(SystemError(errno))
+}
 
