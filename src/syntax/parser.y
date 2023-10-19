@@ -355,33 +355,7 @@ Atom
     cod_vec_destroy($5.keys);
   }
 
-  | '(' List ')' %prec GROUPING {
-    if ($2.len == 1)
-    {
-      $$ = $2.data[0];
-    }
-    else
-    {
-      int n = $2.len;
-      char fieldsbuf[n][22];
-      char *fields[n];
-      for (int i = 0; i < n; ++i)
-      {
-        fields[i] = fieldsbuf[i];
-        sprintf(fields[i], "_%d", i+1);
-      }
-      if ($2.len <= 1)
-      {
-        eth_error("invalid tuple");
-        eth_location *loc = location(&@$);
-        eth_print_location(loc, stderr);
-        eth_drop_location(loc);
-        abort();
-      }
-      $$ = eth_ast_make_record(eth_tuple_type(n), fields, $2.data, n);
-    }
-    cod_vec_destroy($2);
-  }
+  | '(' ExprSeq ')' %prec GROUPING { $$ = $2; }
 
   | CapIdent '{' Record '}' %prec APPLY {
     $$ = eth_ast_update($1, $3.vals.data, $3.keys.data, $3.vals.len);
@@ -442,8 +416,6 @@ Atom
   }
   | FmtString
   | RegExp
-
-  | '{' ExprSeq '}' { $$ = $2; }
 ;
 
 Expr
@@ -640,7 +612,7 @@ Bind
       $$.val = eth_ast_apply(eth_ast_cval(mkref), p, 1);
     }
   }
-  | Attribute SYMBOL '(' PatternList ')' '{' ExprSeq '}' {
+  | Attribute SYMBOL '(' PatternList ')' RARROW Expr {
     $$.pat = eth_ast_ident_pattern($2);
     eth_attr *attr = eth_create_attr($1);
     if (g_filename)
@@ -969,7 +941,9 @@ List
     $$ = $1;
     cod_vec_push($$, $2);
   }
-  | List ',' { $$ = $1; }
+  | List ',' {
+    $$ = $1;
+  }
 ;
 
 Record
@@ -987,10 +961,10 @@ Record
     cod_vec_insert($$.keys, $1, 0);
     cod_vec_insert($$.vals, eth_ast_ident($1), 0);
   }
-  | SYMBOL '(' PatternList ')' Expr Record {
-    $$ = $6;
+  | SYMBOL '(' PatternList ')' RARROW Expr Record {
+    $$ = $7;
 
-    eth_ast *fn = eth_ast_fn_with_patterns($3.data, $3.len, $5);
+    eth_ast *fn = eth_ast_fn_with_patterns($3.data, $3.len, $6);
     cod_vec_destroy($3);
 
     cod_vec_insert($$.keys, $1, 0);

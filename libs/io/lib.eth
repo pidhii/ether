@@ -50,28 +50,28 @@ import 'string'
 
 let pub fopen = __open
 
-let pub read_line() { read_line_of(stdin) }
-let pub read_line_opt() {
+let pub read_line() -> read_line_of(stdin)
+let pub read_line_opt() -> (
   try Some(read_line())
   with `end_of_file -> false
-}
-let pub read_line_of_opt(file) {
+)
+let pub read_line_of_opt(file) -> (
   try Some(read_line_of(file))
   with `end_of_file -> false
-}
+)
 
 let pub read = read_of(stdin)
-let pub read_opt(n) {
+let pub read_opt(n) -> (
   try Some(read(n))
   with `end_of_file -> false
-}
-let pub read_of_opt(file, n) {
+)
+let pub read_of_opt(file, n) -> (
   try Some(read_of(file, n))
   with `end_of_file -> false
-}
+)
 
 let pub printf = __printf(stdout)
-let pub fprintf(file) { __printf(file) }
+let pub fprintf(file) -> __printf(file)
 let pub eprintf = __printf(stderr)
 
 let pub write = write_to(stdout)
@@ -79,24 +79,24 @@ let pub write = write_to(stdout)
 pub struct SeekSet { _1 = nil }
 pub struct SeekCur { _1 = nil }
 pub struct SeekEnd { _1 = nil }
-let pub seek(file, pos) {
+let pub seek(file, pos) -> (
   let #(offs, whence) =
     if let SeekSet(x) = pos then #(x, 0)
     else if let SeekCur(x) = pos then #(x, 1)
     else if let SeekEnd(x) = pos then #(x, 2)
     else raise(`invalid_argument)
   __seek(file, offs, whence)
-}
+)
 
-let pub shell(cmd) {
+let pub shell(cmd) -> (
   let pipe = open_pipe_in(cmd)
-  let rec loop(acc) {
+  let rec loop(acc) -> (
     if let Some(data) = read_of_opt(pipe, 0x100)
     then loop(data :: acc)
     else list.rev(acc) |> string.cat |> string.chomp
-  }
+  )
   let out = loop([])
   if close(pipe) == 0 then out
   else raise(`failure)
-}
+)
 

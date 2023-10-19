@@ -40,13 +40,13 @@ let list = require("list")
 
 -- Prelude
 let pub cat = __cat
-let pub join(sep, xs) {
+let pub join(sep, xs) -> (
   if xs is nil then ""
   else if let hd::[] = xs then hd
   else if let hd::tl = xs then
     list.fold_left(fn x y -> cat([x, sep, y]), hd, tl)
   else invalid_argument(nil)
-}
+)
 let pub to_upper = __to_upper
 let pub to_lower = __to_lower
 let pub chr = __chr
@@ -57,15 +57,15 @@ let pub chomp = __chomp
 let pub chop = __chop
 let pub trim_left = __trim_left
 let pub trim_right = __trim_right
-let pub trim(s) { trim_left(trim_right(s)) }
+let pub trim(s) -> trim_left(trim_right(s))
 let pub strcmp = __strcmp
 let pub strcasecmp = __strcasecmp
 let pub match = __match
 let pub gsub = __gsub
 let pub rev_split = __rev_split
-let pub split(re, str) { list.rev(rev_split(re, str)) }
+let pub split(re, str) -> list.rev(rev_split(re, str))
 
-let pub malloc = {
+let pub malloc = (
   {help|
   = String.malloc
   == DESCRIPTION:
@@ -74,9 +74,9 @@ let pub malloc = {
     malloc number? -> string?
   |help}
   __malloc
-}
+)
 
-let pub calloc = {
+let pub calloc = (
   {help|
   = String.calloc
   == DESCRIPTION:
@@ -85,10 +85,10 @@ let pub calloc = {
     calloc number? -> string?
   |help}
   __calloc
-}
+)
 
 --------------------------------------------------------------------------------
-let pub make_string = {
+let pub make_string = (
   {help|
   = String.make
   == DESCRIPTION
@@ -98,16 +98,16 @@ let pub make_string = {
     make number? string? -> string?
   |help}
   __make
-}
+)
 
 let pub strlen = __len
-let pub substr(x, s) {
+let pub substr(x, s) -> (
   if let #(k, n) = x then __substr(s, k, n)
   else if let l .. r = x then __substr(s, l, r - l + 1)
   else if let l..* = x then __substr(s, l, strlen(s) - l)
   else if let *..r = x then __substr(s, 0, r + 1)
   else invalid_argument(nil)
-}
+)
 
 --------------------------------------------------------------------------------
 --                                Regexp
@@ -116,12 +116,12 @@ let pub substr(x, s) {
 -- * split
 -- * gsub
 
-let pub strstr(pat, s) {
+let pub strstr(pat, s) -> (
   if regexp?(pat) then __find_regexp(pat, s)
   else if string?(pat) then
     if let Some(start) = __strstr_opt(s, pat) then
       #(start, start + strlen(pat))
     else false
   else type_error(nil)
-}
+)
 

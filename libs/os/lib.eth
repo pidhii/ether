@@ -20,12 +20,12 @@ let pub o_cloexec = __o_cloexec
 let pub o_direct = __o_direct
 let pub o_nonblock = __o_nonblock
 
-let pub chdir(dir) {
+let pub chdir(dir) -> (
   try __chdir(dir)
   with errno -> raise(SystemError(errno))
-}
+)
 
-let pub access(path, amode) {
+let pub access(path, amode) -> (
   {help|
   = Os.access
 
@@ -43,37 +43,36 @@ let pub access(path, amode) {
   |help}
   try __access(path, amode)
   with errno -> raise(SystemError(errno))
+)
 
-}
-
-let pub getcwd() {
+let pub getcwd() -> (
   try __getcwd()
   with errno -> raise(SystemError(errno))
-}
+)
 
 let pub getenv = __getenv
 
-let pub setenv(name, value, overwrite) {
+let pub setenv(name, value, overwrite) -> (
   try __setenv(name, value, overwrite)
   with errno -> raise(SystemError(errno))
-}
+)
 
-let pub unsetenv(name) {
+let pub unsetenv(name) -> (
   try __unsetenv(name)
   with errno -> raise(SystemError(errno))
-}
+)
 
-let fix_path(path) {
-  if {substr(path, 0 .. 1, path) eq "~/"} or false
+let fix_path(path) -> (
+  if (substr(path, 0 .. 1, path) eq "~/") or false
   then getenv("HOME") ++ substr(1..*, path)
   else path
-}
-let pub realpath(path) {
+)
+let pub realpath(path) -> (
   try __realpath(fix_path(path))
   with errno -> raise(SystemError(errno))
-}
+)
 
-let pub mkdtemp(temp) {
+let pub mkdtemp(temp) -> (
   {help|
   = Os.mkdtemp
 
@@ -90,30 +89,30 @@ let pub mkdtemp(temp) {
   |help}
   try __mkdtemp(temp)
   with errno -> raise(SystemError(errno))
-}
+)
 
-let pub fork() {
+let pub fork() -> (
   try __fork()
   with errno -> raise(SystemError(errno))
-}
+)
 
-let pub waitpid(pid, opts) {
+let pub waitpid(pid, opts) -> (
   try __waitpid(pid, opts)
   with errno -> raise(SystemError(errno))
-}
+)
 
-let pub pipe() {
+let pub pipe() -> (
   try __pipe()
   with errno -> raise(SystemError(errno))
-}
+)
 
-let pub pipe2(flags) {
+let pub pipe2(flags) -> (
   try __pipe2(flags)
   with errno -> raise(SystemError(errno))
-}
+)
 
-let pub fileno(file) {
+let pub fileno(file) -> (
   try __fileno(file)
   with errno -> raise(SystemError(errno))
-}
+)
 

@@ -1096,7 +1096,7 @@ _record(void)
   return ret;
 }
 
-#define COROUTINES 0
+#define COROUTINES 1
 #if COROUTINES
 
 static eth_type *_state_obj_type;

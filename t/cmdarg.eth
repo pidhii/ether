@@ -10,7 +10,7 @@ let options = [
 ]
 
 let tests = [
-  {
+  (
     let cmd = ["first", "--long-arg", "arg", "second", "--long-no-arg", "-a", "1", "-f", "third"]
     let #(kw, pos) = cmdarg.get(options, cmd)
     #("test-1", fn -> all?(id, [
@@ -20,8 +20,8 @@ let tests = [
         assoc("short-arg", kw) eq "1",
         assoc("short-no-arg", kw) eq true,])
     )
-  },
-  {
+  ),
+  (
     let cmd = ["first","--long-arg=arg","second","--long-no-arg","-a1","-f","third"]
     let #(kw, pos) = cmdarg.get(options, cmd)
     #("test-2", fn -> all?(id, [
@@ -31,61 +31,61 @@ let tests = [
         assoc("short-arg", kw) eq "1",
         assoc("short-no-arg", kw) eq true ])
     )
-  },
+  ),
 
-  {
+  (
     let cmd = ["--long-arg="]
     let #(kw, pos) = cmdarg.get(options, cmd)
     #("test-3", fn -> assoc("long-arg", kw) eq "")
-  },
+  ),
 
-  {
+  (
     let cmd = ["--long-arg"]
     #("test-4", fn ->
-      try { cmdarg.get(options, cmd) false }
+      try ( cmdarg.get(options, cmd) false )
       with e -> e eq `missing_argument
     )
-  },
+  ),
 
-  {
+  (
     let cmd = ["-a"]
     #("test-5", fn ->
-      try { cmdarg.get(options, cmd) false }
+      try ( cmdarg.get(options, cmd) false )
       with e -> e eq `missing_argument
     )
-  },
+  ),
 
-  {
+  (
     let cmd = ["--long-no-arg=x"]
     #("test-6", fn ->
-      try { cmdarg.get(options, cmd) false }
+      try ( cmdarg.get(options, cmd) false )
       with e -> e eq `unexpected_argument
     )
-  },
+  ),
 
-  {
+  (
     let cmd = ["-fx"]
     #("test-7", fn ->
-      try { cmdarg.get(options, cmd) false }
+      try ( cmdarg.get(options, cmd) false )
       with e -> e eq `unexpected_argument
     )
-  },
+  ),
 
-  {
+  (
     let cmd = ["-o"]
     #("test-8", fn ->
-      try { cmdarg.get(options, cmd) false }
+      try ( cmdarg.get(options, cmd) false )
       with e -> e eq `undefined_option
     )
-  },
+  ),
 
-  #("test-9", fn -> {
+  #("test-9", fn -> (
     let cmd1 = ["-h"]
     let kw1 = first $ cmdarg.get(options, cmd1)
     let cmd2 = ["--help"]
     let kw2 = first $ cmdarg.get(options, cmd2)
     assoc("h", kw1) eq true && assoc("h", kw2) eq true
-  }),
+  )),
 ]
 
 let #(nok, nfail) = require('test').run([#(nil, tests)])

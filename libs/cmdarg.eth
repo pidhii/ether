@@ -3,7 +3,7 @@ open 'string'
 
 pub struct InvalidOptionArgument { _1 = nil }
 
-let get_options(cfg, os) {
+let get_options(cfg, os) -> (
 
   let cfg = cfg |> flat_map(fn optcfg ->
     if pair?(optcfg.name)
@@ -17,72 +17,72 @@ let get_options(cfg, os) {
     else record(#('arg_pat', /.*/) :: list(optcfg))
   )
 
-  let get_rules(opt) {
+  let get_rules(opt) -> (
     try find(fn #{name} -> name eq opt, cfg)
     with `failure -> raise(`undefined_option)
-  }
+  )
 
-  let rec mainLoop(os, kws, pos) {
+  let rec mainLoop(os, kws, pos) -> (
     if let o::os = os then
-      if o eq "--" then #(kws rev_append(pos, os))
+      if o eq "--" then #(kws, rev_append(pos, os))
       else if o =~ /^--/ then handle_long_option(o, os, kws, pos)
       else if o =~ /^-/ then handle_short_option(o, os, kws, pos)
       else mainLoop(os, kws, o :: pos)
     else #(kws, rev(pos))
-  }
-  and handle_long_option(o, os, kws, pos) {
-    if let #(brk _) = strstr("=", o) then {
+  )
+  and handle_long_option(o, os, kws, pos) -> (
+    if let #(brk _) = strstr("=", o) then (
       -- Long option with '=' 
       let lopt = substr(2 .. brk-1, o)
       let #{has_arg val arg_pat} = get_rules(lopt)
-      if has_arg then {
+      if has_arg then (
         let arg = substr(brk+1..*, o)
         if arg =~ arg_pat then
           mainLoop(os, #(val, arg) :: kws, pos)
         else raise(InvalidOptionArgument(lopt))
-      }
+      )
       else raise(`unexpected_argument)
-    }
-    else {
+    )
+    else (
       let lopt = substr(2..*, o)
       let #{has_arg val arg_pat} = get_rules(lopt)
       if has_arg then
         if let arg::os = os then
           if arg =~ arg_pat then
-            mainLoop(os, #(val arg) :: kws, pos)
+            mainLoop(os, #(val, arg) :: kws, pos)
           else raise(InvalidOptionArgument(lopt))
         else raise(`missing_argument)
       else
-        mainLoop(os, #(val true) :: kws, pos)
-    }
-  }
-  and handle_short_option(o, os, kws, pos) {
+        mainLoop(os, #(val, true) :: kws, pos)
+    )
+  )
+  and handle_short_option(o, os, kws, pos) -> (
     let shopt = substr(1..1, o)
     let #{has_arg val arg_pat} = get_rules(shopt)
     if strlen(o) > 2 then
       -- Option and argument are merged 
-      if has_arg then {
+      if has_arg then (
         let arg = substr(2..*, o)
         if arg =~ arg_pat then
-          mainLoop(os, #(val arg) :: kws, pos)
+          mainLoop(os, #(val, arg) :: kws, pos)
         else raise(InvalidOptionArgument(shopt))
-      }
+      )
       else raise(`unexpected_argument)
     else
       if has_arg then
         if let arg::os = os then
           if arg =~ arg_pat then
-            mainLoop(os, #(val arg) :: kws, pos)
+            mainLoop(os, #(val, arg) :: kws, pos)
           else raise(InvalidOptionArgument(shopt))
         else raise(`missing_argument)
       else
-        mainLoop(os, #(val true) :: kws, pos)
-  }
+        mainLoop(os, #(val, true) :: kws, pos)
+  )
 
   mainLoop(os, [], [])
-}
+)
 
-let pub get = {
+let pub get = (
   {help|
   = CmdArg.get
 
@@ -102,5 +102,5 @@ let pub get = {
     arguments passed to your script use \`cdr command_line`.
   |help}
   get_options
-}
+)
 

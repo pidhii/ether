@@ -1,62 +1,62 @@
-let pub __builtin (+)(x, y) { x + y }
-let pub __builtin (-)(x, y) { x - y }
-let pub __builtin (*)(x, y) { x * y }
-let pub __builtin (/)(x, y) { x / y }
-let pub __builtin (mod)(x, y) { x mod y }
-let pub __builtin (^)(x, y) { x ^ y }
+let pub __builtin (+)(x, y) -> x + y
+let pub __builtin (-)(x, y) -> x - y
+let pub __builtin (*)(x, y) -> x * y
+let pub __builtin (/)(x, y) -> x / y
+let pub __builtin (mod)(x, y) -> x mod y
+let pub __builtin (^)(x, y) -> x ^ y
 
-let pub __builtin (land)(x, y) { x land y }
-let pub __builtin (lor)(x, y) { x lor y }
-let pub __builtin (lxor)(x, y) { x lxor y }
-let pub __builtin (lshl)(x, y) { x lshl y }
-let pub __builtin (lshr)(x, y) { x lshr y }
-let pub __builtin (ashl)(x, y) { x ashl y }
-let pub __builtin (ashr)(x, y) { x ashr y }
-let pub __builtin (lnot)(x) { lnot x }
+let pub __builtin (land)(x, y) -> x land y
+let pub __builtin (lor)(x, y) -> x lor y
+let pub __builtin (lxor)(x, y) -> x lxor y
+let pub __builtin (lshl)(x, y) -> x lshl y
+let pub __builtin (lshr)(x, y) -> x lshr y
+let pub __builtin (ashl)(x, y) -> x ashl y
+let pub __builtin (ashr)(x, y) -> x ashr y
+let pub __builtin (lnot)(x) -> lnot x
 
-let pub __builtin (<)(x, y) { x < y }
-let pub __builtin (>)(x, y) { x > y }
-let pub __builtin (<=)(x, y) { x <= y }
-let pub __builtin (>=)(x, y) { x >= y }
-let pub __builtin (==)(x, y) { x == y }
-let pub __builtin (!=)(x, y) { x != y }
+let pub __builtin (<)(x, y) -> x < y
+let pub __builtin (>)(x, y) -> x > y
+let pub __builtin (<=)(x, y) -> x <= y
+let pub __builtin (>=)(x, y) -> x >= y
+let pub __builtin (==)(x, y) -> x == y
+let pub __builtin (!=)(x, y) -> x != y
 
-let pub __builtin (is)(x, y) { x is y }
+let pub __builtin (is)(x, y) -> x is y
 
-let pub (++)(x, y) { x ++ y }
+let pub (++)(x, y) -> x ++ y
 
-let pub __builtin (::)(x, y) { x :: y }
+let pub __builtin (::)(x, y) -> x :: y
 
-let pub (,)(a, b) { #(a, b) }
-let pub (,,)(a, b, c) { #(a, b, c) }
-let pub (,,,)(a, b, c, d) { #(a, b, c, d) }
-let pub (,,,,)(a, b, c, d, e) { #(a, b, c, d, e) }
+let pub (,)(a, b) -> #(a, b)
+let pub (,,)(a, b, c) -> #(a, b, c)
+let pub (,,,)(a, b, c, d) -> #(a, b, c, d)
+let pub (,,,,)(a, b, c, d, e) -> #(a, b, c, d, e)
 
-let pub __builtin (not)(x) { not x }
+let pub __builtin (not)(x) -> not x
 
 
 --let pub (∘) f g x = f (g x)
 
 -- Application
-let pub ($)(f, x) { f(x) }
-let pub (|>)(x, f) { f(x) }
+let pub ($)(f, x) -> f(x)
+let pub (|>)(x, f) -> f(x)
 
 -- Pairs
-let pub car((x :: _)) { x }
-let pub cdr((_ :: x)) { x }
+let pub car((x :: _)) -> x
+let pub cdr((_ :: x)) -> x
 
 -- Tuples
-let pub first(#{_1 = x}) { x }
-let pub second(#{_2 = x}) { x }
-let pub third(#{_3 = x}) { x }
+let pub first(#{_1 = x}) -> x
+let pub second(#{_2 = x}) -> x
+let pub third(#{_3 = x}) -> x
 
 -- Functions
-let pub id(x) { x }
+let pub id(x) -> x
 
-let pub flip(f, x, y) { f(y, x) }
-let pub const(x) { fn _ -> x }
-let pub curry(f) { fn x y -> f (x, y) }
-let pub uncurry(f) { fn #(x y) -> f(x, y) }
+let pub flip(f, x, y) -> f(y, x)
+let pub const(x) -> fn _ -> x
+let pub curry(f) -> fn x y -> f (x, y)
+let pub uncurry(f) -> fn (x y) -> f(x, y)
 
 -- Sequences
 --let pub index seq idx =
@@ -64,68 +64,66 @@ let pub uncurry(f) { fn #(x y) -> f(x, y) }
   --else __index seq idx
 
 -- Math
-let pub even?(x) { x mod 2 == 0 }
-let pub odd?(x) { x mod 2 == 1 }
+let pub even?(x) -> x mod 2 == 0
+let pub odd?(x) -> x mod 2 == 1
 
-let compose_va(f, g) {
-  let rec aux(x) {
+let compose_va(f, g) -> (
+  let rec aux(x) -> (
     if function?(x) then
       fn y -> aux(x(y))
     else f(x)
-  }
+  )
   aux(g)
-}
+)
 
-let pub die(msg) {
+let pub die(msg) -> (
   __print_to(stderr, msg)
   exit(1)
-}
+)
 
 let pub require = __require
 
-let pub create_env(defs) {
-  #{
-    defs
-    load(#{defs}, path) { __load(path, defs) }
-    load_stream(#{defs}, file) { __load_stream(file, defs) }
-    load_string(#{defs}, str) { __load_stream(__open_string(str), defs) }
-  }
+let pub create_env(defs) -> #{
+  defs
+  load(#{defs}, path) -> __load(path, defs)
+  load_stream(#{defs}, file) -> __load_stream(file, defs)
+  load_string(#{defs}, str) -> __load_stream(__open_string(str), defs)
 }
-let pub load(path) { __load(path, []) }
-let pub load_stream(file) { __load_stream(file, []) }
-let pub load_string(str) { __load_stream(__open_string(str), []) }
+let pub load(path) ->__load(path, [])
+let pub load_stream(file) -> __load_stream(file, [])
+let pub load_string(str) -> __load_stream(__open_string(str), [])
 
 
-let pub __fmt(l) {
-  let rec loop(l, acc) {
-    if let x :: xs = l then {
+let pub __fmt(l) -> (
+  let rec loop(l, acc) -> (
+    if let x :: xs = l then (
       let x = if string?(x) then x else format("%w", x)
       loop(xs, x ++ acc)
-    }
+    )
     else acc
-  }
+  )
   loop(l, "")
-}
+)
 
 
-let pub record = lazy {
+let pub record = lazy (
   let #{strcmp} = require('string')
   let #{sort, mapi, map} = require('list')
-  fn pairs -> {
+  fn pairs -> (
     -- sort pairs
     let sortedPairs =
       pairs
       |> mapi((,))
-      |> sort(fn #(i, #(a, _)) as lhs, #(j, #(b, _)) as rhs -> {
+      |> sort(fn (i, (a, _)) as lhs, (j, (b, _)) as rhs -> (
         let cmp = strcmp(a, b)
         if cmp < 0 then true
         else if cmp == 0 then i < j
         else false
-      })
+      ))
       |> map(second)
 
     -- remove duplicate keys (leave the latest one) and construct a record
-    let rec loop(l, acc) {
+    let rec loop(l, acc) -> (
       if let x :: xs = l then
         if acc is [] then
           -- accumulate first kv-pair
@@ -137,12 +135,11 @@ let pub record = lazy {
           -- accumulate kv-pair
           loop(xs, x :: acc)
       else
-        --__print_to(stdout, "record({acc})")
         __record(acc)
-    }
+    )
     loop(pairs, [])
-  }
-}
+  )
+)
 
 --------------------------------------------------------------------------------
 --                                   IO
@@ -161,12 +158,12 @@ let pub record = lazy {
 -- * print
 -- * eprint
 --
-let pub open_in(path) { __open(path, "r") }
-let pub open_out(path) { __open(path, "w") }
-let pub open_append(path) { __open(path, "a") }
-let pub open_pipe_in(cmd) { __popen(cmd, "r") }
-let pub open_pipe_out(cmd) { __popen(cmd, "w") }
-let pub open_string_in() { __open_string() }
+let pub open_in(path) -> __open(path, "r")
+let pub open_out(path) -> __open(path, "w")
+let pub open_append(path) -> __open(path, "a")
+let pub open_pipe_in(cmd) -> __popen(cmd, "r")
+let pub open_pipe_out(cmd) -> __popen(cmd, "w")
+let pub open_string_in() -> __open_string()
 
 let pub print_to = __print_to
 let pub print = print_to(stdout)
@@ -184,9 +181,9 @@ let pub srand = __srand
 --------------------------------------------------------------------------------
 --                                Errors
 --
-let pub failure(nil) { raise(`failure) }
-let pub invalid_argument(nil) { raise(`invalid_argument) }
-let pub type_error(nil) { raise(`type_error) }
+let pub failure(nil) -> raise(`failure)
+let pub invalid_argument(nil) -> raise(`invalid_argument)
+let pub type_error(nil) -> raise(`type_error)
 
 
 

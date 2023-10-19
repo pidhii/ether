@@ -23,35 +23,35 @@ print(123 < other_variable < my_variable is not false) --> true
 
 
 -- Simple function
-let square(x) { x * x }
+let square(x) -> x * x
 print(square(2))
 
 
 -- Recursive function
-let rec factorial(x) {
+let rec factorial(x) -> (
   if x <= 1 then 1
   else x * factorial(x - 1)
-}
+)
 
 print(factorial(3))
 
 
 -- Multiple cross-referencing functions
-let rec even?(x) {
+let rec even?(x) -> (
   x == 0 || odd?(x - 1)
-}
-and odd?(x) {
+)
+and odd?(x) -> (
   x != 0 && even?(x - 1)
-}
+)
 
 print(even?(42))
 
 
 -- Better way to write factorial: tail-recursion
-let rec factorial2(x, acc) {
+let rec factorial2(x, acc) -> (
   if x <= 1 then acc
   else factorial2(x - 1, acc * x)
-}
+)
 
 print(factorial2(1000000, 1))
 
@@ -62,17 +62,17 @@ with `stack_overflow -> print("Stack overflow")
 
 
 -- Currying
-let add(x, y) { x + y }
+let add(x, y) -> x + y
 let increment = add(1)
 print(increment(3))
 
 
 -- Higher order functions
-let rec map(f, xs) {
+let rec map(f, xs) -> (
   if let x :: xs' = xs then
     f(x) :: map(f, xs')
   else []
-}
+)
 
 print(map(increment, [1 2 3]))
 
@@ -87,9 +87,9 @@ print(#(x, xs))
 
 
 -- ...
-let safe_div(x, y) {
+let safe_div(x, y) -> (
   if y != 0 then Some(x / y) else false
-}
+)
 let Some(x) = safe_div(1, 2)
 print(x)
 
@@ -111,9 +111,9 @@ print(info.login eq login) --> true
 -- `|>` is a "pipe"-operator from OCaml: `x |> f` is equivalent to `f x`
 -- `()` is a synonim for `nil`.
 open 'list'
-range(1 .. 100) |> iter $ fn i -> {
+range(1 .. 100) |> iter(fn i -> (
   if i mod 3 == 0 then print("FIZZ")
   else if i mod 5 == 0 then print("BUZZ")
   else print(i)
-}
+))
 

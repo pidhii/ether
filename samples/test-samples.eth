@@ -6,13 +6,13 @@ open 'string'
 
 chdir(get(command_line, 1))
 
-let test_mergesort() {
+let test_mergesort() -> (
   let origlist = [1 9 4 5 7 6 8 2 3]
   let ret =
     origlist
     |> map(format("%d"))
     |> join("\n")
-    |> {fn x -> shell({q|ether ./mergesort.eth <<<'{x}' | grep "Sorted list"|q})}
+    |> (fn x -> shell({q|ether ./mergesort.eth <<<'{x}' | grep "Sorted list"|q}))
     |> match( /\[.+\]/)
     |> car
 
@@ -23,11 +23,11 @@ let test_mergesort() {
     |> format("[%d]")
 
   assert ret eq correct
-}
+)
 
-let test_basics() {
+let test_basics() -> (
   assert system("ether ./basics.eth &>/dev/null") == 0
-}
+)
 
 test_basics()
 print("> 'test_basics` succeed")

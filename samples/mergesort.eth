@@ -11,24 +11,24 @@ import 'io'
 -- Also note that the `loop` is calling itself from a propper tail position.
 -- Thus this function is evaluated withing fixed/finite stack frame, and it
 -- will never generate a `Stack_overflow` exception.
-let split(xs) {
+let split(xs) -> (
   --This is the way you write loops: just create an auxilary function
-  let rec loop(slow, fast, acc) {
+  let rec loop(slow, fast, acc) -> (
     -- Try to move fast iterator on two positions further; otherwize, we are
     -- done
-    if let _::_::fast = fast then {
+    if let _::_::fast = fast then (
       --Now move slow iterator by one position and continue the loop
       let x :: slow = slow
       loop(slow, fast, x :: acc)
-    }
-    else #(acc slow)
-  }
+    )
+    else #(acc, slow)
+  )
   loop(xs, xs, nil)
-}
+)
 
 -- Merge two sorted lists preserving order.
-let merge(xs, ys) {
-  let rec loop(xs, ys, acc) {
+let merge(xs, ys) -> (
+  let rec loop(xs, ys, acc) -> (
     -- This dispatch would look much better with MATCH expression like in OCaml,
     -- however I haven't yet implemented it.
     if let x :: xs' = xs then
@@ -43,23 +43,23 @@ let merge(xs, ys) {
     else
       -- No more xs left, append all remaining ys to the result
       list.rev_append(acc, ys)
-  }
+  )
   loop(xs, ys, nil)
-}
+)
 
 -- Sort a list of numbers in increasing order.
-let rec sort(xs) {
+let rec sort(xs) -> (
   -- Check if length of the list is greater than 1; otherwize, there is nothing
   -- to sort
-  if let _::_::_ = xs then {
+  if let _::_::_ = xs then (
     let #(l, r) = split(xs)
     merge(sort(l), sort(r))
-  }
+  )
   else xs
-}
+)
 
 -- Read a list of numbers.
-let read_list(file) {
+let read_list(file) -> (
   -- Builtin `read_line_of` will throw `End_of_file` exception upon reaching
   -- end of file, so we could use TRY/WITH expression to do the job.
   --
@@ -73,21 +73,21 @@ let read_list(file) {
   -- otherwize, it returns nil. Note that in fact it does not matter what do
   -- we return in case of End_of_file exception. We only need it to be NOT the
   -- `Some _`-variant.
-  let read_line_opt(file) {
+  let read_line_opt(file) -> (
     try Some(io.read_line_of(file))
     with `end_of_file -> nil
-  }
+  )
 
   -- And here is the actual loop to read the list
-  let rec loop(acc) {
+  let rec loop(acc) -> (
     if let Some(x) = read_line_opt(file) then
       -- Note the `$`: this is an application operator from Haskell. The whole
       -- role of `$` is to have the lowest precedence of all operators
       loop(string.to_number(string.chomp(x)) :: acc)
     else acc
-  }
+  )
   loop(nil)
-}
+)
 
 -- Read a list from standard input.
 --
@@ -95,8 +95,8 @@ let read_list(file) {
 -- however I think this is out of the scope of this tutorial.
 -- Use <C-d> (close input) to finish entering the list.
 let l = read_list(stdin)
-print(#("Given list:" l))
+print(#("Given list:", l))
 
 -- Sort it
-print(#("Sorted list:" sort(l)))
+print(#("Sorted list:", sort(l)))
 
