@@ -1,5 +1,5 @@
 
-open 'string'
+open 'string';
 
 --------------------------------------------------------------------------------
 -- Functions:
@@ -11,21 +11,21 @@ open 'string'
 -- Values:
 -- * f_ok, r_ok, w_ok, x_ok
 
-let pub f_ok = __f_ok
-let pub r_ok = __r_ok
-let pub w_ok = __w_ok
-let pub x_ok = __x_ok
+let pub F_OK = __f_ok in
+let pub R_OK = __r_ok in
+let pub W_OK = __w_ok in
+let pub X_OK = __x_ok in
 
-let pub o_cloexec = __o_cloexec
-let pub o_direct = __o_direct
-let pub o_nonblock = __o_nonblock
+let pub O_CLOEXEC = __o_cloexec in
+let pub O_DIRECT = __o_direct in
+let pub O_NONBLOCK = __o_nonblock in
 
-let pub chdir(dir) -> (
-  try __chdir(dir)
-  with errno -> raise(SystemError(errno))
-)
+let pub fn chdir dir =
+  try __chdir dir
+  except errno -> raise $ system_error errno
+in
 
-let pub access(path, amode) -> (
+let pub fn access path amode =
   {help|
   = Os.access
 
@@ -40,39 +40,39 @@ let pub access(path, amode) -> (
   The value of _amode_  is either the bitwise-inclusive OR of \`r_ok`, \`w_ok`, \`x_ok` or existence test, \`f_ok`.
 
   See also man(3) access for complete documentation.
-  |help}
-  try __access(path, amode)
-  with errno -> raise(SystemError(errno))
-)
+  |help};
+  try __access path amode
+  except errno -> raise $ system_error errno
+in
 
-let pub getcwd() -> (
-  try __getcwd()
-  with errno -> raise(SystemError(errno))
-)
+let pub fn getcwd () =
+  try __getcwd ()
+  except errno -> raise $ system_error errno
+in
 
-let pub getenv = __getenv
+let pub getenv = __getenv in
 
-let pub setenv(name, value, overwrite) -> (
-  try __setenv(name, value, overwrite)
-  with errno -> raise(SystemError(errno))
-)
+let pub fn setenv name value overwrite =
+  try __setenv name value overwrite
+  except errno -> raise $  system_error errno
+in
 
-let pub unsetenv(name) -> (
-  try __unsetenv(name)
-  with errno -> raise(SystemError(errno))
-)
+let pub fn unsetenv name =
+  try __unsetenv name
+  except errno -> raise $  system_error errno
+in
 
-let fix_path(path) -> (
-  if (substr(path, 0 .. 1, path) eq "~/") or false
-  then getenv("HOME") ++ substr(1..*, path)
+let fn fix_path path =
+  if (substr path (0 .. 1) path eq "~/") or false
+  then getenv "HOME" ++ substr (1..*) path
   else path
-)
-let pub realpath(path) -> (
-  try __realpath(fix_path(path))
-  with errno -> raise(SystemError(errno))
-)
+in
+let pub fn realpath path =
+  try __realpath $ fix_path path
+  except errno -> raise $  system_error errno
+in
 
-let pub mkdtemp(temp) -> (
+let pub fn mkdtemp temp =
   {help|
   = Os.mkdtemp
 
@@ -86,33 +86,34 @@ let pub mkdtemp(temp) -> (
 
   ==== ARGUMENTS
   - _emplate-string_: Template path for the directory ending with six 'X' characters.
-  |help}
-  try __mkdtemp(temp)
-  with errno -> raise(SystemError(errno))
-)
+  |help};
+  try __mkdtemp temp
+  except errno -> raise $  system_error errno
+in
 
-let pub fork() -> (
-  try __fork()
-  with errno -> raise(SystemError(errno))
-)
+let pub fn fork () =
+  try __fork ()
+  except errno -> raise $ system_error errno
+in
 
-let pub waitpid(pid, opts) -> (
-  try __waitpid(pid, opts)
-  with errno -> raise(SystemError(errno))
-)
+let pub fn waitpid pid opts =
+  try __waitpid pid opts
+  except errno -> raise $ system_error errno
+in
 
-let pub pipe() -> (
-  try __pipe()
-  with errno -> raise(SystemError(errno))
-)
+let pub fn pipe () =
+  try __pipe ()
+  except errno -> raise $ system_error errno
+in
 
-let pub pipe2(flags) -> (
-  try __pipe2(flags)
-  with errno -> raise(SystemError(errno))
-)
+let pub fn pipe2 flags =
+  try __pipe2 flags
+  except errno -> raise $ system_error errno
+in
 
-let pub fileno(file) -> (
-  try __fileno(file)
-  with errno -> raise(SystemError(errno))
-)
+let pub fn fileno file =
+  try __fileno file
+  except errno -> raise $ system_error errno
+in
 
+nil

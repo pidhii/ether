@@ -1,4 +1,4 @@
 
-pub open 'list'
-pub open 'string'
+pub open 'list';
+pub open 'string';
 

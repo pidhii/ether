@@ -16,7 +16,7 @@
 #include "ether/ether.h"
 
 
-static eth_t Some;
+static eth_t some;
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                  lists
@@ -247,23 +247,22 @@ _rev_filter_map(void)
   const eth_t l = eth_arg(args);
 
   eth_t acc = eth_nil;
-  eth_t it;
-  for (it = l; eth_is_pair(it); it = eth_cdr(it))
+  for (eth_t it = l; eth_is_pair(it); it = eth_cdr(it))
   {
     eth_reserve_stack(1);
     eth_sp[0] = eth_car(it);
     const eth_t optv = eth_apply(f, 1);
-    if (optv->type == Some->type)
+    if (optv->type == some->type)
     {
-      eth_t v = eth_tup_get(optv, 0);
+      const eth_t v = eth_tup_get(optv, 0);
       acc = eth_cons(v, acc);
-      eth_drop(optv);
     }
     else if (eth_unlikely(eth_is_exn(optv)))
     {
       eth_drop(acc);
       eth_rethrow(args, optv);
     }
+    eth_drop(optv);
   }
 
   eth_return(args, acc);
@@ -272,7 +271,7 @@ _rev_filter_map(void)
 int
 ether_module(eth_module *mod, eth_root *topenv)
 {
-  Some = eth_get_builtin(topenv, "Some");
+  some = eth_get_builtin(topenv, "some");
 
   eth_define(mod, "__len", eth_create_proc(_length, 1, NULL, NULL));
   eth_define(mod, "__rev_append", eth_create_proc(_rev_append, 2, NULL, NULL));

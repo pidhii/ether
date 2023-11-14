@@ -1,62 +1,62 @@
-let pub __builtin (+)(x, y) -> x + y
-let pub __builtin (-)(x, y) -> x - y
-let pub __builtin (*)(x, y) -> x * y
-let pub __builtin (/)(x, y) -> x / y
-let pub __builtin (mod)(x, y) -> x mod y
-let pub __builtin (^)(x, y) -> x ^ y
+let pub __builtin fn (+) x y = x + y in
+let pub __builtin fn (-) x y = x - y in
+let pub __builtin fn (*) x y = x * y in
+let pub __builtin fn (/) x y = x / y in
+let pub __builtin fn (mod) x y = x mod y in
+let pub __builtin fn (^) x y = x ^ y in
 
-let pub __builtin (land)(x, y) -> x land y
-let pub __builtin (lor)(x, y) -> x lor y
-let pub __builtin (lxor)(x, y) -> x lxor y
-let pub __builtin (lshl)(x, y) -> x lshl y
-let pub __builtin (lshr)(x, y) -> x lshr y
-let pub __builtin (ashl)(x, y) -> x ashl y
-let pub __builtin (ashr)(x, y) -> x ashr y
-let pub __builtin (lnot)(x) -> lnot x
+let pub __builtin fn (land) x y = x land y in
+let pub __builtin fn (lor) x y = x lor y in
+let pub __builtin fn (lxor) x y = x lxor y in
+let pub __builtin fn (lshl) x y = x lshl y in
+let pub __builtin fn (lshr) x y = x lshr y in
+let pub __builtin fn (ashl) x y = x ashl y in
+let pub __builtin fn (ashr) x y = x ashr y in
+let pub __builtin fn (lnot) x = lnot x in
 
-let pub __builtin (<)(x, y) -> x < y
-let pub __builtin (>)(x, y) -> x > y
-let pub __builtin (<=)(x, y) -> x <= y
-let pub __builtin (>=)(x, y) -> x >= y
-let pub __builtin (==)(x, y) -> x == y
-let pub __builtin (!=)(x, y) -> x != y
+let pub __builtin fn (<) x y = x < y in
+let pub __builtin fn (>) x y = x > y in
+let pub __builtin fn (<=) x y = x <= y in
+let pub __builtin fn (>=) x y = x >= y in
+let pub __builtin fn (==) x y = x == y in
+let pub __builtin fn (!=) x y = x != y in
 
-let pub __builtin (is)(x, y) -> x is y
+let pub __builtin fn (is) x y = x is y in
 
-let pub (++)(x, y) -> x ++ y
+let pub fn (++) x y = x ++ y in
 
-let pub __builtin (::)(x, y) -> x :: y
+let pub __builtin fn (::) x y = x :: y in
 
-let pub (,)(a, b) -> #(a, b)
-let pub (,,)(a, b, c) -> #(a, b, c)
-let pub (,,,)(a, b, c, d) -> #(a, b, c, d)
-let pub (,,,,)(a, b, c, d, e) -> #(a, b, c, d, e)
+let pub fn (,) a b = (a, b) in
+let pub fn (,,) a b c = (a, b, c) in
+let pub fn (,,,) a b c d = (a, b, c, d) in
+let pub fn (,,,,) a b c d e = (a, b, c, d, e) in
 
-let pub __builtin (not)(x) -> not x
+let pub __builtin fn (not) x = not x in
 
 
 --let pub (∘) f g x = f (g x)
 
 -- Application
-let pub ($)(f, x) -> f(x)
-let pub (|>)(x, f) -> f(x)
+let pub fn ($) f x = f x in
+let pub fn (|>) x f = f x in
 
 -- Pairs
-let pub car((x :: _)) -> x
-let pub cdr((_ :: x)) -> x
+let pub fn car (x :: _) = x in
+let pub fn cdr (_ :: x) = x in
 
 -- Tuples
-let pub first(#{_1 = x}) -> x
-let pub second(#{_2 = x}) -> x
-let pub third(#{_3 = x}) -> x
+let pub fn first {_1 = x} = x in
+let pub fn second {_2 = x} = x in
+let pub fn third {_3 = x} = x in
 
 -- Functions
-let pub id(x) -> x
+let pub fn id x = x in
 
-let pub flip(f, x, y) -> f(y, x)
-let pub const(x) -> fn _ -> x
-let pub curry(f) -> fn x y -> f (x, y)
-let pub uncurry(f) -> fn (x y) -> f(x, y)
+let pub fn flip f x y = f y x in
+let pub fn const x = fn _ -> x in
+let pub fn curry f = fn x y -> f x y in
+let pub fn uncurry f = fn (x, y) -> f x y in
 
 -- Sequences
 --let pub index seq idx =
@@ -64,82 +64,80 @@ let pub uncurry(f) -> fn (x y) -> f(x, y)
   --else __index seq idx
 
 -- Math
-let pub even?(x) -> x mod 2 == 0
-let pub odd?(x) -> x mod 2 == 1
+let pub fn even? x = x mod 2 == 0 in
+let pub fn odd? x = x mod 2 == 1 in
 
-let compose_va(f, g) -> (
-  let rec aux(x) -> (
-    if function?(x) then
-      fn y -> aux(x(y))
-    else f(x)
-  )
-  aux(g)
-)
+let fn compose_va f g =
+  let rec fn aux x =
+    if function? x then
+      fn y -> aux (x y)
+    else f x
+  in aux g
+in
 
-let pub die(msg) -> (
-  __print_to(stderr, msg)
-  exit(1)
-)
+let pub fn die msg =
+  __print_to stderr msg;
+  exit 1;
+in
 
-let pub require = __require
+let pub require = __require in
 
-let pub create_env(defs) -> #{
-  defs
-  load(#{defs}, path) -> __load(path, defs)
-  load_stream(#{defs}, file) -> __load_stream(file, defs)
-  load_string(#{defs}, str) -> __load_stream(__open_string(str), defs)
-}
-let pub load(path) ->__load(path, [])
-let pub load_stream(file) -> __load_stream(file, [])
-let pub load_string(str) -> __load_stream(__open_string(str), [])
+let pub fn create_env defs =
+  {
+    defs
+    fn load {defs} path = (__load path defs)
+    fn load_stream {defs} file = (__load_stream file defs)
+    fn load_string {defs} str = (__load_stream (__open_string str) defs)
+  }
+in
+let pub fn load path = __load path [] in
+let pub fn load_stream file = __load_stream file [] in
+let pub fn load_string str = __load_stream (__open_string str) [] in
 
 
-let pub __fmt(l) -> (
-  let rec loop(l, acc) -> (
-    if let x :: xs = l then (
-      let x = if string?(x) then x else format("%w", x)
-      loop(xs, x ++ acc)
-    )
+let pub fn __fmt l =
+  let rec fn loop l acc =
+    if let x :: xs = l then
+      let x = if string? x then x else format "%w" x in
+      loop xs (x ++ acc)
     else acc
-  )
-  loop(l, "")
-)
+  in loop l ""
+in
 
 
-let pub record = lazy (
-  let #{strcmp} = require('string')
-  let #{sort, mapi, map} = require('list')
-  fn pairs -> (
+let pub record = lazy
+  let {strcmp} = require 'string' in
+  let {sort, mapi, map} = require 'list' in
+  fn pairs ->
     -- sort pairs
     let sortedPairs =
       pairs
-      |> mapi((,))
-      |> sort(fn (i, (a, _)) as lhs, (j, (b, _)) as rhs -> (
-        let cmp = strcmp(a, b)
+      |> mapi (,)
+      |> sort (fn ((i, (a, _)) as lhs) ((j, (b, _)) as rhs) ->
+        let cmp = strcmp a b in
         if cmp < 0 then true
         else if cmp == 0 then i < j
         else false
-      ))
-      |> map(second)
+      )
+      |> map second
+     in
 
     -- remove duplicate keys (leave the latest one) and construct a record
-    let rec loop(l, acc) -> (
+    let rec fn loop l acc =
       if let x :: xs = l then
         if acc is [] then
           -- accumulate first kv-pair
-          loop(xs, [x])
-        else if first(x) eq first(car(acc)) then
+          loop xs [x]
+        else if first x eq first (car acc) then
           -- replace previous kv-pair with the current one (collision of keys)
-          loop(xs, x :: cdr(acc))
+          loop xs (x :: cdr acc)
         else
           -- accumulate kv-pair
-          loop(xs, x :: acc)
+          loop xs (x :: acc)
       else
-        __record(acc)
-    )
-    loop(pairs, [])
-  )
-)
+        __record acc
+    in loop pairs []
+in
 
 --------------------------------------------------------------------------------
 --                                   IO
@@ -158,34 +156,58 @@ let pub record = lazy (
 -- * print
 -- * eprint
 --
-let pub open_in(path) -> __open(path, "r")
-let pub open_out(path) -> __open(path, "w")
-let pub open_append(path) -> __open(path, "a")
-let pub open_pipe_in(cmd) -> __popen(cmd, "r")
-let pub open_pipe_out(cmd) -> __popen(cmd, "w")
-let pub open_string_in() -> __open_string()
+let pub fn open_in path = __open path "r" in
+let pub fn open_out path = __open path "w" in
+let pub fn open_append path = __open path "a" in
+let pub fn open_pipe_in cmd = __popen cmd "r" in
+let pub fn open_pipe_out cmd = __popen cmd "w" in
+let pub open_string_in = __open_string in
 
-let pub print_to = __print_to
-let pub print = print_to(stdout)
-let pub eprint = print_to(stderr)
+let pub print_to = __print_to in
+let pub print = print_to stdout in
+let pub eprint = print_to stderr in
 
 --------------------------------------------------------------------------------
 --                                System
-let pub system = __system
+let pub system = __system in
 
 --------------------------------------------------------------------------------
 --                                Random
-let pub rand = __rand
-let pub srand = __srand
+let pub rand = __rand in
+let pub srand = __srand in
 
 --------------------------------------------------------------------------------
 --                                Errors
 --
-let pub failure(nil) -> raise(`failure)
-let pub invalid_argument(nil) -> raise(`invalid_argument)
-let pub type_error(nil) -> raise(`type_error)
+let pub fn failure nil = raise `failure in
+let pub fn invalid_argument nil = raise `invalid_argument in
+let pub fn type_error nil = raise `type_error in
 
 
 
-pub struct Some { _1 = nil }
-pub struct SystemError { _1 = nil, _2 = "I am SystemError" }
+let pub some = enum (nil) in
+let pub system_error = enum (nil) in
+
+
+--let pub access = trait
+  --method (.) self key = undefined
+--in
+
+--let pub module = struct defs
+  --val _defs = hash $ list defs
+
+  --impl as_list:
+    --method to_list self = list self._defs
+    --method from_list proto l = proto with _defs
+
+  --impl access:
+    --method (.) self key = self._defs.(key)
+    --method (*) self = self._defs
+
+  --impl representation:
+    --method write self stream =
+      --fprintf stream "<module %w>" (map first $ list self._defs)
+--in
+
+nil
+

@@ -80,9 +80,10 @@ _updtrcrd(eth_t *restrict r, int out, int src, const size_t *iids,
   return test;
 }
 
+// XXX BROKEN (ocasionally leaks memory)
 static inline bool
 _updtrcrd2(eth_t *restrict r, int out, int src, const size_t *iids,
-          eth_t *vals, const int N)
+           eth_t *vals, const int N)
 {
   eth_t const x = r[src];
   eth_type *restrict const type = x->type;
@@ -104,8 +105,10 @@ _updtrcrd2(eth_t *restrict r, int out, int src, const size_t *iids,
         if (eth_unlikely(i == n))
         { // field not found => type error
           test = 0;
-          for (i = n - 1; i >= 0; --i)
-            eth_dec(rec->data[i]);
+          eth_unimplemented();
+          //for (int j = 0; j < N; ++j) eth_ref(vals[j]);
+          //for (int j = 0; j < i; ++j) eth_unref(rec->data[j]);
+          //for (int j = 0; j < N; ++j) eth_unref(rec->data[j]);
           eth_free(rec, sizeof(eth_struct) + sizeof(eth_t)*n);
           break;
         }
@@ -121,7 +124,6 @@ _updtrcrd2(eth_t *restrict r, int out, int src, const size_t *iids,
             eth_init_header(rec, type);
             if (type->notify_copy)
               type->notify_copy(type, ETH(rec), x);
-            eth_ref(ETH(rec)); // due to PHI-semantics
             r[out] = ETH(rec);
             break;
           }
@@ -134,6 +136,8 @@ _updtrcrd2(eth_t *restrict r, int out, int src, const size_t *iids,
         eth_ref(rec->data[i] = eth_tup_get(x, i));
     }
   }
+  for (int i = 0; i < N; ++i) eth_ref(vals[i]);
+  for (int i = 0; i < N; ++i) eth_unref(vals[i]);
   return test;
 }
 
@@ -327,11 +331,14 @@ eth_vm(eth_bytecode *bc)
         {
           const int n = nstack;
           test = _updtrcrd2(r, ip->apply.out, ip->apply.fn,
-                            (const size_t*)eth_ordsyms, eth_sp, n);
-          if (not test)
+                            (const size_t*)(eth_ordsyms+1), eth_sp, n);
+          if (test)
+          {
+            eth_pop_stack(n);
+            nstack = 0;
+          }
+          else
             eth_unimplemented();
-          eth_pop_stack(n);
-          nstack = 0;
         }
         else
         {

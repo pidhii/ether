@@ -1,37 +1,39 @@
 
-open 'os'
-open 'io'
-open 'list'
-open 'string'
+open 'os';
+open 'io';
+open 'list';
+open 'string';
 
-chdir(get(command_line, 1))
+chdir $ get command_line 1;
 
-let test_mergesort() -> (
-  let origlist = [1 9 4 5 7 6 8 2 3]
+let fn test_mergesort () =
+  let origlist = [1, 9, 4, 5, 7, 6, 8, 2, 3] in
   let ret =
     origlist
-    |> map(format("%d"))
-    |> join("\n")
-    |> (fn x -> shell({q|ether ./mergesort.eth <<<'{x}' | grep "Sorted list"|q}))
-    |> match( /\[.+\]/)
+    |> map $ format "%d"
+    |> join "\n"
+    |> (fn x -> shell {q|ether ./mergesort.eth <<<'{x}' | grep "Sorted list"|q})
+    |> match /\[.+\]/
     |> car
+  in
 
   let correct =
-    sort((<), origlist)
-    |> map(format("%d"))
-    |> join(",")
-    |> format("[%d]")
+    sort (<) origlist
+    |> map $ format "%d"
+    |> join ","
+    |> format "[%d]"
+  in
 
   assert ret eq correct
-)
+in
 
-let test_basics() -> (
-  assert system("ether ./basics.eth &>/dev/null") == 0
-)
+let fn test_basics () =
+  assert system "ether ./basics.eth &>/dev/null" == 0
+in
 
-test_basics()
-print("> 'test_basics` succeed")
+test_basics ();
+print "> 'test_basics` succeed";
 
-test_mergesort()
-print("> 'test_mergesort` succeed")
+test_mergesort ();
+print "> 'test_mergesort` succeed";
 

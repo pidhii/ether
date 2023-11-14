@@ -116,6 +116,7 @@ OPERATOR {OPCHR}+|mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|eq|not|lnot
 
 let             { return LET; }
 and             { return AND; }
+in              { return IN; }
 if[ \t\n]+let   { return IFLET; }
 fn              { return FN; }
 
@@ -154,9 +155,7 @@ fn              { return FN; }
   ENTER_STATE(STRING);
   return '"';
 }
-[^[:alnum:]"']?"/"/[^[:space:]] {
-  if (yytext[0] != '/')
-    REJECT;
+[[:space:]]"/"/[^[:space:]] {
   ENTER_STATE(REGEXP);
   /*char *p = strchr(yytext, '/');*/
   /*yyless(p - yytext + 1);*/
@@ -273,6 +272,7 @@ inf                                 |
 
 
 struct { return STRUCT; }
+enum   { return ENUM; }
 open   { return OPEN; }
 import { return IMPORT; }
 rec    { return REC; }
@@ -282,6 +282,7 @@ then   { return THEN; }
 as     { return AS; }
 try    { return TRY; }
 with   { return WITH; }
+except { return EXCEPT; }
 or     { return OR; }
 do     { return DO; }
 lazy   { return LAZY; }
@@ -367,14 +368,9 @@ lnot    { return LNOT; }
   return USROP;
 }
 
-[_a-z][_a-zA-Z0-9]*['?]? {
+[_a-zA-Z][_a-zA-Z0-9]*['?]? {
   yylval->string = strdup(yytext);
   return SYMBOL;
-}
-
-[A-Z][_a-zA-Z0-9]* {
-  yylval->string = strdup(yytext);
-  return CAPSYMBOL;
 }
 
 

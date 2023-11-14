@@ -636,7 +636,7 @@ _to_symbol(void)
 int
 ether_module(eth_module *mod, eth_root *topenv)
 {
-  Some = eth_get_builtin(topenv, "Some");
+  Some = eth_get_builtin(topenv, "some");
 
   eth_module *detail = eth_create_module("string.detail", NULL);
   eth_copy_module_path(eth_get_root_env(topenv), eth_get_env(detail));

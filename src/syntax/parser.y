@@ -187,18 +187,19 @@ _create_attr(int aflag, void *locpp)
 // =============================================================================
 %token START_REPL UNDEFINED
 %token START_FORMAT END_FORMAT
-%token STRUCT
+%token STRUCT ENUM
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %token<number> NUMBER
-%token<string> SYMBOL CAPSYMBOL
+%token<string> SYMBOL
 %token<constant> CONST
 %token<character> CHAR
 %token<string> STR
 %token START_REGEXP
 %token<integer> END_REGEXP
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-%right ';'
 %right FN
+%right IN
+%right ';'
 %nonassoc AS
 %nonassoc LARROW
 %nonassoc PUB MUT BUILTIN DEPRECATED
@@ -215,7 +216,7 @@ _create_attr(int aflag, void *locpp)
 %right ELSE TERNARY
 /*%nonassoc ELSE*/
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-%nonassoc IF IFLET THEN TRY WITH
+%nonassoc IF IFLET THEN TRY EXCEPT WITH
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 // level 0:
 %right '='
@@ -249,7 +250,8 @@ _create_attr(int aflag, void *locpp)
 
 
 // =============================================================================
-%type<ast> Atom Expr ExprSeq
+%type<ast> Atom Form Expr Tuple
+%type<astvec> TupleAux
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %type<binds> Binds
 %type<bind> Bind
@@ -259,13 +261,12 @@ _create_attr(int aflag, void *locpp)
 %type<ast> FmtString FmtStringAux
 %type<ast> RegExp
 %type<charvec> StringAux
-%type<pattern> AtomicPattern ExprPattern
+%type<pattern> AtomicPattern FormPattern ExprPattern
 %type<astvec> List
-%type<patvec> PatternList
+%type<patvec> ArgPatterns TuplePatternAux
 %type<boolean> MaybeComaDots
 %type<record> Record
 %type<record_pattern> RecordPattern
-%type<ast> Ident CapIdent
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %start Entry
 
@@ -273,27 +274,12 @@ _create_attr(int aflag, void *locpp)
 %%
 
 Entry
-  : ExprSeq { g_result = $1; }
+  : Expr { g_result = $1; }
   | START_REPL Expr { g_result = $2; }
 ;
 
-Ident
-  : SYMBOL { $$ = eth_ast_ident($1); free($1); }
-  | Ident '.' SYMBOL { $$ = eth_ast_access($1, $3); LOC($$, @$); free($3); }
-;
-
-CapIdent
-  : CAPSYMBOL { $$ = eth_ast_ident($1); free($1); }
-  | Ident '.' CAPSYMBOL { $$ = eth_ast_access($1, $3); LOC($$, @$); free($3); }
-;
-
 Atom
-  : Ident
-  | CapIdent
-  /*: SYMBOL { $$ = eth_ast_ident($1); free($1); LOC($$, @$); }*/
-  /*| '(' Expr ')' { $$ = $2; }*/
-  /*| Atom '!' { $$ = eth_ast_apply($1, NULL, 0); LOC($$, @$); }*/
-
+  : SYMBOL { $$ = eth_ast_ident($1); free($1); LOC($$, @$); }
   /*| '(' Expr DDOT Expr ')' { char *fields[] = { "l", "r" }; eth_ast *vals[] = { $2, $4 }; $$ = eth_ast_make_record(eth_rangelr_type, fields, vals, 2); }*/
   | '['']' { $$ = eth_ast_cval(eth_nil); }
   | '[' List ']' {
@@ -302,85 +288,15 @@ Atom
     cod_vec_destroy($2);
     LOC($$, @$);
   }
-  | '#' '(' List ')' {
-    int n = $3.len;
-    char fieldsbuf[n][22];
-    char *fields[n];
-    for (int i = 0; i < n; ++i)
-    {
-      fields[i] = fieldsbuf[i];
-      sprintf(fields[i], "_%d", i+1);
-    }
-    if ($3.len <= 1)
-    {
-      eth_error("invalid tuple");
-      eth_location *loc = location(&@$);
-      eth_print_location(loc, stderr);
-      eth_drop_location(loc);
-      abort();
-    }
-    $$ = eth_ast_make_record(eth_tuple_type(n), fields, $3.data, n);
-    cod_vec_destroy($3);
-  }
-  /*| STRUCT '{' Record '}' {*/
-    /*eth_type *type = eth_unique_record_type($3.keys.data, $3.keys.len);*/
-    /*$$ = eth_ast_make_record(type, $3.keys.data, $3.vals.data, $3.keys.len);*/
-    /*cod_vec_iter($3.keys, i, x, free(x));*/
-    /*cod_vec_destroy($3.keys);*/
-    /*cod_vec_destroy($3.vals);*/
-  /*}*/
-  | Attribute STRUCT CAPSYMBOL '{' Record '}' {
-    eth_type *type = eth_unique_record_type($5.keys.data, $5.keys.len);
-    eth_ast *struct_ast = eth_ast_make_record(type, $5.keys.data, $5.vals.data, $5.keys.len);
-    cod_vec_iter($5.keys, i, x, free(x));
-    cod_vec_destroy($5.keys);
-    cod_vec_destroy($5.vals);
-
-    eth_ast_pattern *p[] = { eth_ast_ident_pattern($3) };
-    eth_ref_attr(p[0]->ident.attr = eth_create_attr($1));
-    $$ = eth_ast_let(p, &struct_ast, 1, eth_ast_cval(eth_nil));
-  }
-  | '#' '{' Record '}' {
-    eth_type *type = eth_record_type($3.keys.data, $3.keys.len);
-    $$ = eth_ast_make_record(type, $3.keys.data, $3.vals.data, $3.keys.len);
-    cod_vec_iter($3.keys, i, x, free(x));
-    cod_vec_destroy($3.keys);
-    cod_vec_destroy($3.vals);
+  | '{' Record '}' {
+    eth_type *type = eth_record_type($2.keys.data, $2.keys.len);
+    $$ = eth_ast_make_record(type, $2.keys.data, $2.vals.data, $2.keys.len);
+    cod_vec_iter($2.keys, i, x, free(x));
+    cod_vec_destroy($2.keys);
+    cod_vec_destroy($2.vals);
   }
 
-  | '#' '{' Expr WITH Record '}' {
-    $$ = eth_ast_update($3, $5.vals.data, $5.keys.data, $5.vals.len);
-    cod_vec_destroy($5.vals);
-    cod_vec_iter($5.keys, i, x, free(x));
-    cod_vec_destroy($5.keys);
-  }
-
-  | '(' ExprSeq ')' %prec GROUPING { $$ = $2; }
-
-  | CapIdent '{' Record '}' %prec APPLY {
-    $$ = eth_ast_update($1, $3.vals.data, $3.keys.data, $3.vals.len);
-    cod_vec_destroy($3.vals);
-    cod_vec_iter($3.keys, i, x, free(x));
-    cod_vec_destroy($3.keys);
-  }
-  | CapIdent '(' Args ')' %prec APPLY {
-    char *keys[$3.len];
-    char buf[42];
-    for (size_t i = 1; i <= $3.len; ++i)
-    {
-      sprintf(buf, "_%ju", i);
-      keys[i-1] = strdup(buf);
-    }
-    $$ = eth_ast_update($1, $3.data, keys, $3.len);
-    cod_vec_destroy($3);
-    for (size_t i = 0; i < $3.len; ++i)
-      free(keys[i]);
-  }
-  | Atom '(' Args ')' %prec APPLY {
-    $$ = eth_ast_apply($1, $3.data, $3.len);
-    LOC($$, @$);
-    cod_vec_destroy($3);
-  }
+  | Tuple
 
   | Atom '.' SYMBOL {
     $$ = eth_ast_access($1, $3);
@@ -393,20 +309,17 @@ Atom
     LOC($$, @$);
     cod_vec_destroy($3);
   }
-  | Atom ':' SYMBOL '(' Args ')' %prec APPLY {
+  | Atom ':' SYMBOL {
     eth_ast *access = eth_ast_access($1, $3);
     LOC(access, @2);
-    cod_vec_insert($5, $1, 0);
-    $$ = eth_ast_apply(access, $5.data, $5.len);
+    $$ = eth_ast_apply(access, &$1, 1);
     LOC($$, @$);
     free($3);
-    cod_vec_destroy($5);
   }
 
   | '@' '(' Expr ')' { $$ = eth_ast_evmac($3); LOC($$, @$); }
 
   | '_' { $$ = eth_ast_ident("_"); }
-  /*| CAPSYMBOL { $$ = eth_ast_cval(eth_sym($1)); free($1); LOC($$, @$); }*/
   | NUMBER { $$ = eth_ast_cval(eth_create_number($1)); LOC($$, @$); }
   | CONST  { $$ = eth_ast_cval($1); LOC($$, @$); }
   | String {
@@ -416,10 +329,61 @@ Atom
   }
   | FmtString
   | RegExp
+
+  | STRUCT '{' Record '}' {
+    eth_type *type = eth_unique_record_type($3.keys.data, $3.keys.len);
+    $$ = eth_ast_make_record(type, $3.keys.data, $3.vals.data, $3.keys.len);
+    cod_vec_iter($3.keys, i, x, free(x));
+    cod_vec_destroy($3.keys);
+    cod_vec_destroy($3.vals);
+  }
+
+  | ENUM '(' TupleAux ')' {
+    int n = $3.len;
+    char fieldsbuf[n][22];
+    char *fields[n];
+    for (int i = 0; i < n; ++i)
+    {
+      fields[i] = fieldsbuf[i];
+      sprintf(fields[i], "_%d", i+1);
+    }
+    eth_type *type = eth_unique_record_type(fields, n);
+    $$ = eth_ast_make_record(type, fields, $3.data, n);
+    cod_vec_destroy($3);
+    LOC($$, @$);
+  }
+;
+
+Form
+  : Atom
+  | Atom Args {
+    $$ = eth_ast_apply($1, $2.data, $2.len);
+    LOC($$, @$);
+    cod_vec_destroy($2);
+  }
+  | Atom WITH '{' Record '}' {
+    $$ = eth_ast_update($1, $4.vals.data, $4.keys.data, $4.vals.len);
+    cod_vec_iter($4.keys, i, x, free(x));
+    cod_vec_destroy($4.keys);
+    cod_vec_destroy($4.vals);
+  }
 ;
 
 Expr
-  : Atom
+  : Form
+
+  | Expr ';'
+  | Expr ';' Expr {
+    if (($1->tag == ETH_AST_LET || $1->tag == ETH_AST_LETREC))
+    {
+      eth_unref_ast($1->let.body);
+      eth_ref_ast($1->let.body = $3);
+      $$ = $1;
+    }
+    else
+      $$ = eth_ast_seq($1, $3);
+    LOC($$, @$);
+  }
 
   | DEFINED SYMBOL {
     $$ = eth_ast_defined($2);
@@ -483,21 +447,21 @@ Expr
   | IFLET ExprPattern '=' Expr THEN Expr ELSE Expr %prec ELSE { $$ = eth_ast_match($2, $4, $6, $8); LOC($$, @$); }
   | IFLET ExprPattern '=' Expr THEN Expr %prec TERNARY { $$ = eth_ast_match($2, $4, $6, eth_ast_cval(eth_nil)); LOC($$, @$); }
 
-  | LET Binds {
-    $$ = eth_ast_let($2.pats.data, $2.vals.data, $2.pats.len, eth_ast_cval(eth_nil));
+  | LET Binds IN Expr {
+    $$ = eth_ast_let($2.pats.data, $2.vals.data, $2.pats.len, $4);
     cod_vec_destroy($2.pats);
     cod_vec_destroy($2.vals);
     LOC($$, @$);
   }
 
-  | LET REC Binds {
-    $$ = eth_ast_letrec($3.pats.data, $3.vals.data, $3.pats.len, eth_ast_cval(eth_nil));
+  | LET REC Binds IN Expr {
+    $$ = eth_ast_letrec($3.pats.data, $3.vals.data, $3.pats.len, $5);
     cod_vec_destroy($3.pats);
     cod_vec_destroy($3.vals);
     LOC($$, @$);
   }
 
-  | TRY Expr WITH ExprPattern RARROW Expr %prec TRY { $$ = eth_ast_try($4, $2, $6, 1); LOC($$, @$); }
+  | TRY Expr EXCEPT ExprPattern RARROW Expr %prec TRY { $$ = eth_ast_try($4, $2, $6, 1); LOC($$, @$); }
 
   | LAZY Expr {
     eth_t lazy = eth_get_builtin(SCANROOT, "__make_lazy");
@@ -506,9 +470,14 @@ Expr
     $$ = eth_ast_apply(eth_ast_cval(lazy), &thunk, 1);
   }
 
-  | FN PatternList RARROW Expr %prec FN {
+  | FN ArgPatterns RARROW Expr %prec FN {
     $$ = eth_ast_fn_with_patterns($2.data, $2.len, $4);
     cod_vec_destroy($2);
+    LOC($$, @$);
+  }
+
+  | FN RARROW Expr %prec FN {
+    $$ = eth_ast_fn_with_patterns(NULL, 0, $3);
     LOC($$, @$);
   }
 
@@ -558,30 +527,50 @@ Expr
   | RETURN Expr { $$ = eth_ast_return($2); LOC($$, @$); }
 ;
 
-ExprSeq
-  : Expr
-  | Expr ExprSeq %prec ';' {
-    if (($1->tag == ETH_AST_LET || $1->tag == ETH_AST_LETREC))
+Tuple
+  : '(' TupleAux ')' {
+    if ($2.len == 1)
     {
-      eth_unref_ast($1->let.body);
-      eth_ref_ast($1->let.body = $2);
-      $$ = $1;
+      $$ = $2.data[0];
+      cod_vec_destroy($2);
     }
     else
-      $$ = eth_ast_seq($1, $2);
-    LOC($$, @$);
+    {
+      int n = $2.len;
+      char fieldsbuf[n][22];
+      char *fields[n];
+      for (int i = 0; i < n; ++i)
+      {
+        fields[i] = fieldsbuf[i];
+        sprintf(fields[i], "_%d", i+1);
+      }
+      $$ = eth_ast_make_record(eth_tuple_type(n), fields, $2.data, n);
+      cod_vec_destroy($2);
+      LOC($$, @$);
+    }
+  }
+;
+
+TupleAux
+  : Expr {
+    cod_vec_init($$);
+    cod_vec_push($$, $1);
+  }
+  | TupleAux ',' Expr {
+    $$ = $1;
+    cod_vec_push($$, $3);
   }
 ;
 
 Args
-  : { cod_vec_init($$); }
-  | Expr {
+  : '(' ')' { cod_vec_init($$); }
+  | Atom {
     cod_vec_init($$);
     cod_vec_push($$, $1);
   }
-  | Args ',' Expr {
+  | Args Atom {
     $$ = $1;
-    cod_vec_push($$, $3);
+    cod_vec_push($$, $2);
   }
 ;
 
@@ -612,14 +601,14 @@ Bind
       $$.val = eth_ast_apply(eth_ast_cval(mkref), p, 1);
     }
   }
-  | Attribute SYMBOL '(' PatternList ')' RARROW Expr {
-    $$.pat = eth_ast_ident_pattern($2);
+  | Attribute FN SYMBOL ArgPatterns '=' Expr {
+    $$.pat = eth_ast_ident_pattern($3);
     eth_attr *attr = eth_create_attr($1);
     if (g_filename)
       eth_set_location(attr, location(&@$));
     eth_ref_attr($$.pat->ident.attr = attr);
-    $$.val = eth_ast_fn_with_patterns($4.data, $4.len, $7);
-    free($2);
+    $$.val = eth_ast_fn_with_patterns($4.data, $4.len, $6);
+    free($3);
     cod_vec_destroy($4);
   }
 ;
@@ -717,38 +706,6 @@ AtomicPattern
     eth_ref_attr($$->ident.attr = attr);
     free($2);
   }
-  /*| Attribute CAPSYMBOL {*/
-    /*$$ = eth_ast_ident_pattern($2);*/
-    /*eth_attr *attr = eth_create_attr($1);*/
-    /*if (g_filename)*/
-      /*eth_set_location(attr, location(&@$));*/
-    /*eth_ref_attr($$->ident.attr = attr);*/
-    /*free($2);*/
-  /*}*/
-  | CAPSYMBOL '{' RecordPattern '}' {
-    $$ = eth_ast_record_pattern(eth_ast_ident($1), $3.keys.data, $3.vals.data, $3.keys.len);
-    cod_vec_iter($3.keys, i, x, free(x));
-    cod_vec_destroy($3.keys);
-    cod_vec_destroy($3.vals);
-    free($1);
-  }
-  | CAPSYMBOL '(' PatternList ')' {
-    int n = $3.len;
-    char fieldsbuf[n][22];
-    char *fields[n];
-    for (int i = 0; i < n; ++i)
-    {
-      fields[i] = fieldsbuf[i];
-      sprintf(fields[i], "_%d", i+1);
-    }
-    $$ = eth_ast_record_pattern(eth_ast_ident($1), fields, $3.data, n);
-    cod_vec_destroy($3);
-    free($1);
-  }
-  | CAPSYMBOL {
-    $$ = eth_ast_record_pattern(eth_ast_ident($1), NULL, NULL, 0);
-    free($1);
-  }
   | CONST { $$ = eth_ast_constant_pattern($1); }
   | String {
     cod_vec_push($1, 0);
@@ -757,22 +714,13 @@ AtomicPattern
   }
   | NUMBER { $$ = eth_ast_constant_pattern(eth_create_number($1)); }
   | '['']' { $$ = eth_ast_constant_pattern(eth_nil); }
-  | '(' PatternList ')' %prec GROUPING {
+  | '(' TuplePatternAux ')' {
     if ($2.len == 1)
     {
       $$ = $2.data[0];
     }
     else
     {
-      if ($2.len < 1)
-      {
-        eth_error("invalid tuple");
-        eth_location *loc = location(&@$);
-        eth_print_location(loc, stderr);
-        eth_drop_location(loc);
-        abort();
-      }
-
       int n = $2.len;
       char fieldsbuf[n][22];
       char *fields[n];
@@ -785,54 +733,20 @@ AtomicPattern
     }
     cod_vec_destroy($2);
   }
-  | '#' '(' PatternList  ')' {
-    if ($3.len < 1)
-    {
-      eth_error("invalid tuple");
-      eth_location *loc = location(&@$);
-      eth_print_location(loc, stderr);
-      eth_drop_location(loc);
-      abort();
-    }
-
-    int n = $3.len;
-    char fieldsbuf[n][22];
-    char *fields[n];
-    for (int i = 0; i < n; ++i)
-    {
-      fields[i] = fieldsbuf[i];
-      sprintf(fields[i], "_%d", i+1);
-    }
-    $$ = eth_ast_record_pattern(NULL, fields, $3.data, n);
-
-    cod_vec_destroy($3);
-  }
-  | '#' '{' RecordPattern '}' {
-    $$ = eth_ast_record_pattern(NULL, $3.keys.data, $3.vals.data, $3.keys.len);
-    cod_vec_iter($3.keys, i, x, free(x));
-    cod_vec_destroy($3.keys);
-    cod_vec_destroy($3.vals);
-  }
-  /*| STRUCT '{' RecordPattern '}' {*/
-    /*$$ = eth_ast_record_pattern(NULL, $3.keys.data, $3.vals.data, $3.keys.len);*/
-    /*cod_vec_iter($3.keys, i, x, free(x));*/
-    /*cod_vec_destroy($3.keys);*/
-    /*cod_vec_destroy($3.vals);*/
-  /*}*/
   | '{' RecordPattern '}' {
     $$ = eth_ast_record_pattern(NULL, $2.keys.data, $2.vals.data, $2.keys.len);
     cod_vec_iter($2.keys, i, x, free(x));
     cod_vec_destroy($2.keys);
     cod_vec_destroy($2.vals);
   }
-  | '#' '{' Attribute '*' '}' {
+  | '{' Attribute '*' '}' {
     $$ = eth_ast_record_star_pattern();
-    eth_attr *attr = eth_create_attr($3);
+    eth_attr *attr = eth_create_attr($2);
     if (g_filename)
       eth_set_location(attr, location(&@$));
     eth_ref_attr($$->recordstar.attr = attr);
   }
-  | '[' PatternList MaybeComaDots ']' {
+  | '[' ArgPatterns MaybeComaDots ']' {
     int n = $2.len;
     // ---
     if ($3) $$ = eth_ast_dummy_pattern();
@@ -854,14 +768,36 @@ MaybeComaDots
   | DDDOT { $$ = true; }
 ;
 
-ExprPattern
+FormPattern
   : AtomicPattern
+  | AtomicPattern ArgPatterns {
+    if ($1->tag != ETH_AST_PATTERN_IDENT)
+    {
+      eth_error("invalid syntax: expected identifier, got ...");
+      abort();
+    }
+    int n = $2.len;
+    char fieldsbuf[n][22];
+    char *fields[n];
+    for (int i = 0; i < n; ++i)
+    {
+      fields[i] = fieldsbuf[i];
+      sprintf(fields[i], "_%d", i+1);
+    }
+    $$ = eth_ast_record_pattern(eth_ast_ident($1->ident.str), fields, $2.data, n);
+    cod_vec_destroy($2);
+    eth_drop_ast_pattern($1);
+  }
+;
+
+ExprPattern
+  : FormPattern
   | ExprPattern CONS ExprPattern {
     char *fields[2] = { "car", "cdr" };
     eth_ast_pattern *pats[2] = { $1, $3 };
     $$ = eth_ast_unpack_pattern(eth_pair_type, fields, pats, 2);
   }
-  | AtomicPattern DDOT AtomicPattern {
+  | ExprPattern DDOT ExprPattern {
     char *fields[2] = { "l", "r" };
     eth_ast_pattern *pats[2] = { $1, $3 };
     $$ = eth_ast_unpack_pattern(eth_rangelr_type, fields, pats, 2);
@@ -883,13 +819,27 @@ ExprPattern
   }
 ;
 
-PatternList
-  : { cod_vec_init($$); }
-  | PatternList ExprPattern {
+TuplePatternAux
+  : ExprPattern {
+    cod_vec_init($$);
+    cod_vec_push($$, $1);
+  }
+  | TuplePatternAux ',' ExprPattern {
+    $$ = $1;
+    cod_vec_push($$, $3);
+  }
+;
+
+ArgPatterns
+  : '(' ')' { cod_vec_init($$); }
+  | AtomicPattern {
+    cod_vec_init($$);
+    cod_vec_push($$, $1);
+  }
+  | ArgPatterns AtomicPattern {
     $$ = $1;
     cod_vec_push($$, $2);
   }
-  | PatternList ',' { $$ = $1; }
 ;
 
 RecordPattern
@@ -906,17 +856,12 @@ RecordPattern
     cod_vec_push($$.keys, $2);
     cod_vec_push($$.vals, idpat);
   }
-  | Attribute SYMBOL '=' ExprPattern {
+  | Attribute SYMBOL '=' AtomicPattern {
     cod_vec_init($$.keys);
     cod_vec_init($$.vals);
     cod_vec_push($$.keys, $2);
     cod_vec_push($$.vals, $4);
   }
-  /*| RecordPattern ',' SYMBOL {*/
-    /*$$ = $1;*/
-    /*cod_vec_push($$.keys, $3);*/
-    /*cod_vec_push($$.vals, eth_ast_ident_pattern($3));*/
-  /*}*/
   | RecordPattern Attribute SYMBOL {
     $$ = $1;
     eth_ast_pattern *idpat = eth_ast_ident_pattern($3);
@@ -924,12 +869,12 @@ RecordPattern
     cod_vec_push($$.keys, $3);
     cod_vec_push($$.vals, idpat);
   }
-  | RecordPattern Attribute SYMBOL '=' ExprPattern {
+  | RecordPattern Attribute SYMBOL '=' AtomicPattern {
     $$ = $1;
     cod_vec_push($$.keys, $3);
     cod_vec_push($$.vals, $5);
   }
-  | RecordPattern ',' { $$ = $1; }
+  | RecordPattern ','
 ;
 
 List
@@ -937,13 +882,11 @@ List
     cod_vec_init($$);
     cod_vec_push($$, $1);
   }
-  | List Expr {
+  | List ',' Expr {
     $$ = $1;
-    cod_vec_push($$, $2);
+    cod_vec_push($$, $3);
   }
-  | List ',' {
-    $$ = $1;
-  }
+  | List ','
 ;
 
 Record
@@ -951,7 +894,7 @@ Record
     cod_vec_init($$.keys);
     cod_vec_init($$.vals);
   }
-  | SYMBOL '=' Expr Record {
+  | SYMBOL '=' Atom Record {
     $$ = $4;
     cod_vec_insert($$.keys, $1, 0);
     cod_vec_insert($$.vals, $3, 0);
@@ -961,13 +904,13 @@ Record
     cod_vec_insert($$.keys, $1, 0);
     cod_vec_insert($$.vals, eth_ast_ident($1), 0);
   }
-  | SYMBOL '(' PatternList ')' RARROW Expr Record {
-    $$ = $7;
+  | FN SYMBOL ArgPatterns '=' Atom Record {
+    $$ = $6;
 
-    eth_ast *fn = eth_ast_fn_with_patterns($3.data, $3.len, $6);
+    eth_ast *fn = eth_ast_fn_with_patterns($3.data, $3.len, $5);
     cod_vec_destroy($3);
 
-    cod_vec_insert($$.keys, $1, 0);
+    cod_vec_insert($$.keys, $2, 0);
     cod_vec_insert($$.vals, fn, 0);
   }
   | ',' Record { $$ = $2; }
