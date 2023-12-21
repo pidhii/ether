@@ -1,6 +1,6 @@
 
-open 'list';
-open 'io';
+let {*} = require 'list' in
+let {*} = require 'io' in
 
 let test_sample =
   let fn do_test name thunk =
@@ -36,6 +36,7 @@ let pub fn run samples =
     print "";
     if title is not nil then
       printf "\x1b[1mTest %d\x1b[0m\n" title;
+    else nil;
     sumres res (test_sample tlist)
   in
 

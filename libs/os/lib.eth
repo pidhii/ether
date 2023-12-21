@@ -1,5 +1,5 @@
 
-open 'string';
+let {*} = require 'string' in
 
 --------------------------------------------------------------------------------
 -- Functions:
@@ -45,7 +45,7 @@ let pub fn access path amode =
   except errno -> raise $ system_error errno
 in
 
-let pub fn getcwd () =
+let pub fn getcwd =
   try __getcwd ()
   except errno -> raise $ system_error errno
 in
@@ -91,7 +91,7 @@ let pub fn mkdtemp temp =
   except errno -> raise $  system_error errno
 in
 
-let pub fn fork () =
+let pub fn fork =
   try __fork ()
   except errno -> raise $ system_error errno
 in
@@ -101,7 +101,7 @@ let pub fn waitpid pid opts =
   except errno -> raise $ system_error errno
 in
 
-let pub fn pipe () =
+let pub fn pipe =
   try __pipe ()
   except errno -> raise $ system_error errno
 in

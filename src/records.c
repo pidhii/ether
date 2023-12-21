@@ -61,14 +61,13 @@ write_tuple(eth_type *type, eth_t x, FILE *stream)
 {
   int n = type->nfields;
   eth_struct *tup = ETH_TUPLE(x);
-  putc('#', stream);
-  putc('(', stream);
+  fputc('(', stream);
   for (int i = 0; i < n; ++i)
   {
-    if (i > 0) putc(',', stream);
+    if (i > 0) fputs(", ", stream);
     eth_write(tup->data[i], stream);
   }
-  putc(')', stream);
+  fputc(')', stream);
 }
 
 static void
@@ -82,12 +81,11 @@ write_record(eth_type *type, eth_t x, FILE *stream)
   {
     int n = type->nfields;
     eth_struct *tup = ETH_TUPLE(x);
-    putc('#', stream);
     putc('{', stream);
     for (int i = 0; i < n; ++i)
     {
-      if (i > 0) putc(',', stream);
-      eth_fprintf(stream, "%s=~w", type->fields[i].name, tup->data[i]);
+      if (i > 0) fputs(", ", stream);
+      eth_fprintf(stream, "%s = ~w", type->fields[i].name, tup->data[i]);
     }
     putc('}', stream);
   }

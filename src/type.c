@@ -57,6 +57,7 @@ create_type(const char *name, const char *tag, int nfields)
   type->clos = NULL;
   type->dtor = NULL;
   type->flag = 0;
+  type->methods = eth_create_methods();
   return type;
 }
 
@@ -97,6 +98,7 @@ eth_destroy_type(eth_type *type)
   }
 
   free(type->name);
+  eth_destroy_methods(type->methods);
   free(type);
 }
 
@@ -138,13 +140,44 @@ eth_cast_id(eth_type *type, eth_t x)
 void
 eth_write(eth_t x, FILE *out)
 {
-  x->type->write(x->type, x, out);
+  eth_t m;
+  if ((m = eth_find_method(x->type->methods, eth_write_method)))
+  {
+    eth_ref(x);
+    eth_reserve_stack(2);
+    eth_sp[0] = x;
+    eth_disown_file(eth_sp[1] = eth_open_stream(out));
+    eth_drop(eth_apply(m, 2));
+    eth_dec(x);
+  }
+  else
+    x->type->write(x->type, x, out);
 }
 
 void
 eth_display(eth_t x, FILE *out)
 {
-  x->type->display(x->type, x, out);
+  eth_t m;
+  if ((m = eth_find_method(x->type->methods, eth_display_method)))
+  {
+    eth_ref(x);
+    eth_reserve_stack(2);
+    eth_sp[0] = x;
+    eth_disown_file(eth_sp[1] = eth_open_stream(out));
+    eth_drop(eth_apply(m, 2));
+    eth_dec(x);
+  }
+  else if ((m = eth_find_method(x->type->methods, eth_write_method)))
+  {
+    eth_ref(x);
+    eth_reserve_stack(2);
+    eth_sp[0] = x;
+    eth_disown_file(eth_sp[1] = eth_open_stream(out));
+    eth_drop(eth_apply(m, 2));
+    eth_dec(x);
+  }
+  else
+    x->type->display(x->type, x, out);
 }
 
 bool

@@ -8,7 +8,6 @@
 -- * linspace
 --
 -- Miscelenious:
--- * len
 -- * rev_append
 -- * rev
 -- * append
@@ -75,8 +74,6 @@
 -- * get
 --
 
-let pub len = __len in
-
 let pub rev_append = __rev_append in
 
 let rec pub fn fold_map f z xs =
@@ -87,19 +84,19 @@ let rec pub fn fold_map f z xs =
 in
 
 let pub fn init n f =
-  let rec fn loop i acc =
+  (fn i acc ->
     if i >= 0 then
-      loop (i - 1) (f i :: acc)
+      this (i - 1) (f i :: acc)
     else acc
-  in loop (n - 1) []
+  ) (n - 1) []
 in
 
 let pub fn unfold_left f z =
-  let rec fn loop z acc =
+  (fn z acc ->
     if let (z, x) = f z then
-      loop z (x :: acc)
+      this z (x :: acc)
     else acc
-  in loop z []
+  ) z []
 in
 
 
@@ -110,10 +107,10 @@ let rec pub fn unfold_right f z =
 in
 
 let pub fn range (from .. to) =
-  let rec fn loop i acc =
+  (fn i acc ->
     if i < from then acc
-    else loop (i - 1) (i :: acc)
-  in loop to []
+    else this (i - 1) (i :: acc)
+  ) to []
 in
 
 let pub fn linspace from to n =
@@ -152,22 +149,22 @@ let rec pub fn iter f xs =
 in
 
 let rec pub fn iteri f xs =
-  let rec fn loop i xs =
+  (fn i xs ->
     if let x::xs = xs then (
       f i x;
-      loop (i + 1) xs f
+      this (i + 1) xs f
     )
-  in loop 0 xs
+  ) 0 xs
 in
 
 let rec pub fn rev_flat_map f xs =
-  let rec fn loop ys xs acc =
+  (fn ys xs acc ->
     if let y::ys = ys then
-      loop ys xs (y :: acc)
+      this ys xs (y :: acc)
     else if let x::xs = xs then
-      loop (f x) xs acc
+      this (f x) xs acc
     else acc
-  in loop [] xs []
+  ) [] xs []
 in
 
 let rec pub fn flat_map f xs =
@@ -198,21 +195,21 @@ let pub fn fold_left f z xs =
 
     fold_left (z -> x -> z) z [x] -> z
   |help};
-  let rec fn loop xs acc =
+  (fn xs acc ->
     if let x::xs = xs then
-      loop xs (f acc x)
+      this xs (f acc x)
     else acc
-  in loop xs z
+  ) xs z
 in
 
 let pub fn fold_left2 f z xs ys =
-  let rec fn loop xs ys acc =
+  (fn xs ys acc ->
     if let x :: xs = xs then
       if let y :: ys = ys then
-        loop xs ys (f acc x y)
+        this xs ys (f acc x y)
       else acc
     else acc
-  in loop xs ys z
+  ) xs ys z
 in
 
 let rec pub fn fold_right f z xs =
@@ -260,12 +257,12 @@ let pub fn reduce_right' f xs =
 in
 
 let pub fn rev_scan_left f z xs =
-  let rec fn loop z xs acc =
+  (fn z xs acc ->
     if let x :: xs = xs then
       let z = f z x in
-      loop z xs (z :: acc)
+      this z xs (z :: acc)
     else acc
-  in loop z xs []
+  ) z xs []
 in
 
 let rec pub fn scan_left f z xs =
@@ -284,12 +281,12 @@ let rec pub fn scan_right f z xs =
 in
 
 let pub fn rev_take n xs =
-  let rec fn loop n xs acc =
+  (fn n xs acc ->
     if n > 0 then
       let x::xs = xs in
-      loop (n - 1) xs (x :: acc)
+      this (n - 1) xs (x :: acc)
     else acc
-  in loop n xs []
+  ) n xs []
 in
 
 let rec pub fn take n xs =
@@ -330,11 +327,11 @@ let rec pub fn memq? a xs =
 in
 
 let pub fn rev_filter f xs =
-  let rec fn loop xs acc =
+  (fn xs acc ->
     if let x :: xs = xs then
-      loop xs (if f x then x :: acc else acc)
+      this xs (if f x then x :: acc else acc)
     else acc
-  in loop xs nil
+  ) xs nil
 in
 
 let pub fn filter f xs = rev $ rev_filter f xs in
@@ -366,12 +363,12 @@ let pub fn find p xs =
 in
 
 let pub fn index_opt p xs =
-  let rec fn loop i xs =
+  (fn i xs ->
     if let x::xs = xs then
       if p x then some i
-      else loop (i+1) xs
+      else this (i+1) xs
     else false
-  in loop 0 xs
+  ) 0 xs
 in
 
 let pub fn index p xs =
@@ -397,26 +394,26 @@ in
 --in
 
 let pub fn partition p xs =
-  let rec fn loop xs acc1 acc2 =
+  (fn xs acc1 acc2 ->
     if let x::xs = xs then
       if p x then
-        loop xs (x :: acc1) acc2
+        this xs (x :: acc1) acc2
       else
-        loop xs acc1 (x :: acc2)
+        this xs acc1 (x :: acc2)
     else (rev acc1, rev acc2)
-  in loop xs [] []
+  ) xs [] []
 in
 
 let pub fn merge cmp xs ys =
-  let rec fn loop xs ys acc =
+  (fn xs ys acc ->
     if let x::xs' = xs then
       if let y::ys' = ys then
         if cmp x y
-        then loop xs' ys (x::acc)
-        else loop xs  ys' (y::acc)
+        then this xs' ys (x::acc)
+        else this xs  ys' (y::acc)
       else rev_append acc xs
     else rev_append acc ys
-  in loop xs ys []
+  ) xs ys []
 in
 
 let split_by_half =
@@ -463,6 +460,7 @@ let pub fn assq k l =
   else failure nil
 in
 
+-- TODO: tail recursive
 let rec pub fn transpose xs =
   if let xs :: xss = xs then
     if let x :: xs = xs then
@@ -477,6 +475,6 @@ in
 
 let pub fn get l k = car $  drop k l in
 
-let pub list = list in -- not to hide the builtin by module name
+let pub list = list in -- not to hide the builtin `list` by module name
 
 nil

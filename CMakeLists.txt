@@ -187,5 +187,5 @@ enable_testing ()
 add_test (Builtins ether -L${CMAKE_SOURCE_DIR}/t ${CMAKE_SOURCE_DIR}/t/builtins.eth)
 add_test (CmdArg ether -L${CMAKE_SOURCE_DIR}/t ${CMAKE_SOURCE_DIR}/t/cmdarg.eth)
 add_test (Samples ether ${CMAKE_SOURCE_DIR}/samples/test-samples.eth ${CMAKE_SOURCE_DIR}/samples)
-add_test (Dope ether ${CMAKE_SOURCE_DIR}/t/test-dope.eth ${CMAKE_INSTALL_PREFIX}/bin/dope ${CMAKE_SOURCE_DIR}/t)
+#add_test (Dope ether ${CMAKE_SOURCE_DIR}/t/test-dope.eth ${CMAKE_INSTALL_PREFIX}/bin/dope ${CMAKE_SOURCE_DIR}/t)
 

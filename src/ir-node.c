@@ -78,6 +78,17 @@ eth_ir_record_pattern(int varid, eth_ir_node *proto, size_t const ids[],
   return pat;
 }
 
+eth_ir_pattern*
+eth_ir_star_pattern(int varid, int oldvarid)
+{
+  eth_ir_pattern *pat = eth_malloc(sizeof(eth_ir_pattern));
+  pat->tag = ETH_PATTERN_STAR;
+  pat->star.varid = varid;
+  pat->star.oldvarid = oldvarid;
+  return pat;
+}
+
+
 void
 eth_destroy_ir_pattern(eth_ir_pattern *pat)
 {
@@ -107,6 +118,9 @@ eth_destroy_ir_pattern(eth_ir_pattern *pat)
       if (pat->record.proto)
         eth_unref_ir_node(pat->record.proto);
       free(pat->record.subpats);
+      break;
+
+    case ETH_PATTERN_STAR:
       break;
   }
   free(pat);
@@ -235,6 +249,9 @@ destroy_ir_node(eth_ir_node *node)
         eth_unref_ir_node(node->update.fields[i]);
       free(node->update.fields);
       free(node->update.ids);
+      break;
+
+    case ETH_IR_THIS:
       break;
   }
 
@@ -468,6 +485,13 @@ eth_ir_return(eth_ir_node *expr)
 {
   eth_ir_node *node = create_ir_node(ETH_IR_RETURN);
   eth_ref_ir_node(node->retrn.expr = expr);
+  return node;
+}
+
+eth_ir_node*
+eth_ir_this()
+{
+  eth_ir_node *node = create_ir_node(ETH_IR_THIS);
   return node;
 }
 

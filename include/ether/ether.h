@@ -347,12 +347,12 @@ eth_reserve_c_stack(ssize_t size)
 #define ETH_RC_MAX UINT32_MAX
 struct eth_header {
   eth_type *type;
-#if defined(ETH_OBJECT_FLAGS)
-  uint8_t flags:4;
-  eth_dword_t rc:60;
-#else
+/*#if defined(ETH_OBJECT_FLAGS)*/
+  /*uint8_t flags:4;*/
+  /*eth_dword_t rc:60;*/
+/*#else*/
   eth_dword_t rc;
-#endif
+/*#endif*/
 };
 #define ETH(x) ((eth_t)(x))
 
@@ -455,10 +455,44 @@ eth_free(void *ptr, size_t size /* bytes */)
 
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
-//                              METHODS
+//                               METHODS
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-typedef eth_t (*eth_method_cb)(eth_t self, void *data);
+typedef struct eth_method_spec eth_method_spec;
+typedef struct eth_method eth_method;
 typedef struct eth_methods eth_methods;
+
+struct eth_method_spec {
+  int arity;
+  eth_t default_impl;
+};
+
+struct eth_method {
+  eth_header hdr;
+  eth_method_spec spec;
+};
+
+extern
+eth_type *eth_method_type;
+
+extern eth_t eth_apply_method;
+extern eth_t eth_enum_ctor_method;
+extern eth_t eth_get_method;
+extern eth_t eth_set_method;
+extern eth_t eth_write_method;
+extern eth_t eth_display_method;
+extern eth_t eth_len_method;
+extern eth_t eth_cmp_method;
+
+eth_t
+eth_create_method(int arity, eth_t default_impl /* or NULL */);
+
+static inline int
+eth_get_method_arity(eth_t method)
+{ return ((eth_method*)method)->spec.arity; }
+
+static inline eth_t
+eth_get_method_default(eth_t method)
+{ return ((eth_method*)method)->spec.default_impl; }
 
 eth_methods*
 eth_create_methods();
@@ -467,11 +501,13 @@ void
 eth_destroy_methods(eth_methods *ms);
 
 bool
-eth_add_method(eth_methods *ms, eth_t sym, eth_method_cb cb, void *data,
-    void (*dtor) (void*));
+eth_add_method(eth_methods *ms, eth_t method, eth_t impl);
 
 eth_t
-eth_eval_method(eth_methods *ms, eth_t sym, eth_t self);
+eth_find_method(eth_methods *ms, eth_t method);
+
+/*extern*/
+/*eth_method *eth_access_method;*/
 
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
@@ -508,6 +544,8 @@ struct eth_type {
   void *clos;
   void (*dtor)(void *clos);
 
+  eth_methods *methods;
+
   int nfields;
   eth_field *fields;
   size_t fieldids[];
@@ -524,9 +562,7 @@ eth_create_tagged_type(const char *name, const char *tag);
 
 static inline eth_type*
 eth_create_type(const char *name)
-{
-  return eth_create_tagged_type(name, NULL);
-}
+{ return eth_create_tagged_type(name, NULL); }
 
 eth_type*
 eth_create_tagged_struct_type(const char *name, const char *tag,
@@ -538,33 +574,23 @@ eth_create_struct_type(const char *name, const eth_field *fields, int n)
 
 static inline bool
 eth_is_plain(eth_type *type)
-{
-  return type->flag & ETH_TFLAG_PLAIN;
-}
+{ return type->flag & ETH_TFLAG_PLAIN; }
 
 static inline bool
 eth_is_tuple(eth_type *type)
-{
-  return type->flag == ETH_TFLAG_TUPLE;
-}
+{ return type->flag == ETH_TFLAG_TUPLE; }
 
 static inline bool
 eth_is_record(eth_type *type)
-{
-  return type->flag == ETH_TFLAG_RECORD;
-}
+{ return type->flag == ETH_TFLAG_RECORD; }
 
 static inline bool
 eth_is_like_record(eth_type *type)
-{
-  return (type->flag & ETH_TFLAG_RECORD) == ETH_TFLAG_RECORD;
-}
+{ return (type->flag & ETH_TFLAG_RECORD) == ETH_TFLAG_RECORD; }
 
 static inline bool
 eth_is_like_tuple(eth_type *type)
-{
-  return (type->flag & ETH_TFLAG_TUPLE) == ETH_TFLAG_TUPLE;
-}
+{ return (type->flag & ETH_TFLAG_TUPLE) == ETH_TFLAG_TUPLE; }
 
 eth_field* __attribute__((pure))
 eth_get_field(eth_type *type, const char *field);
@@ -845,11 +871,15 @@ _eth_raw_apply(eth_t fn, int narg)
 {
   extern eth_t eth_vm(eth_bytecode *bc);
   eth_function *proc = ETH_FUNCTION(fn);
+  eth_function *that = eth_this;
   eth_this = proc;
+  eth_t ret;
   if (proc->islam)
-    return eth_vm(proc->clos.bc);
+    ret = eth_vm(proc->clos.bc);
   else
-    return proc->proc.handle();
+    ret = proc->proc.handle();
+  eth_this = that;
+  return ret;
 }
 
 static inline eth_t
@@ -1271,6 +1301,9 @@ eth_open_fd(int fd, const char *mod);
 eth_t
 eth_open_stream(FILE *stream);
 
+void
+eth_disown_file(eth_t x);
+
 eth_t
 eth_open_pipe(const char *command, const char *mod);
 
@@ -1461,6 +1494,55 @@ eth_vector_begin(eth_t vec, eth_vector_iterator *iter, int start);
 bool
 eth_vector_next(eth_vector_iterator *iter);
 /** @} Vector */
+
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                               rbtree
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+extern
+eth_type *eth_rbtree_type;
+
+eth_t
+eth_create_rbtree();
+
+eth_t
+eth_rbtree_mfind(eth_t t, eth_t k, eth_t *exn);
+
+eth_t
+eth_rbtree_sfind(eth_t t, eth_t k, eth_t *exn);
+
+eth_t
+eth_rbtree_minsert(eth_t t, eth_t kvtup, eth_t *exn);
+
+eth_t
+eth_rbtree_sinsert(eth_t t, eth_t x, eth_t *exn);
+
+void
+eth_rbtree_foreach(eth_t t, bool (*f)(eth_t x, void *data), void *data);
+
+void
+eth_rbtree_rev_foreach(eth_t t, bool (*f)(eth_t x, void *data), void *data);
+
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                               glob
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+typedef struct {
+  eth_header hdr;
+  eth_t rl;
+} eth_glob;
+
+extern
+eth_type *eth_glob_type;
+
+eth_t
+eth_create_glob();
+
+eth_t
+eth_glob_add(eth_t glob, eth_t r);
+
+eth_t
+eth_glob_find(eth_t glob, eth_t sym);
 
 /** @} BuiltinTypes */
 
@@ -1779,6 +1861,8 @@ typedef enum {
    * type (one-pass load of multiple fields only works for records).
    */
   ETH_PATTERN_RECORD,
+
+  ETH_PATTERN_STAR,
 } eth_pattern_tag;
 
 /**
@@ -2006,6 +2090,7 @@ typedef enum {
   ETH_AST_MULTIMATCH,
   ETH_AST_ASSIGN,
   ETH_AST_RETURN,
+  ETH_AST_THIS,
 } eth_ast_tag;
 
 typedef enum {
@@ -2168,6 +2253,9 @@ eth_ast_assign(const char *ident, eth_ast *val);
 eth_ast*
 eth_ast_return(eth_ast *expr);
 
+eth_ast*
+eth_ast_this();
+
 eth_ast_pattern*
 eth_ast_to_pattern(eth_ast *ast);
 
@@ -2213,6 +2301,7 @@ struct eth_ir_pattern {
     struct { eth_t val; } constant;
     struct { size_t *ids; int n, varid; eth_ir_node *proto;
              eth_ir_pattern **subpats; } record;
+    struct { int varid, oldvarid; } star;
   };
 };
 
@@ -2232,6 +2321,9 @@ eth_ir_constant_pattern(eth_t val);
 eth_ir_pattern*
 eth_ir_record_pattern(int varid, eth_ir_node *proto, size_t const ids[],
     eth_ir_pattern *const pats[], int n);
+
+eth_ir_pattern*
+eth_ir_star_pattern(int varid, int oldvarid /* or -1 */);
 
 void
 eth_destroy_ir_pattern(eth_ir_pattern *pat);
@@ -2255,6 +2347,7 @@ typedef enum {
   ETH_IR_UPDATE,
   ETH_IR_THROW,
   ETH_IR_RETURN,
+  ETH_IR_THIS,
 } eth_ir_tag;
 
 typedef struct {
@@ -2381,6 +2474,9 @@ eth_ir_throw(eth_ir_node *exn);
 
 eth_ir_node*
 eth_ir_return(eth_ir_node *expr);
+
+eth_ir_node*
+eth_ir_this();
 
 typedef enum eth_spec_tag {
   ETH_SPEC_TYPE,
@@ -2734,6 +2830,7 @@ typedef enum {
   ETH_INSN_TRY,
   ETH_INSN_GETEXN,
   ETH_INSN_MKRCRD,
+  ETH_INSN_THIS,
 } eth_insn_tag;
 
 typedef enum {
@@ -2873,6 +2970,9 @@ eth_insn_getexn(int out);
 
 eth_insn*
 eth_insn_mkrcrd(int out, int const vids[], eth_type *type);
+
+eth_insn*
+eth_insn_this(int out);
 
 void
 eth_set_insn_comment(eth_insn *insn, const char *comment);
@@ -3020,6 +3120,8 @@ typedef enum {
 
   ETH_OPC_MKRCRD,
   ETH_OPC_UPDTRCRD,
+
+  ETH_OPC_THIS,
 } eth_opc;
 
 struct eth_bc_insn {
@@ -3087,6 +3189,7 @@ struct eth_bc_insn {
     // TODO: smaller!
     struct { uint32_t out; uint16_t src, n; uint64_t *vids; size_t *ids; }
       updtrcrd;
+    struct { uint64_t out; } thiss;
   };
 };
 

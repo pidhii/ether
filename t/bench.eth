@@ -1,71 +1,79 @@
 
-let rec revAppend xs acc =
+let rec fn revAppend xs acc =
   if let x::xs = xs then
     revAppend xs (x :: acc)
   else acc
+in
 
-let reverse xs = revAppend xs nil
+let fn reverse xs = revAppend xs nil in
 
-let revMap f xs =
-  let rec loop xs acc =
+let fn revMap f xs =
+  let rec fn loop xs acc =
     if let x::xs = xs then
       loop xs (f x :: acc)
     else acc
-  loop xs nil
+  in loop xs nil
+in
 
-let map f xs = reverse $ revMap f xs
+let fn map f xs = reverse $ revMap f xs in
 
-let revFilter f xs =
-  let rec loop xs acc =
+let fn revFilter f xs =
+  let rec fn loop xs acc =
     if let x::xs = xs then
       loop xs (if f x then x :: acc else acc)
     else acc
-  loop xs nil
+  in loop xs nil
+in
 
-let filter f xs = reverse $ revFilter f xs
+let fn filter f xs = reverse $ revFilter f xs in
 
-let rec foldLeft f z xs =
+let rec fn foldLeft f z xs =
   if let x :: xs = xs then
     foldLeft f (f z x) xs
   else z
+in
 
-let range from to =
-  let rec loop i acc =
+let fn range from to =
+  let rec fn loop i acc =
     if i < from then acc
     else loop (i - 1) (i :: acc)
-  loop (to - 1) nil
+  in loop (to - 1) nil
+in
 
-let even x = x mod 2 == 0
-let odd  x = x mod 2 != 0
+let fn even x = x mod 2 == 0 in
+let fn odd  x = x mod 2 != 0 in
 
-let rec doTimes n thunk =
+let rec fn doTimes n thunk =
   if n == 0 then nil
   else (thunk nil; doTimes (n - 1) thunk)
+in
 
 
-let n = 10_000_000
+let n = 1_00_000 in
 
 let job_user_nobrain =
   fn _ ->
-    range 0 n | map (x -> x + 1) | filter even? | foldLeft (+) 0
+    range 0 n | map (fn x -> x + 1) | filter even? | foldLeft (+) 0
+in
 
 let job_user_smart =
   fn _ ->
-    range 0 n | revMap (x -> x + 1) | revFilter even? | foldLeft (+) 0
+    range 0 n | revMap (fn x -> x + 1) | revFilter even? | foldLeft (+) 0
+in
 
 let job_native =
-  open 'list'
+  let {*} = require 'list' in
   fn _ ->
-    fold_left (+) 0 [x + 1 with x <- [0 .. n-1], odd? x]
-    --[0..n-1]
-    --|> rev_filter_map (x -> x + 1 if odd? x else raise `filter_out)
-    --|> fold_left (+) 0
+    range 0 n --(0..n)
+    | rev_filter_map (fn x -> if odd? x then some (x + 1))
+    | fold_left (+) 0
+in
 
 
---let job = job_user_nobrain
---let job = job_user_smart
-let job = job_native
+--let job = job_user_nobrain in
+let job = job_user_smart in
+--let job = job_native in
 
-print $ job ()
-doTimes 1 job
+print $ job nil;
+doTimes 10 job
 

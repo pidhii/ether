@@ -45,13 +45,13 @@
 -- * shell
 --
 
-import 'list';
-import 'string';
+let list = require 'list' in
+let string = require 'string' in
 
 let pub fopen = __open in
 
-let pub fn read_line () = read_line_of stdin in
-let pub fn read_line_opt () =
+let pub fn read_line = read_line_of stdin in
+let pub fn read_line_opt =
   try some (read_line ())
   except `end_of_file -> false
 in
@@ -93,7 +93,7 @@ let pub fn shell cmd =
   let rec fn loop acc =
     if let some data = read_of_opt pipe 0x100
     then loop (data :: acc)
-    else list.rev acc |> string.cat |> string.chomp
+    else list.rev acc |> string.strcat |> string.chomp
   in
   let out = loop [] in
   if close pipe == 0 then out

@@ -184,6 +184,7 @@ eth_vm(eth_bytecode *bc)
     [ETH_OPC_UNREF    ] = &&INSN_UNREF,
     [ETH_OPC_DROP     ] = &&INSN_DROP,
     [ETH_OPC_RET      ] = &&INSN_RET,
+    [ETH_OPC_THIS     ] = &&INSN_THIS,
     [ETH_OPC_ADD      ] = &&INSN_ADD,
     [ETH_OPC_SUB      ] = &&INSN_SUB,
     [ETH_OPC_MUL      ] = &&INSN_MUL,
@@ -278,13 +279,21 @@ eth_vm(eth_bytecode *bc)
       PREDICTED(APPLY)
       OP(APPLY)
       {
+        eth_t apply_impl;
         eth_t fn = r[ip->apply.fn];
-        if (fn->type == eth_function_type)
+        if (eth_likely(fn->type == eth_function_type))
         {
           r[ip->apply.out] = eth_apply(fn, nstack);
           nstack = 0;
         }
-        else if (eth_is_like_record(fn->type))
+        else if ((apply_impl = eth_find_method(fn->type->methods, eth_apply_method)))
+        {
+          eth_reserve_stack(1);
+          eth_sp[0] = fn;
+          r[ip->apply.out] = eth_apply(apply_impl, nstack+1);
+          nstack = 0;
+        }
+        else if (eth_find_method(fn->type->methods, eth_enum_ctor_method))
         {
           const int n = nstack;
           test = _updtrcrd2(r, ip->apply.out, ip->apply.fn,
@@ -299,6 +308,7 @@ eth_vm(eth_bytecode *bc)
           for (int i = 0; i < nstack; eth_ref(eth_sp[i++]));
           for (int i = 0; i < nstack; eth_unref(eth_sp[i++]));
           r[ip->apply.out] = eth_exn(eth_sym("apply_error"));
+          eth_pop_stack(nstack);
           nstack = 0;
         }
         FAST_DISPATCH_NEXT();
@@ -307,6 +317,7 @@ eth_vm(eth_bytecode *bc)
       PREDICTED(APPLYTC)
       OP(APPLYTC)
       {
+        eth_t apply_impl;
         eth_t fn = r[ip->apply.fn];
         if (fn->type == eth_function_type)
         {
@@ -327,7 +338,14 @@ eth_vm(eth_bytecode *bc)
             nstack = 0;
           }
         }
-        else if (eth_is_like_record(fn->type))
+        else if ((apply_impl = eth_find_method(fn->type->methods, eth_apply_method)))
+        {
+          eth_reserve_stack(1);
+          eth_sp[0] = fn;
+          r[ip->apply.out] = eth_apply(apply_impl, nstack+1);
+          nstack = 0;
+        }
+        else if (eth_find_method(fn->type->methods, eth_enum_ctor_method))
         {
           const int n = nstack;
           test = _updtrcrd2(r, ip->apply.out, ip->apply.fn,
@@ -345,6 +363,7 @@ eth_vm(eth_bytecode *bc)
           for (int i = 0; i < nstack; eth_ref(eth_sp[i]));
           for (int i = 0; i < nstack; eth_unref(eth_sp[i]));
           r[ip->apply.out] = eth_exn(eth_sym("apply_error"));
+          eth_pop_stack(nstack);
           nstack = 0;
         }
         FAST_DISPATCH_NEXT();
@@ -689,6 +708,13 @@ eth_vm(eth_bytecode *bc)
       {
         test = _updtrcrd(r, ip->updtrcrd.out, ip->updtrcrd.src, ip->updtrcrd.ids,
                          ip->updtrcrd.vids, ip->updtrcrd.n);
+        FAST_DISPATCH_NEXT();
+      }
+
+      OP(THIS)
+      {
+        r[ip->thiss.out] = ETH(eth_this);
+        PREDICT_NEXT(APPLYTC);
         FAST_DISPATCH_NEXT();
       }
     }

@@ -112,7 +112,7 @@ _read_of(void)
   static eth_t                                         \
   _read_##NAME##_of(void)                              \
   {                                                    \
-    eth_use_symbol(End_of_file);                       \
+    eth_use_symbol(end_of_file);                       \
     eth_use_symbol(Failure);                           \
                                                        \
     eth_args args = eth_start(1);                      \
@@ -123,7 +123,7 @@ _read_of(void)
     if (nrd == 0)                                      \
     {                                                  \
       if (feof(stream))                                \
-        eth_throw(args, End_of_file);                  \
+        eth_throw(args, end_of_file);                  \
       else if (ferror(stream))                         \
         eth_throw(args, eth_system_error(0));          \
     }                                                  \

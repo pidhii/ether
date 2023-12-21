@@ -165,6 +165,15 @@ _record_p(void)
 }
 
 static eth_t
+_dict_p(void)
+{
+  eth_t x = *eth_sp++;
+  eth_t ret = eth_boolean(x->type == eth_rbtree_type);
+  eth_drop(x);
+  return ret;
+}
+
+static eth_t
 _file_p(void)
 {
   eth_t x = *eth_sp++;
@@ -832,21 +841,14 @@ _require(void)
 {
   eth_root *thisroot = eth_this->proc.data;
 
-  eth_t modpath = *eth_sp++;
-  if (eth_unlikely(not eth_is_str(modpath)))
-  {
-    eth_drop(modpath);
-    return eth_exn(eth_type_error());
-  }
+  eth_args args = eth_start(1);
+  eth_t modpath = eth_arg2(args, eth_string_type);
 
   eth_module *mod = eth_require_module(thisroot, eth_get_root_env(thisroot),
       eth_str_cstr(modpath));
 
   if (not mod)
-  {
-    eth_drop(modpath);
-    return eth_exn(eth_failure());
-  }
+    eth_throw(args, eth_failure());
 
   int ndefs = eth_get_ndefs(mod);
   eth_def defs[ndefs];
@@ -860,8 +862,7 @@ _require(void)
   }
   eth_t ret = eth_record(keys, vals, ndefs);
 
-  eth_drop(modpath);
-  return ret;
+  eth_return(args, ret);
 }
 // */
 
@@ -954,6 +955,14 @@ _list(void)
     eth_t acc = eth_nil;
     for (int i = n - 1; i >= 0; --i)
       acc = eth_cons(eth_vec_get(x, i), acc);
+    eth_drop(x);
+    return acc;
+  }
+  else if (x->type == eth_rbtree_type)
+  {
+    eth_t acc = eth_nil;
+    bool iter(eth_t x, void*) { acc = eth_cons(x, acc); return true; }
+    eth_rbtree_rev_foreach(x, iter, NULL);
     eth_drop(x);
     return acc;
   }
@@ -1207,6 +1216,68 @@ _make_initial_state(void)
 }
 #endif
 
+static eth_t
+_make_method(void)
+{
+  eth_args args = eth_start(2);
+  eth_t arity = eth_arg2(args, eth_number_type);
+  eth_t default_impl = eth_arg(args);
+  eth_return(args, eth_create_method(
+        eth_num_val(arity), default_impl == eth_nil ? NULL : default_impl));
+                                      
+}
+
+static eth_t
+_implements(void)
+{
+  eth_args args = eth_start(2);
+  eth_t x = eth_arg(args);
+  eth_t method = eth_arg2(args, eth_method_type);
+  eth_return(args, eth_boolean(eth_find_method(x->type->methods, method)));
+}
+
+static eth_t
+_make_struct(void)
+{
+  eth_args args = eth_start(2);
+  eth_t base = eth_arg(args);
+  eth_t methods = eth_arg(args);
+
+  int nfields = eth_length(base, NULL);
+  char *keys[nfields];
+  eth_t vals[nfields];
+  for (int i = 0; eth_is_pair(base); base = eth_cdr(base), ++i)
+  {
+    keys[i] = eth_str_cstr(eth_car(base));
+    vals[i] = eth_nil;
+  }
+  eth_type *type = eth_unique_record_type(keys, nfields);
+
+  for (; eth_is_pair(methods); methods = eth_cdr(methods))
+  {
+    eth_t keyval = eth_car(methods);
+    eth_t method = eth_tup_get(keyval, 0);
+    eth_t impl = eth_tup_get(keyval, 1);
+    if (method->type != eth_method_type)
+    {
+      eth_destroy_type(type);
+      eth_throw(args, eth_type_error());
+    }
+
+    if (impl == eth_nil)
+      impl = eth_get_method_default(method);
+    else if (ETH_FUNCTION(impl)->arity < eth_get_method_arity(method))
+    {
+      eth_destroy_type(type);
+      eth_throw(args, eth_type_error());
+    }
+
+    eth_add_method(type->methods, method, impl);
+  }
+
+  eth_t ret = eth_create_record(type, vals);
+  eth_return(args, ret);
+}
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                 module
@@ -1260,6 +1331,7 @@ eth_create_builtins(eth_root *root)
   eth_define(mod,  "function?", eth_create_proc(_function_p, 1, NULL, NULL));
   eth_define(mod,     "tuple?", eth_create_proc(   _tuple_p, 1, NULL, NULL));
   eth_define(mod,    "record?", eth_create_proc(  _record_p, 1, NULL, NULL));
+  eth_define(mod,      "dict?", eth_create_proc(    _dict_p, 1, NULL, NULL));
   eth_define(mod,      "file?", eth_create_proc(    _file_p, 1, NULL, NULL));
   eth_define(mod,    "regexp?", eth_create_proc(  _regexp_p, 1, NULL, NULL));
   eth_define(mod,    "vector?", eth_create_proc(  _vector_p, 1, NULL, NULL));
@@ -1301,6 +1373,18 @@ eth_create_builtins(eth_root *root)
   eth_define(mod, "__create_ref", eth_create_proc(_create_ref, 1, NULL, NULL));
   eth_define(mod, "__dereference", eth_create_proc(_dereference, 1, NULL, NULL));
   eth_define(mod, "__assign", eth_create_proc(_assign, 2, NULL, NULL));
+
+  eth_define(mod, "__make_method", eth_create_proc(_make_method, 2, NULL, NULL));
+  eth_define(mod, "__make_struct", eth_create_proc(_make_struct, 2, NULL, NULL));
+  eth_define(mod, "implements", eth_create_proc(_implements, 2, NULL, NULL));
+  eth_define(mod, "apply", eth_apply_method);
+  eth_define(mod, "access", eth_get_method);
+  eth_define(mod, "write", eth_write_method);
+  eth_define(mod, "display", eth_display_method);
+  eth_define(mod, "len", eth_len_method);
+  eth_define(mod, "cmp", eth_cmp_method);
+
+  eth_define(mod, "dict", eth_create_rbtree());
 
 #if COROUTINES
   eth_define(mod, "__switch_state", eth_create_proc(_switch_state, 3, NULL, NULL));

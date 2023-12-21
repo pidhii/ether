@@ -1,7 +1,7 @@
 
-import 'list';
-import 'string';
-import 'io';
+let list = require 'list' in
+let string = require 'string' in
+let io = require 'io' in
 
 -- Split a list on two halves using slow/fast iterators approach.
 --
@@ -58,7 +58,7 @@ in
 
 -- Read a list of numbers.
 let fn read_list file =
-  -- Builtin `read_line_of` will throw `End_of_file` exception upon reaching
+  -- Builtin `read_line_of` will throw `end_of_file` exception upon reaching
   -- end of file, so we could use TRY/WITH expression to do the job.
   --
   -- However, we want to be tail-recursive, but it is impossible to achieve
@@ -69,7 +69,7 @@ let fn read_list file =
   --
   -- In case of succesfull reading, it will return a variant `Some <line>`;
   -- otherwize, it returns nil. Note that in fact it does not matter what do
-  -- we return in case of End_of_file exception. We only need it to be NOT the
+  -- we return in case of end_of_file exception. We only need it to be NOT the
   -- `Some _`-variant.
   let fn read_line_opt file =
     try some (io.read_line_of file)

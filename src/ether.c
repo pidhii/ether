@@ -171,6 +171,9 @@ eth_init(void *argv)
   extern void _eth_init_alloc(void);
   _eth_init_alloc();
 
+  extern void _eth_init_methods(void);
+  _eth_init_methods();
+
   extern void _eth_init_number_type(void);
   _eth_init_number_type();
 
@@ -215,11 +218,18 @@ eth_init(void *argv)
 
   extern void _eth_init_vector_type(void);
   _eth_init_vector_type();
+
+  extern void _eth_init_rbtree_type(void);
+  _eth_init_rbtree_type();
+
+  extern void _eth_init_glob_type(void);
+  _eth_init_glob_type();
 }
 
 void
 eth_cleanup(void)
 {
+  /*
   eth_destroy_type(eth_number_type);
   eth_destroy_type(eth_boolean_type);
   eth_destroy_type(eth_nil_type);
@@ -244,12 +254,16 @@ eth_cleanup(void)
   extern void _eth_cleanup_record_types(void);
   _eth_cleanup_record_types();
 
-  extern void _eth_cleanup_alloc(void);
-  _eth_cleanup_alloc();
+  extern void _eth_cleanup_methods(void);
+  _eth_cleanup_methods();
+  */
+
+  /*extern void _eth_cleanup_alloc(void);*/
+  /*_eth_cleanup_alloc();*/
 
   if (eth_sp != eth_sb)
     eth_warning("stack pointer is not on the top of the stack");
-  free(_main_arg_stack);
+  /*free(_main_arg_stack);*/
 }
 
 const char*

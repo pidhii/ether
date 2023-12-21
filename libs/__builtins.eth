@@ -82,23 +82,29 @@ in
 
 let pub require = __require in
 
-let pub fn create_env defs =
-  {
-    defs
-    fn load {defs} path = (__load path defs)
-    fn load_stream {defs} file = (__load_stream file defs)
-    fn load_string {defs} str = (__load_stream (__open_string str) defs)
-  }
+--let fn load_with_defs defs path = __load path defs in
+--let fn load_stream_with_defs defs file = __load_stream file (list defs) in
+--let fn load_string_with_defs defs str = __load_stream (__open_string str) (list defs) in
+let pub fn load x =
+  if record? x then
+    fn path -> __load path (list x)
+  else __load x []
 in
-let pub fn load path = __load path [] in
-let pub fn load_stream file = __load_stream file [] in
-let pub fn load_string str = __load_stream (__open_string str) [] in
-
+let pub fn load_stream x =
+  if record? x then
+    fn stream -> __load_stream stream (list x)
+  else __load_stream x []
+in
+let pub fn load_string x =
+  if record? x then
+    fn str -> __load_stream (__open_string str) (list x)
+  else __load_stream (__open_string x) []
+in
 
 let pub fn __fmt l =
   let rec fn loop l acc =
     if let x :: xs = l then
-      let x = if string? x then x else format "%w" x in
+      let x = if string? x then x else format "%d" x in
       loop xs (x ++ acc)
     else acc
   in loop l ""
@@ -179,35 +185,28 @@ let pub srand = __srand in
 --------------------------------------------------------------------------------
 --                                Errors
 --
+let struct __invalid_argument =
+  val what = nil
+
+  impl apply self what = self with {what}
+
+  impl write self os =
+    let {fprintf} = require 'io' in
+    fprintf os "invalid_argument %w" self.what
+
+  impl display self os =
+    let {fprintf} = require 'io' in
+    fprintf os "invalid argument: %d" self.what
+in
+let pub fn invalid_argument what = raise $ __invalid_argument what in
+
 let pub fn failure nil = raise `failure in
-let pub fn invalid_argument nil = raise `invalid_argument in
 let pub fn type_error nil = raise `type_error in
 
 
 
 let pub some = enum (nil) in
 let pub system_error = enum (nil) in
-
-
---let pub access = trait
-  --method (.) self key = undefined
---in
-
---let pub module = struct defs
-  --val _defs = hash $ list defs
-
-  --impl as_list:
-    --method to_list self = list self._defs
-    --method from_list proto l = proto with _defs
-
-  --impl access:
-    --method (.) self key = self._defs.(key)
-    --method (*) self = self._defs
-
-  --impl representation:
-    --method write self stream =
-      --fprintf stream "<module %w>" (map first $ list self._defs)
---in
 
 nil
 

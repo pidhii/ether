@@ -359,6 +359,15 @@ write_ret(bc_builder *bldr, int vid)
 }
 
 static int
+write_this(bc_builder *bldr, int out)
+{
+  eth_bc_insn *insn = append_insn(bldr);
+  insn->opc = ETH_OPC_THIS;
+  insn->thiss.out = out;
+  return bldr->len - 1;
+}
+
+static int
 write_fn(bc_builder *bldr, int out, int arity, eth_source *src, eth_bytecode *bc,
     int *caps, int ncap)
 {
@@ -639,6 +648,9 @@ build_pattern(bc_builder *bldr, eth_ssa_pattern *pat, int expr, int_vec *jmps)
 
       break;
     }
+
+    case ETH_PATTERN_STAR:
+      eth_unimplemented();
   }
 }
 
@@ -851,6 +863,12 @@ end_if:
       {
         if (ip->var.vid >= 0)
           write_ret(bldr, get_reg(bldr, ip->var.vid));
+        break;
+      }
+
+      case ETH_INSN_THIS:
+      {
+        write_this(bldr, new_reg(bldr, ip->out));
         break;
       }
 

@@ -36,20 +36,6 @@ of_list(void)
 }
 
 static eth_t
-len(void)
-{
-  eth_t x = *eth_sp++;
-  if (eth_unlikely(not eth_is_vec(x)))
-  {
-    eth_drop(x);
-    return eth_exn(eth_type_error());
-  }
-  int len = eth_vec_len(x);
-  eth_drop(x);
-  return eth_num(len);
-}
-
-static eth_t
 push(void)
 {
   eth_t v = *eth_sp++;
@@ -233,7 +219,6 @@ int
 ether_module(eth_module *mod, eth_root *topenv)
 {
   eth_define(mod, "of_list", eth_create_proc(of_list, 1, NULL, NULL));
-  eth_define(mod, "len", eth_create_proc(len, 1, NULL, NULL));
   eth_define(mod, "push", eth_create_proc(push, 2, NULL, NULL));
   eth_define(mod, "insert", eth_create_proc(insert, 3, NULL, NULL));
   eth_define(mod, "front", eth_create_proc(front, 1, NULL, NULL));

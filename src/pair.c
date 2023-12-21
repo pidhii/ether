@@ -42,7 +42,7 @@ write_pair(eth_type *type, eth_t x, FILE *stream)
       eth_write(eth_car(x), stream);
       x = eth_cdr(x);
       if (x != eth_nil)
-        putc(',', stream);
+        fputs(", ", stream);
     }
     putc(']', stream);
   }
@@ -74,6 +74,14 @@ pair_equal(eth_type *type, eth_t x, eth_t y)
   return eth_equal(x, y);
 }
 
+static eth_t
+len_impl(void)
+{
+  eth_args args = eth_start(1);
+  eth_t l = eth_arg(args);
+  eth_return(args, eth_num(eth_length(l, NULL)));
+}
+
 void
 _eth_init_pair_type(void)
 {
@@ -85,5 +93,6 @@ _eth_init_pair_type(void)
   eth_pair_type->destroy = destroy_pair;
   eth_pair_type->write = write_pair;
   eth_pair_type->equal = pair_equal;
+  eth_add_method(eth_pair_type->methods, eth_len_method, eth_proc(len_impl, 1));
 }
 

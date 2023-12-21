@@ -24,6 +24,7 @@ ETH_MODULE("ether:file")
 
 #define OPEN (1 << 0)
 #define PIPE (1 << 1)
+#define OWNR (1 << 2)
 
 eth_type *eth_file_type;
 eth_t eth_stdin, eth_stdout, eth_stderr;
@@ -55,10 +56,13 @@ eth_close(eth_t x)
   if (eth_is_open(x))
   {
     f->flag ^= OPEN;
-    if (eth_is_pipe(x))
-      return pclose(f->stream);
-    else
-      return fclose(f->stream);
+    if (f->flag & OWNR)
+    {
+      if (eth_is_pipe(x))
+        return pclose(f->stream);
+      else
+        return fclose(f->stream);
+    }
   }
   return 0;
 }
@@ -132,7 +136,7 @@ eth_open(const char *path, const char *mod)
   file *f = eth_malloc(sizeof(file));
   init_file(f);
   f->stream = stream;
-  f->flag = OPEN;
+  f->flag = OPEN | OWNR;
   return ETH(f);
 }
 
@@ -145,7 +149,7 @@ eth_open_fd(int fd, const char *mod)
   file *f = eth_malloc(sizeof(file));
   init_file(f);
   f->stream = stream;
-  f->flag = OPEN;
+  f->flag = OPEN | OWNR;
   return ETH(f);
 }
 
@@ -155,7 +159,7 @@ eth_open_stream(FILE *stream)
   file *f = eth_malloc(sizeof(file));
   init_file(f);
   f->stream = stream;
-  f->flag = OPEN;
+  f->flag = OPEN | OWNR;
   return ETH(f);
 }
 
@@ -168,7 +172,7 @@ eth_open_pipe(const char *command, const char *mod)
   file *f = eth_malloc(sizeof(file));
   init_file(f);
   f->stream = stream;
-  f->flag = OPEN | PIPE;
+  f->flag = OPEN | PIPE | OWNR;
   return ETH(f);
 }
 
@@ -178,4 +182,11 @@ eth_set_file_data(eth_t x, void *data, void (*dtor)(void*))
   file *f = (file*)x;
   f->data = data;
   f->dtor = dtor;
+}
+
+void
+eth_disown_file(eth_t x)
+{
+  file *f = (file*)x;
+  f->flag ^= OWNR;
 }

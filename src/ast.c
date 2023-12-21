@@ -363,6 +363,9 @@ destroy_ast_node(eth_ast *ast)
     case ETH_AST_RETURN:
       eth_unref_ast(ast->retrn.expr);
       break;
+
+    case ETH_AST_THIS:
+      break;
   }
 
   if (ast->loc)
@@ -739,6 +742,13 @@ eth_ast_return(eth_ast *expr)
 {
   eth_ast *ast = create_ast_node(ETH_AST_RETURN);
   eth_ref_ast(ast->retrn.expr = expr);
+  return ast;
+}
+
+eth_ast*
+eth_ast_this()
+{
+  eth_ast *ast = create_ast_node(ETH_AST_THIS);
   return ast;
 }
 

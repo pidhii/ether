@@ -1,9 +1,14 @@
-open 'list';
-open 'string';
+let {*} = require 'list' in
+let {*} = require 'string' in
 
 let pub invalid_option_argument = enum (nil) in
 
 let fn get_options cfg os =
+  cfg |> iter (fn opt ->
+    if not (opt is of {name, value, has_arg}) then
+      raise $ invalid_argument
+        "options must be of type \{name, value, has_arg}, got `{opt}`"
+  );
 
   let cfg = cfg |> flat_map $ fn optcfg ->
     if pair? optcfg.name
@@ -32,42 +37,42 @@ let fn get_options cfg os =
     if let (brk, _) = strstr "=" o then
       -- Long option with '=' 
       let lopt = substr (2 .. brk-1) o in
-      let {has_arg, val, arg_pat} = get_rules lopt in
+      let {has_arg, value, arg_pat} = get_rules lopt in
       if has_arg then
         let arg = substr (brk+1..*) o in
         if arg =~ arg_pat then
-          mainLoop os ((val, arg) :: kws) pos
+          mainLoop os ((value, arg) :: kws) pos
         else raise $ invalid_option_argument lopt
       else raise `unexpected_argument
     else
       let lopt = substr (2..*) o in
-      let {has_arg, val, arg_pat} = get_rules lopt in
+      let {has_arg, value, arg_pat} = get_rules lopt in
       if has_arg then
         if let arg::os = os then
           if arg =~ arg_pat then
-            mainLoop os ((val, arg) :: kws) pos
+            mainLoop os ((value, arg) :: kws) pos
           else raise $ invalid_option_argument lopt
         else raise `missing_argument
-      else mainLoop os ((val, true) :: kws) pos
+      else mainLoop os ((value, true) :: kws) pos
   and fn handle_short_option o os kws pos =
     let shopt = substr (1, 1) o in
-    let {has_arg, val, arg_pat} = get_rules shopt in
+    let {has_arg, value, arg_pat} = get_rules shopt in
     if strlen o > 2 then
       -- Option and argument are merged 
       if has_arg then
         let arg = substr (2..*) o in
         if arg =~ arg_pat then
-          mainLoop os ((val, arg) :: kws) pos
+          mainLoop os ((value, arg) :: kws) pos
         else raise $ invalid_option_argument shopt
       else raise `unexpected_argument
     else
       if has_arg then
         if let arg::os = os then
           if arg =~ arg_pat then
-            mainLoop os ((val, arg) :: kws) pos
+            mainLoop os ((value, arg) :: kws) pos
           else raise invalid_option_argument shopt
         else raise `missing_argument
-      else mainLoop os ((val, true) :: kws) pos
+      else mainLoop os ((value, true) :: kws) pos
   in
   mainLoop os [] []
 in
@@ -86,7 +91,7 @@ let pub get =
   === ARGUMENTS
   * _list-of-options_ is a list of configurations for expected argumets of the form 
 
-      \{name = string?, val = <any-tag>, has_arg = boolean?}
+      \{name = string?, value = <any-tag>, has_arg = boolean?}
 
   * _list-of-arguments_ is a list of strings to be parsed (to parse command-line
     arguments passed to your script use \`cdr command_line`.

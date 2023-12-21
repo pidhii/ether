@@ -34,7 +34,7 @@ destroy_string(eth_type *type, eth_t x)
 static void
 write_string(eth_type *type, eth_t x, FILE *out)
 {
-  putc('"', out);
+  fputc('\'', out);
   const char *p = eth_str_cstr(x);
   for (int i = 0; i < eth_str_len(x); ++i)
   {
@@ -44,6 +44,7 @@ write_string(eth_type *type, eth_t x, FILE *out)
     {
       switch (p[i])
       {
+        case '\'': fputs("\\'", out); break;
         case '\0': fputs("\\0", out); break;
         case '\a': fputs("\\a", out); break;
         case '\b': fputs("\\b", out); break;
@@ -56,7 +57,7 @@ write_string(eth_type *type, eth_t x, FILE *out)
       }
     }
   }
-  putc('"', out);
+  fputc('\'', out);
 }
 
 static void
@@ -72,6 +73,23 @@ string_equal(eth_type *type, eth_t x, eth_t y)
      and memcmp(eth_str_cstr(x), eth_str_cstr(y), eth_str_len(x)) == 0;
 }
 
+static eth_t
+cmp_impl(void)
+{
+  eth_args args = eth_start(2);
+  eth_t x = eth_arg2(args, eth_string_type);
+  eth_t y = eth_arg2(args, eth_string_type);
+  eth_return(args, eth_num(strcmp(eth_str_cstr(x), eth_str_cstr(y))));
+}
+
+static eth_t
+len_impl(void)
+{
+  eth_args args = eth_start(1);
+  eth_t s = eth_arg2(args, eth_string_type);
+  eth_return(args, eth_num(eth_str_len(s)));
+}
+
 void
 _eth_init_strings(void)
 {
@@ -80,6 +98,8 @@ _eth_init_strings(void)
   eth_string_type->write = write_string;
   eth_string_type->display = display_string;
   eth_string_type->equal = string_equal;
+  eth_add_method(eth_string_type->methods, eth_cmp_method, eth_proc(cmp_impl, 2));
+  eth_add_method(eth_string_type->methods, eth_len_method, eth_proc(len_impl, 1));
 
   for (int i = 0; i < 256; ++i)
   {

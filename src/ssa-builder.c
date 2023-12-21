@@ -518,6 +518,24 @@ combine_match_results(match_result a, match_result b)
   return MATCH_SUCCESS;
 }
 
+static eth_t
+create_glob(void)
+{
+  eth_args args = eth_start(1);
+  eth_t r = eth_arg(args);
+  eth_return(args, eth_glob_add(eth_create_glob(), r));
+}
+
+static eth_t
+update_glob(void)
+{
+  eth_args args = eth_start(2);
+  eth_t g = eth_arg(args);
+  eth_t r = eth_arg(args);
+  eth_return(args, eth_glob_add(g, r));
+}
+
+
 /**
  * @brief Build SSA-pattern.
  *
@@ -718,6 +736,42 @@ l_match_record_without_vinfo:
       *mchres = mymchres;
       return eth_ssa_record_pattern(proto, pat->record.ids, vids, pats,
                                     pat->record.n);
+    }
+
+    case ETH_PATTERN_STAR:
+    {
+      *mchres = MATCH_SUCCESS;
+      if (pat->star.oldvarid < 0)
+      {
+        eth_t create = eth_proc(create_glob, 1);
+        int create_vid = new_val(bldr, RC_RULES_DISABLE);
+        bldr->ssavinfo[create_vid]->cval = create;
+        bldr->ssavinfo[create_vid]->type = eth_function_type;
+        eth_write_insn(tape, eth_insn_cval(create_vid, create));
+
+        int glob_vid = new_val(bldr, RC_RULES_DEFAULT);
+        eth_insn *create_insn = eth_insn_apply(glob_vid, create_vid, &expr, 1);
+        bldr->irvinfo[pat->star.varid]->ssavid = glob_vid;
+        bldr->ssavinfo[glob_vid]->creatloc = create_insn;
+        eth_write_insn(tape, create_insn);
+        return eth_ssa_ident_pattern(glob_vid);
+      }
+      else
+      {
+        eth_t update = eth_proc(update_glob, 2);
+        int update_vid = new_val(bldr, RC_RULES_DISABLE);
+        bldr->ssavinfo[update_vid]->cval = update;
+        bldr->ssavinfo[update_vid]->type = eth_function_type;
+        eth_write_insn(tape, eth_insn_cval(update_vid, update));
+
+        int glob_vid = new_val(bldr, RC_RULES_DEFAULT);
+        int p[] = { bldr->irvinfo[pat->star.oldvarid]->ssavid, expr };
+        eth_insn *update_insn = eth_insn_apply(glob_vid, update_vid, p, 2);
+        bldr->irvinfo[pat->star.varid]->ssavid = glob_vid;
+        bldr->ssavinfo[glob_vid]->creatloc = update_insn;
+        eth_write_insn(tape, update_insn);
+        return eth_ssa_ident_pattern(glob_vid);
+      }
     }
   }
 
@@ -1211,7 +1265,9 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
     {
       int expr = build(bldr, tape, ir->match.expr, false, e);
 
-      if (ir->match.pat->tag == ETH_PATTERN_IDENT)
+      // BUG: for some reason this "optimization" is REQUIRED to handle record
+      //      star pattern; otherwize, make_module() crashes.
+      if (ir->match.pat->tag == ETH_PATTERN_IDENT || ir->match.pat->tag == ETH_PATTERN_STAR)
       { // optimize trivial identifier-match
         eth_ssa_pattern *pat = build_pattern(bldr, tape, ir->match.pat, expr, NULL, e);
         eth_destroy_ssa_pattern(pat);
@@ -1331,6 +1387,14 @@ build(ssa_builder *bldr, eth_ssa_tape *tape, eth_ir_node *ir, bool istc, bool *e
       int vid = build(bldr, tape, ir->retrn.expr, istc, e);
       eth_write_insn(tape, eth_insn_ret(vid));
       return vid;
+    }
+
+    case ETH_IR_THIS:
+    {
+      int out = new_val(bldr, RC_RULES_DISABLE);
+      eth_write_insn(tape, eth_insn_this(out));
+      bldr->ssavinfo[out]->type = eth_function_type;
+      return out;
     }
 
     case ETH_IR_MULTIMATCH:
@@ -1460,6 +1524,9 @@ is_using(eth_insn *insn, int vid)
         if (insn->mkrcrd.vids[i] == vid)
           return true;
       }
+      return false;
+
+    case ETH_INSN_THIS:
       return false;
   }
 
@@ -2143,13 +2210,18 @@ static eth_t
 make_module(void)
 {
   module_info *data = eth_this->proc.data;
-  eth_t ret = eth_sp[0];
-  eth_t acc = eth_nil;
   int n = data->ndefs;
-  for (int i = n - 1; i >= 0; --i)
-    acc = eth_cons(eth_sp[i+1], acc);
-  eth_pop_stack(n + 1);
-  return eth_tup2(ret, acc);
+  eth_args args = eth_start(n + 1);
+  eth_t ret = eth_arg(args);
+  eth_t revacc = eth_nil;
+  for (int i = 0; i < n; ++i)
+  {
+    eth_t v = eth_arg(args);
+    revacc = eth_cons(v, revacc);
+  }
+  eth_t acc = eth_reverse(revacc);
+  eth_drop(revacc);
+  eth_return(args, eth_tup2(ret, acc));
 }
 
 static eth_insn*
@@ -2215,7 +2287,10 @@ eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
       if (lastinsn == tape->point)
         tlvltape = tape;
       else
+      {
+        /*lastinsn = lastinsn->prev;*/
         tlvltape = eth_create_ssa_tape_at(lastinsn);
+      }
 
       int n = defs->n;
       module_info *data = eth_malloc(sizeof(module_info));
@@ -2223,10 +2298,10 @@ eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
 
       eth_t mkmod = eth_create_proc(make_module, n + 1, data, (void*)free);
 
-      int modret = new_val(bldr, RC_RULES_DEFAULT);
       int fnvid = new_val(bldr, RC_RULES_DISABLE);
       eth_write_insn(tlvltape, eth_insn_cval(fnvid, mkmod));
       int argvids[n + 1];
+      /*eth_trace("ret: %d [%b] (%d)", ret, tlvltape == tape, lastinsn->tag);*/
       argvids[0] = ret;
       for (int i = 0; i < n; ++i)
       {
@@ -2246,9 +2321,10 @@ eth_build_ssa(eth_ir *ir, eth_ir_defs *defs)
         }
       }
 
+      int modret = new_val(bldr, RC_RULES_DEFAULT);
       eth_insn *insn = eth_insn_apply(modret, fnvid, argvids, n + 1);
-      eth_write_insn(tlvltape, insn);
       bldr->ssavinfo[modret]->creatloc = insn;
+      eth_write_insn(tlvltape, insn);
 
       eth_write_insn(tlvltape, eth_insn_ret(modret));
 

@@ -89,7 +89,7 @@ _strlen(void)
     eth_drop(x);
     return eth_exn(eth_type_error());
   }
-  eth_t ret = eth_num(eth_str_len(x));
+  eth_t ret = eth_num(strnlen(eth_str_cstr(x), eth_str_len(x)));
   eth_drop(x);
   return ret;
 }
@@ -652,7 +652,7 @@ ether_module(eth_module *mod, eth_root *topenv)
   eth_define(detail, "__strcasecmp", eth_create_proc(_strcasecmp, 2, NULL, NULL));
   eth_define(detail, "__substr", eth_create_proc(_substr, 3, NULL, NULL));
   eth_define(detail, "__strstr_opt", eth_create_proc(_strstr_opt, 2, NULL, NULL));
-  eth_define(detail, "__cat", eth_create_proc(_cat, 1, NULL, NULL));
+  eth_define(detail, "__strcat", eth_create_proc(_cat, 1, NULL, NULL));
   eth_define(detail, "__chomp", eth_create_proc(_chomp, 1, NULL, NULL));
   eth_define(detail, "__chop", eth_create_proc(_chop, 1, NULL, NULL));
   eth_define(detail, "__trim_left", eth_create_proc(_trim_left, 1, NULL, NULL));

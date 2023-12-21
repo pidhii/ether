@@ -19,6 +19,10 @@
 #include <assert.h>
 #include <string.h>
 
+
+ETH_MODULE("ether:insn");
+
+
 eth_ssa_pattern*
 eth_ssa_dummy_pattern(void)
 {
@@ -113,6 +117,9 @@ eth_destroy_ssa_pattern(eth_ssa_pattern *pat)
         eth_destroy_ssa_pattern(pat->record.subpat[i]);
       free(pat->record.subpat);
       break;
+
+    case ETH_PATTERN_STAR:
+      eth_unimplemented();
   }
   free(pat);
 }
@@ -498,6 +505,14 @@ eth_insn_mkrcrd(int out, int const vids[], eth_type *type)
   return insn;
 }
 
+eth_insn*
+eth_insn_this(int out)
+{
+  eth_insn *insn = create_insn(ETH_INSN_THIS);
+  insn->out = out;
+  return insn;
+}
+
 static void
 dump_ssa(int ident, const eth_insn *insn, FILE *stream)
 {
@@ -709,6 +724,10 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
       for (int i = 0; i < insn->mkrcrd.type->nfields; ++i)
         fprintf(stream, " %%%d", insn->mkrcrd.vids[i]);
       fputs(";\n", stream);
+      break;
+
+    case ETH_INSN_THIS:
+      fprintf(stream, "%%%d = this;\n", insn->out);
       break;
   }
 

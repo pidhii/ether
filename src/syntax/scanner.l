@@ -114,11 +114,16 @@ OPERATOR {OPCHR}+|mod|land|lor|lxor|lshl|lshr|ashl|ashr|is|eq|not|lnot
 "|"|"|>" return PIPE;
 
 
+method          { return METHOD; }
+impl            { return IMPL; }
+val             { return VAL; }
+undefined       { return UNDEFINED; }
 let             { return LET; }
 and             { return AND; }
 in              { return IN; }
 if[ \t\n]+let   { return IFLET; }
 fn              { return FN; }
+this            { return THIS; }
 
 "{" {
   if (fmtbracecnt.len > 0)

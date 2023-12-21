@@ -75,6 +75,15 @@ number_equal(eth_type *type, eth_t x, eth_t y)
   return eth_num_val(x) == eth_num_val(y);
 }
 
+static eth_t
+cmp_impl(void)
+{
+  eth_args args = eth_start(2);
+  eth_t x = eth_arg2(args, eth_number_type);
+  eth_t y = eth_arg2(args, eth_number_type);
+  eth_return(args, eth_num(eth_num_val(y) - eth_num_val(x)));
+}
+
 void
 _eth_init_number_type(void)
 {
@@ -83,5 +92,6 @@ _eth_init_number_type(void)
   eth_number_type->write = number_write;
   eth_number_type->display = number_display;
   eth_number_type->equal = number_equal;
+  eth_add_method(eth_number_type->methods, eth_cmp_method, eth_proc(cmp_impl, 2));
 }
 

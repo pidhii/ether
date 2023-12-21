@@ -372,11 +372,32 @@ destroy_vector(eth_type *type, eth_t x)
   free(vec);
 }
 
+static eth_t
+get_impl(void)
+{
+  eth_args args = eth_start(2);
+  eth_t vec = eth_arg2(args, eth_vector_type);
+  eth_t idx = eth_arg2(args, eth_number_type);
+  if (0 > eth_num_val(idx) || eth_num_val(idx) >= eth_vec_len(vec))
+    eth_throw(args, eth_invalid_argument());
+  eth_return(args, eth_vec_get(vec, eth_num_val(idx)));
+}
+
+static eth_t
+len_impl(void)
+{
+  eth_args args = eth_start(1);
+  eth_t vec = eth_arg2(args, eth_vector_type);
+  eth_return(args, eth_num(eth_vec_len(vec)));
+}
+
 void
 _eth_init_vector_type(void)
 {
   eth_vector_type = eth_create_type("vector");
   eth_vector_type->destroy = destroy_vector;
+  eth_add_method(eth_vector_type->methods, eth_get_method, eth_proc(get_impl, 2));
+  eth_add_method(eth_vector_type->methods, eth_len_method, eth_proc(len_impl, 1));
 }
 
 static vector*

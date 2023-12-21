@@ -24,6 +24,13 @@ write_nil(eth_type *type, eth_t x, FILE *out)
   fputs("nil", out);
 }
 
+static eth_t
+len_impl(void)
+{
+  eth_drop(*eth_sp++);
+  return eth_num(0);
+}
+
 void
 _eth_init_nil_type(void)
 {
@@ -32,6 +39,7 @@ _eth_init_nil_type(void)
   eth_nil_type = eth_create_type("nil");
   eth_nil_type->write = write_nil;
   eth_nil_type->display = write_nil;
+  eth_add_method(eth_nil_type->methods, eth_len_method, eth_proc(len_impl, 1));
 
   eth_nil = &nil;
   eth_init_header(eth_nil, eth_nil_type);

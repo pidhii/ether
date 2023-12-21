@@ -1,13 +1,13 @@
-open 'list';
-import 'cmdarg';
+let {*} = require 'list' in
+let cmdarg = require 'cmdarg' in
 
 let options =
   [
-    {name = "long-arg", val = "long-arg", has_arg = true},
-    {name = "long-no-arg", val = "long-no-arg", has_arg = false},
-    {name = "a", val = "short-arg", has_arg = true},
-    {name = "f", val = "short-no-arg", has_arg = false},
-    {name = ["help", "h"], val = "h", has_arg = false},
+    {name = "long-arg", value = "long-arg", has_arg = true},
+    {name = "long-no-arg", value = "long-no-arg", has_arg = false},
+    {name = "a", value = "short-arg", has_arg = true},
+    {name = "f", value = "short-no-arg", has_arg = false},
+    {name = ["help", "h"], value = "h", has_arg = false},
   ]
 in
 

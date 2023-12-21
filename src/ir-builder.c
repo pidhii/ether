@@ -290,10 +290,24 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
     }
 
     case ETH_AST_PATTERN_RECORD_STAR:
-      eth_error("wild record, {*}, is not allowed in this context");
-      *e = 1;
-      eth_print_location(loc, stderr);
-      return eth_ir_ident_pattern(-1); // just some dummy
+    {
+      /*eth_error("wild record, {*}, is not allowed in this context");*/
+      /**e = 1;*/
+      /*eth_print_location(loc, stderr);*/
+      /*return eth_ir_ident_pattern(-1); // just some dummy*/
+
+      int oldglobid = -1;
+      eth_var var;
+      if (require_var(bldr, "{*}", &var))
+      {
+        assert(var.vid >= 0);
+        oldglobid = var.vid;
+      }
+
+      int globid = new_vid(bldr);
+      eth_prepend_var(bldr->vars, eth_dyn_var("{*}", globid, NULL));
+      return eth_ir_star_pattern(globid, oldglobid);
+    }
   }
 
   eth_error("wtf");
@@ -677,7 +691,13 @@ try_resolve_ident(ir_builder *bldr, const char *str, eth_location *loc)
 {
   eth_var var;
   if (not require_var(bldr, str, &var))
-    return NULL;
+  {
+    if (not require_var(bldr, "{*}", &var))
+      return NULL;
+
+    eth_ir_node *p[] = { eth_ir_var(var.vid), eth_ir_cval(eth_sym(str)) };
+    return eth_ir_apply(eth_ir_cval(eth_get_method), p, 2);
+  }
 
   if (var.attr && var.attr->flag & ETH_ATTR_DEPRECATED)
   {
@@ -714,33 +734,15 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
 
     case ETH_AST_IDENT:
     {
-      eth_var var;
-      if (not require_var(bldr, ast->ident.str, &var))
+      eth_ir_node *ret;
+      if ((ret = try_resolve_ident(bldr, ast->ident.str, ast->loc)))
+        return ret;
+      else
       {
-        eth_warning("undefined variable, '%s'", ast->ident.str);
+        eth_error("undefined variable, '%s'", ast->ident.str);
         *e = 1;
         eth_print_location(ast->loc, stderr);
         return eth_ir_error();
-      }
-      if (var.attr && var.attr->flag & ETH_ATTR_DEPRECATED)
-      {
-        eth_warning("use of deprecated variable, '%s'", ast->ident.str);
-        eth_print_location_opt(ast->loc, stderr, ETH_LOPT_FILE);
-      }
-
-      if (var.cval)
-      {
-        return eth_ir_cval(var.cval);
-      }
-      else if (var.attr && var.attr->flag & ETH_ATTR_MUT)
-      {
-        eth_t deref = eth_get_builtin(bldr->root, "__dereference");
-        eth_ir_node *args[] = { eth_ir_var(var.vid) };
-        return eth_ir_apply(eth_ir_cval(deref), args, 1);
-      }
-      else
-      {
-        return eth_ir_var(var.vid);
       }
     }
 
@@ -1290,6 +1292,13 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
     {
       eth_ir_node *expr = build_with_toplvl(bldr, ast->retrn.expr, e, false);
       eth_ir_node *ret = eth_ir_return(expr);
+      eth_set_ir_location(ret, ast->loc);
+      return ret;
+    }
+
+    case ETH_AST_THIS:
+    {
+      eth_ir_node *ret = eth_ir_this();
       eth_set_ir_location(ret, ast->loc);
       return ret;
     }
