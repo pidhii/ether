@@ -64,7 +64,7 @@ write_pair(eth_type *type, eth_t x, FILE *stream)
 static bool
 pair_equal(eth_type *type, eth_t x, eth_t y)
 {
-  while (eth_is_pair(x) & eth_is_pair(y))
+  while (x->type == eth_pair_type and y->type == eth_pair_type)
   {
     if (not eth_equal(eth_car(x), eth_car(y)))
       return false;

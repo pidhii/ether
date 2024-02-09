@@ -32,7 +32,7 @@
   name(void)                                   \
   {                                            \
     eth_t x = *eth_sp++;                       \
-    if (eth_unlikely(not eth_is_num(x)))       \
+    if (eth_unlikely(x->type != eth_number_type)) \
     {                                          \
       eth_drop(x);                             \
       return eth_exn(eth_type_error());        \
@@ -48,7 +48,7 @@
   {                                                            \
     eth_t x = *eth_sp++;                                       \
     eth_t y = *eth_sp++;                                       \
-    if (eth_unlikely(not eth_is_num(x) or not eth_is_num(y)))  \
+    if (eth_unlikely(x->type != eth_number_type or y->type != eth_number_type))  \
     {                                                          \
       eth_drop_2(x, y);                                        \
       return eth_exn(eth_type_error());                        \
@@ -65,7 +65,7 @@
     eth_t x = *eth_sp++;                                                           \
     eth_t y = *eth_sp++;                                                           \
     eth_t z = *eth_sp++;                                                           \
-    if (eth_unlikely(not eth_is_num(x) or not eth_is_num(y) or not eth_is_num(z))) \
+    if (eth_unlikely(x->type != eth_number_type or y->type != eth_number_type or z->type != eth_number_type)) \
     {                                                                              \
       eth_drop_3(x, y, z);                                                         \
       return eth_exn(eth_type_error());                                            \
@@ -145,7 +145,7 @@ _minmax(void)
 {
   eth_t x = *eth_sp++;
   eth_t y = *eth_sp++;
-  if (eth_unlikely(not eth_is_num(x) or not eth_is_num(y)))
+  if (eth_unlikely(x->type != eth_number_type or y->type != eth_number_type))
   {
     eth_drop_2(x, y);
     return eth_exn(eth_type_error());
@@ -179,7 +179,7 @@ static eth_t
 _frexp(void)
 {
   eth_t x = *eth_sp++;
-  if (eth_unlikely(not eth_is_num(x)))
+  if (eth_unlikely(x->type != eth_number_type))
   {
     eth_drop(x);
     return eth_exn(eth_type_error());
@@ -196,7 +196,7 @@ static eth_t
 _nanp(void)
 {
   eth_t x = *eth_sp++;
-  if (eth_unlikely(not eth_is_num(x)))
+  if (eth_unlikely(x->type != eth_number_type))
   {
     eth_drop(x);
     return eth_exn(eth_type_error());

@@ -28,7 +28,7 @@ static eth_t
 _malloc(void)
 {
   eth_t n = *eth_sp++;
-  if (eth_unlikely(not eth_is_num(n)))
+  if (eth_unlikely(n->type != eth_number_type))
   {
     eth_drop(n);
     return eth_exn(eth_type_error());
@@ -44,7 +44,7 @@ static eth_t
 _calloc(void)
 {
   eth_t n = *eth_sp++;
-  if (eth_unlikely(not eth_is_num(n)))
+  if (eth_unlikely(n->type != eth_number_type))
   {
     eth_drop(n);
     return eth_exn(eth_type_error());
@@ -155,7 +155,7 @@ _strcmp(void)
   eth_ref(x);
   eth_t y = *eth_sp++;
   eth_ref(y);
-  if (eth_unlikely(not eth_is_str(x) || not eth_is_str(y)))
+  if (eth_unlikely(x->type != eth_string_type || y->type != eth_string_type))
   {
     eth_unref(x);
     eth_unref(y);
@@ -174,7 +174,7 @@ _strcasecmp(void)
   eth_ref(x);
   eth_t y = *eth_sp++;
   eth_ref(y);
-  if (eth_unlikely(not eth_is_str(x) || not eth_is_str(y)))
+  if (eth_unlikely(x->type != eth_string_type || y->type != eth_string_type))
   {
     eth_unref(x);
     eth_unref(y);
@@ -234,10 +234,10 @@ _cat(void)
   cod_vec_init(buf);
 
   eth_t it;
-  for (it = x; eth_is_pair(it); it = eth_cdr(it))
+  for (it = x; it->type == eth_pair_type; it = eth_cdr(it))
   {
     eth_t s = eth_car(it);
-    if (eth_unlikely(not eth_is_str(s)))
+    if (eth_unlikely(s->type != eth_string_type))
     {
       eth_drop(x);
       cod_vec_destroy(buf);
@@ -265,7 +265,7 @@ _strstr_opt(void)
   eth_ref(x);
   eth_t y = *eth_sp++;
   eth_ref(y);
-  if (eth_unlikely(not eth_is_str(x) || not eth_is_str(y)))
+  if (eth_unlikely(x->type != eth_string_type || y->type != eth_string_type))
   {
     eth_unref(x);
     eth_unref(y);
@@ -289,7 +289,7 @@ static eth_t
 _chomp(void)
 {
   eth_t x = *eth_sp++;
-  if (eth_unlikely(not eth_is_str(x)))
+  if (eth_unlikely(x->type != eth_string_type))
   {
     eth_drop(x);
     return eth_exn(eth_type_error());
@@ -315,7 +315,7 @@ static eth_t
 _chop(void)
 {
   eth_t x = *eth_sp++;
-  if (eth_unlikely(not eth_is_str(x)))
+  if (eth_unlikely(x->type != eth_string_type))
   {
     eth_drop(x);
     return eth_exn(eth_type_error());
@@ -339,7 +339,7 @@ static eth_t
 _trim_left(void)
 {
   eth_t x = *eth_sp++;
-  if (eth_unlikely(not eth_is_str(x)))
+  if (eth_unlikely(x->type != eth_string_type))
   {
     eth_drop(x);
     return eth_exn(eth_type_error());
@@ -365,7 +365,7 @@ static eth_t
 _trim_right(void)
 {
   eth_t x = *eth_sp++;
-  if (eth_unlikely(not eth_is_str(x)))
+  if (eth_unlikely(x->type != eth_string_type))
   {
     eth_drop(x);
     return eth_exn(eth_type_error());
@@ -388,7 +388,7 @@ static eth_t
 _chr(void)
 {
   eth_t x = *eth_sp++;
-  if (eth_unlikely(not eth_is_num(x)))
+  if (eth_unlikely(x->type != eth_number_type))
   {
     eth_drop(x);
     return eth_exn(eth_type_error());
@@ -405,7 +405,7 @@ static eth_t
 _ord(void)
 {
   eth_t x = *eth_sp++;
-  if (eth_unlikely(not eth_is_str(x)))
+  if (eth_unlikely(x->type != eth_string_type))
   {
     eth_drop(x);
     return eth_exn(eth_type_error());
@@ -498,13 +498,13 @@ _gsub(void)
         eth_sp[0] = x;
         eth_t r = eth_apply(f, 1);
         // --
-        if (eth_unlikely(eth_is_exn(r)))
+        if (eth_unlikely(r->type == eth_exception_type))
         {
           fclose(buf);
           free(ptr);
           eth_rethrow(args, r);
         }
-        if (eth_unlikely(not eth_is_str(r)))
+        if (eth_unlikely(r->type != eth_string_type))
         {
           fclose(buf);
           free(ptr);

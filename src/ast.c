@@ -496,7 +496,7 @@ eth_ast_let(eth_ast_pattern *const pats[], eth_ast *const *vals, int n,
     if (expr->tag != ETH_AST_SEQ)
       continue;
     eth_ast *head = expr->seq.e1;
-    if (head->tag != ETH_AST_CVAL or not eth_is_str(head->cval.val))
+    if (head->tag != ETH_AST_CVAL or head->cval.val->type != eth_string_type)
       continue;
     eth_set_help(pat->ident.attr, eth_str_cstr(head->cval.val));
   }

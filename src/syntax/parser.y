@@ -406,16 +406,17 @@ Form
     LOC($$, @$);
     cod_vec_destroy($2);
   }
-  | Atom WITH '{' Record '}' {
+;
+
+Expr
+  : Form
+
+  | Expr WITH '{' Record '}' {
     $$ = eth_ast_update($1, $4.vals.data, $4.keys.data, $4.vals.len);
     cod_vec_iter($4.keys, i, x, free(x));
     cod_vec_destroy($4.keys);
     cod_vec_destroy($4.vals);
   }
-;
-
-Expr
-  : Form
 
   | Expr ';'
   | Expr ';' Expr {
@@ -550,16 +551,16 @@ Expr
     /*$$ = eth_ast_let(&lhs, &rhs, 1, eth_ast_cval(eth_nil));*/
   /*}*/
 
-  /*| Attribute IMPORT String {*/
-    /*cod_vec_push($3, 0);*/
-    /*eth_ast *require = eth_ast_cval(eth_get_builtin(SCANROOT, "__require"));*/
-    /*eth_ast_pattern *lhs = eth_ast_ident_pattern($3.data);*/
-    /*eth_ref_attr(lhs->ident.attr = eth_create_attr($1));*/
-    /*eth_ast *arg = eth_ast_cval(eth_create_string_from_ptr2($3.data, $3.len - 1));*/
-    /*eth_ast *rhs = eth_ast_evmac(eth_ast_apply(require, &arg, 1));*/
-    /*$3.data = NULL;*/
-    /*$$ = eth_ast_let(&lhs, &rhs, 1, eth_ast_cval(eth_nil));*/
-  /*}*/
+  | Attribute IMPORT String {
+    cod_vec_push($3, 0);
+    eth_ast *require = eth_ast_cval(eth_get_builtin(SCANROOT, "__require"));
+    eth_ast_pattern *lhs = eth_ast_ident_pattern($3.data);
+    eth_ref_attr(lhs->ident.attr = eth_create_attr($1));
+    eth_ast *arg = eth_ast_cval(eth_create_string_from_ptr2($3.data, $3.len - 1));
+    eth_ast *rhs = eth_ast_evmac(eth_ast_apply(require, &arg, 1));
+    $3.data = NULL;
+    $$ = eth_ast_let(&lhs, &rhs, 1, eth_ast_cval(eth_nil));
+  }
 
   /*| Attribute IMPORT Expr AS SYMBOL {*/
     /*eth_ast *rhs;*/

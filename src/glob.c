@@ -62,7 +62,7 @@ eth_t
 eth_glob_find(eth_t glob, eth_t sym)
 {
   eth_t rl = ((eth_glob*)glob)->rl;
-  for (eth_t it = rl; eth_is_pair(it); it = eth_cdr(it))
+  for (eth_t it = rl; it->type == eth_pair_type; it = eth_cdr(it))
   {
     eth_t r = eth_car(it);
     int i = eth_get_field_by_id(r->type, eth_get_symbol_id(sym));

@@ -1,5 +1,7 @@
 #include "ether/ether.h"
 
+#include <codeine/vec.h>
+
 
 ETH_MODULE("ether:rbtree")
 
@@ -27,7 +29,7 @@ test_color(rbtree *a, color_t color)
 static rbtree*
 make_node(color_t color, eth_t x, rbtree *a, rbtree *b)
 {
-  rbtree *t = eth_malloc(sizeof(rbtree));
+  rbtree *t = eth_alloc(sizeof(rbtree));
   t->color = color;
   if ((t->left = a)) eth_ref(ETH(a));
   if ((t->right = b)) eth_ref(ETH(b));
@@ -148,7 +150,7 @@ find(rbtree *t, eth_t x, int (*compare)(eth_t, eth_t, eth_t*), eth_t *exn)
     return NULL;
 }
 
-void
+static void
 foreach(rbtree *t, bool (*f)(eth_t x, void *data), void *data, int dir)
 {
   if (t and t->color != EMPTY)
@@ -161,7 +163,7 @@ foreach(rbtree *t, bool (*f)(eth_t x, void *data), void *data, int dir)
   }
 }
 
-// TODO: optimize (dont search for cmp implementation every single time time)
+// TODO: optimize (dont search for cmp implementation every single time)
 static int
 compare(eth_t x, eth_t y, eth_t *exn)
 {
@@ -179,7 +181,7 @@ compare(eth_t x, eth_t y, eth_t *exn)
       eth_t res = eth_apply(cmp, 2);
       eth_dec(x);
       eth_dec(y);
-      if (eth_is_exn(res))
+      if (res->type == eth_exception_type)
       {
         *exn = eth_what(res);
         eth_ref(x);
@@ -191,7 +193,7 @@ compare(eth_t x, eth_t y, eth_t *exn)
         eth_dec(y);
         return 0;
       }
-      else if (not eth_is_num(res))
+      else if (res->type != eth_number_type)
       {
         eth_ref(x);
         eth_ref(y);
@@ -225,6 +227,72 @@ compare(eth_t x, eth_t y, eth_t *exn)
 static int
 tup_compare(eth_t x, eth_t y, eth_t *exn)
 { return compare(eth_tup_get(x, 0), eth_tup_get(y, 0), exn); }
+
+
+struct eth_rbtree_iterator {
+  cod_vec(rbtree*) stack;
+  int idx;
+};
+
+eth_rbtree_iterator*
+eth_rbtree_begin(eth_t t)
+{
+  eth_rbtree_iterator *it = eth_alloc(sizeof(eth_rbtree_iterator));
+  cod_vec_init(it->stack);
+  if (((rbtree*)t)->color != EMPTY)
+    cod_vec_push(it->stack, (rbtree*)t);
+  return it;
+}
+
+eth_t
+eth_rbtree_next(eth_rbtree_iterator *it)
+{
+  if (it->stack.len == 0)
+    return NULL;
+
+  rbtree *node = it->stack.data[it->stack.len - 1];
+  eth_t ret = node->value;
+
+  if (node->left)
+  {
+    cod_vec_push(it->stack, node->left);
+    return ret;
+  }
+  else if (node->right)
+  {
+    cod_vec_push(it->stack, node->right);
+    return ret;
+  }
+  else
+  {
+    rbtree *tail = cod_vec_pop(it->stack);
+    rbtree *head = it->stack.data[it->stack.len - 1];
+    while (it->stack.len > 0)
+    {
+      if (tail == head->right)
+      {
+        tail = head;
+        head = cod_vec_pop(it->stack);
+      }
+      else if (head->right)
+      {
+        cod_vec_push(it->stack, head->right);
+        return ret;
+      }
+      else
+        cod_vec_pop(it->stack);
+    }
+    return NULL;
+  }
+}
+
+void
+eth_rbtree_stop(eth_rbtree_iterator *it)
+{
+  cod_vec_destroy(it->stack);
+  eth_free(it, sizeof(eth_rbtree_iterator));
+}
+
 
 eth_t
 eth_rbtree_mfind(eth_t t, eth_t k, eth_t *exn)

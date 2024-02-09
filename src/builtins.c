@@ -297,12 +297,12 @@ _map(void)
 
   eth_t acc = eth_nil;
   eth_t it;
-  for (it = l; eth_is_pair(it); it = eth_cdr(it))
+  for (it = l; it->type == eth_pair_type; it = eth_cdr(it))
   {
     eth_reserve_stack(1);
     eth_sp[0] = eth_car(it);
     const eth_t v = eth_apply(f, 1);
-    if (eth_unlikely(eth_is_exn(v)))
+    if (eth_unlikely(v->type == eth_exception_type))
     {
       eth_drop(acc);
       eth_rethrow(args, v);
@@ -332,12 +332,12 @@ _filter_map(void)
 
   eth_t acc = eth_nil;
   eth_t it;
-  for (it = l; eth_is_pair(it); it = eth_cdr(it))
+  for (it = l; it->type == eth_pair_type; it = eth_cdr(it))
   {
     eth_reserve_stack(1);
     eth_sp[0] = eth_car(it);
     const eth_t v = eth_apply(f, 1);
-    if (eth_is_exn(v) && eth_what(v) == filter_out)
+    if (v->type == eth_exception_type && eth_what(v) == filter_out)
       eth_drop(v);
     else
       acc = eth_cons(v, acc);
@@ -561,7 +561,7 @@ static eth_t
 _srand(void)
 {
   eth_t s = *eth_sp++;
-  if (eth_unlikely(not eth_is_num(s)))
+  if (eth_unlikely(s->type != eth_number_type))
   {
     eth_drop(s);
     return eth_exn(eth_invalid_argument());
@@ -686,14 +686,14 @@ _load(void)
 
   eth_t path = *eth_sp++;
   eth_t env = *eth_sp++;
-  if (eth_unlikely(not eth_is_str(path)))
+  if (eth_unlikely(path->type != eth_string_type))
   {
     eth_drop_2(path, env);
     return eth_exn(eth_type_error());
   }
 
   eth_module *envmod = eth_create_module(NULL, NULL);
-  for (eth_t it = env; eth_is_pair(it); it = eth_cdr(it))
+  for (eth_t it = env; it->type == eth_pair_type; it = eth_cdr(it))
   {
     eth_t def = eth_car(it);
     if (def->type != tup2)
@@ -704,7 +704,7 @@ _load(void)
     }
     eth_t key = eth_tup_get(def, 0);
     eth_t val = eth_tup_get(def, 1);
-    if (not eth_is_str(key))
+    if (key->type != eth_string_type)
     {
       eth_drop_2(path, env);
       eth_destroy_module(envmod);
@@ -768,11 +768,11 @@ _load_stream(void)
 
   eth_t file = *eth_sp++;
   eth_t env = *eth_sp++;
-  if (eth_unlikely(not eth_is_file(file)))
+  if (eth_unlikely(file->type != eth_file_type))
     goto error_1;
 
   eth_module *envmod = eth_create_module(NULL, NULL);
-  for (eth_t it = env; eth_is_pair(it); it = eth_cdr(it))
+  for (eth_t it = env; it->type == eth_pair_type; it = eth_cdr(it))
   {
     eth_t def = eth_car(it);
     if (def->type != tup2)
@@ -780,7 +780,7 @@ _load_stream(void)
 
     eth_t key = eth_tup_get(def, 0);
     eth_t val = eth_tup_get(def, 1);
-    if (not eth_is_str(key))
+    if (key->type != eth_string_type)
       goto error_2;
 
     eth_define(envmod, eth_str_cstr(key), val);
@@ -881,7 +881,7 @@ _lazy_eval(void)
   eth_function *this = eth_this;
   eth_t thunk = this->proc.data;
   eth_t val = eth_apply(thunk, 0);
-  if (eth_unlikely(eth_is_exn(val)))
+  if (eth_unlikely(val->type == eth_exception_type))
     return val;
   // replace handle
   this->proc.handle = _lazy_get;
@@ -896,7 +896,7 @@ static eth_t
 _make_lazy(void)
 {
   eth_t thunk = *eth_sp++;
-  if (eth_unlikely(not eth_is_fn(thunk)))
+  if (eth_unlikely(thunk->type != eth_function_type))
   {
     eth_drop(thunk);
     return eth_exn(eth_type_error());
@@ -908,63 +908,17 @@ _make_lazy(void)
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                 sequences
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-
 static eth_t
 _list(void)
 {
   eth_t x = *eth_sp++;
-  if (x == eth_nil || x->type == eth_pair_type)
+  eth_t ret = eth_list(x);
+  if (ret)
   {
-    return x;
-  }
-  else if (x->type == eth_string_type)
-  {
-    eth_t acc = eth_nil;
-    const char *str = eth_str_cstr(x);
-    for (int i = eth_str_len(x) - 1; i >= 0; --i)
-      acc = eth_cons(eth_create_string_from_char(str[i]), acc);
+    eth_ref(ret);
     eth_drop(x);
-    return acc;
-  }
-  else if (eth_is_tuple(x->type))
-  {
-    int n = eth_struct_size(x->type);
-    eth_t acc = eth_nil;
-    for (int i = n - 1; i >= 0; --i)
-      acc = eth_cons(eth_tup_get(x, i), acc);
-    eth_drop(x);
-    return acc;
-  }
-  else if (eth_is_record(x->type))
-  {
-    int n = eth_struct_size(x->type);
-    eth_t acc = eth_nil;
-    for (int i = n - 1; i >= 0; --i)
-    {
-      eth_t key = eth_str(x->type->fields[i].name);
-      eth_t val = eth_tup_get(x, i);
-      acc = eth_cons(eth_tup2(key, val), acc);
-    }
-    eth_drop(x);
-    return acc;
-  }
-  else if (eth_is_vec(x))
-  {
-    // TODO: optimize
-    int n = eth_vec_len(x);
-    eth_t acc = eth_nil;
-    for (int i = n - 1; i >= 0; --i)
-      acc = eth_cons(eth_vec_get(x, i), acc);
-    eth_drop(x);
-    return acc;
-  }
-  else if (x->type == eth_rbtree_type)
-  {
-    eth_t acc = eth_nil;
-    bool iter(eth_t x, void*) { acc = eth_cons(x, acc); return true; }
-    eth_rbtree_rev_foreach(x, iter, NULL);
-    eth_drop(x);
-    return acc;
+    eth_dec(ret);
+    return ret;
   }
   else
   {
@@ -1088,7 +1042,7 @@ _record(void)
 
     eth_t key = eth_tup_get(x, 0);
     eth_t val = eth_tup_get(x, 1);
-    if (eth_unlikely(not eth_is_str(key)))
+    if (eth_unlikely(key->type != eth_string_type))
     {
       eth_drop(list);
       return eth_exn(eth_invalid_argument());
@@ -1246,14 +1200,14 @@ _make_struct(void)
   int nfields = eth_length(base, NULL);
   char *keys[nfields];
   eth_t vals[nfields];
-  for (int i = 0; eth_is_pair(base); base = eth_cdr(base), ++i)
+  for (int i = 0; base->type == eth_pair_type; base = eth_cdr(base), ++i)
   {
     keys[i] = eth_str_cstr(eth_car(base));
     vals[i] = eth_nil;
   }
   eth_type *type = eth_unique_record_type(keys, nfields);
 
-  for (; eth_is_pair(methods); methods = eth_cdr(methods))
+  for (; methods->type == eth_pair_type; methods = eth_cdr(methods))
   {
     eth_t keyval = eth_car(methods);
     eth_t method = eth_tup_get(keyval, 0);

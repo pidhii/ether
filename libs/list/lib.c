@@ -67,12 +67,12 @@ _rev_map(void)
 
   eth_t acc = eth_nil;
   eth_t it;
-  for (it = l; eth_is_pair(it); it = eth_cdr(it))
+  for (it = l; it->type == eth_pair_type; it = eth_cdr(it))
   {
     eth_reserve_stack(1);
     eth_sp[0] = eth_car(it);
     const eth_t v = eth_apply(f, 1);
-    if (eth_unlikely(eth_is_exn(v)))
+    if (eth_unlikely(v->type == eth_exception_type))
     {
       eth_drop(acc);
       eth_rethrow(args, v);
@@ -93,13 +93,13 @@ _rev_mapi(void)
   eth_t acc = eth_nil;
   eth_t it;
   eth_number_t i = 0;
-  for (it = l; eth_is_pair(it); it = eth_cdr(it), ++i)
+  for (it = l; it->type == eth_pair_type; it = eth_cdr(it), ++i)
   {
     eth_reserve_stack(2);
     eth_sp[0] = eth_num(i);
     eth_sp[1] = eth_car(it);
     const eth_t v = eth_apply(f, 2);
-    if (eth_unlikely(eth_is_exn(v)))
+    if (eth_unlikely(v->type == eth_exception_type))
     {
       eth_drop(acc);
       eth_rethrow(args, v);
@@ -120,14 +120,14 @@ _rev_map2(void)
 
   eth_t acc = eth_nil;
   eth_t it1, it2;
-  for (it1 = xs, it2 = ys; eth_is_pair(it1) and eth_is_pair(it2);
+  for (it1 = xs, it2 = ys; it1->type == eth_pair_type and it2->type == eth_pair_type;
       it1 = eth_cdr(it1), it2 = eth_cdr(it2))
   {
     eth_reserve_stack(2);
     eth_sp[0] = eth_car(it1);
     eth_sp[1] = eth_car(it2);
     const eth_t v = eth_apply(f, 2);
-    if (eth_unlikely(eth_is_exn(v)))
+    if (eth_unlikely(v->type == eth_exception_type))
     {
       eth_drop(acc);
       eth_rethrow(args, v);
@@ -153,7 +153,7 @@ _rev_zip(void)
   for (int i = 0; i < n; ++i)
   {
     it[i] = eth_tup_get(ltup, i);
-    if (eth_unlikely(not eth_is_pair(it[i])))
+    if (eth_unlikely((it[i])->type != eth_pair_type))
     {
       if (it[i] == eth_nil)
         eth_return(args, eth_nil);
@@ -171,7 +171,7 @@ _rev_zip(void)
       eth_sp[i] = eth_car(it[i]);
     // apply
     const eth_t v = eth_apply(f, n);
-    if (eth_unlikely(eth_is_exn(v)))
+    if (eth_unlikely(v->type == eth_exception_type))
     {
       eth_drop(acc);
       eth_rethrow(args, v);
@@ -182,7 +182,7 @@ _rev_zip(void)
     for (int i = 0; i < n; ++i)
     {
       it[i] = eth_cdr(it[i]);
-      if (eth_unlikely(not eth_is_pair(it[i])))
+      if (eth_unlikely((it[i])->type != eth_pair_type))
         goto end_loop;
     }
   }
@@ -206,7 +206,7 @@ _fold_zip(void)
   for (int i = 0; i < n; ++i)
   {
     it[i] = eth_tup_get(ltup, i);
-    if (eth_unlikely(not eth_is_pair(it[i])))
+    if (eth_unlikely((it[i])->type != eth_pair_type))
     {
       if (it[i] == eth_nil)
         eth_return(args, eth_nil);
@@ -225,13 +225,13 @@ _fold_zip(void)
       eth_sp[i+1] = eth_car(it[i]);
     // apply
     acc = eth_apply(f, n + 1);
-    if (eth_unlikely(eth_is_exn(acc)))
+    if (eth_unlikely(acc->type == eth_exception_type))
       eth_rethrow(args, acc);
     // incerement iterators
     for (int i = 0; i < n; ++i)
     {
       it[i] = eth_cdr(it[i]);
-      if (eth_unlikely(not eth_is_pair(it[i])))
+      if (eth_unlikely((it[i])->type != eth_pair_type))
         goto end_loop;
     }
   }
@@ -247,7 +247,7 @@ _rev_filter_map(void)
   const eth_t l = eth_arg(args);
 
   eth_t acc = eth_nil;
-  for (eth_t it = l; eth_is_pair(it); it = eth_cdr(it))
+  for (eth_t it = l; it->type == eth_pair_type; it = eth_cdr(it))
   {
     eth_reserve_stack(1);
     eth_sp[0] = eth_car(it);
@@ -257,7 +257,7 @@ _rev_filter_map(void)
       const eth_t v = eth_tup_get(optv, 0);
       acc = eth_cons(v, acc);
     }
-    else if (eth_unlikely(eth_is_exn(optv)))
+    else if (eth_unlikely(optv->type == eth_exception_type))
     {
       eth_drop(acc);
       eth_rethrow(args, optv);

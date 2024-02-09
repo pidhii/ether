@@ -193,3 +193,58 @@ eth_equal(eth_t x, eth_t y)
     return false;
 }
 
+eth_t
+eth_list(eth_t x)
+{
+  if (x == eth_nil || x->type == eth_pair_type)
+  {
+    return x;
+  }
+  else if (x->type == eth_string_type)
+  {
+    eth_t acc = eth_nil;
+    const char *str = eth_str_cstr(x);
+    for (int i = eth_str_len(x) - 1; i >= 0; --i)
+      acc = eth_cons(eth_create_string_from_char(str[i]), acc);
+    return acc;
+  }
+  else if (eth_is_tuple(x->type))
+  {
+    int n = eth_struct_size(x->type);
+    eth_t acc = eth_nil;
+    for (int i = n - 1; i >= 0; --i)
+      acc = eth_cons(eth_tup_get(x, i), acc);
+    return acc;
+  }
+  else if (eth_is_record(x->type))
+  {
+    int n = eth_struct_size(x->type);
+    eth_t acc = eth_nil;
+    for (int i = n - 1; i >= 0; --i)
+    {
+      eth_t key = eth_str(x->type->fields[i].name);
+      eth_t val = eth_tup_get(x, i);
+      acc = eth_cons(eth_tup2(key, val), acc);
+    }
+    return acc;
+  }
+  else if (x->type == eth_vector_type)
+  {
+    // TODO: optimize
+    int n = eth_vec_len(x);
+    eth_t acc = eth_nil;
+    for (int i = n - 1; i >= 0; --i)
+      acc = eth_cons(eth_vec_get(x, i), acc);
+    return acc;
+  }
+  else if (x->type == eth_rbtree_type)
+  {
+    eth_t acc = eth_nil;
+    bool iter(eth_t x, void*) { acc = eth_cons(x, acc); return true; }
+    eth_rbtree_rev_foreach(x, iter, NULL);
+    return acc;
+  }
+  else
+    return NULL;
+}
+

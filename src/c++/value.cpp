@@ -5,40 +5,134 @@
 #include <ostream>
 #include <sstream>
 
+#include <iostream>
 
-eth::value
-eth::value::operator [] (size_t i) const
+
+eth::value&
+eth::value::operator = (const eth::value &other)
 {
-  if (not is_tuple())
-    throw type_exn {"not a tuple"};
-  if (i >= eth_struct_size(m_ptr->type))
-    throw runtime_exn {"touple-index index out of bounds"};
-  return value {eth_tup_get(m_ptr, i)};
+  eth_t oldptr = m_ptr;
+  eth_ref(m_ptr = other.m_ptr);
+  eth_unref(oldptr);
+  return *this;
 }
 
-eth::value
-eth::value::operator [] (const char *field) const
-{
-  if (not is_record())
-    throw type_exn {"not a record"};
 
-  const int idx = eth_get_field_by_id(m_ptr->type,
-      eth_get_symbol_id(eth_sym(field)));
-  if (idx == m_ptr->type->nfields)
+eth::value&
+eth::value::operator = (eth::value &&other)
+{
+  if (m_ptr != other.m_ptr)
   {
-    std::ostringstream what;
-    what << "no such field: '" << field << "' in {";
-    for (int i = 0; i < m_ptr->type->nfields; ++i)
-    {
-      if (i > 0)
-        what << ", ";
-      what << m_ptr->type->fields[i].name;
-    }
-    what << "}";
-    throw logic_exn {what.str()};
+    eth_unref(m_ptr);
+    m_ptr = other.m_ptr;
+    other.m_ptr = nullptr;
   }
-  return value {eth_tup_get(m_ptr, idx)};
+  return *this;
 }
+
+
+const char*
+eth::value::str() const
+{
+  if (eth_likely(is_string()))
+    return eth_str_cstr(m_ptr);
+  else
+    throw type_exn {"not a string"};
+};
+
+
+eth::number_t
+eth::value::num() const
+{
+  if (eth_likely(is_number()))
+    return eth_num_val(m_ptr);
+  else
+    throw type_exn {"not a number"};
+}
+
+
+eth::value
+eth::value::car() const
+{
+  if (eth_likely(is_pair()))
+    return value {eth_car(m_ptr)};
+  else
+    throw type_exn {"not a pair"};
+}
+
+
+eth::value
+eth::value::cdr() const
+{
+  if (eth_likely(is_pair()))
+    return value {eth_cdr(m_ptr)};
+  else
+    throw type_exn {"not a pair"};
+}
+
+
+eth::value
+eth::value::operator [] (const eth::value &k) const
+{
+  if (is_record())
+  {
+    size_t symid;
+    if (k.is_symbol())
+      symid = eth_get_symbol_id(k.m_ptr);
+    else if (k.is_string())
+      symid = eth_get_symbol_id(eth_sym(k.str()));
+    else
+      throw type_exn {"record must be indexed via symbols or strings"};
+    const int idx = eth_get_field_by_id(m_ptr->type, symid);
+    if (idx == m_ptr->type->nfields)
+    {
+      std::ostringstream what;
+      what << "no field '" << k.d() << "' in " << d();
+      throw logic_exn {what.str()};
+    }
+    return value {eth_tup_get(m_ptr, idx)};
+  }
+  else if (is_tuple())
+  {
+    if (not k.is_number())
+      throw type_exn {"tuple must be indexed via numbers"};
+    if (k.num() >= eth_struct_size(m_ptr->type))
+      throw runtime_exn {"touple index out of bounds"};
+    return value {eth_tup_get(m_ptr, size_t(k.num()))};
+  }
+  else if (is_dict())
+  {
+    eth_t exn = nullptr;
+    if (eth_t ret = eth_rbtree_mfind(m_ptr, k.m_ptr, &exn))
+      return value {eth_tup_get(ret, 1)};
+    else
+    {
+      std::ostringstream what;
+      what << "failed to index dictionary: " << value(exn).d();
+      eth_drop(exn);
+      throw runtime_exn {what.str()};
+    }
+    throw logic_exn {"unimplemented"};
+  }
+  else if (const eth_t m = eth_find_method(m_ptr->type->methods, eth_get_method))
+  {
+    eth_reserve_stack(2);
+    eth_sp[0] = m_ptr;
+    eth_sp[1] = k.m_ptr;
+    const eth_t ret = eth_apply(m, 2);
+    if (ret->type == eth_exception_type)
+    {
+      std::ostringstream what;
+      what << value(ret).d();
+      eth_drop(ret);
+      throw runtime_exn {what.str()};
+    }
+    return value {ret};
+  }
+
+  throw type_exn {"can't index object of type " + std::string(m_ptr->type->name)};
+}
+
 
 std::ostream&
 operator << (std::ostream &os, const eth::detail::format_proxy::write &v)

@@ -1240,7 +1240,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         return eth_ir_error();
       }
 
-      if (eth_is_exn(ret))
+      if (ret->type == eth_exception_type)
       {
         eth_error("exception thrown during evaluation of macros (~w)", ret);
         eth_drop(ret);

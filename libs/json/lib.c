@@ -135,7 +135,7 @@ to_json(eth_t x, FILE *err, bool *haserr)
   else if (x->type == eth_pair_type)
   {
     struct json_object *ret = json_object_new_array();
-    for (eth_t it = x; eth_is_pair(it); it = eth_cdr(it))
+    for (eth_t it = x; it->type == eth_pair_type; it = eth_cdr(it))
       json_object_array_add(ret, to_json(eth_car(it), err, haserr));
     return ret;
   }
@@ -144,7 +144,7 @@ to_json(eth_t x, FILE *err, bool *haserr)
     eth_reserve_stack(1);
     eth_sp[0] = x;
     x = eth_apply(to_json_impl, 1);
-    if (eth_is_exn(x))
+    if (x->type == eth_exception_type)
     {
       eth_fprintf(err, "exception during serialization (~w)", eth_what(x));
       *haserr = true;

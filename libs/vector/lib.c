@@ -24,7 +24,7 @@ of_list(void)
   eth_t l = *eth_sp++;
   eth_t vec = eth_create_vector();
   eth_t it;
-  for (it = l; eth_is_pair(it); it = eth_cdr(it))
+  for (it = l; it->type == eth_pair_type; it = eth_cdr(it))
     eth_push_mut(vec, eth_car(it));
   if (eth_unlikely(it != eth_nil))
   {
@@ -40,7 +40,7 @@ push(void)
 {
   eth_t v = *eth_sp++;
   eth_t x = *eth_sp++;
-  if (eth_unlikely(not eth_is_vec(v)))
+  if (eth_unlikely(v->type != eth_vector_type))
   {
     eth_drop_2(v, x);
     return eth_exn(eth_type_error());
@@ -61,7 +61,7 @@ insert(void)
   eth_t v = *eth_sp++;
   eth_t k = *eth_sp++;
   eth_t x = *eth_sp++;
-  if (eth_unlikely(not eth_is_vec(v) or not eth_is_num(k)))
+  if (eth_unlikely(v->type != eth_vector_type or k->type != eth_number_type))
   {
     eth_drop_3(v, k, x);
     return eth_exn(eth_type_error());
@@ -92,7 +92,7 @@ front(void)
 {
   eth_use_symbol(Range_error)
   eth_t v = *eth_sp++;
-  if (eth_unlikely(not eth_is_vec(v)))
+  if (eth_unlikely(v->type != eth_vector_type))
   {
     eth_drop(v);
     return eth_exn(eth_type_error());
@@ -114,7 +114,7 @@ back(void)
 {
   eth_use_symbol(Range_error)
   eth_t v = *eth_sp++;
-  if (eth_unlikely(not eth_is_vec(v)))
+  if (eth_unlikely(v->type != eth_vector_type))
   {
     eth_drop(v);
     return eth_exn(eth_type_error());
@@ -137,7 +137,7 @@ get(void)
   eth_use_symbol(Range_error)
   eth_t v = *eth_sp++;
   eth_t k = *eth_sp++;
-  if (eth_unlikely(not (eth_is_vec(v) and eth_is_num(k))))
+  if (eth_unlikely(v->type != eth_vector_type or k->type != eth_number_type))
   {
     eth_drop_2(v, k);
     return eth_exn(eth_type_error());
@@ -172,7 +172,7 @@ iter(void)
       eth_reserve_stack(1);
       eth_sp[0] = *p;
       eth_t r = eth_apply(f, 1);
-      if (eth_unlikely(eth_is_exn(r)))
+      if (eth_unlikely(r->type == eth_exception_type))
         eth_rethrow(args, v);
       eth_drop(r);
     }
@@ -201,7 +201,7 @@ iteri(void)
       eth_sp[0] = eth_num(i);
       eth_sp[1] = *p;
       eth_t r = eth_apply(f, 2);
-      if (eth_unlikely(eth_is_exn(r)))
+      if (eth_unlikely(r->type == eth_exception_type))
         eth_rethrow(args, v);
       eth_drop(r);
 

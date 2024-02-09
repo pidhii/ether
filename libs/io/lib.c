@@ -69,7 +69,7 @@ _read_of(void)
   eth_t n = *eth_sp++;
   eth_ref(n);
 
-  if (file->type != eth_file_type || not eth_is_num(n))
+  if (file->type != eth_file_type || n->type != eth_number_type)
   {
     eth_unref(file);
     eth_unref(n);

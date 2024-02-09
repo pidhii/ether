@@ -625,6 +625,9 @@ eth_display(eth_t x, FILE *out);
 bool
 eth_equal(eth_t x, eth_t y);
 
+/* NOTE: returns NULL on failure */
+eth_t
+eth_list(eth_t x);
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
 //                             OBJECT HEADER
@@ -720,9 +723,6 @@ eth_drop_out(eth_scp *scp);
 extern
 eth_type *eth_number_type;
 
-/** @brief Check wheter the object is a number. */
-#define eth_is_num(x) ((x)->type == eth_number_type)
-
 /** @brief Internal representation of the number. */
 typedef struct {
   eth_header header;
@@ -804,7 +804,6 @@ _ETH_TEST_SNUM(long_double, LDBL)
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 extern
 eth_type *eth_function_type;
-#define eth_is_fn(x) ((x)->type == eth_function_type)
 
 typedef struct {
   int rc;
@@ -898,12 +897,6 @@ eth_apply(eth_t fn, int narg)
 extern
 eth_type *eth_exception_type;
 
-static inline bool
-eth_is_exn(eth_t x)
-{
-  return x->type == eth_exception_type;
-}
-
 typedef struct {
   eth_header header;
   eth_t what;
@@ -943,7 +936,6 @@ eth_create_exit_object(int status);
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 extern
 eth_type *eth_string_type;
-#define eth_is_str(x) ((x)->type == eth_string_type)
 
 typedef struct {
   eth_header header;
@@ -1031,7 +1023,6 @@ eth_t eth_nil;
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 extern
 eth_type *eth_pair_type;
-#define eth_is_pair(x) ((x)->type == eth_pair_type)
 
 typedef struct {
   eth_header header;
@@ -1102,7 +1093,7 @@ static inline eth_t
 eth_reverse(eth_t l)
 {
   eth_t acc = eth_nil;
-  while (eth_is_pair(l))
+  while (l->type == eth_pair_type)
   {
     acc = eth_cons(eth_car(l), acc);
     l = eth_cdr(l);
@@ -1287,7 +1278,6 @@ eth_destroy_record_hn(eth_type *type, eth_t x);
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 extern
 eth_type *eth_file_type;
-#define eth_is_file(x) ((x)->type == eth_file_type)
 
 extern
 eth_t eth_stdin, eth_stdout, eth_stderr;
@@ -1409,8 +1399,6 @@ eth_create_strong_ref(eth_t init);
 extern
 eth_type *eth_vector_type;
 
-#define eth_is_vec(x) ((x)->type == eth_vector_type)
-
 eth_t
 eth_create_vector(void);
 
@@ -1523,6 +1511,16 @@ eth_rbtree_foreach(eth_t t, bool (*f)(eth_t x, void *data), void *data);
 void
 eth_rbtree_rev_foreach(eth_t t, bool (*f)(eth_t x, void *data), void *data);
 
+typedef struct eth_rbtree_iterator eth_rbtree_iterator;
+
+eth_rbtree_iterator*
+eth_rbtree_begin(eth_t t);
+
+eth_t
+eth_rbtree_next(eth_rbtree_iterator *it);
+
+void
+eth_rbtree_stop(eth_rbtree_iterator *it);
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                               glob

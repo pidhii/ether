@@ -7,7 +7,7 @@
   _##fn(void) \
   { \
     eth_t x = *eth_sp++; \
-    if (not eth_is_num(x)) \
+    if (x->type != eth_number_type) \
     { \
       eth_drop(x); \
       return eth_exn(eth_type_error()); \

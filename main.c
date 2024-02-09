@@ -445,7 +445,7 @@ main(int argc, char **argv)
           eth_t ret = eth_eval(&evl, expr);
           if (ret)
           {
-            if (eth_is_exn(ret))
+            if (ret->type == eth_exception_type)
               eth_printf("\e[38;5;1;1mexception:\e[0m (~w)\n", eth_what(ret));
             else if (ret != eth_nil)
               eth_printf("~w\n", ret);
@@ -494,7 +494,7 @@ main(int argc, char **argv)
             eth_t ret = eth_vm(bc);
             clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t2);
 
-            if (eth_is_exn(ret))
+            if (ret->type == eth_exception_type)
             {
               eth_t what = eth_what(ret);
               if (what->type == eth_exit_type)
