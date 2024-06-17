@@ -384,6 +384,25 @@ get_impl(void)
 }
 
 static eth_t
+set_impl(void)
+{
+  eth_args args = eth_start(3);
+  eth_t vec = eth_arg2(args, eth_vector_type);
+  eth_t idx = eth_arg2(args, eth_number_type);
+  eth_t val = eth_arg(args);
+  if (0 > eth_num_val(idx) || eth_num_val(idx) >= eth_vec_len(vec))
+    eth_throw(args, eth_invalid_argument());
+  if (VECTOR(vec)->header.rc == 1)
+  {
+    eth_insert_mut(vec, eth_num_val(idx), val);
+    eth_return(args, vec);
+  }
+  else
+    eth_return(args, eth_insert_pers(vec, eth_num_val(idx), val));
+}
+
+
+static eth_t
 len_impl(void)
 {
   eth_args args = eth_start(1);
@@ -397,6 +416,7 @@ _eth_init_vector_type(void)
   eth_vector_type = eth_create_type("vector");
   eth_vector_type->destroy = destroy_vector;
   eth_add_method(eth_vector_type->methods, eth_get_method, eth_proc(get_impl, 2));
+  eth_add_method(eth_vector_type->methods, eth_set_method, eth_proc(set_impl, 3));
   eth_add_method(eth_vector_type->methods, eth_len_method, eth_proc(len_impl, 1));
 }
 
