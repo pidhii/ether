@@ -517,15 +517,15 @@ _print_to(void)
   eth_t file = *eth_sp++;
   eth_t x = *eth_sp++;
 
-  if (eth_is_tuple(x->type))
-  {
-    for (int i = 0; i < eth_struct_size(x->type); ++i)
-    {
-      if (i > 0) putc('\t', eth_get_file_stream(file));
-      eth_display(eth_tup_get(x, i), eth_get_file_stream(file));
-    }
-  }
-  else
+  /*if (eth_is_tuple(x->type))*/
+  /*{*/
+    /*for (int i = 0; i < eth_struct_size(x->type); ++i)*/
+    /*{*/
+      /*if (i > 0) putc('\t', eth_get_file_stream(file));*/
+      /*eth_display(eth_tup_get(x, i), eth_get_file_stream(file));*/
+    /*}*/
+  /*}*/
+  /*else*/
     eth_display(x, eth_get_file_stream(file));
   putc('\n', eth_get_file_stream(file));
   eth_drop(file);
