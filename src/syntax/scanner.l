@@ -373,15 +373,24 @@ lnot    { return LNOT; }
   return USROP;
 }
 
+
 [_a-zA-Z][_a-zA-Z0-9]*['?]? {
   yylval->string = strdup(yytext);
   return SYMBOL;
 }
 
 
-`[_a-zA-Z0-9]* {
+`[_a-zA-Z0-9]+ {
   yylval->constant = eth_sym(yytext+1);
   return CONST;
+}
+
+`[_a-zA-Z0-9]+` {
+  if (yytext[1] == '/')
+    REJECT;
+  yylval->string = strdup(yytext+1);
+  yylval->string[(yyleng-1)-1] = '\0';
+  return USROP;
 }
 
 . {

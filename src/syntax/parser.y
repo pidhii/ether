@@ -484,13 +484,20 @@ Expr
   | Expr DDOT Expr { char *fields[] = { "l", "r" }; eth_ast *vals[] = { $1, $3 }; $$ = eth_ast_make_record(eth_rangelr_type, fields, vals, 2); }
   | Expr DDDOTR  { char *fields[] = { "l" }; eth_ast *vals[] = { $1 }; $$ = eth_ast_make_record(eth_rangel_type, fields, vals, 1); }
   | DDDOTL Expr { char *fields[] = { "r" }; eth_ast *vals[] = { $2 }; $$ = eth_ast_make_record(eth_ranger_type, fields, vals, 1); }
-  /*| '-' Expr %prec UMINUS { $$ = eth_ast_binop(ETH_SUB, eth_ast_cval(eth_num(0)), $2); LOC($$, @$); }*/
-  /*| '+' Expr %prec UPLUS { $$ = eth_ast_binop(ETH_ADD, eth_ast_cval(eth_num(0)), $2); LOC($$, @$); }*/
+  | '-' Expr %prec UMINUS { $$ = eth_ast_binop(ETH_SUB, eth_ast_cval(eth_num(0)), $2); LOC($$, @$); }
+  | '+' Expr %prec UPLUS { $$ = eth_ast_binop(ETH_ADD, eth_ast_cval(eth_num(0)), $2); LOC($$, @$); }
 
   | NOT Expr { $$ = eth_ast_unop(ETH_NOT , $2); LOC($$, @$); }
   | LNOT Expr { $$ = eth_ast_unop(ETH_LNOT, $2); LOC($$, @$); }
 
   | Expr USROP Expr { eth_ast *args[] = { $1, $3 }; eth_ast *fn = eth_ast_ident($2); $$ = eth_ast_apply(fn, args, 2); LOC($$, @$); free($2); }
+  /*| USROP Expr %prec UMINUS {*/
+    /*eth_ast *args[] = { $2 };*/
+    /*eth_ast *fn = eth_ast_ident($1);*/
+    /*$$ = eth_ast_apply(fn, args, 1);*/
+    /*LOC($$, @$);*/
+    /*free($1);*/
+  /*}*/
 
   | SYMBOL ASSIGN Expr { $$ = eth_ast_assign($1, $3); free($1); LOC($$, @$); }
 
