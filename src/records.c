@@ -25,6 +25,27 @@
 ETH_MODULE("ether:record")
 
 
+typedef struct {
+  uint8_t *field_flags;
+} record_type_info;
+
+
+static record_type_info*
+create_record_type_info(int nfields)
+{
+  record_type_info *rfi = malloc(sizeof(record_type_info));
+  rfi->field_flags = calloc(nfields, sizeof(uint8_t));
+  return rfi;
+}
+
+static void
+destroy_record_type_info(record_type_info *rti)
+{
+  free(rti->field_flags);
+  free(rti);
+}
+
+
 static
 cod_hash_map *g_rectab;
 
@@ -203,6 +224,8 @@ record_type(char *const fldnames[], size_t n, bool unique)
   type->flag = istuple ? ETH_TFLAG_TUPLE : ETH_TFLAG_RECORD;
   type->write = write_record;
   type->equal = struct_equal;
+  type->clos = create_record_type_info(n);
+  type->dtor = (void*)destroy_record_type_info;
 
   if (unique)
     cod_vec_push(g_unque_types, type);
@@ -295,5 +318,17 @@ eth_record(char *const keys[], eth_t const vals[], int n)
 
   eth_type *recordtype = eth_record_type(ordkeys, n);
   return eth_create_record(recordtype, ordvals);
+}
+
+void
+eth_set_record_field_flag(eth_type *rtype, int fieldidx, eth_rf_flag flag)
+{
+  ((record_type_info*)rtype->clos)->field_flags[fieldidx] |= (1 << flag);
+}
+
+bool
+eth_get_record_field_flag(eth_type *rtype, int fieldidx, eth_rf_flag flag)
+{
+  return (((record_type_info*)rtype->clos)->field_flags[fieldidx] & (1 << flag)) == (1 << flag);
 }
 

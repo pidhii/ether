@@ -24,6 +24,7 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <limits.h>
+#include <time.h>
 
 #include <sys/wait.h>
 
@@ -936,6 +937,67 @@ _rev_list(void)
   return ret;
 }
 
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                                 time
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+static eth_t
+_realtime(void)
+{
+  struct timespec t;
+  clock_gettime(CLOCK_REALTIME, &t);
+  eth_number_t res = (eth_number_t)t.tv_sec + (eth_number_t)t.tv_nsec*(eth_number_t)1e-9;
+  return eth_num(res);
+}
+
+static eth_t
+_taitime(void)
+{
+  struct timespec t;
+  clock_gettime(CLOCK_TAI, &t);
+  eth_number_t res = (eth_number_t)t.tv_sec + (eth_number_t)t.tv_nsec*(eth_number_t)1e-9;
+  return eth_num(res);
+}
+
+static eth_t
+_monotonictime(void)
+{
+  struct timespec t;
+  clock_gettime(CLOCK_MONOTONIC, &t);
+  eth_number_t res = (eth_number_t)t.tv_sec + (eth_number_t)t.tv_nsec*(eth_number_t)1e-9;
+  return eth_num(res);
+}
+
+static eth_t
+_boottime(void)
+{
+  struct timespec t;
+  clock_gettime(CLOCK_BOOTTIME, &t);
+  eth_number_t res = (eth_number_t)t.tv_sec + (eth_number_t)t.tv_nsec*(eth_number_t)1e-9;
+  return eth_num(res);
+}
+
+static eth_t
+_processcputime(void)
+{
+  struct timespec t;
+  clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t);
+  eth_number_t res = (eth_number_t)t.tv_sec + (eth_number_t)t.tv_nsec*(eth_number_t)1e-9;
+  return eth_num(res);
+}
+
+static eth_t
+_threadcputime(void)
+{
+  struct timespec t;
+  clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t);
+  eth_number_t res = (eth_number_t)t.tv_sec + (eth_number_t)t.tv_nsec*(eth_number_t)1e-9;
+  return eth_num(res);
+}
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                                 misc
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+
 static eth_t
 _create_ref(void)
 {
@@ -970,6 +1032,27 @@ _assign(void)
     eth_set_strong_ref(ref, x);
   else
     eth_throw(args, eth_exn(eth_type_error()));
+  eth_return(args, eth_nil);
+}
+
+static eth_t
+_assign_field(void)
+{
+  eth_args args = eth_start(3);
+  eth_t record = eth_arg(args);
+  eth_t fieldsym = eth_arg2(args, eth_symbol_type);
+  eth_t val = eth_arg(args);
+  if (not eth_is_record(record->type))
+    eth_throw(args, eth_exn(eth_type_error()));
+  int fieldidx = eth_get_field_by_id(record->type, eth_get_symbol_id(fieldsym));
+  if (fieldidx == eth_struct_size(record->type))
+    eth_throw(args, eth_exn(eth_type_error()));
+  if (not eth_get_record_field_flag(record->type, fieldidx, ETH_RF_MUTABLE))
+    eth_throw(args, eth_exn(eth_type_error()));
+  eth_t *field = (void*)record + record->type->fields[fieldidx].offs;
+  eth_t oldval = *field;
+  eth_ref(*field = val);
+  eth_unref(oldval);
   eth_return(args, eth_nil);
 }
 
@@ -1193,9 +1276,10 @@ _implements(void)
 static eth_t
 _make_struct(void)
 {
-  eth_args args = eth_start(2);
+  eth_args args = eth_start(3);
   eth_t base = eth_arg(args);
   eth_t methods = eth_arg(args);
+  eth_t mutfields = eth_arg(args);
 
   int nfields = eth_length(base, NULL);
   char *keys[nfields];
@@ -1206,6 +1290,13 @@ _make_struct(void)
     vals[i] = eth_nil;
   }
   eth_type *type = eth_unique_record_type(keys, nfields);
+
+  for (; mutfields->type == eth_pair_type; mutfields = eth_cdr(mutfields))
+  {
+    eth_t fldnam = eth_sym(keys[(int)eth_num_val(eth_car(mutfields))]);
+    int fldidx = eth_get_field_by_id(type, eth_get_symbol_id(fldnam));
+    eth_set_record_field_flag(type, fldidx, ETH_RF_MUTABLE);
+  }
 
   for (; methods->type == eth_pair_type; methods = eth_cdr(methods))
   {
@@ -1315,6 +1406,13 @@ eth_create_builtins(eth_root *root)
   // ---
   eth_define(mod,     "format", eth_create_proc(    _format, 1, NULL, NULL));
   // ---
+  eth_define(mod,  "real_time", eth_create_proc(  _realtime, 0, NULL, NULL));
+  eth_define(mod,   "tai_time", eth_create_proc(   _taitime, 0, NULL, NULL));
+  eth_define(mod, "monotonic_time", eth_create_proc(_monotonictime, 0, NULL, NULL));
+  eth_define(mod, "boot_time", eth_create_proc(_boottime, 0, NULL, NULL));
+  eth_define(mod, "process_cpu_time", eth_create_proc(_processcputime, 0, NULL, NULL));
+  eth_define(mod, "thread_cpu_time", eth_create_proc(_threadcputime, 0, NULL, NULL));
+  // ---
   eth_define(mod,      "raise", eth_create_proc(     _raise, 1, NULL, NULL));
   eth_define(mod,       "exit", eth_create_proc(     __exit, 1, NULL, NULL));
   // ---
@@ -1327,9 +1425,10 @@ eth_create_builtins(eth_root *root)
   eth_define(mod, "__create_ref", eth_create_proc(_create_ref, 1, NULL, NULL));
   eth_define(mod, "__dereference", eth_create_proc(_dereference, 1, NULL, NULL));
   eth_define(mod, "__assign", eth_create_proc(_assign, 2, NULL, NULL));
+  eth_define(mod, "__assign_field", eth_create_proc(_assign_field, 3, NULL, NULL));
 
   eth_define(mod, "__make_method", eth_create_proc(_make_method, 2, NULL, NULL));
-  eth_define(mod, "__make_struct", eth_create_proc(_make_struct, 2, NULL, NULL));
+  eth_define(mod, "__make_struct", eth_create_proc(_make_struct, 3, NULL, NULL));
   eth_define(mod, "implements", eth_create_proc(_implements, 2, NULL, NULL));
   eth_define(mod, "apply", eth_apply_method);
   eth_define(mod, "access", eth_get_method);

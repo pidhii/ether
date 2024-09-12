@@ -1,7 +1,7 @@
 
-let list = require 'list' in
-let string = require 'string' in
-let io = require 'io' in
+let list = import 'list' in
+let string = import 'string' in
+let io = import 'io' in
 
 -- Split a list on two halves using slow/fast iterators approach.
 --

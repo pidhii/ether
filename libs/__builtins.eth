@@ -55,7 +55,7 @@ let pub fn id x = x in
 
 let pub fn flip f x y = f y x in
 let pub fn const x = fn _ -> x in
-let pub fn curry f = fn x y -> f x y in
+let pub fn curry f = fn x y -> f (x, y) in
 let pub fn uncurry f = fn (x, y) -> f x y in
 
 -- Sequences

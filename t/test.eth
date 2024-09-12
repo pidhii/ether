@@ -1,6 +1,6 @@
 
-let {*} = require 'list' in
-let {*} = require 'io' in
+let {*} = import 'list' in
+let {*} = import 'io' in
 
 let test_sample =
   let fn do_test name thunk =

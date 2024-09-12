@@ -1,5 +1,5 @@
-let {*} = require 'list' in
-let {*} = require 'string' in
+let {*} = import 'list' in
+let {*} = import 'string' in
 
 let pub invalid_option_argument = enum (nil) in
 

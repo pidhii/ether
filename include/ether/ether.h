@@ -520,7 +520,7 @@ eth_find_method(eth_methods *ms, eth_t method);
 /** @ingroup Type */
 typedef struct eth_field {
   char *name; /**< @brief Field name */
-  ptrdiff_t offs; /**< @brief Field offset. @todo ...offset from what? */
+  ptrdiff_t offs; /**< @brief Field offset (w.r.t. object-pointer)? */
 } eth_field;
 
 #define ETH_TFLAG_PLAIN     0x01
@@ -596,10 +596,10 @@ eth_field* __attribute__((pure))
 eth_get_field(eth_type *type, const char *field);
 
 static inline int __attribute__((pure))
-eth_get_field_by_id(eth_type *restrict type, size_t id)
+eth_get_field_by_id(eth_type *type, size_t id)
 {
   const int n = type->nfields;
-  size_t *restrict ids = type->fieldids;
+  size_t *ids = type->fieldids;
   ids[n] = id;
   for (int i = 0; true; ++i)
   {
@@ -1156,6 +1156,16 @@ eth_record_type(char *const fields[], size_t n);
 eth_type*
 eth_unique_record_type(char *const fields[], size_t n);
 
+typedef enum {
+  ETH_RF_MUTABLE = 0,
+} eth_rf_flag;
+
+bool
+eth_get_record_field_flag(eth_type *rtype, int fieldidx, eth_rf_flag flag);
+
+void
+eth_set_record_field_flag(eth_type *rtype, int fieldidx, eth_rf_flag flag);
+
 static inline eth_t
 eth_create_tuple_2(eth_t _1, eth_t _2)
 {
@@ -1251,27 +1261,6 @@ eth_create_record(eth_type *type, eth_t const data[]);
 
 eth_t
 eth_record(char *const keys[], eth_t const vals[], int n);
-
-void
-eth_destroy_record_h1(eth_type *type, eth_t x);
-
-void
-eth_destroy_record_h2(eth_type *type, eth_t x);
-
-void
-eth_destroy_record_h3(eth_type *type, eth_t x);
-
-void
-eth_destroy_record_h4(eth_type *type, eth_t x);
-
-void
-eth_destroy_record_h5(eth_type *type, eth_t x);
-
-void
-eth_destroy_record_h6(eth_type *type, eth_t x);
-
-void
-eth_destroy_record_hn(eth_type *type, eth_t x);
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                 file
@@ -3121,6 +3110,7 @@ typedef enum {
 
   ETH_OPC_THIS,
 } eth_opc;
+
 
 struct eth_bc_insn {
 #ifdef ETH_DEBUG_MODE

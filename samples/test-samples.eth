@@ -1,8 +1,8 @@
 
-let {*} = require 'os' in
-let {*} = require 'io' in
-let {*} = require 'list' in
-let {*} = require 'string' in
+let {*} = import 'os' in
+let {*} = import 'io' in
+let {*} = import 'list' in
+let {*} = import 'string' in
 
 chdir $ get command_line 1;
 

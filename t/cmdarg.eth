@@ -1,5 +1,5 @@
-let {*} = require 'list' in
-let cmdarg = require 'cmdarg' in
+let {*} = import 'list' in
+let cmdarg = import 'cmdarg' in
 
 let options =
   [
@@ -92,7 +92,7 @@ let tests =
   ]
 in
 
-let (nok, nfail) = (require 'test').run [(nil, tests)] in
+let (nok, nfail) = (import 'test').run [(nil, tests)] in
 if nfail > 0 then
   exit 1
 

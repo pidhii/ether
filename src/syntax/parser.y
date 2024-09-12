@@ -129,6 +129,7 @@ _create_attr(int aflag, void *locpp)
     cod_vec(eth_ast*) fldvals;
     cod_vec(eth_ast*) methods;
     cod_vec(eth_ast*) methimpls;
+    cod_vec(int) mutfields;
   } structure;
 
   cod_vec(eth_ast*) astvec;
@@ -211,6 +212,7 @@ _create_attr(int aflag, void *locpp)
   cod_vec_destroy($$.fldvals);
   cod_vec_destroy($$.methods);
   cod_vec_destroy($$.methimpls);
+  cod_vec_destroy($$.mutfields);
 } <structure>
 
 // =============================================================================
@@ -246,12 +248,12 @@ _create_attr(int aflag, void *locpp)
 %right ELSE TERNARY
 /*%nonassoc ELSE*/
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-%nonassoc IF IFLET THEN TRY EXCEPT WITH
+%nonassoc IF IFLET THEN TRY EXCEPT
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 // level 0:
-%right '='
+/*%right '='*/
 %right OR
-%nonassoc ASSIGN
+%nonassoc ASSIGN '='
 %left PIPE
 %right '$'
 // level 1:
@@ -273,6 +275,7 @@ _create_attr(int aflag, void *locpp)
 %left<string> USROP
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %left UMINUS UPLUS NOT LNOT
+%nonassoc WITH
 %right COMPOSE
 %nonassoc GROUPING
 %nonassoc APPLY
@@ -444,7 +447,7 @@ Expr
     LOC($$, @$);
   }
 
-  | Expr ISOF AtomicPattern {
+  | Expr ISOF FormPattern {
     $$ = eth_ast_match($3, $1, eth_ast_cval(eth_true), eth_ast_cval(eth_false));
     LOC($$, @$);
   }
@@ -500,6 +503,15 @@ Expr
   /*}*/
 
   | SYMBOL ASSIGN Expr { $$ = eth_ast_assign($1, $3); free($1); LOC($$, @$); }
+  | SYMBOL '=' Expr { $$ = eth_ast_assign($1, $3); free($1); LOC($$, @$); }
+  | Atom '.' SYMBOL '=' Expr {
+    eth_t assign_field = eth_get_builtin(SCANROOT, "__assign_field");
+    assert(assign_field);
+    eth_ast *p[] = { $1, eth_ast_cval(eth_sym($3)), $5 };
+    $$ = eth_ast_apply(eth_ast_cval(assign_field), p, 3);
+    LOC($$, @$);
+    free($3);
+  }
 
   | IF Expr THEN Expr ELSE Expr %prec ELSE { $$ = eth_ast_if($2, $4, $6); LOC($$, @$); }
   | IF Expr THEN Expr %prec TERNARY { $$ = eth_ast_if($2, $4, eth_ast_cval(eth_nil)); LOC($$, @$); }
@@ -544,29 +556,26 @@ Expr
   | Expr PIPE Expr { if ($3->tag == ETH_AST_APPLY) { $$ = $3; eth_ast_append_arg($$, $1); } else $$ = eth_ast_apply($3, &$1, 1); LOC($$, @$); }
   | Expr '$' Expr { if ($1->tag == ETH_AST_APPLY) { $$ = $1; eth_ast_append_arg($$, $3); } else $$ = eth_ast_apply($1, &$3, 1); LOC($$, @$); }
 
-  /*| Attribute OPEN Atom {*/
-    /*eth_ast *rhs;*/
-    /*if ($3->tag == ETH_AST_CVAL and $3->cval.val->type == eth_string_type)*/
-    /*{*/
-      /*eth_ast *require = eth_ast_cval(eth_get_builtin(SCANROOT, "__require"));*/
-      /*rhs = eth_ast_evmac(eth_ast_apply(require, &$3, 1));*/
-    /*}*/
-    /*else*/
-      /*rhs = $3;*/
-    /*eth_ast_pattern *lhs = eth_ast_record_star_pattern();*/
-    /*eth_ref_attr(lhs->recordstar.attr = eth_create_attr($1));*/
-    /*$$ = eth_ast_let(&lhs, &rhs, 1, eth_ast_cval(eth_nil));*/
-  /*}*/
-
-  | Attribute IMPORT String {
-    cod_vec_push($3, 0);
-    eth_ast *require = eth_ast_cval(eth_get_builtin(SCANROOT, "__require"));
-    eth_ast_pattern *lhs = eth_ast_ident_pattern($3.data);
-    eth_ref_attr(lhs->ident.attr = eth_create_attr($1));
-    eth_ast *arg = eth_ast_cval(eth_create_string_from_ptr2($3.data, $3.len - 1));
-    eth_ast *rhs = eth_ast_evmac(eth_ast_apply(require, &arg, 1));
-    $3.data = NULL;
+  | Attribute OPEN Atom {
+    eth_ast *rhs;
+    if ($3->tag == ETH_AST_CVAL and $3->cval.val->type == eth_string_type)
+    {
+      eth_ast *require = eth_ast_cval(eth_get_builtin(SCANROOT, "__require"));
+      rhs = eth_ast_evmac(eth_ast_apply(require, &$3, 1));
+    }
+    else
+      rhs = $3;
+    eth_ast_pattern *lhs = eth_ast_record_star_pattern();
+    eth_ref_attr(lhs->recordstar.attr = eth_create_attr($1));
     $$ = eth_ast_let(&lhs, &rhs, 1, eth_ast_cval(eth_nil));
+  }
+
+  | IMPORT String {
+    cod_vec_push($2, 0);
+    eth_ast *require = eth_ast_cval(eth_get_builtin(SCANROOT, "__require"));
+    eth_ast *arg = eth_ast_cval(eth_create_string_from_ptr2($2.data, $2.len - 1));
+    $2.data = NULL;
+    $$ = eth_ast_evmac(eth_ast_apply(require, &arg, 1));
   }
 
   /*| Attribute IMPORT Expr AS SYMBOL {*/
@@ -603,6 +612,7 @@ Expr
   }
 
   | STRUCT Struct {
+    // TODO: can set fields inside __make_struct (no need for extra update)
     eth_t fldnams = eth_nil;
     int n = $2.fldnams.len;
     for (int i = n - 1; i >= 0; --i)
@@ -616,9 +626,15 @@ Expr
       eth_ast *meth = eth_ast_make_record(eth_tuple_type(2), fields, vals, 2);
       methods = eth_ast_binop(ETH_CONS, meth, methods);
     }
-    eth_ast *p[] = { eth_ast_cval(fldnams), methods };
+    eth_ast *mutfields = eth_ast_cval(eth_nil);
+    for (int i = $2.mutfields.len - 1; i >= 0; --i)
+    {
+      eth_ast *fieldno = eth_ast_cval(eth_num($2.mutfields.data[i]));
+      mutfields = eth_ast_binop(ETH_CONS, fieldno, mutfields);
+    }
+    eth_ast *p[] = { eth_ast_cval(fldnams), methods, mutfields };
     eth_t make_struct = eth_get_builtin(SCANROOT, "__make_struct");
-    eth_ast *proto = eth_ast_apply(eth_ast_cval(make_struct), p, 2);
+    eth_ast *proto = eth_ast_apply(eth_ast_cval(make_struct), p, 3);
 
     $$ = eth_ast_update(proto, $2.fldvals.data, $2.fldnams.data, $2.fldnams.len);
 
@@ -627,6 +643,7 @@ Expr
     cod_vec_destroy($2.fldvals);
     cod_vec_destroy($2.methods);
     cod_vec_destroy($2.methimpls);
+    cod_vec_destroy($2.mutfields);
   }
 
 ;
@@ -759,9 +776,15 @@ Bind
       eth_ast *meth = eth_ast_make_record(eth_tuple_type(2), fields, vals, 2);
       methods = eth_ast_binop(ETH_CONS, meth, methods);
     }
-    eth_ast *p[] = { eth_ast_cval(fldnams), methods };
+    eth_ast *mutfields = eth_ast_cval(eth_nil);
+    for (int i = $5.mutfields.len - 1; i >= 0; --i)
+    {
+      eth_ast *fieldno = eth_ast_cval(eth_num($5.mutfields.data[i]));
+      mutfields = eth_ast_binop(ETH_CONS, fieldno, mutfields);
+    }
+    eth_ast *p[] = { eth_ast_cval(fldnams), methods, mutfields };
     eth_t make_struct = eth_get_builtin(SCANROOT, "__make_struct");
-    eth_ast *proto = eth_ast_apply(eth_ast_cval(make_struct), p, 2);
+    eth_ast *proto = eth_ast_apply(eth_ast_cval(make_struct), p, 3);
 
     $$.val = eth_ast_update(proto, $5.fldvals.data, $5.fldnams.data, $5.fldnams.len);
 
@@ -771,6 +794,7 @@ Bind
     cod_vec_destroy($5.fldvals);
     cod_vec_destroy($5.methods);
     cod_vec_destroy($5.methimpls);
+    cod_vec_destroy($5.mutfields);
   }
 
 ;
@@ -908,7 +932,7 @@ AtomicPattern
       eth_set_location(attr, location(&@$));
     eth_ref_attr($$->recordstar.attr = attr);
   }
-  | '[' ArgPatternsPlus MaybeComaDots ']' {
+  | '[' TuplePatternAux MaybeComaDots ']' { // FIXME dots dont work
     int n = $2.len;
     // ---
     if ($3) $$ = eth_ast_dummy_pattern();
@@ -1134,11 +1158,18 @@ Struct
     cod_vec_init($$.fldvals);
     cod_vec_init($$.methods);
     cod_vec_init($$.methimpls);
+    cod_vec_init($$.mutfields);
   }
   | Struct VAL SYMBOL '=' Expr {
     $$ = $1;
     cod_vec_push($$.fldnams, $3);
     cod_vec_push($$.fldvals, $5);
+  }
+  | Struct VAL MUT SYMBOL '=' Expr {
+    $$ = $1;
+    cod_vec_push($$.mutfields, $$.fldnams.len);
+    cod_vec_push($$.fldnams, $4);
+    cod_vec_push($$.fldvals, $6);
   }
   | Struct IMPL Atom ArgPatterns '=' Expr {
     $$ = $1;

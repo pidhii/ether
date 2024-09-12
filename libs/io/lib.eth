@@ -45,8 +45,8 @@
 -- * shell
 --
 
-let list = require 'list' in
-let string = require 'string' in
+let list = import 'list' in
+let string = import 'string' in
 
 let pub fopen = __open in
 

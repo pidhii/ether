@@ -53,7 +53,7 @@ eth_create_exception(eth_t what)
   eth_exception *exn = eth_malloc(sizeof(eth_exception));
   eth_init_header(exn, eth_exception_type);
   eth_ref(exn->what = what);
-  exn->trace = eth_malloc(0);
+  exn->trace = eth_malloc(sizeof(eth_location*));
   exn->tracelen = 0;
   return ETH(exn);
 }

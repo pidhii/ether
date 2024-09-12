@@ -291,22 +291,22 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
 
     case ETH_AST_PATTERN_RECORD_STAR:
     {
-      /*eth_error("wild record, {*}, is not allowed in this context");*/
-      /**e = 1;*/
-      /*eth_print_location(loc, stderr);*/
-      /*return eth_ir_ident_pattern(-1); // just some dummy*/
+      eth_error("wild record, {*}, is not allowed in this context");
+      *e = 1;
+      eth_print_location(loc, stderr);
+      return eth_ir_ident_pattern(-1); // just some dummy
 
-      int oldglobid = -1;
-      eth_var var;
-      if (require_var(bldr, "{*}", &var))
-      {
-        assert(var.vid >= 0);
-        oldglobid = var.vid;
-      }
+      /*int oldglobid = -1;*/
+      /*eth_var var;*/
+      /*if (require_var(bldr, "{*}", &var))*/
+      /*{*/
+        /*assert(var.vid >= 0);*/
+        /*oldglobid = var.vid;*/
+      /*}*/
 
-      int globid = new_vid(bldr);
-      eth_prepend_var(bldr->vars, eth_dyn_var("{*}", globid, NULL));
-      return eth_ir_star_pattern(globid, oldglobid);
+      /*int globid = new_vid(bldr);*/
+      /*eth_prepend_var(bldr->vars, eth_dyn_var("{*}", globid, NULL));*/
+      /*return eth_ir_star_pattern(globid, oldglobid);*/
     }
   }
 
@@ -692,11 +692,12 @@ try_resolve_ident(ir_builder *bldr, const char *str, eth_location *loc)
   eth_var var;
   if (not require_var(bldr, str, &var))
   {
-    if (not require_var(bldr, "{*}", &var))
-      return NULL;
+    return NULL;
+    /*if (not require_var(bldr, "{*}", &var))*/
+      /*return NULL;*/
 
-    eth_ir_node *p[] = { eth_ir_var(var.vid), eth_ir_cval(eth_sym(str)) };
-    return eth_ir_apply(eth_ir_cval(eth_get_method), p, 2);
+    /*eth_ir_node *p[] = { eth_ir_var(var.vid), eth_ir_cval(eth_sym(str)) };*/
+    /*return eth_ir_apply(eth_ir_cval(eth_get_method), p, 2);*/
   }
 
   if (var.attr && var.attr->flag & ETH_ATTR_DEPRECATED)

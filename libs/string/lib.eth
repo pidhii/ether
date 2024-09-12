@@ -35,7 +35,7 @@
 -- * find
 --
 
-let list = require 'list' in
+let list = import 'list' in
 
 
 -- Prelude

@@ -62,7 +62,7 @@ let job_user_smart =
 in
 
 let job_native =
-  let {*} = require 'list' in
+  let {*} = import 'list' in
   fn _ ->
     range 0 n --(0..n)
     | rev_filter_map (fn x -> if odd? x then some (x + 1))

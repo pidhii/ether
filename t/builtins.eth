@@ -1,6 +1,6 @@
 
 let math_tests =
-  let {*} = require 'math' in
+  let {*} = import 'math' in
   [
     ("even?", fn -> even? 0 && even? 2 && not even? 3),
     ("odd?", fn -> not odd? 0 && odd? 1 && not odd? 2 && odd? 3),
@@ -11,8 +11,8 @@ let math_tests =
 in
 
 let string_tests =
-  let {*} = require 'string' in
-  let list = require 'list' in
+  let {*} = import 'string' in
+  let list = import 'list' in
   [
     ("strcat", fn -> strcat ["a", "b", "c"] eq "abc"),
     ("join", fn -> join "," ["a", "b", "c"] eq "a,b,c"),
@@ -67,7 +67,7 @@ let regexp_tests =
 in
 
 let list_tests =
-  let {*} = require 'list' in
+  let {*} = import 'list' in
   [
     ("fold_map", fn -> fold_map (fn z  x -> (x + z, x)) 0 (range  (1..3)) eq [1, 3, 5]),
     ("init", fn -> init 3 id eq [0, 1, 2]),
@@ -149,7 +149,7 @@ let list_tests =
 in
 
 let vector_tests =
-  let vector = require 'vector' in
+  let vector = import 'vector' in
   let v = vector.of_list [1, 2, 3] in
   [
     ("get", fn -> vector.get v 1 == 2),
@@ -167,7 +167,7 @@ let vector_tests =
 in
 
 let io_tests =
-  let io = require 'io' in
+  let io = import 'io' in
   [
     ("open_string_in", fn ->
       let str = "1 + 1" in
@@ -191,7 +191,7 @@ in
 
 
 let misc_tests =
-  let {*} = require 'list' in
+  let {*} = import 'list' in
   [
     ("record", fn ->
       let r = {a='a', b='b'} in
@@ -212,7 +212,7 @@ in
 let res = (0, 0) in
 
 let (nok, nfail) =
-  let test = require 'test' in
+  let test = import 'test' in
   test.run [
     ("math", math_tests),
     ("string", string_tests),

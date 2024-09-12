@@ -110,7 +110,7 @@ print (info.login eq login); --> true
 --
 -- `|>` is a "pipe"-operator from OCaml: `x |> f` is equivalent to `f x`
 -- `()` is a synonim for `nil`.
-let {*} = require 'list' in
+let {*} = import 'list' in
 range (1 .. 100) |> iter (fn i ->
   if i mod 3 == 0 then print "FIZZ"
   else if i mod 5 == 0 then print "BUZZ"

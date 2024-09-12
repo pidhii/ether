@@ -114,7 +114,7 @@ let pub fn range (from .. to) =
 in
 
 let pub fn linspace from to n =
-  let {fma} = @(require('math')) in
+  let {fma} = import 'math' in
   let dx = (to - from) / (n - 1) in
   unfold_left (fn i -> if i >= 0 then (i - 1, fma  dx i from)) (n - 1)
 in

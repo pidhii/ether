@@ -1,5 +1,6 @@
 
-pub open 'list' in
-pub open 'string' in
+let {pub *} = import 'list' in
+let {pub *} = import 'string' in
+
 nil
 
