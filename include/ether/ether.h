@@ -3119,7 +3119,7 @@ struct eth_bc_insn {
   uint64_t opc;
 #endif
   union {
-    struct { uint64_t out; eth_t val; } cval;
+    struct { uint16_t out; uint16_t idx; } cval;
 
     // TODO: mege PUSH with APPLY
     struct { uint64_t *vids, n; } push;
@@ -3185,8 +3185,10 @@ struct eth_bytecode {
   int rc;
   int nreg;
   int nargs;
-  int len;
+  eth_t *consts;
+  int nconsts;
   eth_bc_insn *code;
+  int len;
 };
 
 eth_bytecode*

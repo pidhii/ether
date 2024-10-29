@@ -29,10 +29,6 @@ destroy_insn(eth_bc_insn *insn)
 {
   switch (insn->opc)
   {
-    case ETH_OPC_CVAL:
-      eth_unref(insn->cval.val);
-      break;
-
     case ETH_OPC_PUSH:
       free(insn->push.vids);
       break;
@@ -94,6 +90,7 @@ typedef struct {
   int *vmap; /* Map of the SSA-values to registers. */
   int regcnt;
   int entrypoint;
+  cod_vec(eth_t) consts;
 } bc_builder;
 
 static bc_builder*
@@ -110,6 +107,7 @@ create_bc_builder(int nvals, int ntries)
   for (int i = 0; i < nvals; bldr->vmap[i++] = -1);
   bldr->regcnt = 0;
   bldr->entrypoint = -1;
+  cod_vec_init(bldr->consts);
   return bldr;
 }
 
@@ -120,6 +118,8 @@ destroy_bc_builder(bc_builder *bldr)
   cod_vec_destroy(bldr->cchjmps);
   free(bldr->catches);
   free(bldr->vmap);
+  cod_vec_iter(bldr->consts, i, x, eth_unref(x));
+  cod_vec_destroy(bldr->consts);
   free(bldr);
 }
 
@@ -156,7 +156,9 @@ write_cval(bc_builder *bldr, int out, eth_t val)
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_CVAL;
   insn->cval.out = out;
-  eth_ref(insn->cval.val = val);
+  insn->cval.idx = bldr->consts.len;
+  cod_vec_push(bldr->consts, val);
+  eth_ref(val);
   return bldr->len - 1;
 }
 
@@ -1063,6 +1065,10 @@ eth_build_bytecode(eth_ssa *ssa, int nargs)
   bc->nargs = nargs;
   bc->len = bldr->len;
   bc->code = bldr->arr;
+  bc->consts = bldr->consts.data;
+  bc->nconsts = bldr->consts.len;
+  bldr->consts.data = NULL;
+  bldr->consts.len = 0;
   destroy_bc_builder(bldr);
 
   return bc;
@@ -1073,6 +1079,9 @@ destroy_bytecode(eth_bytecode *bc)
 {
   for (int i = 0; i < bc->len; ++i)
     destroy_insn(bc->code + i);
+  for (int i = 0; i < bc->nconsts; ++i)
+    eth_unref(bc->consts[i]);
+  free(bc->consts);
   free(bc->code);
   free(bc);
 }

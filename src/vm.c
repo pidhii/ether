@@ -252,7 +252,7 @@ eth_vm(eth_bytecode *bc)
     {
       OP(CVAL)
       {
-        r[ip->cval.out] = ip->cval.val;
+        r[ip->cval.out] = bc->consts[ip->cval.idx];
         FAST_DISPATCH_NEXT();
       }
 
