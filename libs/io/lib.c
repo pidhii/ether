@@ -17,6 +17,9 @@
 
 #include <errno.h>
 #include <stdlib.h>
+#include <string.h>
+
+#include <codeine/vec.h>
 
 
 ETH_MODULE("ether:io");
@@ -60,6 +63,7 @@ _read_line_of(void)
   return eth_create_string_from_ptr2(line, nrd);
 }
 
+#define BUFFER_SIZE 1024
 static eth_t
 _read_of(void)
 {
@@ -69,43 +73,85 @@ _read_of(void)
   eth_t n = *eth_sp++;
   eth_ref(n);
 
-  if (file->type != eth_file_type || n->type != eth_number_type)
+  if (file->type != eth_file_type)
   {
     eth_unref(file);
     eth_unref(n);
     return eth_exn(eth_type_error());
   }
-  if (eth_num_val(n) < 0)
+
+  size_t size;
+  if (n->type == eth_symbol_type and strcmp(eth_sym_cstr(n), "all") == 0)
+    size = SIZE_MAX;
+  else if (n->type == eth_number_type and eth_num_val(n) >= 0)
+    size = eth_num_val(n);
+  else
   {
     eth_unref(file);
     eth_unref(n);
     return eth_exn(eth_invalid_argument());
   }
 
+  cod_vec(char*) bufs;
+  cod_vec(size_t) buflens;
+  size_t nread = 0;
+  size_t nleft = size;
+
+  cod_vec_init(bufs);
+  cod_vec_init(buflens);
+
   FILE *stream = eth_get_file_stream(file);
-  size_t size = eth_num_val(n);
-  char *buf = eth_malloc(size + 1);
-  size_t nrd = fread(buf, 1, size, stream);
-  if (nrd == 0)
+  size_t nrd;
+  for (size_t nleft = size; nleft > 0; nleft -= nrd, nread += nrd)
   {
-    free(buf);
-    if (feof(stream))
+    const size_t buflen = nleft < BUFFER_SIZE ? nleft : BUFFER_SIZE;
+    char *buf = eth_malloc(buflen);
+    nrd = fread(buf, 1, buflen, stream);
+    if (nrd == 0)
     {
-      eth_unref(file);
-      eth_unref(n);
-      return eth_exn(eth_sym("end_of_file"));
+      free(buf);
+      if (feof(stream))
+      {
+        if (nread == 0)
+        {
+          cod_vec_destroy(bufs);
+          cod_vec_destroy(buflens);
+          eth_unref(file);
+          eth_unref(n);
+          return eth_exn(eth_sym("end_of_file"));
+        }
+        break;
+      }
+      else if (ferror(stream))
+      {
+        eth_unref(file);
+        eth_unref(n);
+        for (size_t i = 0; i < bufs.len; free(bufs.data[i++]));
+        cod_vec_destroy(bufs);
+        cod_vec_destroy(buflens);
+        return eth_exn(eth_system_error(0));
+      }
     }
-    else if (ferror(stream))
-    {
-      eth_unref(file);
-      eth_unref(n);
-      return eth_exn(eth_system_error(0));
-    }
+    cod_vec_push(bufs, buf);
+    cod_vec_push(buflens, nrd);
   }
+        /*return eth_exn(eth_sym("end_of_file"));*/
   eth_unref(file);
   eth_unref(n);
-  buf[nrd] = '\0';
-  return eth_create_string_from_ptr2(buf, nrd);
+
+  // TODO optimize for the case when there is only one buffer read
+  char *res = eth_malloc(nread+1);
+  char *p = res;
+  for (size_t i = 0; i < bufs.len; ++i)
+  {
+    memcpy(p, bufs.data[i], buflens.data[i]);
+    p += buflens.data[i];
+    free(bufs.data[i]);
+  }
+  res[nread] = '\0';
+  cod_vec_destroy(bufs);
+  cod_vec_destroy(buflens);
+  return eth_create_string_from_ptr2(res, nread);
 }
 
 #define DEF_READ_NUM(NAME, TYPE)                       \

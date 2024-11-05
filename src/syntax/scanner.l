@@ -384,8 +384,8 @@ lnot    { return LNOT; }
   return CONST;
 }
 
-:[-_a-zA-Z0-9?]+ {
-  yylval->constant = eth_string(yytext+1);
+:[-_a-zA-Z0-9]+ {
+  yylval->constant = eth_sym(yytext+1);
   return CONST;
 }
 
