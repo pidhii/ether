@@ -157,12 +157,12 @@ eth_vm(eth_bytecode *bc)
     return eth_exn(eth_sym("stack_overflow"));
   }
 
-  eth_t *restrict const r = alloca(nreg * sizeof(eth_t));
+  eth_t *const restrict r = alloca(nreg * sizeof(eth_t));
   bool test = 0;
   int nstack = 0;
   eth_t exn = NULL;
 
-  register eth_bc_insn *restrict ip = bc->code;
+  register eth_bc_insn *ip = bc->code;
   static const void *insn[] = {
     [ETH_OPC_CVAL     ] = &&INSN_CVAL,
     [ETH_OPC_PUSH     ] = &&INSN_PUSH,
@@ -258,11 +258,12 @@ eth_vm(eth_bytecode *bc)
 
       OP(PUSH)
       {
-        eth_reserve_stack(ip->push.n);
-        for (size_t i = 0; i < ip->push.n; ++i)
-          eth_sp[i] = r[ip->push.vids[i]];
-        nstack += ip->push.n;
-        ip += 1;
+        do {
+          eth_sp -= 1;
+          *eth_sp = r[ip->push.vid];
+          nstack += 1;
+          ip += 1;
+        } while (ip->opc == ETH_OPC_PUSH);
         PREDICT(APPLY);
         PREDICT(APPLYTC);
         DISPATCH();
@@ -360,8 +361,8 @@ eth_vm(eth_bytecode *bc)
         }
         else
         {
-          for (int i = 0; i < nstack; eth_ref(eth_sp[i]));
-          for (int i = 0; i < nstack; eth_unref(eth_sp[i]));
+          for (int i = 0; i < nstack; eth_ref(eth_sp[i++]));
+          for (int i = 0; i < nstack; eth_unref(eth_sp[i++]));
           r[ip->apply.out] = eth_exn(eth_sym("apply_error"));
           eth_pop_stack(nstack);
           nstack = 0;

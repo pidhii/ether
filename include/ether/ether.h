@@ -338,7 +338,7 @@ eth_pop_stack(int n)
 }
 
 static inline bool
-eth_reserve_c_stack(ssize_t size)
+eth_reserve_c_stack(ssize_t __attribute__((unused)) size)
 {
   uintptr_t cpu_sp = (uintptr_t)&cpu_sp;
   return cpu_sp > eth_cpu_se;
@@ -866,7 +866,7 @@ void
 eth_deactivate_clos(eth_function *func);
 
 static inline eth_t
-_eth_raw_apply(eth_t fn, int narg)
+_eth_raw_apply(eth_t fn)
 {
   extern eth_t eth_vm(eth_bytecode *bc);
   eth_function *proc = ETH_FUNCTION(fn);
@@ -886,7 +886,7 @@ eth_apply(eth_t fn, int narg)
 {
   extern eth_t _eth_partial_apply(eth_function *fn, int narg);
   if (eth_likely(ETH_FUNCTION(fn)->arity == narg))
-    return _eth_raw_apply(fn, narg);
+    return _eth_raw_apply(fn);
   else
     return _eth_partial_apply(ETH_FUNCTION(fn), narg);
 }
@@ -3122,7 +3122,7 @@ struct eth_bc_insn {
     struct { uint16_t out; uint16_t idx; } cval;
 
     // TODO: mege PUSH with APPLY
-    struct { uint64_t *vids, n; } push;
+    struct { uint16_t vid; } push;
     struct { uint64_t vid0, n; } pop;
 
     struct { uint64_t out, fn; } apply;

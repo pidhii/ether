@@ -29,10 +29,6 @@ destroy_insn(eth_bc_insn *insn)
 {
   switch (insn->opc)
   {
-    case ETH_OPC_PUSH:
-      free(insn->push.vids);
-      break;
-
     case ETH_OPC_FN:
       eth_unref_source(insn->fn.data->src);
       eth_unref_bytecode(insn->fn.data->bc);
@@ -163,14 +159,11 @@ write_cval(bc_builder *bldr, int out, eth_t val)
 }
 
 static int
-write_push(bc_builder *bldr, int *vids, int n)
+write_push(bc_builder *bldr, int vid)
 {
   eth_bc_insn *insn = append_insn(bldr);
   insn->opc = ETH_OPC_PUSH;
-  insn->push.vids = eth_malloc(sizeof(size_t) * n);
-  for (int i = 0; i < n; ++i)
-    insn->push.vids[i] = vids[i];
-  insn->push.n = n;
+  insn->push.vid = vid;
   return bldr->len - 1;
 }
 
@@ -677,10 +670,8 @@ build(bc_builder *bldr, eth_insn *ssa)
       case ETH_INSN_APPLY:
       {
         int nargs = ip->apply.nargs;
-        int args[nargs];
-        for (int i = 0; i < nargs; ++i)
-          args[i] = get_reg(bldr, ip->apply.args[i]);
-        write_push(bldr, args, nargs);
+        for (int i = nargs-1; i >= 0; --i)
+          write_push(bldr, get_reg(bldr, ip->apply.args[i]));
 
         int out = new_reg(bldr, ip->out);
         int fn = get_reg(bldr, ip->apply.fn);
@@ -691,10 +682,8 @@ build(bc_builder *bldr, eth_insn *ssa)
       case ETH_INSN_APPLYTC:
       {
         int nargs = ip->apply.nargs;
-        int args[nargs];
-        for (int i = 0; i < nargs; ++i)
-          args[i] = get_reg(bldr, ip->apply.args[i]);
-        write_push(bldr, args, nargs);
+        for (int i = nargs-1; i >= 0; --i)
+          write_push(bldr, get_reg(bldr, ip->apply.args[i]));
 
         int out = new_reg(bldr, ip->out);
         int fn = get_reg(bldr, ip->apply.fn);

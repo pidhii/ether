@@ -19,6 +19,7 @@
 #include <string.h>
 #include <assert.h>
 
+
 ETH_MODULE("ether:function")
 
 eth_type* eth_function_type;
@@ -67,7 +68,7 @@ eth_drop_source(eth_source *src)
 
 // TODO: may cause stack overflow during UNREF of captures
 static void
-function_destroy(eth_type *type, eth_t x)
+function_destroy(eth_type * __attribute((unused)) type, eth_t x)
 {
   eth_function *func = ETH_FUNCTION(x);
 
@@ -235,7 +236,7 @@ _eth_partial_apply(eth_function *fn, int narg)
   if (arity < narg)
   {
     for (int i = arity; i < narg; eth_ref(eth_sp[i++]));
-    eth_t tmp_f = _eth_raw_apply(ETH(fn), arity);
+    eth_t tmp_f = _eth_raw_apply(ETH(fn));
     narg -= arity;
 
     if (eth_unlikely(tmp_f->type != eth_function_type))
