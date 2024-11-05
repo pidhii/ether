@@ -2,6 +2,8 @@ cmake_minimum_required (VERSION 3.15)
 project (ether VERSION 0.9.0)
 enable_language (C CXX)
 
+set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 include (CheckIncludeFile REQUIRED)
 include (CheckCCompilerFlag)
 include (ExternalProject OPTIONAL RESULT_VARIABLE ExternalProject_FOUND)
