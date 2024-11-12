@@ -366,12 +366,12 @@ _open(void)
     eth_t exn;
     switch (errno)
     {
-    case EINVAL:
-      exn = eth_invalid_argument();
-      break;
-    default:
-      exn = eth_system_error(errno);
-      break;
+      case EINVAL:
+        exn = eth_invalid_argument();
+        break;
+      default:
+        exn = eth_system_error(errno);
+        break;
     }
     eth_throw(args, exn);
   }
@@ -390,12 +390,12 @@ _popen(void)
     eth_t exn;
     switch (errno)
     {
-    case EINVAL:
-      exn = eth_invalid_argument();
-      break;
-    default:
-      exn = eth_system_error(errno);
-      break;
+      case EINVAL:
+        exn = eth_invalid_argument();
+        break;
+      default:
+        exn = eth_system_error(errno);
+        break;
     }
     eth_throw(args, exn);
   }
@@ -446,10 +446,10 @@ _close(void)
       {
         switch (err)
         {
-        case EBADF:
-          return eth_exn(eth_invalid_argument());
-        default:
-          return eth_system_error(err);
+          case EBADF:
+            return eth_exn(eth_invalid_argument());
+          default:
+            return eth_system_error(err);
         }
       }
       else
@@ -498,10 +498,10 @@ _input(void)
     {
       switch (err)
       {
-      case EINVAL:
-        return eth_exn(eth_invalid_argument());
-      default:
-        return eth_system_error(err);
+        case EINVAL:
+          return eth_exn(eth_invalid_argument());
+        default:
+          return eth_system_error(err);
       }
     }
   }
@@ -881,26 +881,19 @@ _require(void)
 //                                  lazy
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 static eth_t
-_lazy_get(void)
+_get_lazy(void)
 {
-  return eth_this->proc.data;
-}
-
-static eth_t
-_lazy_eval(void)
-{
-  eth_function *this = eth_this;
-  eth_t thunk = this->proc.data;
-  eth_t val = eth_apply(thunk, 0);
-  if (eth_unlikely(val->type == eth_exception_type))
-    return val;
-  // replace handle
-  this->proc.handle = _lazy_get;
-  this->proc.data = val;
-  this->proc.dtor = (void *)eth_unref;
-  eth_ref(val);
-  eth_unref(thunk);
-  return val;
+  eth_t lazy = *eth_sp++;
+  if (eth_unlikely(lazy->type != eth_lazy_type))
+  {
+    eth_drop(lazy);
+    return eth_exn(eth_type_error());
+  }
+  eth_t ret = eth_get_lazy_value(lazy);
+  eth_ref(ret);
+  eth_drop(lazy);
+  eth_dec(ret);
+  return ret;
 }
 
 static eth_t
@@ -912,8 +905,7 @@ _make_lazy(void)
     eth_drop(thunk);
     return eth_exn(eth_type_error());
   }
-  eth_ref(thunk);
-  return eth_create_proc(_lazy_eval, 0, thunk, (void *)eth_unref);
+  return eth_create_lazy(thunk);
 }
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -1436,6 +1428,7 @@ eth_create_builtins(eth_root *root)
              eth_create_proc(_load_stream, 2, root, NULL));
   eth_define(mod, "__require", eth_create_proc(_require, 1, root, NULL));
   // ---
+  eth_define(mod, "__get_lazy", eth_create_proc(_get_lazy, 1, NULL, NULL));
   eth_define(mod, "__make_lazy", eth_create_proc(_make_lazy, 1, NULL, NULL));
   // ---
   eth_define(mod, "__create_ref", eth_create_proc(_create_ref, 1, NULL, NULL));

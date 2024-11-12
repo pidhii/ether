@@ -1143,6 +1143,47 @@ eth_get_symbol_hash(eth_t x);
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                         records & tuples
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+extern
+eth_type *eth_lazy_type;
+
+typedef struct {
+  eth_header header;
+  uintptr_t ready;
+  union {
+    eth_t proc;
+    eth_t value;
+  };
+} eth_lazy;
+
+static inline eth_t
+eth_create_lazy(eth_t proc)
+{
+  eth_lazy *lazy = (eth_lazy*)eth_alloc_h2();
+  eth_init_header(lazy, eth_lazy_type);
+  lazy->ready = false;
+  eth_ref(lazy->proc = proc);
+  return ETH(lazy);
+}
+
+static eth_t
+eth_get_lazy_value(eth_t x)
+{
+  eth_lazy *lazy = (eth_lazy *)x;
+  if (lazy->ready)
+    return lazy->value;
+  else
+  {
+    eth_t val = eth_apply(lazy->proc, 0);
+    eth_unref(lazy->proc);
+    eth_ref(lazy->value = val);
+    lazy->ready = true;
+    return val;
+  }
+}
+
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+//                         records & tuples
+// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 typedef struct {
   eth_header header;
   eth_t data[];
