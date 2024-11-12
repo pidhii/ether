@@ -3123,7 +3123,6 @@ typedef enum {
 
   ETH_OPC_LOAD,
   ETH_OPC_LOADRCRD,
-  ETH_OPC_LOADRCRD1,
   ETH_OPC_ACCESS,
 
   ETH_OPC_SETEXN,
@@ -3190,7 +3189,6 @@ struct eth_bc_insn {
     struct { uint64_t out; uint32_t vid, offs; } load;
     // TODO: flatten vids
     struct { int16_t proto; uint16_t src, n; uint64_t *vids; size_t *ids; } loadrcrd;
-    struct { int16_t proto; uint16_t out, vid; size_t id; } loadrcrd1;
     struct { uint64_t fld; uint32_t out, vid; } access;
 
     struct { uint64_t vid; } setexn;

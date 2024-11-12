@@ -215,7 +215,6 @@ eth_vm(eth_bytecode *bc)
     [ETH_OPC_MKSCP    ] = &&INSN_MKSCP,
     [ETH_OPC_LOAD     ] = &&INSN_LOAD,
     [ETH_OPC_LOADRCRD ] = &&INSN_LOADRCRD,
-    [ETH_OPC_LOADRCRD1] = &&INSN_LOADRCRD1,
     [ETH_OPC_ACCESS   ] = &&INSN_ACCESS,
     [ETH_OPC_SETEXN   ] = &&INSN_SETEXN,
     [ETH_OPC_GETEXN   ] = &&INSN_GETEXN,
@@ -621,33 +620,6 @@ eth_vm(eth_bytecode *bc)
           }
           /*if (eth_unlikely(i == n))*/
             /*test = 0;*/
-        }
-        FAST_DISPATCH_NEXT();
-      }
-
-      // TODO: should it realy work for any plane type (not records only)?
-      OP(LOADRCRD1)
-      {
-        eth_t x = r[ip->loadrcrd1.vid];
-        eth_type *restrict type = x->type;
-        int proto = ip->loadrcrd1.proto;
-        test = eth_is_plain(type) and (proto < 0 or type == r[proto]->type);
-        if (eth_likely(test))
-        {
-          size_t *restrict ids = type->fieldids;
-          const int n = type->nfields;
-          const size_t id = ip->loadrcrd1.id;
-          int i;
-          ids[n] = id;
-          for (i = 0; true; ++i)
-          {
-            if (ids[i] == id)
-              break;
-          }
-          if (eth_unlikely(i == n))
-            test = 0;
-          else
-            r[ip->loadrcrd1.out] = eth_tup_get(x, i);
         }
         FAST_DISPATCH_NEXT();
       }
