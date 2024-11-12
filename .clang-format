@@ -1,0 +1,17 @@
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  BeforeElse: true
+  IndentBraces: false
+  AfterControlStatement: true
+
+AlwaysBreakAfterReturnType: All
+
+ReflowComments: false
+
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+ColumnLimit: 80
+
+IndentCaseLabels: true
