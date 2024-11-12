@@ -1514,26 +1514,6 @@ eth_rbtree_next(eth_rbtree_iterator *it);
 void
 eth_rbtree_stop(eth_rbtree_iterator *it);
 
-// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-//                               glob
-// -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-typedef struct {
-  eth_header hdr;
-  eth_t rl;
-} eth_glob;
-
-extern
-eth_type *eth_glob_type;
-
-eth_t
-eth_create_glob();
-
-eth_t
-eth_glob_add(eth_t glob, eth_t r);
-
-eth_t
-eth_glob_find(eth_t glob, eth_t sym);
-
 /** @} BuiltinTypes */
 
 // ><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><+><
