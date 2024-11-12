@@ -581,7 +581,17 @@ eth_vm(eth_bytecode *bc)
 
       OP(LOAD)
       {
-        r[ip->load.out] = *(eth_t*)((char*)r[ip->load.vid] + ip->load.offs);
+        eth_t v = *(eth_t*)((char*)r[ip->load.vid] + ip->load.offs);
+        if (v->type == eth_lazy_type)
+        {
+          eth_t vv = eth_get_lazy_value(v);
+          eth_ref(vv);
+          eth_unref(v);
+          *(eth_t*)((char*)r[ip->load.vid] + ip->load.offs) = vv;
+          r[ip->load.out] = vv;
+        }
+        else
+          r[ip->load.out] = v;
         FAST_DISPATCH_NEXT();
       }
 
@@ -611,7 +621,17 @@ eth_vm(eth_bytecode *bc)
               }
               else
               {
-                r[ip->loadrcrd.vids[I++]] = eth_tup_get(x, i);
+                eth_t v = eth_tup_get(x, i);
+                if (v->type == eth_lazy_type)
+                {
+                  eth_t vv = eth_get_lazy_value(v);
+                  eth_ref(vv);
+                  eth_unref(v);
+                  ETH_TUPLE(x)->data[i] = vv;
+                  r[ip->loadrcrd.vids[I++]] = vv;
+                }
+                else
+                  r[ip->loadrcrd.vids[I++]] = v;
                 if (I == N) break;
                 id = ip->loadrcrd.ids[I];
                 ids[n] = id;
@@ -624,6 +644,7 @@ eth_vm(eth_bytecode *bc)
         FAST_DISPATCH_NEXT();
       }
 
+      // TODO: remove, use load instead
       OP(ACCESS)
       {
         eth_t x = r[ip->access.vid];
@@ -643,7 +664,19 @@ eth_vm(eth_bytecode *bc)
           if (i == n)
             r[ip->access.out] = eth_nil;
           else
-            r[ip->access.out] = eth_tup_get(x, i);
+          {
+            eth_t v = eth_tup_get(x, i);
+            if (v->type == eth_lazy_type)
+            {
+              eth_t vv = eth_get_lazy_value(v);
+              eth_ref(vv);
+              eth_unref(v);
+              ETH_TUPLE(x)->data[i] = vv;
+              r[ip->access.out] = vv;
+            }
+            else
+              r[ip->access.out] = v;
+          }
         }
         else
           r[ip->access.out] = eth_nil;
