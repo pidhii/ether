@@ -13,23 +13,20 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#include "ether/ether.h"
 #include "codeine/vec.h"
-#include "eco/eco.h"
+#include "ether/ether.h"
 
-#include <stdlib.h>
-#include <string.h>
 #include <assert.h>
 #include <errno.h>
-#include <ctype.h>
-#include <unistd.h>
 #include <limits.h>
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #include <sys/wait.h>
 
 ETH_MODULE("ether:builtins")
-
 
 static eth_t
 _strcat(void)
@@ -213,11 +210,11 @@ _regexp_eq(void)
   /*eth_t reg = eth_arg2(args, eth_regexp_type);*/
   /*int n = eth_exec_regexp(reg, eth_str_cstr(str), eth_str_len(str), 0);*/
   /*if (n == 0)*/
-    /*eth_throw(args, Regexp_error);*/
+  /*eth_throw(args, Regexp_error);*/
   /*else*/
-    /*eth_return(args, n < 0 ? eth_false : eth_num(n));*/
+  /*eth_return(args, n < 0 ? eth_false : eth_num(n));*/
 
-  eth_use_symbol(regexp_error)
+  eth_use_symbol(regexp_error);
 
   eth_args args = eth_start(2);
   eth_t str = eth_arg2(args, eth_string_type);
@@ -231,22 +228,22 @@ _regexp_eq(void)
     eth_return(args, eth_true);
   else
   {
-    eth_t buf[n-1];
+    eth_t buf[n - 1];
     const int *ovec = eth_ovector();
     for (int cnt = 1; cnt < n; ++cnt)
     {
       int i = cnt * 2;
       char *p = eth_str_cstr(str) + ovec[i];
-      int len = ovec[i+1] - ovec[i];
+      int len = ovec[i + 1] - ovec[i];
       eth_t s = eth_create_string2(p, len);
-      buf[cnt-1] = s;
+      buf[cnt - 1] = s;
     }
 
     if (n == 2)
       eth_return(args, buf[0]);
     else
     {
-      eth_t ret = eth_create_tuple_n(eth_tuple_type(n-1), buf);
+      eth_t ret = eth_create_tuple_n(eth_tuple_type(n - 1), buf);
       eth_return(args, ret);
     }
   }
@@ -290,7 +287,7 @@ _inclusive_range(void)
 static eth_t
 _map(void)
 {
-  eth_use_symbol(improper_list)
+  eth_use_symbol(improper_list);
 
   eth_args args = eth_start(2);
   const eth_t f = eth_arg2(args, eth_function_type);
@@ -324,8 +321,8 @@ _map(void)
 static eth_t
 _filter_map(void)
 {
-  eth_use_symbol(filter_out)
-  eth_use_symbol(improper_list)
+  eth_use_symbol(filter_out);
+  eth_use_symbol(improper_list);
 
   eth_args args = eth_start(2);
   const eth_t f = eth_arg2(args, eth_function_type);
@@ -369,8 +366,12 @@ _open(void)
     eth_t exn;
     switch (errno)
     {
-      case EINVAL: exn = eth_invalid_argument(); break;
-      default: exn = eth_system_error(errno); break;
+    case EINVAL:
+      exn = eth_invalid_argument();
+      break;
+    default:
+      exn = eth_system_error(errno);
+      break;
     }
     eth_throw(args, exn);
   }
@@ -389,8 +390,12 @@ _popen(void)
     eth_t exn;
     switch (errno)
     {
-      case EINVAL: exn = eth_invalid_argument(); break;
-      default: exn = eth_system_error(errno); break;
+    case EINVAL:
+      exn = eth_invalid_argument();
+      break;
+    default:
+      exn = eth_system_error(errno);
+      break;
     }
     eth_throw(args, exn);
   }
@@ -404,7 +409,7 @@ _open_string(void)
   eth_t str = eth_arg2(args, eth_string_type);
   FILE *stream = fmemopen(eth_str_cstr(str), eth_str_len(str), "r");
   eth_t file = eth_open_stream(stream);
-  eth_set_file_data(file, str, (void*)eth_unref);
+  eth_set_file_data(file, str, (void *)eth_unref);
   eth_ref(str);
   eth_return(args, file);
 }
@@ -441,8 +446,10 @@ _close(void)
       {
         switch (err)
         {
-          case EBADF: return eth_exn(eth_invalid_argument());
-          default: return eth_system_error(err);
+        case EBADF:
+          return eth_exn(eth_invalid_argument());
+        default:
+          return eth_system_error(err);
         }
       }
       else
@@ -491,8 +498,10 @@ _input(void)
     {
       switch (err)
       {
-        case EINVAL: return eth_exn(eth_invalid_argument());
-        default: return eth_system_error(err);
+      case EINVAL:
+        return eth_exn(eth_invalid_argument());
+      default:
+        return eth_system_error(err);
       }
     }
   }
@@ -520,20 +529,19 @@ _print_to(void)
 
   /*if (eth_is_tuple(x->type))*/
   /*{*/
-    /*for (int i = 0; i < eth_struct_size(x->type); ++i)*/
-    /*{*/
-      /*if (i > 0) putc('\t', eth_get_file_stream(file));*/
-      /*eth_display(eth_tup_get(x, i), eth_get_file_stream(file));*/
-    /*}*/
+  /*for (int i = 0; i < eth_struct_size(x->type); ++i)*/
+  /*{*/
+  /*if (i > 0) putc('\t', eth_get_file_stream(file));*/
+  /*eth_display(eth_tup_get(x, i), eth_get_file_stream(file));*/
+  /*}*/
   /*}*/
   /*else*/
-    eth_display(x, eth_get_file_stream(file));
+  eth_display(x, eth_get_file_stream(file));
   putc('\n', eth_get_file_stream(file));
   eth_drop(file);
   eth_drop(x);
   return eth_nil;
 }
-
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                  system
@@ -550,13 +558,14 @@ _system(void)
   eth_return(args, eth_num(WEXITSTATUS(ret)));
 }
 
-
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                  random
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 static eth_t
 _rand(void)
-{ return eth_num(rand()); }
+{
+  return eth_num(rand());
+}
 
 static eth_t
 _srand(void)
@@ -571,7 +580,6 @@ _srand(void)
   eth_drop(s);
   return eth_nil;
 }
-
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 //                                  format
@@ -604,9 +612,11 @@ _format_aux(void)
   size_t size = 0;
   FILE *out = open_memstream(&ptr, &size);
   /*eth_t ret = _fmt(fmt, n, out);*/
-  for (int i = 0; i < n; eth_ref(eth_sp[i++]));
+  for (int i = 0; i < n; eth_ref(eth_sp[i++]))
+    ;
   int ok = eth_format(out, fmt, eth_sp, n);
-  for (int i = 0; i < n; eth_unref(eth_sp[i++]));
+  for (int i = 0; i < n; eth_unref(eth_sp[i++]))
+    ;
   eth_pop_stack(n);
   fclose(out);
 
@@ -646,7 +656,7 @@ _format(void)
     eth_ref(data->fmt = fmt);
     data->file = NULL;
     data->n = n;
-    return eth_create_proc(_format_aux, n, data, (void*)destroy_format_data);
+    return eth_create_proc(_format_aux, n, data, (void *)destroy_format_data);
   }
 }
 
@@ -846,7 +856,7 @@ _require(void)
   eth_t modpath = eth_arg2(args, eth_string_type);
 
   eth_module *mod = eth_require_module(thisroot, eth_get_root_env(thisroot),
-      eth_str_cstr(modpath));
+                                       eth_str_cstr(modpath));
 
   if (not mod)
     eth_throw(args, eth_failure());
@@ -887,7 +897,7 @@ _lazy_eval(void)
   // replace handle
   this->proc.handle = _lazy_get;
   this->proc.data = val;
-  this->proc.dtor = (void*)eth_unref;
+  this->proc.dtor = (void *)eth_unref;
   eth_ref(val);
   eth_unref(thunk);
   return val;
@@ -903,7 +913,7 @@ _make_lazy(void)
     return eth_exn(eth_type_error());
   }
   eth_ref(thunk);
-  return eth_create_proc(_lazy_eval, 0, thunk, (void*)eth_unref);
+  return eth_create_proc(_lazy_eval, 0, thunk, (void *)eth_unref);
 }
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -945,7 +955,8 @@ _realtime(void)
 {
   struct timespec t;
   clock_gettime(CLOCK_REALTIME, &t);
-  eth_number_t res = (eth_number_t)t.tv_sec + (eth_number_t)t.tv_nsec*(eth_number_t)1e-9;
+  eth_number_t res =
+      (eth_number_t)t.tv_sec + (eth_number_t)t.tv_nsec * (eth_number_t)1e-9;
   return eth_num(res);
 }
 
@@ -954,7 +965,8 @@ _taitime(void)
 {
   struct timespec t;
   clock_gettime(CLOCK_TAI, &t);
-  eth_number_t res = (eth_number_t)t.tv_sec + (eth_number_t)t.tv_nsec*(eth_number_t)1e-9;
+  eth_number_t res =
+      (eth_number_t)t.tv_sec + (eth_number_t)t.tv_nsec * (eth_number_t)1e-9;
   return eth_num(res);
 }
 
@@ -963,7 +975,8 @@ _monotonictime(void)
 {
   struct timespec t;
   clock_gettime(CLOCK_MONOTONIC, &t);
-  eth_number_t res = (eth_number_t)t.tv_sec + (eth_number_t)t.tv_nsec*(eth_number_t)1e-9;
+  eth_number_t res =
+      (eth_number_t)t.tv_sec + (eth_number_t)t.tv_nsec * (eth_number_t)1e-9;
   return eth_num(res);
 }
 
@@ -972,7 +985,8 @@ _boottime(void)
 {
   struct timespec t;
   clock_gettime(CLOCK_BOOTTIME, &t);
-  eth_number_t res = (eth_number_t)t.tv_sec + (eth_number_t)t.tv_nsec*(eth_number_t)1e-9;
+  eth_number_t res =
+      (eth_number_t)t.tv_sec + (eth_number_t)t.tv_nsec * (eth_number_t)1e-9;
   return eth_num(res);
 }
 
@@ -981,7 +995,8 @@ _processcputime(void)
 {
   struct timespec t;
   clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t);
-  eth_number_t res = (eth_number_t)t.tv_sec + (eth_number_t)t.tv_nsec*(eth_number_t)1e-9;
+  eth_number_t res =
+      (eth_number_t)t.tv_sec + (eth_number_t)t.tv_nsec * (eth_number_t)1e-9;
   return eth_num(res);
 }
 
@@ -990,7 +1005,8 @@ _threadcputime(void)
 {
   struct timespec t;
   clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t);
-  eth_number_t res = (eth_number_t)t.tv_sec + (eth_number_t)t.tv_nsec*(eth_number_t)1e-9;
+  eth_number_t res =
+      (eth_number_t)t.tv_sec + (eth_number_t)t.tv_nsec * (eth_number_t)1e-9;
   return eth_num(res);
 }
 
@@ -1049,7 +1065,7 @@ _assign_field(void)
     eth_throw(args, eth_exn(eth_type_error()));
   if (not eth_get_record_field_flag(record->type, fieldidx, ETH_RF_MUTABLE))
     eth_throw(args, eth_exn(eth_type_error()));
-  eth_t *field = (void*)record + record->type->fields[fieldidx].offs;
+  eth_t *field = (void *)record + record->type->fields[fieldidx].offs;
   eth_t oldval = *field;
   eth_ref(*field = val);
   eth_unref(oldval);
@@ -1063,7 +1079,7 @@ _shell(void)
   eth_t cmd = eth_arg2(args, eth_string_type);
   FILE *input = popen(eth_str_cstr(cmd), "r");
   int totsize = 0;
-  cod_vec(void*) parts;
+  cod_vec(void *) parts;
   cod_vec_init(parts);
   while (true)
   {
@@ -1076,7 +1092,7 @@ _shell(void)
       free(buf);
       goto error;
     }
-    *(int*)(buf+256) = nrd;
+    *(int *)(buf + 256) = nrd;
     totsize += nrd;
     cod_vec_push(parts, buf);
   }
@@ -1084,8 +1100,8 @@ _shell(void)
   if (parts.len == 1)
   {
     void *buf = parts.data[0];
-    int size = *(int*)(buf+256);
-    eth_t ret = eth_create_string_from_ptr2(buf+sizeof(int), size);
+    int size = *(int *)(buf + 256);
+    eth_t ret = eth_create_string_from_ptr2(buf + sizeof(int), size);
   }
 
 error:
@@ -1131,7 +1147,7 @@ _record(void)
       return eth_exn(eth_invalid_argument());
     }
 
-    keys[i] = (char*)eth_sym_cstr(key);
+    keys[i] = (char *)eth_sym_cstr(key);
     vals[i] = val;
   }
 
@@ -1147,15 +1163,14 @@ _record(void)
 
 static eth_type *_state_obj_type;
 
-
 typedef struct _state_obj {
   eth_header hdr;
   eth_state *state;
   eth_t entry;
   bool full_destroy_state;
 } _state_obj;
-#define SOBJ(x) ((_state_obj*)(x))
-#define GET_STATE(x) ((_state_obj*)(x))->state
+#define SOBJ(x) ((_state_obj *)(x))
+#define GET_STATE(x) ((_state_obj *)(x))->state
 
 static eth_t
 _make_state_obj(eth_state *state, eth_t entry, bool full_destroy_state)
@@ -1172,9 +1187,9 @@ _make_state_obj(eth_state *state, eth_t entry, bool full_destroy_state)
 }
 
 static void
-_destroy_state_obj(eth_type *type, eth_t x)
+_destroy_state_obj(eth_type *__attribute((unused)) type, eth_t x)
 {
-  _state_obj *sobj = (_state_obj*)x;
+  _state_obj *sobj = (_state_obj *)x;
 
   if (sobj->full_destroy_state)
     eth_destroy_state(sobj->state);
@@ -1187,9 +1202,7 @@ _destroy_state_obj(eth_type *type, eth_t x)
   free(sobj);
 }
 
-
-static eth_t
-_g_current_state_box;
+static eth_t _g_current_state_box;
 
 static eth_t
 _get_current_state(void)
@@ -1211,8 +1224,8 @@ _switch_state(void)
   eth_state *ret_caller;
   eth_t ret_parcel;
   eth_set_strong_ref(_g_current_state_box, to);
-  if (not eth_switch_state(GET_STATE(from), GET_STATE(to), parcel,
-        &ret_caller, (void**)&ret_parcel))
+  if (not eth_switch_state(GET_STATE(from), GET_STATE(to), parcel, &ret_caller,
+                           (void **)&ret_parcel))
   {
     eth_set_strong_ref(_g_current_state_box, from);
     eth_return(args, eth_false);
@@ -1259,9 +1272,9 @@ _make_method(void)
   eth_args args = eth_start(2);
   eth_t arity = eth_arg2(args, eth_number_type);
   eth_t default_impl = eth_arg(args);
-  eth_return(args, eth_create_method(
-        eth_num_val(arity), default_impl == eth_nil ? NULL : default_impl));
-                                      
+  eth_return(args,
+             eth_create_method(eth_num_val(arity),
+                               default_impl == eth_nil ? NULL : default_impl));
 }
 
 static eth_t
@@ -1330,7 +1343,7 @@ _make_struct(void)
 /*
  * NOTE: IR-builder will use builtins ...while loading builtins.
  */
-eth_module*
+eth_module *
 eth_create_builtins(eth_root *root)
 {
   char buf[PATH_MAX];
@@ -1338,7 +1351,6 @@ eth_create_builtins(eth_root *root)
   eth_module *mod = eth_create_module("builtins", NULL);
   if (eth_get_module_path())
     eth_add_module_path(eth_get_env(mod), eth_get_module_path());
-
 
 #if COROUTINES
   _state_obj_type = eth_create_type("coroutine");
@@ -1351,84 +1363,92 @@ eth_create_builtins(eth_root *root)
   _g_current_state_box = eth_create_strong_ref(initial_sobj);
   eth_ref(_g_current_state_box);
 
-  eth_add_destructor(mod, _g_current_state_box, (void*)eth_unref);
-  eth_add_destructor(mod, _state_obj_type, (void*)eth_destroy_type);
+  eth_add_destructor(mod, _g_current_state_box, (void *)eth_unref);
+  eth_add_destructor(mod, _state_obj_type, (void *)eth_destroy_type);
 #endif
 
-
-  extern void _eth_set_builtins(eth_root*, eth_module*);
+  extern void _eth_set_builtins(eth_root *, eth_module *);
   _eth_set_builtins(root, mod);
 
   eth_debug("loading builtins");
 
   eth_attr *attr = eth_create_attr(ETH_ATTR_BUILTIN);
 
-  eth_define_attr(mod,    "&&", eth_create_proc(_and, 2, NULL, NULL), attr);
-  eth_define_attr(mod,    "||", eth_create_proc( _or, 2, NULL, NULL), attr);
+  eth_define_attr(mod, "&&", eth_create_proc(_and, 2, NULL, NULL), attr);
+  eth_define_attr(mod, "||", eth_create_proc(_or, 2, NULL, NULL), attr);
   // TODO: `++` should be an instruction
-  eth_define(mod,         "++", eth_create_proc(    _strcat, 2, NULL, NULL));
+  eth_define(mod, "++", eth_create_proc(_strcat, 2, NULL, NULL));
   // ---
-  eth_define(mod,      "pair?", eth_create_proc(    _pair_p, 1, NULL, NULL));
-  eth_define(mod,    "symbol?", eth_create_proc(  _symbol_p, 1, NULL, NULL));
-  eth_define(mod,    "number?", eth_create_proc(  _number_p, 1, NULL, NULL));
-  eth_define(mod,    "string?", eth_create_proc(  _string_p, 1, NULL, NULL));
-  eth_define(mod,   "boolean?", eth_create_proc( _boolean_p, 1, NULL, NULL));
-  eth_define(mod,  "function?", eth_create_proc(_function_p, 1, NULL, NULL));
-  eth_define(mod,     "tuple?", eth_create_proc(   _tuple_p, 1, NULL, NULL));
-  eth_define(mod,    "record?", eth_create_proc(  _record_p, 1, NULL, NULL));
-  eth_define(mod,      "dict?", eth_create_proc(    _dict_p, 1, NULL, NULL));
-  eth_define(mod,      "file?", eth_create_proc(    _file_p, 1, NULL, NULL));
-  eth_define(mod,    "regexp?", eth_create_proc(  _regexp_p, 1, NULL, NULL));
-  eth_define(mod,    "vector?", eth_create_proc(  _vector_p, 1, NULL, NULL));
+  eth_define(mod, "pair?", eth_create_proc(_pair_p, 1, NULL, NULL));
+  eth_define(mod, "symbol?", eth_create_proc(_symbol_p, 1, NULL, NULL));
+  eth_define(mod, "number?", eth_create_proc(_number_p, 1, NULL, NULL));
+  eth_define(mod, "string?", eth_create_proc(_string_p, 1, NULL, NULL));
+  eth_define(mod, "boolean?", eth_create_proc(_boolean_p, 1, NULL, NULL));
+  eth_define(mod, "function?", eth_create_proc(_function_p, 1, NULL, NULL));
+  eth_define(mod, "tuple?", eth_create_proc(_tuple_p, 1, NULL, NULL));
+  eth_define(mod, "record?", eth_create_proc(_record_p, 1, NULL, NULL));
+  eth_define(mod, "dict?", eth_create_proc(_dict_p, 1, NULL, NULL));
+  eth_define(mod, "file?", eth_create_proc(_file_p, 1, NULL, NULL));
+  eth_define(mod, "regexp?", eth_create_proc(_regexp_p, 1, NULL, NULL));
+  eth_define(mod, "vector?", eth_create_proc(_vector_p, 1, NULL, NULL));
   // ---
-  eth_define(mod,       "list", eth_create_proc(      _list, 1, NULL, NULL));
-  eth_define(mod, "__rev_list", eth_create_proc(  _rev_list, 1, NULL, NULL));
-  eth_define(mod,   "__record", eth_create_proc(    _record, 1, NULL, NULL));
+  eth_define(mod, "list", eth_create_proc(_list, 1, NULL, NULL));
+  eth_define(mod, "__rev_list", eth_create_proc(_rev_list, 1, NULL, NULL));
+  eth_define(mod, "__record", eth_create_proc(_record, 1, NULL, NULL));
   // ---
-  eth_define(mod,       "dump", eth_create_proc(      _dump, 1, NULL, NULL));
+  eth_define(mod, "dump", eth_create_proc(_dump, 1, NULL, NULL));
   // ---
-  eth_define(mod,         "=~", eth_create_proc( _regexp_eq, 2, NULL, NULL));
+  eth_define(mod, "=~", eth_create_proc(_regexp_eq, 2, NULL, NULL));
   // ---
-  eth_define(mod,      "stdin", eth_stdin);
-  eth_define(mod,     "stdout", eth_stdout);
-  eth_define(mod,     "stderr", eth_stderr);
-  eth_define(mod,     "__open", eth_create_proc(      _open, 2, NULL, NULL));
-  eth_define(mod,    "__popen", eth_create_proc(     _popen, 2, NULL, NULL));
-  eth_define(mod, "__open_string", eth_create_proc(_open_string, 1, NULL, NULL));
-  eth_define(mod,      "close", eth_create_proc(     _close, 1, NULL, NULL));
-  eth_define(mod,      "input", eth_create_proc(     _input, 1, NULL, NULL));
-  eth_define(mod, "__print_to", eth_create_proc(  _print_to, 2, NULL, NULL));
+  eth_define(mod, "stdin", eth_stdin);
+  eth_define(mod, "stdout", eth_stdout);
+  eth_define(mod, "stderr", eth_stderr);
+  eth_define(mod, "__open", eth_create_proc(_open, 2, NULL, NULL));
+  eth_define(mod, "__popen", eth_create_proc(_popen, 2, NULL, NULL));
+  eth_define(mod, "__open_string",
+             eth_create_proc(_open_string, 1, NULL, NULL));
+  eth_define(mod, "close", eth_create_proc(_close, 1, NULL, NULL));
+  eth_define(mod, "input", eth_create_proc(_input, 1, NULL, NULL));
+  eth_define(mod, "__print_to", eth_create_proc(_print_to, 2, NULL, NULL));
   // ---
-  eth_define(mod,   "__system", eth_create_proc(    _system, 1, NULL, NULL));
+  eth_define(mod, "__system", eth_create_proc(_system, 1, NULL, NULL));
   // ---
-  eth_define(mod,     "__rand", eth_create_proc(      _rand, 0, NULL, NULL));
-  eth_define(mod,    "__srand", eth_create_proc(     _srand, 1, NULL, NULL));
+  eth_define(mod, "__rand", eth_create_proc(_rand, 0, NULL, NULL));
+  eth_define(mod, "__srand", eth_create_proc(_srand, 1, NULL, NULL));
   // ---
-  eth_define(mod,     "format", eth_create_proc(    _format, 1, NULL, NULL));
+  eth_define(mod, "format", eth_create_proc(_format, 1, NULL, NULL));
   // ---
-  eth_define(mod,  "real_time", eth_create_proc(  _realtime, 0, NULL, NULL));
-  eth_define(mod,   "tai_time", eth_create_proc(   _taitime, 0, NULL, NULL));
-  eth_define(mod, "monotonic_time", eth_create_proc(_monotonictime, 0, NULL, NULL));
+  eth_define(mod, "real_time", eth_create_proc(_realtime, 0, NULL, NULL));
+  eth_define(mod, "tai_time", eth_create_proc(_taitime, 0, NULL, NULL));
+  eth_define(mod, "monotonic_time",
+             eth_create_proc(_monotonictime, 0, NULL, NULL));
   eth_define(mod, "boot_time", eth_create_proc(_boottime, 0, NULL, NULL));
-  eth_define(mod, "process_cpu_time", eth_create_proc(_processcputime, 0, NULL, NULL));
-  eth_define(mod, "thread_cpu_time", eth_create_proc(_threadcputime, 0, NULL, NULL));
+  eth_define(mod, "process_cpu_time",
+             eth_create_proc(_processcputime, 0, NULL, NULL));
+  eth_define(mod, "thread_cpu_time",
+             eth_create_proc(_threadcputime, 0, NULL, NULL));
   // ---
-  eth_define(mod,      "raise", eth_create_proc(     _raise, 1, NULL, NULL));
-  eth_define(mod,       "exit", eth_create_proc(     __exit, 1, NULL, NULL));
+  eth_define(mod, "raise", eth_create_proc(_raise, 1, NULL, NULL));
+  eth_define(mod, "exit", eth_create_proc(__exit, 1, NULL, NULL));
   // ---
   eth_define(mod, "__load", eth_create_proc(_load, 2, root, NULL));
-  eth_define(mod, "__load_stream", eth_create_proc(_load_stream, 2, root, NULL));
+  eth_define(mod, "__load_stream",
+             eth_create_proc(_load_stream, 2, root, NULL));
   eth_define(mod, "__require", eth_create_proc(_require, 1, root, NULL));
   // ---
   eth_define(mod, "__make_lazy", eth_create_proc(_make_lazy, 1, NULL, NULL));
   // ---
   eth_define(mod, "__create_ref", eth_create_proc(_create_ref, 1, NULL, NULL));
-  eth_define(mod, "__dereference", eth_create_proc(_dereference, 1, NULL, NULL));
+  eth_define(mod, "__dereference",
+             eth_create_proc(_dereference, 1, NULL, NULL));
   eth_define(mod, "__assign", eth_create_proc(_assign, 2, NULL, NULL));
-  eth_define(mod, "__assign_field", eth_create_proc(_assign_field, 3, NULL, NULL));
+  eth_define(mod, "__assign_field",
+             eth_create_proc(_assign_field, 3, NULL, NULL));
 
-  eth_define(mod, "__make_method", eth_create_proc(_make_method, 2, NULL, NULL));
-  eth_define(mod, "__make_struct", eth_create_proc(_make_struct, 3, NULL, NULL));
+  eth_define(mod, "__make_method",
+             eth_create_proc(_make_method, 2, NULL, NULL));
+  eth_define(mod, "__make_struct",
+             eth_create_proc(_make_struct, 3, NULL, NULL));
   eth_define(mod, "implements", eth_create_proc(_implements, 2, NULL, NULL));
   eth_define(mod, "apply", eth_apply_method);
   eth_define(mod, "access", eth_get_method);
@@ -1440,11 +1460,13 @@ eth_create_builtins(eth_root *root)
   eth_define(mod, "dict", eth_create_rbtree());
 
 #if COROUTINES
-  eth_define(mod, "__switch_state", eth_create_proc(_switch_state, 3, NULL, NULL));
-  eth_define(mod, "__make_initial_state", eth_create_proc(_make_initial_state, 1, NULL, NULL));
-  eth_define(mod, "__get_current_state", eth_create_proc(_get_current_state, 0, NULL, NULL));
+  eth_define(mod, "__switch_state",
+             eth_create_proc(_switch_state, 3, NULL, NULL));
+  eth_define(mod, "__make_initial_state",
+             eth_create_proc(_make_initial_state, 1, NULL, NULL));
+  eth_define(mod, "__get_current_state",
+             eth_create_proc(_get_current_state, 0, NULL, NULL));
 #endif
-
 
   if (not eth_resolve_path(eth_get_env(mod), "__builtins.eth", buf))
   {
@@ -1466,4 +1488,3 @@ eth_create_builtins(eth_root *root)
 
   return mod;
 }
-

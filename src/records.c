@@ -13,24 +13,21 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#include "ether/ether.h"
 #include "codeine/hash-map.h"
 #include "codeine/hash.h"
+#include "ether/ether.h"
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-
 
 ETH_MODULE("ether:record")
-
 
 typedef struct {
   uint8_t *field_flags;
 } record_type_info;
 
-
-static record_type_info*
+static record_type_info *
 create_record_type_info(int nfields)
 {
   record_type_info *rfi = malloc(sizeof(record_type_info));
@@ -45,23 +42,16 @@ destroy_record_type_info(record_type_info *rti)
   free(rti);
 }
 
+static cod_hash_map *g_rectab;
 
-static
-cod_hash_map *g_rectab;
+static cod_vec(eth_type *) g_unque_types;
 
-static
-cod_vec(eth_type*) g_unque_types;
-
-void
-_eth_init_record_types(void)
-{
-  g_rectab = cod_hash_map_new(0);
-}
+ETH_TYPE_CONSTRUCTOR(init_record_types) { g_rectab = cod_hash_map_new(0); }
 
 void
 _eth_cleanup_record_types(void)
 {
-  cod_hash_map_delete(g_rectab, (void*)eth_destroy_type);
+  cod_hash_map_delete(g_rectab, (void *)eth_destroy_type);
   for (size_t i = 0; i < g_unque_types.len; ++i)
     eth_destroy_type(g_unque_types.data[i]);
   cod_vec_destroy(g_unque_types);
@@ -74,7 +64,7 @@ eth_destroy_record(eth_type *type, eth_t x)
   eth_struct *tup = ETH_TUPLE(x);
   for (int i = 0; i < type->nfields; ++i)
     eth_unref(tup->data[i]);
-  eth_free(tup, sizeof(eth_struct) + sizeof(eth_t)*type->nfields);
+  eth_free(tup, sizeof(eth_struct) + sizeof(eth_t) * type->nfields);
 }
 
 static void
@@ -85,7 +75,8 @@ write_tuple(eth_type *type, eth_t x, FILE *stream)
   fputc('(', stream);
   for (int i = 0; i < n; ++i)
   {
-    if (i > 0) fputs(", ", stream);
+    if (i > 0)
+      fputs(", ", stream);
     eth_write(tup->data[i], stream);
   }
   fputc(')', stream);
@@ -105,7 +96,8 @@ write_record(eth_type *type, eth_t x, FILE *stream)
     putc('{', stream);
     for (int i = 0; i < n; ++i)
     {
-      if (i > 0) fputs(", ", stream);
+      if (i > 0)
+        fputs(", ", stream);
       eth_fprintf(stream, "%s = ~w", type->fields[i].name, tup->data[i]);
     }
     putc('}', stream);
@@ -124,17 +116,20 @@ struct_equal(eth_type *type, eth_t x, eth_t y)
   return true;
 }
 
-eth_type*
+eth_type *
 eth_tuple_type(size_t n)
 {
   char *keys[n];
   for (size_t i = 0; i < n; ++i)
-    keys[i] = (char*)eth_get_symbol_cstr(eth_ordsyms[i+1]);
+    keys[i] = (char *)eth_get_symbol_cstr(eth_ordsyms[i + 1]);
   eth_type *ret = eth_record_type(keys, n);
   return ret;
 }
 
-typedef struct { const char *str; size_t id; } info;
+typedef struct {
+  const char *str;
+  size_t id;
+} info;
 static void
 study(char *const fields[], size_t n, info fldinfo[], size_t *namelen)
 {
@@ -161,7 +156,7 @@ is_tuple(const info fldinfo[], size_t n)
 {
   for (size_t i = 0; i < n; ++i)
   {
-    if (strcmp(fldinfo[i].str, eth_get_symbol_cstr(eth_ordsyms[i+1])) != 0)
+    if (strcmp(fldinfo[i].str, eth_get_symbol_cstr(eth_ordsyms[i + 1])) != 0)
       return false;
   }
   return true;
@@ -176,7 +171,8 @@ generate_name(const info fldinfo[], size_t n, char *name)
   *p++ = '{';
   for (size_t i = 0; i < n; ++i)
   {
-    if (i > 0) *p++ = ',';
+    if (i > 0)
+      *p++ = ',';
     int len = strlen(fldinfo[i].str);
     memcpy(p, fldinfo[i].str, len);
     p += len;
@@ -190,12 +186,12 @@ make_fields(const info fldinfo[], size_t n, eth_field fields[])
 {
   for (size_t i = 0; i < n; ++i)
   {
-    fields[i].name = (char*)fldinfo[i].str;
+    fields[i].name = (char *)fldinfo[i].str;
     fields[i].offs = offsetof(eth_struct, data[i]);
   }
 }
 
-static eth_type*
+static eth_type *
 record_type(char *const fldnames[], size_t n, bool unique)
 {
   info arr[n];
@@ -210,7 +206,8 @@ record_type(char *const fldnames[], size_t n, bool unique)
   eth_field fields[n];
   make_fields(arr, n, fields);
 
-  eth_hash_t hash = cod_halfsiphash(eth_get_siphash_key(), (void*)totstr, totlen);
+  eth_hash_t hash =
+      cod_halfsiphash(eth_get_siphash_key(), (void *)totstr, totlen);
 
   if (not unique)
   {
@@ -225,7 +222,7 @@ record_type(char *const fldnames[], size_t n, bool unique)
   type->write = write_record;
   type->equal = struct_equal;
   type->clos = create_record_type_info(n);
-  type->dtor = (void*)destroy_record_type_info;
+  type->dtor = (void *)destroy_record_type_info;
 
   if (unique)
     cod_vec_push(g_unque_types, type);
@@ -239,18 +236,17 @@ record_type(char *const fldnames[], size_t n, bool unique)
 }
 
 // TODO: this looks ugly
-eth_type*
+eth_type *
 eth_record_type(char *const fields[], size_t n)
 {
   return record_type(fields, n, false);
 }
 
-eth_type*
+eth_type *
 eth_unique_record_type(char *const fields[], size_t n)
 {
   return record_type(fields, n, true);
 }
-
 
 eth_t
 eth_create_tuple_n(eth_type *type, eth_t const data[])
@@ -260,13 +256,22 @@ eth_create_tuple_n(eth_type *type, eth_t const data[])
   assert(n > 1);
   switch (n)
   {
-    case 2: return eth_tup2(data[0], data[1]); break;
-    case 3: return eth_tup3(data[0], data[1], data[2]); break;
-    case 4: return eth_tup4(data[0], data[1], data[2], data[3]); break;
-    case 5: return eth_tup5(data[0], data[1], data[2], data[3], data[4]); break;
-    case 6: return eth_tup6(data[0], data[1], data[2], data[3], data[4], data[5]); break;
-    default:
-    {
+    case 2:
+      return eth_tup2(data[0], data[1]);
+      break;
+    case 3:
+      return eth_tup3(data[0], data[1], data[2]);
+      break;
+    case 4:
+      return eth_tup4(data[0], data[1], data[2], data[3]);
+      break;
+    case 5:
+      return eth_tup5(data[0], data[1], data[2], data[3], data[4]);
+      break;
+    case 6:
+      return eth_tup6(data[0], data[1], data[2], data[3], data[4], data[5]);
+      break;
+    default: {
       eth_struct *tup = eth_malloc(sizeof(eth_struct) + sizeof(eth_t) * n);
       eth_init_header(tup, type);
       for (int i = 0; i < n; ++i)
@@ -282,7 +287,7 @@ eth_create_record(eth_type *type, eth_t const data[])
   assert(eth_is_plain(type));
   int n = type->nfields;
   assert(n > 0);
-  eth_struct *rec = eth_alloc(sizeof(eth_struct) + sizeof(eth_t)*n);
+  eth_struct *rec = eth_alloc(sizeof(eth_struct) + sizeof(eth_t) * n);
   eth_init_header(rec, type);
   for (int i = 0; i < n; ++i)
     eth_ref(rec->data[i] = data[i]);
@@ -300,10 +305,11 @@ eth_record(char *const keys[], eth_t const vals[], int n)
   // Sort fields by IDs:
   // - sort
   int idxs[n];
-  for (int i = 0; i < n; idxs[i] = i, ++i);
+  for (int i = 0; i < n; idxs[i] = i, ++i)
+    ;
   int cmp(const void *p1, const void *p2)
   {
-    int i1 = *(int*)p1, i2 = *(int*)p2;
+    int i1 = *(int *)p1, i2 = *(int *)p2;
     return eth_get_symbol_id(keysyms[i1]) - eth_get_symbol_id(keysyms[i2]);
   }
   qsort(idxs, n, sizeof(int), cmp);
@@ -323,12 +329,12 @@ eth_record(char *const keys[], eth_t const vals[], int n)
 void
 eth_set_record_field_flag(eth_type *rtype, int fieldidx, eth_rf_flag flag)
 {
-  ((record_type_info*)rtype->clos)->field_flags[fieldidx] |= (1 << flag);
+  ((record_type_info *)rtype->clos)->field_flags[fieldidx] |= (1 << flag);
 }
 
 bool
 eth_get_record_field_flag(eth_type *rtype, int fieldidx, eth_rf_flag flag)
 {
-  return (((record_type_info*)rtype->clos)->field_flags[fieldidx] & (1 << flag)) == (1 << flag);
+  return (((record_type_info *)rtype->clos)->field_flags[fieldidx] &
+          (1 << flag)) == (1 << flag);
 }
-

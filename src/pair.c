@@ -18,9 +18,10 @@
 eth_type *eth_pair_type;
 
 static void
-destroy_pair(eth_type *type, eth_t x)
+destroy_pair(eth_type *__attribute((unused)) type, eth_t x)
 {
-  while (x->type == eth_pair_type) {
+  while (x->type == eth_pair_type)
+  {
     eth_t tmp = eth_cdr(x);
     eth_unref(eth_car(x));
     eth_free_h2(x);
@@ -33,12 +34,13 @@ destroy_pair(eth_type *type, eth_t x)
 }
 
 static void
-write_pair(eth_type *type, eth_t x, FILE *stream)
+write_pair(eth_type *__attribute((unused)) type, eth_t x, FILE *stream)
 {
   if (eth_is_proper_list(x))
   {
     putc('[', stream);
-    while (x->type == eth_pair_type) {
+    while (x->type == eth_pair_type)
+    {
       eth_write(eth_car(x), stream);
       x = eth_cdr(x);
       if (x != eth_nil)
@@ -48,7 +50,8 @@ write_pair(eth_type *type, eth_t x, FILE *stream)
   }
   else
   {
-    while (x->type == eth_pair_type) {
+    while (x->type == eth_pair_type)
+    {
       if (eth_car(x)->type == eth_pair_type)
         putc('(', stream);
       eth_write(eth_car(x), stream);
@@ -62,7 +65,7 @@ write_pair(eth_type *type, eth_t x, FILE *stream)
 }
 
 static bool
-pair_equal(eth_type *type, eth_t x, eth_t y)
+pair_equal(eth_type *__attribute((unused)) type, eth_t x, eth_t y)
 {
   while (x->type == eth_pair_type and y->type == eth_pair_type)
   {
@@ -82,17 +85,13 @@ len_impl(void)
   eth_return(args, eth_num(eth_length(l, NULL)));
 }
 
-void
-_eth_init_pair_type(void)
+ETH_TYPE_CONSTRUCTOR(init_pair_type)
 {
-  eth_field fields[] = {
-    { "car", offsetof(eth_pair, car) },
-    { "cdr", offsetof(eth_pair, cdr) }
-  };
+  eth_field fields[] = {{"car", offsetof(eth_pair, car)},
+                        {"cdr", offsetof(eth_pair, cdr)}};
   eth_pair_type = eth_create_struct_type("pair", fields, 2);
   eth_pair_type->destroy = destroy_pair;
   eth_pair_type->write = write_pair;
   eth_pair_type->equal = pair_equal;
   eth_add_method(eth_pair_type->methods, eth_len_method, eth_proc(len_impl, 1));
 }
-

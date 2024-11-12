@@ -2,12 +2,9 @@
 
 #include <codeine/vec.h>
 
-
 ETH_MODULE("ether:rbtree")
 
-
-eth_type* eth_rbtree_type;
-
+eth_type *eth_rbtree_type;
 
 typedef enum { EMPTY, RED, BLACK } color_t;
 
@@ -16,30 +13,34 @@ typedef struct rbtree {
   color_t color;
   eth_t value;
   union {
-    struct { struct rbtree *left, *right; };
+    struct {
+      struct rbtree *left, *right;
+    };
     struct rbtree *branch[2];
   };
 } rbtree;
 
 static inline bool
 test_color(rbtree *a, color_t color)
-{ return a ? a->color == color : false; }
+{
+  return a ? a->color == color : false;
+}
 
-
-static rbtree*
+static rbtree *
 make_node(color_t color, eth_t x, rbtree *a, rbtree *b)
 {
   rbtree *t = eth_alloc(sizeof(rbtree));
   t->color = color;
-  if ((t->left = a)) eth_ref(ETH(a));
-  if ((t->right = b)) eth_ref(ETH(b));
+  if ((t->left = a))
+    eth_ref(ETH(a));
+  if ((t->right = b))
+    eth_ref(ETH(b));
   eth_ref(t->value = x);
   eth_init_header(&t->hdr, eth_rbtree_type);
   return t;
 }
 
-
-static rbtree*
+static rbtree *
 balance(color_t color, eth_t x, rbtree *a, rbtree *b)
 {
   if (color == BLACK)
@@ -48,21 +49,19 @@ balance(color_t color, eth_t x, rbtree *a, rbtree *b)
     {
       if (test_color(a->left, RED))
       {
-        rbtree *ret = make_node(RED,
-            a->value,
+        rbtree *ret = make_node(
+            RED, a->value,
             make_node(BLACK, a->left->value, a->left->left, a->left->right),
-            make_node(BLACK, x, a->right, b)
-        );
+            make_node(BLACK, x, a->right, b));
         eth_drop(ETH(a));
         return ret;
       }
       else if (test_color(a->right, RED))
       {
-        rbtree *ret = make_node(RED,
-            a->right->value,
-            make_node(BLACK, a->value, a->left, a->right->left),
-            make_node(BLACK, x, a->right->right, b)
-        );
+        rbtree *ret =
+            make_node(RED, a->right->value,
+                      make_node(BLACK, a->value, a->left, a->right->left),
+                      make_node(BLACK, x, a->right->right, b));
         eth_drop(ETH(a));
         return ret;
       }
@@ -71,21 +70,17 @@ balance(color_t color, eth_t x, rbtree *a, rbtree *b)
     {
       if (test_color(b->left, RED))
       {
-        rbtree *ret = make_node(RED,
-            b->left->value,
-            make_node(BLACK, x, a, b->left->left),
-            make_node(BLACK, b->value, b->left->right, b->right)
-        );
+        rbtree *ret = make_node(
+            RED, b->left->value, make_node(BLACK, x, a, b->left->left),
+            make_node(BLACK, b->value, b->left->right, b->right));
         eth_drop(ETH(b));
         return ret;
       }
       else if (test_color(b->right, RED))
       {
-        rbtree *ret = make_node(RED,
-            b->value,
-            make_node(BLACK, x, a, b->left),
-            make_node(BLACK, b->right->value, b->right->left, b->right->right)
-        );
+        rbtree *ret = make_node(
+            RED, b->value, make_node(BLACK, x, a, b->left),
+            make_node(BLACK, b->right->value, b->right->left, b->right->right));
         eth_drop(ETH(b));
         return ret;
       }
@@ -94,9 +89,9 @@ balance(color_t color, eth_t x, rbtree *a, rbtree *b)
   return make_node(color, x, a, b);
 }
 
-
-static rbtree*
-insert_aux(rbtree *t, eth_t x, int (*compare)(eth_t, eth_t, eth_t*), eth_t *exn)
+static rbtree *
+insert_aux(rbtree *t, eth_t x, int (*compare)(eth_t, eth_t, eth_t *),
+           eth_t *exn)
 {
   if (t and t->color != EMPTY)
   {
@@ -106,14 +101,18 @@ insert_aux(rbtree *t, eth_t x, int (*compare)(eth_t, eth_t, eth_t*), eth_t *exn)
     else if (test > 0)
     {
       rbtree *newright = insert_aux(t->right, x, compare, exn);
-      if (*exn) return NULL;
-      else return balance(t->color, t->value, t->left, newright);
+      if (*exn)
+        return NULL;
+      else
+        return balance(t->color, t->value, t->left, newright);
     }
     else if (test < 0)
     {
       rbtree *newleft = insert_aux(t->left, x, compare, exn);
-      if (*exn) return NULL;
-      else return balance(t->color, t->value, newleft, t->right);
+      if (*exn)
+        return NULL;
+      else
+        return balance(t->color, t->value, newleft, t->right);
     }
     else
       return make_node(t->color, x, t->left, t->right);
@@ -122,17 +121,17 @@ insert_aux(rbtree *t, eth_t x, int (*compare)(eth_t, eth_t, eth_t*), eth_t *exn)
     return make_node(RED, x, NULL, NULL);
 }
 
-static rbtree*
-insert(rbtree *t, eth_t x, int (*compare)(eth_t, eth_t, eth_t*), eth_t *exn)
+static rbtree *
+insert(rbtree *t, eth_t x, int (*compare)(eth_t, eth_t, eth_t *), eth_t *exn)
 {
   rbtree *ret = insert_aux(t, x, compare, exn);
-  if (ret) ret->color = BLACK;
+  if (ret)
+    ret->color = BLACK;
   return ret;
 }
 
-
 static eth_t
-find(rbtree *t, eth_t x, int (*compare)(eth_t, eth_t, eth_t*), eth_t *exn)
+find(rbtree *t, eth_t x, int (*compare)(eth_t, eth_t, eth_t *), eth_t *exn)
 {
   if (t and t->color != EMPTY)
   {
@@ -150,15 +149,17 @@ find(rbtree *t, eth_t x, int (*compare)(eth_t, eth_t, eth_t*), eth_t *exn)
     return NULL;
 }
 
-static void
-foreach(rbtree *t, bool (*f)(eth_t x, void *data), void *data, int dir)
+static void foreach (rbtree *t, bool (*f)(eth_t x, void *data), void *data,
+                     int dir)
 {
   if (t and t->color != EMPTY)
   {
     if (f(t->value, data))
     {
-      foreach(t->branch[dir % 2], f, data, dir);
-      foreach(t->branch[(dir + 1) % 2], f, data, dir);
+      foreach (t->branch[dir % 2], f, data, dir)
+        ;
+      foreach (t->branch[(dir + 1) % 2], f, data, dir)
+        ;
     }
   }
 }
@@ -226,21 +227,22 @@ compare(eth_t x, eth_t y, eth_t *exn)
 
 static int
 tup_compare(eth_t x, eth_t y, eth_t *exn)
-{ return compare(eth_tup_get(x, 0), eth_tup_get(y, 0), exn); }
-
+{
+  return compare(eth_tup_get(x, 0), eth_tup_get(y, 0), exn);
+}
 
 struct eth_rbtree_iterator {
-  cod_vec(rbtree*) stack;
+  cod_vec(rbtree *) stack;
   int idx;
 };
 
-eth_rbtree_iterator*
+eth_rbtree_iterator *
 eth_rbtree_begin(eth_t t)
 {
   eth_rbtree_iterator *it = eth_alloc(sizeof(eth_rbtree_iterator));
   cod_vec_init(it->stack);
-  if (((rbtree*)t)->color != EMPTY)
-    cod_vec_push(it->stack, (rbtree*)t);
+  if (((rbtree *)t)->color != EMPTY)
+    cod_vec_push(it->stack, (rbtree *)t);
   return it;
 }
 
@@ -293,13 +295,12 @@ eth_rbtree_stop(eth_rbtree_iterator *it)
   eth_free(it, sizeof(eth_rbtree_iterator));
 }
 
-
 eth_t
 eth_rbtree_mfind(eth_t t, eth_t k, eth_t *exn)
 {
   eth_t ktup = eth_tup2(k, eth_nil);
   eth_t myexn = NULL;
-  eth_t res = find((rbtree*)t, ktup, tup_compare, &myexn);
+  eth_t res = find((rbtree *)t, ktup, tup_compare, &myexn);
   eth_ref(k);
   eth_drop(ktup);
   eth_dec(k);
@@ -307,7 +308,8 @@ eth_rbtree_mfind(eth_t t, eth_t k, eth_t *exn)
     return res;
   else
   {
-    if (exn) *exn = myexn;
+    if (exn)
+      *exn = myexn;
     return NULL;
   }
 }
@@ -316,12 +318,13 @@ eth_t
 eth_rbtree_sfind(eth_t t, eth_t k, eth_t *exn)
 {
   eth_t myexn = NULL;
-  eth_t res = find((rbtree*)t, k, compare, &myexn);
+  eth_t res = find((rbtree *)t, k, compare, &myexn);
   if (res)
     return res;
   else
   {
-    if (exn) *exn = myexn;
+    if (exn)
+      *exn = myexn;
     return NULL;
   }
 }
@@ -330,12 +333,13 @@ eth_t
 eth_rbtree_minsert(eth_t t, eth_t kvtup, eth_t *exn)
 {
   eth_t myexn = NULL;
-  rbtree *res = insert((rbtree*)t, kvtup, tup_compare, &myexn);
+  rbtree *res = insert((rbtree *)t, kvtup, tup_compare, &myexn);
   if (res)
     return ETH(res);
   else
   {
-    if (exn) *exn = myexn;
+    if (exn)
+      *exn = myexn;
     return NULL;
   }
 }
@@ -344,12 +348,13 @@ eth_t
 eth_rbtree_sinsert(eth_t t, eth_t x, eth_t *exn)
 {
   eth_t myexn = NULL;
-  rbtree *res = insert((rbtree*)t, x, compare, &myexn);
+  rbtree *res = insert((rbtree *)t, x, compare, &myexn);
   if (res)
     return ETH(res);
   else
   {
-    if (exn) *exn = myexn;
+    if (exn)
+      *exn = myexn;
     return NULL;
   }
 }
@@ -362,18 +367,26 @@ eth_create_rbtree()
 
 void
 eth_rbtree_foreach(eth_t t, bool (*f)(eth_t x, void *data), void *data)
-{ foreach((rbtree*)t, f, data, 0); }
+{
+  foreach ((rbtree *)t, f, data, 0)
+    ;
+}
 
 void
 eth_rbtree_rev_foreach(eth_t t, bool (*f)(eth_t x, void *data), void *data)
-{ foreach((rbtree*)t, f, data, 1); }
+{
+  foreach ((rbtree *)t, f, data, 1)
+    ;
+}
 
 static void
-destroy(eth_type *type, eth_t x)
+destroy(eth_type *__attribute((unused)) type, eth_t x)
 {
-  rbtree *t = (rbtree*)x;
-  if (t->left) eth_unref(ETH(t->left));
-  if (t->right) eth_unref(ETH(t->right));
+  rbtree *t = (rbtree *)x;
+  if (t->left)
+    eth_unref(ETH(t->left));
+  if (t->right)
+    eth_unref(ETH(t->right));
   eth_unref(t->value);
   eth_free(t, sizeof(rbtree));
 }
@@ -414,15 +427,15 @@ set_impl(void)
   }
 }
 
-
 static void
-write(eth_type *type, eth_t x, FILE *os)
+write(eth_type *__attribute((unused)) type, eth_t x, FILE *os)
 {
   fputc('{', os);
   int isnotfirst = 0;
-  bool iter(eth_t x, void*)
+  bool iter(eth_t x, void *)
   {
-    if (isnotfirst++) fputs(", ", os);
+    if (isnotfirst++)
+      fputs(", ", os);
     eth_fprintf(os, "~w: ~w", eth_tup_get(x, 0), eth_tup_get(x, 1));
     return true;
   }
@@ -430,12 +443,13 @@ write(eth_type *type, eth_t x, FILE *os)
   fputc('}', os);
 }
 
-void
-_eth_init_rbtree_type(void)
+ETH_TYPE_CONSTRUCTOR(init_rbtree_type)
 {
   eth_rbtree_type = eth_create_type("rbtree");
   eth_rbtree_type->destroy = destroy;
   eth_rbtree_type->write = write;
-  eth_add_method(eth_rbtree_type->methods, eth_get_method, eth_proc(get_impl, 2));
-  eth_add_method(eth_rbtree_type->methods, eth_set_method, eth_proc(set_impl, 3));
+  eth_add_method(eth_rbtree_type->methods, eth_get_method,
+                 eth_proc(get_impl, 2));
+  eth_add_method(eth_rbtree_type->methods, eth_set_method,
+                 eth_proc(set_impl, 3));
 }

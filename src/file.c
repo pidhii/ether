@@ -1,24 +1,23 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "ether/ether.h"
 
-#include <string.h>
 #include <errno.h>
 #include <stdlib.h>
-
+#include <string.h>
 
 ETH_MODULE("ether:file")
 
@@ -34,25 +33,25 @@ typedef struct {
   FILE *stream;
   int flag;
   void *data;
-  void (*dtor)(void*);
+  void (*dtor)(void *);
 } file;
 
 extern inline int
 eth_is_open(eth_t f)
 {
-  return ((file*)f)->flag & OPEN;
+  return ((file *)f)->flag & OPEN;
 }
 
 extern inline int
 eth_is_pipe(eth_t f)
 {
-  return ((file*)f)->flag & PIPE;
+  return ((file *)f)->flag & PIPE;
 }
 
 int
 eth_close(eth_t x)
 {
-  file *f = (void*)x;
+  file *f = (void *)x;
   if (eth_is_open(x))
   {
     f->flag ^= OPEN;
@@ -67,16 +66,16 @@ eth_close(eth_t x)
   return 0;
 }
 
-FILE*
+FILE *
 eth_get_file_stream(eth_t x)
 {
-  return ((file*)x)->stream;
+  return ((file *)x)->stream;
 }
 
 static void
-destroy_file(eth_type *type, eth_t x)
+destroy_file(eth_type *__attribute((unused)) type, eth_t x)
 {
-  file *f = (void*)x;
+  file *f = (void *)x;
 
   if (eth_is_open(x))
   {
@@ -99,18 +98,17 @@ static void
 init_file(void *f)
 {
   eth_init_header(f, eth_file_type);
-  ((file*)f)->data = NULL;
-  ((file*)f)->dtor = NULL;
+  ((file *)f)->data = NULL;
+  ((file *)f)->dtor = NULL;
 }
 
-void
-_eth_init_file_type(void)
+ETH_TYPE_CONSTRUCTOR(init_file_type)
 {
   eth_file_type = eth_create_type("file");
   eth_file_type->destroy = destroy_file;
 
   static file _stdin, _stdout, _stderr;
-  eth_stdin  = ETH(&_stdin);
+  eth_stdin = ETH(&_stdin);
   eth_stdout = ETH(&_stdout);
   eth_stderr = ETH(&_stderr);
   init_file(eth_stdin);
@@ -177,9 +175,9 @@ eth_open_pipe(const char *command, const char *mod)
 }
 
 void
-eth_set_file_data(eth_t x, void *data, void (*dtor)(void*))
+eth_set_file_data(eth_t x, void *data, void (*dtor)(void *))
 {
-  file *f = (file*)x;
+  file *f = (file *)x;
   f->data = data;
   f->dtor = dtor;
 }
@@ -187,6 +185,6 @@ eth_set_file_data(eth_t x, void *data, void (*dtor)(void*))
 void
 eth_disown_file(eth_t x)
 {
-  file *f = (file*)x;
+  file *f = (file *)x;
   f->flag ^= OWNR;
 }

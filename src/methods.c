@@ -48,7 +48,7 @@ _apply(void)
   eth_return(args, ret);
 }
 
-void
+__attribute__((constructor(102))) void
 _eth_init_methods(void)
 {
   eth_method_type = eth_create_type("method");

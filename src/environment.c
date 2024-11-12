@@ -366,14 +366,14 @@ eth_load_module_from_elf(eth_root *root, const char *path)
   if (not realpath(path, fullpath))
   {
     eth_warning("no such file \"%s\"", path);
-    return false;
+    return NULL;
   }
 
   eth_module *memmod;
   if ((memmod = check_memorized(root, fullpath)))
   {
     if (memmod == (eth_module*)(-1))
-      return false;
+      return NULL;
     else
       return memmod;
   }

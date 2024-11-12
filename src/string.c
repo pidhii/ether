@@ -15,24 +15,24 @@
  */
 #include "ether/ether.h"
 
-#include <stdlib.h>
-#include <string.h>
 #include <assert.h>
 #include <ctype.h>
+#include <stdlib.h>
+#include <string.h>
 
 eth_type *eth_string_type;
 
 static eth_t g_chars[256];
 
 static void
-destroy_string(eth_type *type, eth_t x)
+destroy_string(eth_type *__attribute((unused)) type, eth_t x)
 {
   free(ETH_STRING(x)->cstr);
   free(x);
 }
 
 static void
-write_string(eth_type *type, eth_t x, FILE *out)
+write_string(eth_type *__attribute((unused)) type, eth_t x, FILE *out)
 {
   fputc('\'', out);
   const char *p = eth_str_cstr(x);
@@ -44,16 +44,35 @@ write_string(eth_type *type, eth_t x, FILE *out)
     {
       switch (p[i])
       {
-        case '\'': fputs("\\'", out); break;
-        case '\0': fputs("\\0", out); break;
-        case '\a': fputs("\\a", out); break;
-        case '\b': fputs("\\b", out); break;
-        case '\f': fputs("\\f", out); break;
-        case '\n': fputs("\\n", out); break;
-        case '\r': fputs("\\r", out); break;
-        case '\t': fputs("\\t", out); break;
-        case '\v': fputs("\\v", out); break;
-        default: fprintf(out, "\\x%hhx", p[i]);
+        case '\'':
+          fputs("\\'", out);
+          break;
+        case '\0':
+          fputs("\\0", out);
+          break;
+        case '\a':
+          fputs("\\a", out);
+          break;
+        case '\b':
+          fputs("\\b", out);
+          break;
+        case '\f':
+          fputs("\\f", out);
+          break;
+        case '\n':
+          fputs("\\n", out);
+          break;
+        case '\r':
+          fputs("\\r", out);
+          break;
+        case '\t':
+          fputs("\\t", out);
+          break;
+        case '\v':
+          fputs("\\v", out);
+          break;
+        default:
+          fprintf(out, "\\x%hhx", p[i]);
       }
     }
   }
@@ -61,16 +80,16 @@ write_string(eth_type *type, eth_t x, FILE *out)
 }
 
 static void
-display_string(eth_type *type, eth_t x, FILE *out)
+display_string(eth_type *__attribute((unused)) type, eth_t x, FILE *out)
 {
   fwrite(eth_str_cstr(x), 1, eth_str_len(x), out);
 }
 
 static bool
-string_equal(eth_type *type, eth_t x, eth_t y)
+string_equal(eth_type *__attribute((unused)) type, eth_t x, eth_t y)
 {
-  return eth_str_len(x) == eth_str_len(y)
-     and memcmp(eth_str_cstr(x), eth_str_cstr(y), eth_str_len(x)) == 0;
+  return eth_str_len(x) == eth_str_len(y) and
+         memcmp(eth_str_cstr(x), eth_str_cstr(y), eth_str_len(x)) == 0;
 }
 
 static eth_t
@@ -90,16 +109,17 @@ len_impl(void)
   eth_return(args, eth_num(eth_str_len(s)));
 }
 
-void
-_eth_init_strings(void)
+ETH_TYPE_CONSTRUCTOR(init_string_type)
 {
   eth_string_type = eth_create_type("string");
   eth_string_type->destroy = destroy_string;
   eth_string_type->write = write_string;
   eth_string_type->display = display_string;
   eth_string_type->equal = string_equal;
-  eth_add_method(eth_string_type->methods, eth_cmp_method, eth_proc(cmp_impl, 2));
-  eth_add_method(eth_string_type->methods, eth_len_method, eth_proc(len_impl, 1));
+  eth_add_method(eth_string_type->methods, eth_cmp_method,
+                 eth_proc(cmp_impl, 2));
+  eth_add_method(eth_string_type->methods, eth_len_method,
+                 eth_proc(len_impl, 1));
 
   for (int i = 0; i < 256; ++i)
   {
@@ -158,4 +178,3 @@ eth_create_string_from_char(char c)
 {
   return g_chars[(uint8_t)c];
 }
-

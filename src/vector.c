@@ -15,18 +15,14 @@
  */
 #include "ether/ether.h"
 
-#include <stdlib.h>
-#include <math.h>
 #include <assert.h>
+#include <stdlib.h>
 #include <string.h>
-
 
 ETH_MODULE("ether:vector")
 
-
 #define NODE_SIZE_LOG2 ETH_VECTOR_SLICE_SIZE_LOG2
 #define NODE_SIZE ETH_VECTOR_SLICE_SIZE
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //                            Auxilary Tree
@@ -41,7 +37,7 @@ struct vector_node {
 };
 
 // TODO: use uniform allocator
-static inline vector_node*
+static inline vector_node *
 create_node(void)
 {
   return calloc(1, sizeof(vector_node));
@@ -88,7 +84,7 @@ ref_node(vector_node *node)
   node->rc += 1;
 }
 
-static inline vector_node*
+static inline vector_node *
 copy_leaf(const vector_node *restrict node)
 {
   vector_node *newnode = calloc(1, sizeof(vector_node));
@@ -97,7 +93,7 @@ copy_leaf(const vector_node *restrict node)
   return newnode;
 }
 
-static inline vector_node*
+static inline vector_node *
 copy_branch(const vector_node *restrict node)
 {
   vector_node *newnode = calloc(1, sizeof(vector_node));
@@ -127,7 +123,7 @@ destroy_tree(vector_tree *tree)
     unref_node(tree->root, tree->depth);
 }
 
-static vector_node*
+static vector_node *
 find_node(const vector_tree *tree, int *restrict k)
 {
   vector_node *curr = tree->root;
@@ -143,9 +139,9 @@ find_node(const vector_tree *tree, int *restrict k)
   return curr;
 }
 
-static vector_node*
+static vector_node *
 copy_path_aux(const vector_node *curr, int log2cap, int lvl, int *restrict k,
-    vector_node **leaf)
+              vector_node **leaf)
 {
   if (lvl > 1)
   {
@@ -155,7 +151,7 @@ copy_path_aux(const vector_node *curr, int log2cap, int lvl, int *restrict k,
 
     vector_node *newnode = copy_branch(curr);
     vector_node *newsubnode =
-      copy_path_aux(curr->subnodes[isub], log2cap, lvl-1, k, leaf);
+        copy_path_aux(curr->subnodes[isub], log2cap, lvl - 1, k, leaf);
 
     dec_node(newnode->subnodes[isub]);
     ref_node(newnode->subnodes[isub] = newsubnode);
@@ -164,7 +160,7 @@ copy_path_aux(const vector_node *curr, int log2cap, int lvl, int *restrict k,
   return *leaf = copy_leaf(curr);
 }
 
-static vector_node*
+static vector_node *
 copy_path(vector_tree *tree, int *restrict k)
 {
   /* No copying untill encountered a node with multiple references. */
@@ -229,11 +225,12 @@ copy_path(vector_tree *tree, int *restrict k)
 }
 
 static void
-append_node(vector_node *root, int k, int depth, int log2cap, vector_node *node);
+append_node(vector_node *root, int k, int depth, int log2cap,
+            vector_node *node);
 
-static vector_node*
+static vector_node *
 append_node_pers(const vector_node *root, int k, int depth, int log2cap,
-    vector_node *node);
+                 vector_node *node);
 
 // TODO: optimize path throug unintialized branch
 static void
@@ -253,13 +250,13 @@ append_node(vector_node *root, int k, int depth, int log2cap, vector_node *node)
       return;
     }
     else
-    // init branch node
+      // init branch node
       ref_node(root->subnodes[isub] = create_node());
   }
   else if (root->subnodes[isub]->rc > 1)
   {
     vector_node *newbranch =
-      append_node_pers(root->subnodes[isub], k, depth - 1, log2cap, node);
+        append_node_pers(root->subnodes[isub], k, depth - 1, log2cap, node);
     dec_node(root->subnodes[isub]);
     ref_node(root->subnodes[isub] = newbranch);
   }
@@ -267,9 +264,9 @@ append_node(vector_node *root, int k, int depth, int log2cap, vector_node *node)
   append_node(root->subnodes[isub], k, depth - 1, log2cap, node);
 }
 
-static vector_node*
+static vector_node *
 append_node_pers(const vector_node *root, int k, int depth, int log2cap,
-    vector_node *node)
+                 vector_node *node)
 {
   log2cap -= NODE_SIZE_LOG2;
   int isub = k >> log2cap;
@@ -292,15 +289,14 @@ append_node_pers(const vector_node *root, int k, int depth, int log2cap,
     }
     else
     {
-      vector_node *newbranch =
-        append_node_pers(newroot->subnodes[isub], k, depth - 1, log2cap, node);
+      vector_node *newbranch = append_node_pers(newroot->subnodes[isub], k,
+                                                depth - 1, log2cap, node);
       dec_node(newroot->subnodes[isub]);
       ref_node(newroot->subnodes[isub] = newbranch);
       return newroot;
     }
   }
 }
-
 
 static void
 push_node(vector_tree *restrict tree, vector_node *node)
@@ -338,8 +334,8 @@ push_node(vector_tree *restrict tree, vector_node *node)
     {
       if (tree->root->rc > 1)
       {
-        vector_node *newroot =
-          append_node_pers(tree->root, tree->size, tree->depth, log2cap, node);
+        vector_node *newroot = append_node_pers(tree->root, tree->size,
+                                                tree->depth, log2cap, node);
         dec_node(tree->root);
         ref_node(tree->root = newroot);
       }
@@ -359,12 +355,12 @@ typedef struct {
   int tailsize;
   vector_node *tail;
 } vector;
-#define VECTOR(x) ((vector*)(x))
+#define VECTOR(x) ((vector *)(x))
 
 eth_type *eth_vector_type;
 
 static void
-destroy_vector(eth_type *type, eth_t x)
+destroy_vector(eth_type *__attribute((unused)) type, eth_t x)
 {
   vector *vec = VECTOR(x);
   destroy_tree(&vec->tree);
@@ -401,7 +397,6 @@ set_impl(void)
     eth_return(args, eth_insert_pers(vec, eth_num_val(idx), val));
 }
 
-
 static eth_t
 len_impl(void)
 {
@@ -410,17 +405,19 @@ len_impl(void)
   eth_return(args, eth_num(eth_vec_len(vec)));
 }
 
-void
-_eth_init_vector_type(void)
+ETH_TYPE_CONSTRUCTOR(init_vector_type)
 {
   eth_vector_type = eth_create_type("vector");
   eth_vector_type->destroy = destroy_vector;
-  eth_add_method(eth_vector_type->methods, eth_get_method, eth_proc(get_impl, 2));
-  eth_add_method(eth_vector_type->methods, eth_set_method, eth_proc(set_impl, 3));
-  eth_add_method(eth_vector_type->methods, eth_len_method, eth_proc(len_impl, 1));
+  eth_add_method(eth_vector_type->methods, eth_get_method,
+                 eth_proc(get_impl, 2));
+  eth_add_method(eth_vector_type->methods, eth_set_method,
+                 eth_proc(set_impl, 3));
+  eth_add_method(eth_vector_type->methods, eth_len_method,
+                 eth_proc(len_impl, 1));
 }
 
-static vector*
+static vector *
 create_vector(void)
 {
   vector *vec = eth_malloc(sizeof(vector));
@@ -431,7 +428,7 @@ create_vector(void)
   return vec;
 }
 
-static vector*
+static vector *
 copy_vector(vector *vec)
 {
   vector *newvec = eth_malloc(sizeof(vector));
@@ -589,7 +586,7 @@ eth_vector_begin(eth_t v, eth_vector_iterator *iter, int start)
   {
     iter->isend = false;
 
-    vector* v = VECTOR(vec);
+    vector *v = VECTOR(vec);
     if (start >= v->tree.size)
     { // tail slice
       iter->slice.begin = v->tail->leafs + start - v->tree.size;
@@ -647,7 +644,6 @@ eth_vector_next(eth_vector_iterator *iter)
   }
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 //                               Tests
 ////////////////////////////////////////////////////////////////////////////////
@@ -702,4 +698,3 @@ print_tree(const vector_tree *tree, FILE *out)
     fprintf(out, "\n");
   }
 }
-

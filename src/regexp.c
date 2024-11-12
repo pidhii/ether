@@ -19,20 +19,16 @@
 
 #include <string.h>
 
-
 ETH_MODULE("ether:regexp")
 
-
 eth_type *eth_regexp_type;
-
 
 #define ETH_OVECTOR_N 0x64
 #define ETH_OVECTOR_SIZE (ETH_OVECTOR_N * 3)
 
-static
-int g_ovector[ETH_OVECTOR_SIZE];
+static int g_ovector[ETH_OVECTOR_SIZE];
 
-const int*
+const int *
 eth_ovector(void)
 {
   return g_ovector;
@@ -45,17 +41,16 @@ struct eth_regexp {
 };
 
 static void
-destroy_regexp(eth_type *type, eth_t x)
+destroy_regexp(eth_type *__attribute((unused)) type, eth_t x)
 {
-  eth_regexp *regexp = (void*)x;
+  eth_regexp *regexp = (void *)x;
   if (regexp->extra)
     pcre_free_study(regexp->extra);
   pcre_free(regexp->re);
   free(regexp);
 }
 
-void
-_eth_init_regexp_type(void)
+ETH_TYPE_CONSTRUCTOR(init_regextp_type)
 {
   eth_regexp_type = eth_create_type("regexp");
   eth_regexp_type->destroy = destroy_regexp;
@@ -66,8 +61,10 @@ eth_create_regexp(const char *pat, int opts, const char **eptr, int *eoffs)
 {
   const char *_eptr = NULL;
   int _eoffs = 0;
-  if (eptr == NULL) eptr = &_eptr;
-  if (eoffs == NULL) eoffs = &_eoffs;
+  if (eptr == NULL)
+    eptr = &_eptr;
+  if (eoffs == NULL)
+    eoffs = &_eoffs;
 
   pcre *re = pcre_compile(pat, opts, eptr, eoffs, NULL);
   if (re == NULL)
@@ -85,7 +82,7 @@ eth_create_regexp(const char *pat, int opts, const char **eptr, int *eoffs)
 void
 eth_study_regexp(eth_t x)
 {
-  eth_regexp *regexp = (void*)x;
+  eth_regexp *regexp = (void *)x;
   if (not regexp->extra)
   {
     int opt = PCRE_STUDY_JIT_COMPILE | PCRE_STUDY_EXTRA_NEEDED;
@@ -97,7 +94,7 @@ eth_study_regexp(eth_t x)
 int
 eth_get_regexp_ncaptures(eth_t x)
 {
-  eth_regexp *regexp = (void*)x;
+  eth_regexp *regexp = (void *)x;
   int n;
   if (pcre_fullinfo(regexp->re, NULL, PCRE_INFO_CAPTURECOUNT, &n))
     return -1;
@@ -117,10 +114,9 @@ eth_exec_regexp(eth_t x, const char *str, int len, int opts)
     return -1;
   }
 
-  eth_regexp *regexp = (void*)x;
+  eth_regexp *regexp = (void *)x;
   int n = pcre_exec(regexp->re, regexp->extra, str, len, 0, opts, g_ovector,
-      ETH_OVECTOR_SIZE);
+                    ETH_OVECTOR_SIZE);
 
   return n;
 }
-

@@ -1,28 +1,27 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "ether/ether.h"
 
-#include <stdlib.h>
-#include <string.h>
 #include <assert.h>
+#include <stdlib.h>
 
-eth_type* eth_exception_type;
+eth_type *eth_exception_type;
 
 static void
-destroy_exception(eth_type *type, eth_t x)
+destroy_exception(eth_type *__attribute((unused)) type, eth_t x)
 {
   eth_exception *e = ETH_EXCEPTION(x);
   eth_unref(e->what);
@@ -33,15 +32,14 @@ destroy_exception(eth_type *type, eth_t x)
 }
 
 static void
-write_exception(eth_type *type, eth_t x, FILE *out)
+write_exception(eth_type *__attribute((unused)) type, eth_t x, FILE *out)
 {
   eth_fprintf(out, "exception { ~w }", ETH_EXCEPTION(x)->what);
 }
 
-void
-_eth_init_exception_type(void)
+ETH_TYPE_CONSTRUCTOR(init_exception_type)
 {
-  eth_field what = { "what", offsetof(eth_exception, what) };
+  eth_field what = {"what", offsetof(eth_exception, what)};
   eth_exception_type = eth_create_struct_type("exception", &what, 1);
   eth_exception_type->destroy = destroy_exception;
   eth_exception_type->write = write_exception;
@@ -53,7 +51,7 @@ eth_create_exception(eth_t what)
   eth_exception *exn = eth_malloc(sizeof(eth_exception));
   eth_init_header(exn, eth_exception_type);
   eth_ref(exn->what = what);
-  exn->trace = eth_malloc(sizeof(eth_location*));
+  exn->trace = eth_malloc(sizeof(eth_location *));
   exn->tracelen = 0;
   return ETH(exn);
 }
@@ -79,4 +77,3 @@ eth_push_trace(eth_t exn, eth_location *loc)
   e->trace[e->tracelen++] = loc;
   eth_ref_location(loc);
 }
-

@@ -1,33 +1,32 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "ether/ether.h"
 
-#include <stdlib.h>
 #include <math.h>
 
 eth_type *eth_number_type;
 
 static void
-number_destroy(eth_type *type, eth_t num)
+number_destroy(eth_type *__attribute((unused)) type, eth_t num)
 {
   eth_free_h2(num);
 }
 
 static void
-number_write(eth_type *type, eth_t x, FILE *out)
+number_write(eth_type *__attribute((unused)) type, eth_t x, FILE *out)
 {
   eth_number_t val = ETH_NUMBER(x)->val;
   if ((val == INFINITY) | (val == -INFINITY))
@@ -49,7 +48,7 @@ number_write(eth_type *type, eth_t x, FILE *out)
 }
 
 static void
-number_display(eth_type *type, eth_t x, FILE *out)
+number_display(eth_type *__attribute((unused)) type, eth_t x, FILE *out)
 {
   eth_number_t val = ETH_NUMBER(x)->val;
   if ((val == INFINITY) | (val == -INFINITY))
@@ -70,7 +69,7 @@ number_display(eth_type *type, eth_t x, FILE *out)
 }
 
 static bool
-number_equal(eth_type *type, eth_t x, eth_t y)
+number_equal(eth_type *__attribute((unused)) type, eth_t x, eth_t y)
 {
   return eth_num_val(x) == eth_num_val(y);
 }
@@ -84,14 +83,13 @@ cmp_impl(void)
   eth_return(args, eth_num(eth_num_val(y) - eth_num_val(x)));
 }
 
-void
-_eth_init_number_type(void)
+ETH_TYPE_CONSTRUCTOR(init_number_type)
 {
   eth_number_type = eth_create_type("number");
   eth_number_type->destroy = number_destroy;
   eth_number_type->write = number_write;
   eth_number_type->display = number_display;
   eth_number_type->equal = number_equal;
-  eth_add_method(eth_number_type->methods, eth_cmp_method, eth_proc(cmp_impl, 2));
+  eth_add_method(eth_number_type->methods, eth_cmp_method,
+                 eth_proc(cmp_impl, 2));
 }
-

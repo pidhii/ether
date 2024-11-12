@@ -15,17 +15,15 @@
  */
 #include "ether/ether.h"
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-
 
 ETH_MODULE("ether:function")
 
-eth_type* eth_function_type;
+eth_type *eth_function_type;
 
-
-eth_source*
+eth_source *
 eth_create_source(eth_ast *ast, eth_ir *ir, eth_ssa *ssa)
 {
   eth_source *src = eth_malloc(sizeof(eth_source));
@@ -65,10 +63,9 @@ eth_drop_source(eth_source *src)
     destroy_source(src);
 }
 
-
 // TODO: may cause stack overflow during UNREF of captures
 static void
-function_destroy(eth_type * __attribute((unused)) type, eth_t x)
+function_destroy(eth_type *__attribute((unused)) type, eth_t x)
 {
   eth_function *func = ETH_FUNCTION(x);
 
@@ -114,14 +111,13 @@ eth_deactivate_clos(eth_function *func)
   func->proc.dtor = NULL;
 }
 
-void
-_eth_init_function_type(void)
+ETH_TYPE_CONSTRUCTOR(init_function_type)
 {
   eth_function_type = eth_create_type("function");
   eth_function_type->destroy = function_destroy;
 }
 
-static inline eth_function* __attribute__((eth_malloc))
+static inline eth_function *__attribute__((eth_malloc))
 create_function(void)
 {
   eth_function *func = eth_alloc_h6();
@@ -130,7 +126,7 @@ create_function(void)
 }
 
 eth_t
-eth_create_proc(eth_t (*f)(void), int n, void *data, void (*dtor)(void*), ...)
+eth_create_proc(eth_t (*f)(void), int n, void *data, void (*dtor)(void *), ...)
 {
   eth_function *func = create_function();
   func->islam = false;
@@ -142,7 +138,8 @@ eth_create_proc(eth_t (*f)(void), int n, void *data, void (*dtor)(void*), ...)
 }
 
 eth_t
-eth_create_clos(eth_source *src, eth_bytecode *bc, eth_t *cap, int ncap, int arity)
+eth_create_clos(eth_source *src, eth_bytecode *bc, eth_t *cap, int ncap,
+                int arity)
 {
   eth_function *func = create_function();
   func->islam = true;
@@ -172,7 +169,7 @@ eth_create_dummy_func(int arity)
 
 void
 eth_finalize_clos(eth_function *func, eth_source *src, eth_bytecode *bc,
-    eth_t *cap, int ncap, int arity)
+                  eth_t *cap, int ncap, int arity)
 {
   assert(arity == func->arity);
   func->islam = true;
@@ -185,7 +182,6 @@ eth_finalize_clos(eth_function *func, eth_source *src, eth_bytecode *bc,
   eth_ref_source(src);
   eth_ref_bytecode(bc);
 }
-
 
 typedef struct {
   eth_t f;
@@ -235,7 +231,8 @@ _eth_partial_apply(eth_function *fn, int narg)
 
   if (arity < narg)
   {
-    for (int i = arity; i < narg; eth_ref(eth_sp[i++]));
+    for (int i = arity; i < narg; eth_ref(eth_sp[i++]))
+      ;
     eth_t tmp_f = _eth_raw_apply(ETH(fn));
     narg -= arity;
 
@@ -256,7 +253,8 @@ _eth_partial_apply(eth_function *fn, int narg)
       }
     }
 
-    for (int i = 0; i < narg; eth_dec(eth_sp[i++]));
+    for (int i = 0; i < narg; eth_dec(eth_sp[i++]))
+      ;
     eth_ref(tmp_f);
     eth_t ret = eth_apply(tmp_f, narg);
     eth_ref(ret);
@@ -267,14 +265,14 @@ _eth_partial_apply(eth_function *fn, int narg)
   else
   {
     size_t datasz = sizeof(curry_data) + sizeof(eth_t) * narg;
-    curry_data *data = datasz <= ETH_H6_SIZE ? eth_alloc_h6() : eth_malloc(datasz);
+    curry_data *data =
+        datasz <= ETH_H6_SIZE ? eth_alloc_h6() : eth_malloc(datasz);
     eth_ref(data->f = ETH(fn));
     data->n = narg;
     for (int i = 0; i < narg; ++i)
       eth_ref(data->p[i] = eth_sp[i]);
     eth_pop_stack(narg);
-    return eth_create_proc(curried, arity - narg, data, (void*)destroy_curried);
-
+    return eth_create_proc(curried, arity - narg, data,
+                           (void *)destroy_curried);
   }
 }
-

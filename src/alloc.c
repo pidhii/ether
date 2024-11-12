@@ -170,7 +170,7 @@ eth_free_h6(void *ptr)
 
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-void
+__attribute__((constructor(101))) void
 _eth_init_alloc(void)
 {
   cod_ualloc_h1_init(&g_allocator_h1);

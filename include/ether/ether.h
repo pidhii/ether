@@ -213,6 +213,9 @@ eth_get_siphash_key(void);
 const char*
 eth_errno_to_str(int e);
 
+#define ETH_TYPE_CONSTRUCTOR(ident) \
+  __attribute__((constructor(104))) static void \
+  ident(void)
 
 void
 eth_init(void *argv);
