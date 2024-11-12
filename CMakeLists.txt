@@ -40,7 +40,7 @@ option (WITH_VALGRIND "Enable valgrind support" ON)
 #
 set (WARNING_FLAGS "-Wall -Werror -Wextra -Wno-unused -Wno-error=cpp -Wno-maybe-uninitialized")
 # ------------------------------ Common Flags ----------------------------------
-set (CMAKE_C_STANDARD 99)
+set (CMAKE_C_STANDARD 17)
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${WARNING_FLAGS} -rdynamic")
 # --
 if (DISABLE_BUILTINS)
