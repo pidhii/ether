@@ -120,7 +120,6 @@ let pub record = lazy
       pairs
       |> mapi (,)
       |> sort (fn (i, (a, _)) (j, (b, _)) ->
-          __print_to stdout ("strcmp", a, b, "->", strcmp a b);
         let cmp = strcmp a b in
         if cmp < 0 then true
         else if cmp == 0 then i < j
@@ -131,7 +130,6 @@ let pub record = lazy
 
     -- remove duplicate keys (leave the latest one) and construct a record
     let rec fn loop l acc =
-      __print_to stdout ("loop", l, acc);
       if let x :: xs = l then
         if acc is [] then
           -- accumulate first kv-pair
