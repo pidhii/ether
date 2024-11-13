@@ -926,6 +926,7 @@ _list(void)
   else
   {
     eth_drop(x);
+    eth_error("can't list object of type %s", x->type->name);
     return eth_exn(eth_invalid_argument());
   }
 }
@@ -1384,7 +1385,7 @@ eth_create_builtins(eth_root *root)
   eth_define(mod, "regexp?", eth_create_proc(_regexp_p, 1, NULL, NULL));
   eth_define(mod, "vector?", eth_create_proc(_vector_p, 1, NULL, NULL));
   // ---
-  eth_define(mod, "list", eth_create_proc(_list, 1, NULL, NULL));
+  eth_define(mod, "__list", eth_create_proc(_list, 1, NULL, NULL));
   eth_define(mod, "__rev_list", eth_create_proc(_rev_list, 1, NULL, NULL));
   eth_define(mod, "__record", eth_create_proc(_record, 1, NULL, NULL));
   // ---

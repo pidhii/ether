@@ -37,6 +37,20 @@ let pub __builtin fn (not) x = not x in
 
 --let pub (∘) f g x = f (g x)
 
+let pub fn list x =
+  if x is of (_ :: _) then
+    let rec fn unwrap xs acc =
+      if let x :: xs = xs then
+        unwrap xs (x :: acc)
+      else
+        __rev_list acc
+    in
+    unwrap x nil
+  else
+    __list x
+in
+
+
 -- Application
 let pub fn ($) f x = f x in
 let pub fn (|>) x f = f x in

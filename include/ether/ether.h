@@ -1174,8 +1174,25 @@ eth_get_lazy_value(eth_t x)
   else
   {
     eth_t val = eth_apply(lazy->proc, 0);
+    if (eth_unlikely(val->type == eth_exception_type))
+    {
+      eth_fprintf(stderr, "unhandled exception during lazy evaluation: ~w", val);
+      abort();
+    }
+
+    eth_ref(val);
     eth_unref(lazy->proc);
-    eth_ref(lazy->value = val);
+
+    // fall through nested lazies
+    while (val->type == eth_lazy_type)
+    {
+      eth_t tmp = eth_get_lazy_value(val);
+      eth_ref(tmp);
+      eth_unref(val);
+      val = tmp;
+    }
+
+    lazy->value = val;
     lazy->ready = true;
     return val;
   }
