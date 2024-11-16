@@ -2048,6 +2048,11 @@ eth_ast_constant_pattern(eth_t cval);
 /**
  * Corresponding native syntax for this pattern is `{ ... }`.
  *
+ * @param proto[may be NULL] Protype for the match. To be used for the type-check.
+ * @param fields Fields to be matched.
+ * @param pats Patterns to be matched against @p fields.
+ * @param n Number of @p fields and @p pats.
+ *
  * @see \ref ETH_PATTERN_RECORD
  */
 eth_ast_pattern*
@@ -2368,7 +2373,6 @@ typedef enum {
   ETH_IR_UNOP,
   ETH_IR_FN,
   ETH_IR_MATCH,
-  ETH_IR_ACCESS,
   ETH_IR_LETREC,
   ETH_IR_MULTIMATCH,
   ETH_IR_MKRCRD,
@@ -2420,7 +2424,6 @@ struct eth_ir_node {
     struct { eth_ir_pattern *pat; eth_ir_node *expr, *thenbr, *elsebr;
              eth_toplvl_flag toplvl; int likely; }
       match;
-    struct { eth_ir_node *expr; uint64_t fld; } access;
     struct { eth_type *type; eth_ir_node **fields; } mkrcrd;
     struct { eth_ir_node *src, **fields; size_t *ids; int n; } update;
     struct { eth_ir_node *exn; } throw;
@@ -2476,9 +2479,6 @@ eth_ir_fn(int arity, int *caps, int *capvars, int ncap, int *scpvars_local,
 eth_ir_node*
 eth_ir_match(eth_ir_pattern *pat, eth_ir_node *expr, eth_ir_node *thenbr,
     eth_ir_node *elsebr);
-
-eth_ir_node*
-eth_ir_access(eth_ir_node *expr, uint64_t fld);
 
 eth_ir_node*
 eth_ir_letrec(int *varids, eth_ir_node **exprs, int nvars, eth_ir_node *body);
@@ -2840,7 +2840,6 @@ typedef enum {
   ETH_INSN_APPLYTC,
   ETH_INSN_LOOP,
   ETH_INSN_IF,
-  ETH_INSN_ACCESS,
   ETH_INSN_MOV,
   ETH_INSN_REF,
   ETH_INSN_DEC,
@@ -2889,7 +2888,6 @@ struct eth_insn {
       };
       eth_toplvl_flag toplvl;
     } iff;
-    struct { int src; uint64_t fld; } access;
     struct { eth_binop op; int lhs, rhs; } binop;
     struct { eth_unop op; int vid; } unop;
     struct { int arity, *caps, ncap; eth_ast *ast; eth_ir *ir; eth_ssa *ssa; }
@@ -2943,9 +2941,6 @@ eth_insn_if_match(int out, int cond, eth_ssa_pattern *pat, eth_insn *thenbr,
 eth_insn*
 eth_insn_if_update(int out, int src, int *vids, size_t *ids, int n,
     eth_insn *thenbr, eth_insn *elsebr);
-
-eth_insn*
-eth_insn_access(int out, int src, uint64_t fld);
 
 eth_insn*
 eth_insn_mov(int out, int vid);
@@ -3140,7 +3135,6 @@ typedef enum {
 
   ETH_OPC_LOAD,
   ETH_OPC_LOADRCRD,
-  ETH_OPC_ACCESS,
 
   ETH_OPC_SETEXN,
   ETH_OPC_GETEXN,
@@ -3206,7 +3200,6 @@ struct eth_bc_insn {
     struct { uint64_t out; uint32_t vid, offs; } load;
     // TODO: flatten vids
     struct { int16_t proto; uint16_t src, n; uint64_t *vids; size_t *ids; } loadrcrd;
-    struct { uint64_t fld; uint32_t out, vid; } access;
 
     struct { uint64_t vid; } setexn;
     struct { uint64_t out; } getexn;

@@ -251,17 +251,6 @@ write_testequal(bc_builder *bldr, int vid, eth_t cval)
 }
 
 static int
-write_access(bc_builder *bldr, int out, int vid, uint64_t fld)
-{
-  eth_bc_insn *insn = append_insn(bldr);
-  insn->opc = ETH_OPC_ACCESS;
-  insn->access.out = out;
-  insn->access.vid = vid;
-  insn->access.fld = fld;
-  return bldr->len - 1;
-}
-
-static int
 write_gettest(bc_builder *bldr, int out)
 {
   eth_bc_insn *insn = append_insn(bldr);
@@ -760,25 +749,29 @@ build(bc_builder *bldr, eth_insn *ssa)
           if (ip->iff.likely > 0)
           {
             build(bldr, ip->iff.thenbr);
-            cod_vec_iter(jmps, i, x,
-                         cod_vec_push(bldr->deff, ((deff_block){
-                                                      .jmppos = x,
-                                                      .retpos = bldr->len,
-                                                      .code = ip->iff.elsebr,
-                                                  })););
+            cod_vec_iter(jmps, i, x, {
+              deff_block dbinfo = {
+                  .jmppos = x,
+                  .retpos = bldr->len,
+                  .code = ip->iff.elsebr,
+              };
+              cod_vec_push(bldr->deff, dbinfo);
+            });
           }
           else if (ip->iff.likely < 0)
           {
             build(bldr, ip->iff.elsebr);
-            cod_vec_iter(jmps, i, x,
-                         // change JZEs to JNZs
-                         assert(bldr->arr[x].opc == ETH_OPC_JZE);
-                         bldr->arr[x].opc = ETH_OPC_JNZ;
-                         cod_vec_push(bldr->deff, ((deff_block){
-                                                      .jmppos = x,
-                                                      .retpos = bldr->len,
-                                                      .code = ip->iff.thenbr,
-                                                  })););
+            cod_vec_iter(jmps, i, x, {
+              // change JZEs to JNZs
+              assert(bldr->arr[x].opc == ETH_OPC_JZE);
+              bldr->arr[x].opc = ETH_OPC_JNZ;
+              deff_block dbinfo = {
+                  .jmppos = x,
+                  .retpos = bldr->len,
+                  .code = ip->iff.thenbr,
+              };
+              cod_vec_push(bldr->deff, dbinfo);
+            });
           }
           else
           {
@@ -793,12 +786,6 @@ build(bc_builder *bldr, eth_insn *ssa)
 
       end_if:
         cod_vec_destroy(jmps);
-        break;
-      }
-
-      case ETH_INSN_ACCESS: {
-        write_access(bldr, new_reg(bldr, ip->out),
-                     get_reg(bldr, ip->access.src), ip->access.fld);
         break;
       }
 

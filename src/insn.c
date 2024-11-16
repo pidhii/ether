@@ -325,16 +325,6 @@ eth_insn_if_update(int out, int src, int *vids, size_t *ids, int n,
 }
 
 eth_insn*
-eth_insn_access(int out, int src, uint64_t fld)
-{
-  eth_insn *insn = create_insn(ETH_INSN_ACCESS);
-  insn->out = out;
-  insn->access.src = src;
-  insn->access.fld = fld;
-  return insn;
-}
-
-eth_insn*
 eth_insn_mov(int out, int vid)
 {
   eth_insn *insn = create_insn(ETH_INSN_MOV);
@@ -599,12 +589,6 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
 
       for (int i = 0; i < ident; ++i) putc(' ', stream);
       fputs("end\n", stream);
-      break;
-
-    case ETH_INSN_ACCESS:
-      fprintf(stream, "%%%d = access %%%d [%ju]", insn->out, insn->access.src,
-              insn->access.fld);
-      fprintf(stream, ";\n");
       break;
 
     case ETH_INSN_MOV:

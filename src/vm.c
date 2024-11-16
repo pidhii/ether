@@ -215,7 +215,6 @@ eth_vm(eth_bytecode *bc)
     [ETH_OPC_MKSCP    ] = &&INSN_MKSCP,
     [ETH_OPC_LOAD     ] = &&INSN_LOAD,
     [ETH_OPC_LOADRCRD ] = &&INSN_LOADRCRD,
-    [ETH_OPC_ACCESS   ] = &&INSN_ACCESS,
     [ETH_OPC_SETEXN   ] = &&INSN_SETEXN,
     [ETH_OPC_GETEXN   ] = &&INSN_GETEXN,
     [ETH_OPC_MKRCRD   ] = &&INSN_MKRCRD,
@@ -641,46 +640,6 @@ eth_vm(eth_bytecode *bc)
           /*if (eth_unlikely(i == n))*/
             /*test = 0;*/
         }
-        FAST_DISPATCH_NEXT();
-      }
-
-      // TODO: remove, use load instead
-      OP(ACCESS)
-      {
-        eth_t x = r[ip->access.vid];
-        eth_type *restrict xtype = x->type;
-        if (eth_likely(eth_is_like_record(xtype)))
-        {
-          size_t *restrict ids = xtype->fieldids;
-          const int n = xtype->nfields;
-          const size_t id = ip->access.fld;
-          int i;
-          ids[n] = id;
-          for (i = 0; true; ++i)
-          {
-            if (ids[i] == id)
-              break;
-          }
-          if (i == n)
-            r[ip->access.out] = eth_nil;
-          else
-          {
-            eth_t v = eth_tup_get(x, i);
-            if (v->type == eth_lazy_type)
-            {
-              eth_t vv = eth_get_lazy_value(v);
-              eth_ref(vv);
-              eth_unref(v);
-              ETH_TUPLE(x)->data[i] = vv;
-              r[ip->access.out] = vv;
-            }
-            else
-              r[ip->access.out] = v;
-          }
-        }
-        else
-          r[ip->access.out] = eth_nil;
-
         FAST_DISPATCH_NEXT();
       }
 

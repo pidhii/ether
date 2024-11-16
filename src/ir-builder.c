@@ -13,17 +13,15 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#include "ether/ether.h"
 #include "codeine/vec.h"
+#include "ether/ether.h"
 
-#include <stdlib.h>
-#include <string.h>
 #include <assert.h>
 #include <math.h>
-
+#include <stdlib.h>
+#include <string.h>
 
 ETH_MODULE("ether:ir-builder")
-
 
 typedef struct {
   char *name;
@@ -32,17 +30,17 @@ typedef struct {
 
 typedef struct ir_builder {
   struct ir_builder *parent;
-  eth_root *root; // top-level environment
-  eth_module *mod; // this module
-  bool istoplvl;
-  eth_var_list *vars;
-  int capoffs;
-  int nvars;
-  cod_vec(eth_ir_def) defs;
-  int immcnt;
+  eth_root *root;           // top-level environment
+  eth_module *mod;          // this module
+  bool istoplvl;            // whether it is a top-level scope
+  eth_var_list *vars;       // associative list (alist) of variables
+  int capoffs;              // offset of captured variables in the alist
+  int nvars;                // number of IR variables
+  cod_vec(eth_ir_def) defs; // container for exports
+  int immcnt;               // counter for unique names for macro-modules
 } ir_builder;
 
-static ir_builder*
+static ir_builder *
 create_ir_builder(ir_builder *parent)
 {
   ir_builder *bldr = eth_malloc(sizeof(ir_builder));
@@ -73,10 +71,10 @@ destroy_ir_builder(ir_builder *bldr)
   free(bldr);
 }
 
-static eth_ir_node*
+static eth_ir_node *
 build(ir_builder *bldr, eth_ast *ast, int *e);
 
-static eth_ir_node*
+static eth_ir_node *
 build_with_toplvl(ir_builder *bldr, eth_ast *ast, int *e, bool savetop);
 
 static inline int
@@ -87,15 +85,15 @@ new_vid(ir_builder *bldr)
 
 static inline void
 trace_pub_var(ir_builder *bldr, const char *ident, int varid, eth_attr *attr,
-    eth_location *loc, int *e)
+              eth_location *loc, int *e)
 {
   if (bldr->istoplvl)
   {
     eth_ir_def def = {
-      .tag = ETH_IRDEF_VAR,
-      .ident = strdup(ident),
-      .attr = attr,
-      .varid = varid,
+        .tag = ETH_IRDEF_VAR,
+        .ident = strdup(ident),
+        .attr = attr,
+        .varid = varid,
     };
     cod_vec_push(bldr->defs, def);
     eth_ref_attr(attr);
@@ -110,15 +108,15 @@ trace_pub_var(ir_builder *bldr, const char *ident, int varid, eth_attr *attr,
 
 static inline void
 trace_pub_cval(ir_builder *bldr, const char *ident, eth_t cval, eth_attr *attr,
-    eth_location *loc, int *e)
+               eth_location *loc, int *e)
 {
   if (bldr->istoplvl)
   {
     eth_ir_def def = {
-      .tag = ETH_IRDEF_CVAL,
-      .ident = strdup(ident),
-      .attr = attr,
-      .cval = cval,
+        .tag = ETH_IRDEF_CVAL,
+        .ident = strdup(ident),
+        .attr = attr,
+        .cval = cval,
     };
     cod_vec_push(bldr->defs, def);
     eth_ref(cval);
@@ -164,7 +162,7 @@ require_var(ir_builder *bldr, const char *ident, eth_var *ret)
   return false;
 }
 
-static eth_var*
+static eth_var *
 find_var_deep(ir_builder *bldr, const char *ident)
 {
   eth_var *var = eth_find_var(bldr->vars->head, ident, NULL);
@@ -184,12 +182,13 @@ import(ir_builder *bldr, const eth_module *mod)
   eth_get_defs(mod, defs);
   for (int i = 0; i < ndefs; ++i)
   {
-    eth_var_cfg varcfg = eth_const_var(defs[i].ident, defs[i].val, defs[i].attr);
+    eth_var_cfg varcfg =
+        eth_const_var(defs[i].ident, defs[i].val, defs[i].attr);
     eth_prepend_var(bldr->vars, varcfg);
   }
 }
 
-static eth_ir_pattern*
+static eth_ir_pattern *
 build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
 {
   switch (pat->tag)
@@ -197,8 +196,7 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
     case ETH_AST_PATTERN_DUMMY:
       return eth_ir_dummy_pattern();
 
-    case ETH_AST_PATTERN_IDENT:
-    {
+    case ETH_AST_PATTERN_IDENT: {
       int varid = new_vid(bldr);
 
       // set up attribute
@@ -210,21 +208,21 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
         if (pat->ident.attr->flag & ETH_ATTR_PUB)
           trace_pub_var(bldr, pat->ident.str, varid, attr, loc, e);
         /*else*/
-          /*eth_drop_attr(attr);*/
+        /*eth_drop_attr(attr);*/
       }
 
       eth_prepend_var(bldr->vars, eth_dyn_var(pat->ident.str, varid, attr));
       return eth_ir_ident_pattern(varid);
     }
 
-    case ETH_AST_PATTERN_UNPACK:
-    {
+    case ETH_AST_PATTERN_UNPACK: {
       eth_type *type = pat->unpack.type;
 
       // aliasing:
       int alias = new_vid(bldr);
       if (pat->unpack.alias)
-        eth_prepend_var(bldr->vars, eth_dyn_var(pat->unpack.alias, alias, NULL));
+        eth_prepend_var(bldr->vars,
+                        eth_dyn_var(pat->unpack.alias, alias, NULL));
 
       int n = pat->unpack.n;
       int offs[n];
@@ -235,7 +233,7 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
         if (fld == NULL)
         {
           eth_error("no field '%s' of type '%s'", pat->unpack.fields[i],
-              type->name);
+                    type->name);
           *e = 1;
           eth_print_location(loc, stderr);
           return eth_ir_ident_pattern(-1); // just some dummy
@@ -250,15 +248,18 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
       return eth_ir_constant_pattern(pat->constant.val);
 
     // TODO: handle prototype check when compile-time info on input is available
-    case ETH_AST_PATTERN_RECORD:
-    {
+    case ETH_AST_PATTERN_RECORD: {
       // aliasing:
       int alias = new_vid(bldr);
       if (pat->record.alias)
-        eth_prepend_var(bldr->vars, eth_dyn_var(pat->record.alias, alias, NULL));
+        eth_prepend_var(bldr->vars,
+                        eth_dyn_var(pat->record.alias, alias, NULL));
 
       int n = pat->record.n;
-      typedef struct { uintptr_t id; eth_ir_pattern *pat; } field;
+      typedef struct {
+        uintptr_t id;
+        eth_ir_pattern *pat;
+      } field;
       field fields[n];
 
       for (int i = 0; i < n; ++i)
@@ -289,34 +290,22 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
       return eth_ir_record_pattern(alias, proto, ids, pats, n);
     }
 
-    case ETH_AST_PATTERN_RECORD_STAR:
-    {
+    case ETH_AST_PATTERN_RECORD_STAR: {
       eth_error("wild record, {*}, is not allowed in this context");
       *e = 1;
       eth_print_location(loc, stderr);
       return eth_ir_ident_pattern(-1); // just some dummy
-
-      /*int oldglobid = -1;*/
-      /*eth_var var;*/
-      /*if (require_var(bldr, "{*}", &var))*/
-      /*{*/
-        /*assert(var.vid >= 0);*/
-        /*oldglobid = var.vid;*/
-      /*}*/
-
-      /*int globid = new_vid(bldr);*/
-      /*eth_prepend_var(bldr->vars, eth_dyn_var("{*}", globid, NULL));*/
-      /*return eth_ir_star_pattern(globid, oldglobid);*/
     }
-  }
 
-  eth_error("wtf");
-  abort();
+    default:
+      eth_error("unreachable case");
+      abort();
+  }
 }
 
 static bool
 build_record_star(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc,
-    eth_ir_node *expr, int *e)
+                  eth_ir_node *expr, int *e)
 {
   if (expr->tag != ETH_IR_CVAL)
   {
@@ -359,7 +348,7 @@ build_record_star(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc,
   {
     /*eth_trace("alias {*} (%s)", pat->recordstar.alias);*/
     eth_prepend_var(bldr->vars,
-        eth_const_var(pat->recordstar.alias, record, NULL));
+                    eth_const_var(pat->recordstar.alias, record, NULL));
   }
 
   return true;
@@ -367,15 +356,14 @@ build_record_star(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc,
 
 static bool
 build_pattern_constexpr(ir_builder *bldr, eth_ast_pattern *pat, eth_t expr,
-    eth_location *loc, int *e)
+                        eth_location *loc, int *e)
 {
   switch (pat->tag)
   {
     case ETH_AST_PATTERN_DUMMY:
       return true;
 
-    case ETH_AST_PATTERN_IDENT:
-    {
+    case ETH_AST_PATTERN_IDENT: {
       // set up attribute
       eth_attr *attr = NULL;
       if (pat->ident.attr)
@@ -390,15 +378,15 @@ build_pattern_constexpr(ir_builder *bldr, eth_ast_pattern *pat, eth_t expr,
       return true;
     }
 
-    case ETH_AST_PATTERN_UNPACK:
-    {
+    case ETH_AST_PATTERN_UNPACK: {
       eth_type *type = pat->unpack.type;
       if (expr->type != type)
         return false;
 
       // aliasing:
       if (pat->unpack.alias)
-        eth_prepend_var(bldr->vars, eth_const_var(pat->unpack.alias, expr, NULL));
+        eth_prepend_var(bldr->vars,
+                        eth_const_var(pat->unpack.alias, expr, NULL));
 
       int n = pat->unpack.n;
       int offs[n];
@@ -406,8 +394,9 @@ build_pattern_constexpr(ir_builder *bldr, eth_ast_pattern *pat, eth_t expr,
       for (int i = 0; i < n; ++i)
       {
         eth_field *fld = eth_get_field(type, pat->unpack.fields[i]);
-        eth_t val = *(eth_t*)((char*)expr + fld->offs);
-        if (not build_pattern_constexpr(bldr, pat->unpack.subpats[i], val, loc, e))
+        eth_t val = *(eth_t *)((char *)expr + fld->offs);
+        if (not build_pattern_constexpr(bldr, pat->unpack.subpats[i], val, loc,
+                                        e))
           return false;
       }
       return true;
@@ -416,14 +405,14 @@ build_pattern_constexpr(ir_builder *bldr, eth_ast_pattern *pat, eth_t expr,
     case ETH_AST_PATTERN_CONSTANT:
       return eth_equal(expr, pat->constant.val);
 
-    case ETH_AST_PATTERN_RECORD:
-    {
+    case ETH_AST_PATTERN_RECORD: {
       if (not eth_is_record(expr->type))
         return false;
 
       // aliasing:
       if (pat->record.alias)
-        eth_prepend_var(bldr->vars, eth_const_var(pat->record.alias, expr, NULL));
+        eth_prepend_var(bldr->vars,
+                        eth_const_var(pat->record.alias, expr, NULL));
 
       int n = pat->record.n;
       for (int i = 0; i < n; ++i)
@@ -431,21 +420,22 @@ build_pattern_constexpr(ir_builder *bldr, eth_ast_pattern *pat, eth_t expr,
         eth_field *fld = eth_get_field(expr->type, pat->record.fields[i]);
         if (fld == NULL)
         {
-          eth_error("no field '%s' in type '%s'\n", pat->record.fields[i], expr->type->name);
+          eth_error("no field '%s' in type '%s'\n", pat->record.fields[i],
+                    expr->type->name);
           *e = 1;
           return false;
         }
 
-        eth_t val = *(eth_t*)((char*)expr + fld->offs);
-        if (not build_pattern_constexpr(bldr, pat->record.subpats[i], val, loc, e))
+        eth_t val = *(eth_t *)((char *)expr + fld->offs);
+        if (not build_pattern_constexpr(bldr, pat->record.subpats[i], val, loc,
+                                        e))
           return false;
       }
 
       return true;
     }
 
-    case ETH_AST_PATTERN_RECORD_STAR:
-    {
+    case ETH_AST_PATTERN_RECORD_STAR: {
       eth_ir_node *ex = eth_ir_cval(expr);
       eth_ref_ir_node(ex);
       if (not build_record_star(bldr, pat, loc, ex, e))
@@ -456,13 +446,14 @@ build_pattern_constexpr(ir_builder *bldr, eth_ast_pattern *pat, eth_t expr,
       eth_unref_ir_node(ex);
       return true;
     }
-  }
 
-  eth_error("wtf");
-  abort();
+    default:
+      eth_error("unreachable case");
+      abort();
+  }
 }
 
-static eth_ir_node*
+static eth_ir_node *
 build_with_toplvl(ir_builder *bldr, eth_ast *ast, int *e, bool savetop)
 {
   bool tlvl = bldr->istoplvl;
@@ -473,20 +464,20 @@ build_with_toplvl(ir_builder *bldr, eth_ast *ast, int *e, bool savetop)
   return ret;
 }
 
-static eth_ir_node*
+static eth_ir_node *
 build_let(ir_builder *bldr, int idx, const eth_ast *ast,
-    eth_ir_node *const vals[], int nvars0, int *e)
+          eth_ir_node *const vals[], int nvars0, int *e)
 {
   if (idx < ast->let.n)
   {
     if (vals[idx]->tag == ETH_IR_CVAL)
     {
       bool ok = build_pattern_constexpr(bldr, ast->let.pats[idx],
-          vals[idx]->cval.val, ast->loc, e);
+                                        vals[idx]->cval.val, ast->loc, e);
       if (not ok)
       {
         eth_warning("pattern in LET-expression wount match to `~w`",
-            vals[idx]->cval.val);
+                    vals[idx]->cval.val);
         eth_drop_ir_node(vals[idx]);
         *e = 1;
         eth_print_location(ast->loc, stderr);
@@ -497,7 +488,8 @@ build_let(ir_builder *bldr, int idx, const eth_ast *ast,
     }
     else
     {
-      eth_ir_pattern *pat = build_pattern(bldr, ast->let.pats[idx], ast->loc, e);
+      eth_ir_pattern *pat =
+          build_pattern(bldr, ast->let.pats[idx], ast->loc, e);
 
       eth_ir_node *thenbr = build_let(bldr, idx + 1, ast, vals, nvars0, e);
 
@@ -557,7 +549,7 @@ is_redefined(ir_builder *bldr, const char *ident)
     return true;
 }
 
-static eth_ir_node*
+static eth_ir_node *
 constexpr_binop(eth_binop op, eth_t lhs, eth_t rhs, eth_location *loc, int *e)
 {
   eth_t ret = NULL;
@@ -565,12 +557,11 @@ constexpr_binop(eth_binop op, eth_t lhs, eth_t rhs, eth_location *loc, int *e)
   {
     case ETH_ADD ... ETH_POW:
     case ETH_LAND ... ETH_ASHR:
-    case ETH_LT ... ETH_NE:
-    {
+    case ETH_LT ... ETH_NE: {
       if (lhs->type != eth_number_type || rhs->type != eth_number_type)
       {
         eth_warning("invalid operands for binary %s (%s and %s)",
-            eth_binop_sym(op), lhs->type->name, rhs->type->name);
+                    eth_binop_sym(op), lhs->type->name, rhs->type->name);
         *e = 1;
         eth_print_location(loc, stderr);
         return eth_ir_error();
@@ -579,56 +570,104 @@ constexpr_binop(eth_binop op, eth_t lhs, eth_t rhs, eth_location *loc, int *e)
       eth_number_t y = ETH_NUMBER(rhs)->val;
       switch (op)
       {
-        case ETH_ADD: ret = eth_num(x + y); break;
-        case ETH_SUB: ret = eth_num(x - y); break;
-        case ETH_MUL: ret = eth_num(x * y); break;
-        case ETH_DIV: ret = eth_num(x / y); break;
-        case ETH_MOD: ret = eth_num(eth_mod(x, y)); break;
-        case ETH_POW: ret = eth_num(eth_pow(x, y)); break;
+        case ETH_ADD:
+          ret = eth_num(x + y);
+          break;
+        case ETH_SUB:
+          ret = eth_num(x - y);
+          break;
+        case ETH_MUL:
+          ret = eth_num(x * y);
+          break;
+        case ETH_DIV:
+          ret = eth_num(x / y);
+          break;
+        case ETH_MOD:
+          ret = eth_num(eth_mod(x, y));
+          break;
+        case ETH_POW:
+          ret = eth_num(eth_pow(x, y));
+          break;
         // ---
-        case ETH_LAND: ret = eth_num((intmax_t)x & (intmax_t)y); break;
-        case ETH_LOR:  ret = eth_num((intmax_t)x | (intmax_t)y); break;
-        case ETH_LXOR: ret = eth_num((intmax_t)x ^ (intmax_t)y); break;
-        case ETH_LSHL: ret = eth_num((uintmax_t)x << (uintmax_t)y); break;
-        case ETH_LSHR: ret = eth_num((uintmax_t)x >> (uintmax_t)y); break;
-        case ETH_ASHL: ret = eth_num((intmax_t)x << (intmax_t)y); break;
-        case ETH_ASHR: ret = eth_num((intmax_t)x >> (intmax_t)y); break;
+        case ETH_LAND:
+          ret = eth_num((intmax_t)x & (intmax_t)y);
+          break;
+        case ETH_LOR:
+          ret = eth_num((intmax_t)x | (intmax_t)y);
+          break;
+        case ETH_LXOR:
+          ret = eth_num((intmax_t)x ^ (intmax_t)y);
+          break;
+        case ETH_LSHL:
+          ret = eth_num((uintmax_t)x << (uintmax_t)y);
+          break;
+        case ETH_LSHR:
+          ret = eth_num((uintmax_t)x >> (uintmax_t)y);
+          break;
+        case ETH_ASHL:
+          ret = eth_num((intmax_t)x << (intmax_t)y);
+          break;
+        case ETH_ASHR:
+          ret = eth_num((intmax_t)x >> (intmax_t)y);
+          break;
         // ---
-        case ETH_LT: ret = x < y ? eth_num(y) : eth_false; break;
-        case ETH_LE: ret = x <= y ? eth_num(y) : eth_false; break;
-        case ETH_GT: ret = x > y ? eth_num(y) : eth_false; break;
-        case ETH_GE: ret = x >= y ? eth_num(y) : eth_false; break;
-        case ETH_EQ: ret = eth_boolean(x == y); break;
-        case ETH_NE: ret = eth_boolean(x != y); break;
+        case ETH_LT:
+          ret = x < y ? eth_num(y) : eth_false;
+          break;
+        case ETH_LE:
+          ret = x <= y ? eth_num(y) : eth_false;
+          break;
+        case ETH_GT:
+          ret = x > y ? eth_num(y) : eth_false;
+          break;
+        case ETH_GE:
+          ret = x >= y ? eth_num(y) : eth_false;
+          break;
+        case ETH_EQ:
+          ret = eth_boolean(x == y);
+          break;
+        case ETH_NE:
+          ret = eth_boolean(x != y);
+          break;
         // ---
-        default: abort();
+        default:
+          abort();
       }
       break;
     }
 
-    case ETH_IS: ret = eth_boolean(lhs == rhs); break;
-    case ETH_EQUAL: ret = eth_boolean(eth_equal(lhs, rhs)); break;
-    case ETH_CONS: ret = eth_cons(lhs, rhs); break;
+    case ETH_IS:
+      ret = eth_boolean(lhs == rhs);
+      break;
+    case ETH_EQUAL:
+      ret = eth_boolean(eth_equal(lhs, rhs));
+      break;
+    case ETH_CONS:
+      ret = eth_cons(lhs, rhs);
+      break;
   }
 
   return eth_ir_cval(ret);
 }
 
-static eth_ir_node*
-constexpr_unop(eth_unop op, eth_t x, int *e)
+static eth_ir_node *
+constexpr_unop(eth_unop op, eth_t x, int *__attribute((unused)) e)
 {
   eth_t ret = NULL;
   switch (op)
   {
-    case ETH_NOT: ret = eth_boolean(x == eth_false); break;
-    case ETH_LNOT: ret = eth_num(~(intmax_t)ETH_NUMBER(x)->val);
+    case ETH_NOT:
+      ret = eth_boolean(x == eth_false);
+      break;
+    case ETH_LNOT:
+      ret = eth_num(~(intmax_t)ETH_NUMBER(x)->val);
   }
   return eth_ir_cval(ret);
 }
 
-static eth_ir_node*
+static eth_ir_node *
 build_fn(ir_builder *bldr, eth_ast *fnast, char *scpvarnams[], int nscpvars,
-    int *e)
+         int *e)
 {
   ir_builder *fnbldr = create_ir_builder(bldr);
 
@@ -649,7 +688,7 @@ build_fn(ir_builder *bldr, eth_ast *fnast, char *scpvarnams[], int nscpvars,
   {
     scpvars_local[i] = new_vid(fnbldr);
     eth_prepend_var(fnbldr->vars,
-        eth_dyn_var(scpvarnams[i], scpvars_local[i], NULL));
+                    eth_dyn_var(scpvarnams[i], scpvars_local[i], NULL));
   }
 
   // body:
@@ -657,7 +696,8 @@ build_fn(ir_builder *bldr, eth_ast *fnast, char *scpvarnams[], int nscpvars,
   eth_ir_node *throw = eth_ir_throw(eth_ir_cval(eth_exn(eth_type_error())));
   for (int i = nargs - 1; i >= 0; --i)
   {
-    body_acc = eth_ir_match(pats[i], eth_ir_var(args_local[i]), body_acc, throw);
+    body_acc =
+        eth_ir_match(pats[i], eth_ir_var(args_local[i]), body_acc, throw);
     body_acc->match.likely = 1;
   }
   eth_drop_ir_node(throw);
@@ -683,22 +723,15 @@ build_fn(ir_builder *bldr, eth_ast *fnast, char *scpvarnams[], int nscpvars,
 
   destroy_ir_builder(fnbldr);
   return eth_ir_fn(fnast->fn.arity, capvars_parent, capvars_local, ncap,
-      scpvars_local, nscpvars, body, fnast);
+                   scpvars_local, nscpvars, body, fnast);
 }
 
-static eth_ir_node*
+static eth_ir_node *
 try_resolve_ident(ir_builder *bldr, const char *str, eth_location *loc)
 {
   eth_var var;
   if (not require_var(bldr, str, &var))
-  {
     return NULL;
-    /*if (not require_var(bldr, "{*}", &var))*/
-      /*return NULL;*/
-
-    /*eth_ir_node *p[] = { eth_ir_var(var.vid), eth_ir_cval(eth_sym(str)) };*/
-    /*return eth_ir_apply(eth_ir_cval(eth_get_method), p, 2);*/
-  }
 
   if (var.attr && var.attr->flag & ETH_ATTR_DEPRECATED)
   {
@@ -714,7 +747,7 @@ try_resolve_ident(ir_builder *bldr, const char *str, eth_location *loc)
   else if (var.attr && var.attr->flag & ETH_ATTR_MUT)
   {
     eth_t deref = eth_get_builtin(bldr->root, "__dereference");
-    eth_ir_node *args[] = { eth_ir_var(var.vid) };
+    eth_ir_node *args[] = {eth_ir_var(var.vid)};
     return eth_ir_apply(eth_ir_cval(deref), args, 1);
   }
   else
@@ -723,18 +756,16 @@ try_resolve_ident(ir_builder *bldr, const char *str, eth_location *loc)
   }
 }
 
-static eth_ir_node*
+static eth_ir_node *
 build(ir_builder *bldr, eth_ast *ast, int *e)
 {
   switch (ast->tag)
   {
-    case ETH_AST_CVAL:
-    {
+    case ETH_AST_CVAL: {
       return eth_ir_cval(ast->cval.val);
     }
 
-    case ETH_AST_IDENT:
-    {
+    case ETH_AST_IDENT: {
       eth_ir_node *ret;
       if ((ret = try_resolve_ident(bldr, ast->ident.str, ast->loc)))
         return ret;
@@ -747,8 +778,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       }
     }
 
-    case ETH_AST_APPLY:
-    {
+    case ETH_AST_APPLY: {
       eth_ir_node *fn = build_with_toplvl(bldr, ast->apply.fn, e, false);
       eth_ir_node *args[ast->apply.nargs];
       for (int i = 0; i < ast->apply.nargs; ++i)
@@ -758,8 +788,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       return ret;
     }
 
-    case ETH_AST_IF:
-    {
+    case ETH_AST_IF: {
       eth_ir_node *cond = build_with_toplvl(bldr, ast->iff.cond, e, false);
       eth_ast *thenast = ast->iff.then;
       eth_ast *elseast = ast->iff.els ? ast->iff.els : eth_ast_cval(eth_nil);
@@ -788,23 +817,20 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       }
     }
 
-    case ETH_AST_SEQ:
-    {
+    case ETH_AST_SEQ: {
       eth_ir_node *e1 = build_with_toplvl(bldr, ast->seq.e1, e, false);
       eth_ir_node *e2 = build(bldr, ast->seq.e2, e);
       return eth_ir_seq(e1, e2);
     }
 
-    case ETH_AST_LET:
-    {
+    case ETH_AST_LET: {
       eth_ir_node *vals[ast->let.n];
       for (int i = 0; i < ast->let.n; ++i)
         vals[i] = build_with_toplvl(bldr, ast->let.vals[i], e, false);
-      return build_let(bldr, 0, ast, vals, bldr->vars->len - bldr->capoffs,e);
+      return build_let(bldr, 0, ast, vals, bldr->vars->len - bldr->capoffs, e);
     }
 
-    case ETH_AST_LETREC:
-    {
+    case ETH_AST_LETREC: {
       const int n = ast->letrec.n;
 
       // validate expressions: only closures allowed
@@ -823,7 +849,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         if (ast->letrec.pats[i]->tag != ETH_AST_PATTERN_IDENT)
         {
           eth_error("Only closures allowed in recursive scope (thus can't match"
-            " non-symbol pattern)");
+                    " non-symbol pattern)");
           eth_print_location(ast->loc, stderr);
           *e = true;
           return eth_ir_error();
@@ -842,7 +868,8 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       for (int i = 0; i < n; ++i)
       {
         varids[i] = new_vid(bldr);
-        eth_prepend_var(bldr->vars, eth_dyn_var(scpvarnams[i], varids[i], NULL));
+        eth_prepend_var(bldr->vars,
+                        eth_dyn_var(scpvarnams[i], varids[i], NULL));
         eth_attr *attr = ast->letrec.pats[i]->ident.attr;
         if (attr)
         { // handle PUB
@@ -860,13 +887,12 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       return eth_ir_letrec(varids, fns, n, body);
     }
 
-    case ETH_AST_BINOP:
-    {
+    case ETH_AST_BINOP: {
       if (is_binop_redefined(bldr, ast->binop.op))
       { // user-defined operator -> build as application
         eth_debug("redefined operator '%s'", eth_binop_sym(ast->binop.op));
         eth_ast *f = eth_ast_ident(eth_binop_sym(ast->binop.op));
-        eth_ast *xs[] = { ast->binop.lhs, ast->binop.rhs };
+        eth_ast *xs[] = {ast->binop.lhs, ast->binop.rhs};
         eth_ast *apply = eth_ast_apply(f, xs, 2);
         eth_set_ast_location(apply, ast->loc);
         eth_ir_node *ret = build_with_toplvl(bldr, apply, e, false);
@@ -881,7 +907,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         if (lhs->tag == ETH_IR_CVAL and rhs->tag == ETH_IR_CVAL)
         {
           ret = constexpr_binop(ast->binop.op, lhs->cval.val, rhs->cval.val,
-              ast->loc, e);
+                                ast->loc, e);
           eth_drop_ir_node(lhs);
           eth_drop_ir_node(rhs);
         }
@@ -894,13 +920,14 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       }
     }
 
-    case ETH_AST_UNOP:
-    {
+    case ETH_AST_UNOP: {
       if (is_unop_redefined(bldr, ast->unop.op))
       { // user-defined operator -> build as application
         eth_debug("redefined operator '%s'", eth_unop_sym(ast->unop.op));
         eth_ast *f = eth_ast_ident(eth_unop_sym(ast->unop.op));
-        eth_ast *xs[] = { ast->unop.expr, };
+        eth_ast *xs[] = {
+            ast->unop.expr,
+        };
         eth_ast *apply = eth_ast_apply(f, xs, 1);
         eth_set_ast_location(apply, ast->loc);
         eth_ir_node *ret = build_with_toplvl(bldr, apply, e, false);
@@ -929,23 +956,23 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       return build_fn(bldr, ast, 0, 0, e);
 
     // TODO: handle constexprs
-    case ETH_AST_MATCH:
-    {
+    case ETH_AST_MATCH: {
       eth_ir_node *expr = build_with_toplvl(bldr, ast->match.expr, e, false);
       int n1 = bldr->vars->len - bldr->capoffs;
       eth_ir_pattern *pat = build_pattern(bldr, ast->match.pat, ast->loc, e);
       int n2 = bldr->vars->len - bldr->capoffs;
       int nvars = n2 - n1;
 
-      eth_ir_node *thenbr = build_with_toplvl(bldr, ast->match.thenbr, e,
-          ast->match.toplvl == ETH_TOPLVL_THEN);
+      eth_ir_node *thenbr = build_with_toplvl(
+          bldr, ast->match.thenbr, e, ast->match.toplvl == ETH_TOPLVL_THEN);
 
       eth_pop_var(bldr->vars, nvars);
 
-      eth_ast *elseast = ast->match.elsebr ? ast->match.elsebr : eth_ast_cval(eth_nil);
+      eth_ast *elseast =
+          ast->match.elsebr ? ast->match.elsebr : eth_ast_cval(eth_nil);
       eth_ref_ast(elseast);
-      eth_ir_node *elsebr = build_with_toplvl(bldr, elseast, e,
-          ast->match.toplvl == ETH_TOPLVL_ELSE);
+      eth_ir_node *elsebr = build_with_toplvl(
+          bldr, elseast, e, ast->match.toplvl == ETH_TOPLVL_ELSE);
 
       eth_ir_node *ret = eth_ir_match(pat, expr, thenbr, elsebr);
       ret->match.toplvl = ast->match.toplvl;
@@ -953,8 +980,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       return ret;
     }
 
-    case ETH_AST_MULTIMATCH:
-    {
+    case ETH_AST_MULTIMATCH: {
       eth_match_table *table = ast->multimatch.table;
       int w = table->w;
       int h = table->h;
@@ -979,17 +1005,17 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       for (int i = 0; i < h; ++i)
         tabpats[i] = ir_table[i];
 
-      eth_ir_match_table *tab = eth_create_ir_match_table(tabpats, thenbrs, h, w);
+      eth_ir_match_table *tab =
+          eth_create_ir_match_table(tabpats, thenbrs, h, w);
       return eth_ir_multimatch(tab, exprs);
     }
 
-    case ETH_AST_AND:
-    {
+    case ETH_AST_AND: {
       if (is_redefined(bldr, "&&"))
       { // user-defined operator -> build as application
         eth_debug("redefined operator '&&'");
         eth_ast *f = eth_ast_ident("&&");
-        eth_ast *xs[] = { ast->scand.lhs, ast->scand.rhs };
+        eth_ast *xs[] = {ast->scand.lhs, ast->scand.rhs};
         eth_ast *apply = eth_ast_apply(f, xs, 2);
         eth_set_ast_location(apply, ast->loc);
         eth_ir_node *ret = build_with_toplvl(bldr, apply, e, false);
@@ -1001,20 +1027,19 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         eth_ir_node *lhs = build_with_toplvl(bldr, ast->scand.lhs, e, false);
         eth_ir_node *rhs = build_with_toplvl(bldr, ast->scand.rhs, e, false);
         int tmpvar = new_vid(bldr);
-        eth_ir_node *ret =
-          eth_ir_bind(&tmpvar, &lhs, 1,
+        eth_ir_node *ret = eth_ir_bind(
+            &tmpvar, &lhs, 1,
             eth_ir_if(eth_ir_var(tmpvar), rhs, eth_ir_cval(eth_false)));
         return ret;
       }
     }
 
-    case ETH_AST_OR:
-    {
+    case ETH_AST_OR: {
       if (is_redefined(bldr, "||"))
       { // user-defined operator -> build as application
         eth_debug("redefined operator '||'");
         eth_ast *f = eth_ast_ident("||");
-        eth_ast *xs[] = { ast->scor.lhs, ast->scor.rhs };
+        eth_ast *xs[] = {ast->scor.lhs, ast->scor.rhs};
         eth_ast *apply = eth_ast_apply(f, xs, 2);
         eth_set_ast_location(apply, ast->loc);
         eth_ir_node *ret = build_with_toplvl(bldr, apply, e, false);
@@ -1027,8 +1052,8 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         eth_ir_node *rhs = build_with_toplvl(bldr, ast->scor.rhs, e, false);
         int tmpvar = new_vid(bldr);
         eth_ir_node *ret =
-          eth_ir_bind(&tmpvar, &lhs, 1,
-              eth_ir_if(eth_ir_var(tmpvar), eth_ir_var(tmpvar), rhs));
+            eth_ir_bind(&tmpvar, &lhs, 1,
+                        eth_ir_if(eth_ir_var(tmpvar), eth_ir_var(tmpvar), rhs));
         return ret;
       }
     }
@@ -1043,10 +1068,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
      *   THEN *tmp*
      *   ELSE THROW Type_error
      */
-    case ETH_AST_ACCESS:
-    {
-      eth_use_symbol(access_error);
-
+    case ETH_AST_ACCESS: {
       eth_ir_node *expr = build_with_toplvl(bldr, ast->access.expr, e, false);
       // --
       if (expr->tag == ETH_IR_CVAL)
@@ -1054,8 +1076,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         eth_t rec = expr->cval.val;
         eth_t key = eth_sym(ast->access.field);
         if (not eth_is_plain(rec->type))
-        {
-          // cant access non-plane type
+        { // cant access non-plane type
           eth_warning("undefined field acess (not a plain type: ~w)", rec);
           *e = 1;
           eth_print_location(ast->loc, stderr);
@@ -1080,15 +1101,21 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       }
       else
       { // run-time access
-        uintptr_t fld = eth_get_symbol_id(eth_sym(ast->access.field));
-        eth_ir_node *ret = eth_ir_access(expr, fld);
-        eth_set_ir_location(ret, ast->loc);
-        return ret;
+        int tmpvid = new_vid(bldr);
+        eth_ir_pattern *tmpid = eth_ir_ident_pattern(tmpvid);
+        size_t field = eth_get_symbol_id(eth_sym(ast->access.field));
+        eth_ir_pattern *matchpat =
+            eth_ir_record_pattern(0, NULL, &field, &tmpid, 1);
+        // if match succeeds return the field value
+        eth_ir_node *thenbr = eth_ir_var(tmpvid);
+        // else throw type error
+        eth_t exn = eth_exn(eth_type_error());
+        eth_ir_node *elsebr = eth_ir_throw(eth_ir_cval(exn));
+        return eth_ir_match(matchpat, expr, thenbr, elsebr);
       }
     }
 
-    case ETH_AST_TRY:
-    {
+    case ETH_AST_TRY: {
       eth_ir_node *trybr = build_with_toplvl(bldr, ast->try.trybr, e, false);
 
       int exnvid = new_vid(bldr);
@@ -1109,8 +1136,8 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         assert(pat->unpack.subpats[0]->tag == ETH_PATTERN_IDENT);
         int what = pat->unpack.subpats[0]->ident.varid;
         int dummy = new_vid(bldr);
-        eth_ir_pattern *exitpat = eth_ir_unpack_pattern(dummy, eth_exit_type,
-            NULL, NULL, 0);
+        eth_ir_pattern *exitpat =
+            eth_ir_unpack_pattern(dummy, eth_exit_type, NULL, NULL, 0);
         ok = eth_ir_match(exitpat, eth_ir_var(what), rethrow, ok);
       }
 
@@ -1118,8 +1145,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       return eth_ir_try(exnvid, trybr, catchbr, ast->try.likely);
     }
 
-    case ETH_AST_MKRCRD:
-    {
+    case ETH_AST_MKRCRD: {
       eth_type *type = ast->mkrcrd.type;
 
       if (not eth_is_plain(type))
@@ -1132,7 +1158,11 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
 
       assert(ast->mkrcrd.n == type->nfields);
       int n = type->nfields;
-      typedef struct { eth_ast *val; char *field; ptrdiff_t offs; } value;
+      typedef struct {
+        eth_ast *val;
+        char *field;
+        ptrdiff_t offs;
+      } value;
       value vals[n];
 
       for (int i = 0; i < n; ++i)
@@ -1160,12 +1190,15 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       return eth_ir_mkrcrd(type, irvals);
     }
 
-    case ETH_AST_UPDATE:
-    {
+    case ETH_AST_UPDATE: {
       eth_ir_node *src = build_with_toplvl(bldr, ast->update.src, e, false);
 
       int n = ast->update.n;
-      typedef struct { eth_ast *val; char *field; size_t id; } value;
+      typedef struct {
+        eth_ast *val;
+        char *field;
+        size_t id;
+      } value;
       value vals[n];
 
       for (int i = 0; i < n; ++i)
@@ -1190,7 +1223,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         irvals[i] = build_with_toplvl(bldr, vals[i].val, e, false);
         ids[i] = vals[i].id;
       }
-      return eth_ir_update(src,  irvals, ids, n);
+      return eth_ir_update(src, irvals, ids, n);
     }
 
     /*-----------*
@@ -1205,8 +1238,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
      *
      * TODO: remove this AST-node; this conversion should be done in parser
      */
-    case ETH_AST_ASSERT:
-    {
+    case ETH_AST_ASSERT: {
       eth_use_symbol(assertion_failed);
       eth_ir_node *expr = build_with_toplvl(bldr, ast->assert.expr, e, false);
       eth_ir_node *okbr = eth_ir_cval(eth_nil);
@@ -1219,13 +1251,11 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       return node;
     }
 
-    case ETH_AST_DEFINED:
-    {
+    case ETH_AST_DEFINED: {
       return eth_ir_cval(eth_boolean(find_var_deep(bldr, ast->defined.ident)));
     }
 
-    case ETH_AST_EVMAC:
-    {
+    case ETH_AST_EVMAC: {
       char name[256];
       sprintf(name, "<mac%d>", bldr->immcnt++);
 
@@ -1256,8 +1286,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
       return eth_ir_cval(ret);
     }
 
-    case ETH_AST_ASSIGN:
-    {
+    case ETH_AST_ASSIGN: {
       eth_var var;
       if (not require_var(bldr, ast->ident.str, &var))
       {
@@ -1266,7 +1295,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         eth_print_location(ast->loc, stderr);
         return eth_ir_error();
       }
-      if (not (var.attr and var.attr->flag & ETH_ATTR_MUT))
+      if (not(var.attr and var.attr->flag & ETH_ATTR_MUT))
       {
         eth_warning("trying to assign a non-mutable variable");
         *e = 1;
@@ -1281,24 +1310,22 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
 
       eth_t assgn = eth_get_builtin(bldr->root, "__assign");
       eth_ir_node *args[] = {
-        eth_ir_var(var.vid),
-        build_with_toplvl(bldr, ast->assign.val, e, false),
+          eth_ir_var(var.vid),
+          build_with_toplvl(bldr, ast->assign.val, e, false),
       };
       eth_ir_node *ret = eth_ir_apply(eth_ir_cval(assgn), args, 2);
       eth_set_ir_location(ret, ast->loc);
       return ret;
     }
 
-    case ETH_AST_RETURN:
-    {
+    case ETH_AST_RETURN: {
       eth_ir_node *expr = build_with_toplvl(bldr, ast->retrn.expr, e, false);
       eth_ir_node *ret = eth_ir_return(expr);
       eth_set_ir_location(ret, ast->loc);
       return ret;
     }
 
-    case ETH_AST_THIS:
-    {
+    case ETH_AST_THIS: {
       eth_ir_node *ret = eth_ir_this();
       eth_set_ir_location(ret, ast->loc);
       return ret;
@@ -1310,9 +1337,9 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
   return eth_ir_error();
 }
 
-static eth_ir*
+static eth_ir *
 build_ir(eth_ast *ast, eth_root *root, eth_module *mod, eth_ir_defs *defs,
-    eth_module *uservars)
+         eth_module *uservars)
 {
   eth_ir *ret;
   int e = 0;
@@ -1351,15 +1378,15 @@ build_ir(eth_ast *ast, eth_root *root, eth_module *mod, eth_ir_defs *defs,
   return ret;
 }
 
-eth_ir*
+eth_ir *
 eth_build_ir(eth_ast *ast, eth_root *root, eth_module *uservars)
 {
   return build_ir(ast, root, NULL, NULL, uservars);
 }
 
-eth_ir*
+eth_ir *
 eth_build_module_ir(eth_ast *ast, eth_root *root, eth_module *mod,
-    eth_ir_defs *defs, eth_module *uservars)
+                    eth_ir_defs *defs, eth_module *uservars)
 {
   return build_ir(ast, root, mod, defs, uservars);
 }
@@ -1376,4 +1403,3 @@ eth_destroy_ir_defs(eth_ir_defs *defs)
   }
   free(defs->defs);
 }
-
