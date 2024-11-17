@@ -2003,7 +2003,6 @@ struct eth_ast_pattern {
       eth_ast_pattern **subpats; /**< Nested patterns for fields */
       int n; /**< N fields */
       char *alias; /**< Alias */
-      eth_ast *proto; /**< Prototype */
     } record; /**< @brief Record destructuring pattern */
 
     struct { eth_attr *attr; char *alias; } recordstar;
@@ -2048,7 +2047,6 @@ eth_ast_constant_pattern(eth_t cval);
 /**
  * Corresponding native syntax for this pattern is `{ ... }`.
  *
- * @param proto[may be NULL] Protype for the match. To be used for the type-check.
  * @param fields Fields to be matched.
  * @param pats Patterns to be matched against @p fields.
  * @param n Number of @p fields and @p pats.
@@ -2056,8 +2054,7 @@ eth_ast_constant_pattern(eth_t cval);
  * @see \ref ETH_PATTERN_RECORD
  */
 eth_ast_pattern*
-eth_ast_record_pattern(eth_ast *proto, char *const fields[],
-    eth_ast_pattern *pats[], int n);
+eth_ast_record_pattern(char *const fields[], eth_ast_pattern *pats[], int n);
 
 eth_ast_pattern*
 eth_ast_record_star_pattern();
@@ -2332,8 +2329,7 @@ struct eth_ir_pattern {
     struct { eth_type *type; int n, *offs, varid; eth_ir_pattern **subpats; }
       unpack;
     struct { eth_t val; } constant;
-    struct { size_t *ids; int n, varid; eth_ir_node *proto;
-             eth_ir_pattern **subpats; } record;
+    struct { size_t *ids; int n, varid; eth_ir_pattern **subpats; } record;
     struct { int varid, oldvarid; } star;
   };
 };
@@ -2352,7 +2348,7 @@ eth_ir_pattern*
 eth_ir_constant_pattern(eth_t val);
 
 eth_ir_pattern*
-eth_ir_record_pattern(int varid, eth_ir_node *proto, size_t const ids[],
+eth_ir_record_pattern(int varid, size_t const ids[],
     eth_ir_pattern *const pats[], int n);
 
 eth_ir_pattern*
@@ -2682,7 +2678,7 @@ struct eth_ssa_pattern {
              bool dotest; }
       unpack;
     struct { eth_t val; eth_test_op testop; bool dotest; } constant;
-    struct { size_t *ids; int *vids, n, proto; eth_ssa_pattern **subpat;
+    struct { size_t *ids; int *vids, n; eth_ssa_pattern **subpat;
              bool dotest; }
       record;
   };
@@ -2702,7 +2698,7 @@ eth_ssa_pattern*
 eth_ssa_constant_pattern(eth_t val, eth_test_op testop, bool dotest);
 
 eth_ssa_pattern*
-eth_ssa_record_pattern(int proto /* <0 for none */, size_t const ids[], int const vids[],
+eth_ssa_record_pattern(size_t const ids[], int const vids[],
     eth_ssa_pattern *const pats[], int n);
 
 void
@@ -3199,7 +3195,7 @@ struct eth_bc_insn {
 
     struct { uint64_t out; uint32_t vid, offs; } load;
     // TODO: flatten vids
-    struct { int16_t proto; uint16_t src, n; uint64_t *vids; size_t *ids; } loadrcrd;
+    struct { uint16_t src, n; uint64_t *vids; size_t *ids; } loadrcrd;
 
     struct { uint64_t vid; } setexn;
     struct { uint64_t out; } getexn;

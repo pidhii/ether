@@ -1,29 +1,27 @@
 /* Copyright (C) 2020  Ivan Pidhurskyi
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "ether/ether.h"
 
-#include <stdlib.h>
 #include <assert.h>
+#include <stdlib.h>
 #include <string.h>
-
 
 ETH_MODULE("ether:insn");
 
-
-eth_ssa_pattern*
+eth_ssa_pattern *
 eth_ssa_dummy_pattern(void)
 {
   eth_ssa_pattern *pat = eth_malloc(sizeof(eth_ssa_pattern));
@@ -31,7 +29,7 @@ eth_ssa_dummy_pattern(void)
   return pat;
 }
 
-eth_ssa_pattern*
+eth_ssa_pattern *
 eth_ssa_ident_pattern(int vid)
 {
   eth_ssa_pattern *pat = eth_malloc(sizeof(eth_ssa_pattern));
@@ -40,7 +38,7 @@ eth_ssa_ident_pattern(int vid)
   return pat;
 }
 
-eth_ssa_pattern*
+eth_ssa_pattern *
 eth_ssa_constant_pattern(eth_t val, eth_test_op testop, bool dotest)
 {
   eth_ssa_pattern *pat = eth_malloc(sizeof(eth_ssa_pattern));
@@ -51,39 +49,38 @@ eth_ssa_constant_pattern(eth_t val, eth_test_op testop, bool dotest)
   return pat;
 }
 
-eth_ssa_pattern*
+eth_ssa_pattern *
 eth_ssa_unpack_pattern(eth_type *type, int const offs[], int const vids[],
-    eth_ssa_pattern *const pats[], int n, bool dotest)
+                       eth_ssa_pattern *const pats[], int n, bool dotest)
 {
   eth_ssa_pattern *pat = eth_malloc(sizeof(eth_ssa_pattern));
   pat->tag = ETH_PATTERN_UNPACK;
   pat->unpack.type = type;
   pat->unpack.offs = eth_malloc(sizeof(int) * n);
   pat->unpack.vids = eth_malloc(sizeof(int) * n);
-  pat->unpack.subpat = eth_malloc(sizeof(eth_ssa_pattern*) * n);
+  pat->unpack.subpat = eth_malloc(sizeof(eth_ssa_pattern *) * n);
   pat->unpack.n = n;
   pat->unpack.dotest = dotest;
   memcpy(pat->unpack.offs, offs, sizeof(int) * n);
   memcpy(pat->unpack.vids, vids, sizeof(int) * n);
-  memcpy(pat->unpack.subpat, pats, sizeof(eth_ssa_pattern*) * n);
+  memcpy(pat->unpack.subpat, pats, sizeof(eth_ssa_pattern *) * n);
   return pat;
 }
 
-eth_ssa_pattern*
-eth_ssa_record_pattern(int proto, size_t const ids[], int const vids[],
-    eth_ssa_pattern *const pats[], int n)
+eth_ssa_pattern *
+eth_ssa_record_pattern(size_t const ids[], int const vids[],
+                       eth_ssa_pattern *const pats[], int n)
 {
   eth_ssa_pattern *pat = eth_malloc(sizeof(eth_ssa_pattern));
   pat->tag = ETH_PATTERN_RECORD;
   pat->record.ids = eth_malloc(sizeof(size_t) * n);
   pat->record.vids = eth_malloc(sizeof(int) * n);
-  pat->record.subpat = eth_malloc(sizeof(eth_ssa_pattern*) * n);
+  pat->record.subpat = eth_malloc(sizeof(eth_ssa_pattern *) * n);
   pat->record.n = n;
   pat->record.dotest = true;
-  pat->record.proto = proto;
   memcpy(pat->record.ids, ids, sizeof(size_t) * n);
   memcpy(pat->record.vids, vids, sizeof(int) * n);
-  memcpy(pat->record.subpat, pats, sizeof(eth_ssa_pattern*) * n);
+  memcpy(pat->record.subpat, pats, sizeof(eth_ssa_pattern *) * n);
   return pat;
 }
 
@@ -124,7 +121,7 @@ eth_destroy_ssa_pattern(eth_ssa_pattern *pat)
   free(pat);
 }
 
-static eth_insn*
+static eth_insn *
 create_insn(eth_insn_tag tag)
 {
   eth_insn *insn = eth_malloc(sizeof(eth_insn));
@@ -225,14 +222,14 @@ eth_destroy_insn_list(eth_insn *head)
   }
 }
 
-eth_insn*
+eth_insn *
 eth_insn_nop(void)
 {
   eth_insn *insn = create_insn(ETH_INSN_NOP);
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_cval(int out, eth_t val)
 {
   eth_insn *insn = create_insn(ETH_INSN_CVAL);
@@ -241,7 +238,7 @@ eth_insn_cval(int out, eth_t val)
   return insn;
 }
 
-static eth_insn*
+static eth_insn *
 create_apply(eth_insn_tag tag, int out, int fn, const int *args, int nargs)
 {
   eth_insn *insn = create_insn(tag);
@@ -253,19 +250,19 @@ create_apply(eth_insn_tag tag, int out, int fn, const int *args, int nargs)
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_apply(int out, int fn, const int *args, int nargs)
 {
   return create_apply(ETH_INSN_APPLY, out, fn, args, nargs);
 }
 
-eth_insn*
+eth_insn *
 eth_insn_applytc(int out, int fn, const int *args, int nargs)
 {
   return create_apply(ETH_INSN_APPLYTC, out, fn, args, nargs);
 }
 
-eth_insn*
+eth_insn *
 eth_insn_loop(const int args[], int nargs)
 {
   eth_insn *insn = create_insn(ETH_INSN_LOOP);
@@ -275,7 +272,7 @@ eth_insn_loop(const int args[], int nargs)
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_if(int out, int cond, eth_insn *thenbr, eth_insn *elsebr)
 {
   eth_insn *insn = create_insn(ETH_INSN_IF);
@@ -290,9 +287,9 @@ eth_insn_if(int out, int cond, eth_insn *thenbr, eth_insn *elsebr)
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_if_test_type(int out, int cond, eth_type *type, eth_insn *thenbr,
-    eth_insn *elsebr)
+                      eth_insn *elsebr)
 {
   eth_insn *insn = eth_insn_if(out, cond, thenbr, elsebr);
   insn->iff.test = ETH_TEST_TYPE;
@@ -300,9 +297,9 @@ eth_insn_if_test_type(int out, int cond, eth_type *type, eth_insn *thenbr,
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_if_match(int out, int cond, eth_ssa_pattern *pat, eth_insn *thenbr,
-    eth_insn *elsebr)
+                  eth_insn *elsebr)
 {
   eth_insn *insn = eth_insn_if(out, cond, thenbr, elsebr);
   insn->iff.test = ETH_TEST_MATCH;
@@ -310,9 +307,9 @@ eth_insn_if_match(int out, int cond, eth_ssa_pattern *pat, eth_insn *thenbr,
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_if_update(int out, int src, int *vids, size_t *ids, int n,
-    eth_insn *thenbr, eth_insn *elsebr)
+                   eth_insn *thenbr, eth_insn *elsebr)
 {
   eth_insn *insn = eth_insn_if(out, src, thenbr, elsebr);
   insn->iff.test = ETH_TEST_UPDATE;
@@ -324,7 +321,7 @@ eth_insn_if_update(int out, int src, int *vids, size_t *ids, int n,
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_mov(int out, int vid)
 {
   eth_insn *insn = create_insn(ETH_INSN_MOV);
@@ -333,7 +330,7 @@ eth_insn_mov(int out, int vid)
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_ref(int vid)
 {
   eth_insn *insn = create_insn(ETH_INSN_REF);
@@ -341,7 +338,7 @@ eth_insn_ref(int vid)
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_dec(int vid)
 {
   eth_insn *insn = create_insn(ETH_INSN_DEC);
@@ -349,7 +346,7 @@ eth_insn_dec(int vid)
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_unref(int vid)
 {
   eth_insn *insn = create_insn(ETH_INSN_UNREF);
@@ -357,7 +354,7 @@ eth_insn_unref(int vid)
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_drop(int vid)
 {
   eth_insn *insn = create_insn(ETH_INSN_DROP);
@@ -365,7 +362,7 @@ eth_insn_drop(int vid)
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_ret(int vid)
 {
   eth_insn *insn = create_insn(ETH_INSN_RET);
@@ -373,7 +370,7 @@ eth_insn_ret(int vid)
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_binop(eth_binop op, int out, int lhs, int rhs)
 {
   eth_insn *insn = create_insn(ETH_INSN_BINOP);
@@ -384,7 +381,7 @@ eth_insn_binop(eth_binop op, int out, int lhs, int rhs)
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_unop(eth_unop op, int out, int vid)
 {
   eth_insn *insn = create_insn(ETH_INSN_UNOP);
@@ -394,9 +391,9 @@ eth_insn_unop(eth_unop op, int out, int vid)
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_fn(int out, int arity, int *caps, int ncap, eth_ast *ast, eth_ir *ir,
-    eth_ssa *ssa)
+            eth_ssa *ssa)
 {
   eth_insn *insn = create_insn(ETH_INSN_FN);
   insn->out = out;
@@ -413,7 +410,7 @@ eth_insn_fn(int out, int arity, int *caps, int ncap, eth_ast *ast, eth_ir *ir,
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_pop(int const vids[], int n)
 {
   eth_insn *insn = create_insn(ETH_INSN_POP);
@@ -423,7 +420,7 @@ eth_insn_pop(int const vids[], int n)
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_cap(int const vids[], int n)
 {
   eth_insn *insn = create_insn(ETH_INSN_CAP);
@@ -433,7 +430,7 @@ eth_insn_cap(int const vids[], int n)
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_ldscp(int const vids[], int n)
 {
   eth_insn *insn = create_insn(ETH_INSN_LDSCP);
@@ -443,7 +440,7 @@ eth_insn_ldscp(int const vids[], int n)
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_mkscp(int *clos, int nclos)
 {
   eth_insn *insn = create_insn(ETH_INSN_MKSCP);
@@ -453,7 +450,7 @@ eth_insn_mkscp(int *clos, int nclos)
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_catch(int tryid, int vid)
 {
   eth_insn *insn = create_insn(ETH_INSN_CATCH);
@@ -462,7 +459,7 @@ eth_insn_catch(int tryid, int vid)
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_try(int out, int id, eth_insn *trybr, eth_insn *catchbr)
 {
   eth_insn *insn = create_insn(ETH_INSN_TRY);
@@ -475,7 +472,7 @@ eth_insn_try(int out, int id, eth_insn *trybr, eth_insn *catchbr)
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_getexn(int out)
 {
   eth_insn *insn = create_insn(ETH_INSN_GETEXN);
@@ -483,7 +480,7 @@ eth_insn_getexn(int out)
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_mkrcrd(int out, int const vids[], eth_type *type)
 {
   eth_insn *insn = create_insn(ETH_INSN_MKRCRD);
@@ -495,7 +492,7 @@ eth_insn_mkrcrd(int out, int const vids[], eth_type *type)
   return insn;
 }
 
-eth_insn*
+eth_insn *
 eth_insn_this(int out)
 {
   eth_insn *insn = create_insn(ETH_INSN_THIS);
@@ -506,7 +503,8 @@ eth_insn_this(int out)
 static void
 dump_ssa(int ident, const eth_insn *insn, FILE *stream)
 {
-  if (insn == NULL) return;
+  if (insn == NULL)
+    return;
 
   for (int i = 0; i < ident; ++i)
     putc(' ', stream);
@@ -532,7 +530,8 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
       fprintf(stream, "%%%d = apply %%%d (", insn->out, insn->apply.fn);
       for (int i = 0; i < insn->apply.nargs; ++i)
       {
-        if (i > 0) fputs(", ", stream);
+        if (i > 0)
+          fputs(", ", stream);
         fprintf(stream, "%%%d", insn->apply.args[i]);
       }
       fputs(");\n", stream);
@@ -542,7 +541,8 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
       fprintf(stream, "%%%d = apply-tc %%%d (", insn->out, insn->apply.fn);
       for (int i = 0; i < insn->apply.nargs; ++i)
       {
-        if (i > 0) fputs(", ", stream);
+        if (i > 0)
+          fputs(", ", stream);
         fprintf(stream, "%%%d", insn->apply.args[i]);
       }
       fputs(");\n", stream);
@@ -552,7 +552,8 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
       fprintf(stream, "loop (");
       for (int i = 0; i < insn->loop.nargs; ++i)
       {
-        if (i > 0) fputs(", ", stream);
+        if (i > 0)
+          fputs(", ", stream);
         fprintf(stream, "%%%d", insn->loop.args[i]);
       }
       fputs(");\n", stream);
@@ -560,9 +561,12 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
 
     case ETH_INSN_IF:
       fprintf(stream, "if ");
-      if (insn->out >= 0) fprintf(stream, "<phi %%%d> ", insn->out);
-      if (insn->iff.likely > 0) fprintf(stream, "<likely> ");
-      else if (insn->iff.likely < 0) fprintf(stream, "<unlikely> ");
+      if (insn->out >= 0)
+        fprintf(stream, "<phi %%%d> ", insn->out);
+      if (insn->iff.likely > 0)
+        fprintf(stream, "<likely> ");
+      else if (insn->iff.likely < 0)
+        fprintf(stream, "<unlikely> ");
       switch (insn->iff.test)
       {
         case ETH_TEST_NOTFALSE:
@@ -582,12 +586,14 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
 
       dump_ssa(ident + 2, insn->iff.thenbr, stream);
 
-      for (int i = 0; i < ident; ++i) putc(' ', stream);
+      for (int i = 0; i < ident; ++i)
+        putc(' ', stream);
       fputs("else\n", stream);
 
       dump_ssa(ident + 2, insn->iff.elsebr, stream);
 
-      for (int i = 0; i < ident; ++i) putc(' ', stream);
+      for (int i = 0; i < ident; ++i)
+        putc(' ', stream);
       fputs("end\n", stream);
       break;
 
@@ -621,19 +627,20 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
 
     case ETH_INSN_BINOP:
       fprintf(stream, "%%%d = %s %%%d %%%d;\n", insn->out,
-          eth_binop_name(insn->binop.op), insn->binop.lhs, insn->binop.rhs);
+              eth_binop_name(insn->binop.op), insn->binop.lhs, insn->binop.rhs);
       break;
 
     case ETH_INSN_UNOP:
       fprintf(stream, "%%%d = %s %%%d;\n", insn->out,
-          eth_unop_name(insn->unop.op), insn->unop.vid);
+              eth_unop_name(insn->unop.op), insn->unop.vid);
       break;
 
     case ETH_INSN_FN:
       fprintf(stream, "%%%d = fn/%d [", insn->out, insn->fn.arity);
       for (int i = 0; i < insn->fn.ncap; ++i)
       {
-        if (i > 0) fputs(", ", stream);
+        if (i > 0)
+          fputs(", ", stream);
         fprintf(stream, "%%%d", insn->fn.caps[i]);
       }
       fputs("]\n", stream);
@@ -646,7 +653,8 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
     case ETH_INSN_POP:
       for (int i = 0; i < insn->pop.n; ++i)
       {
-        if (i > 0) fputs(", ", stream);
+        if (i > 0)
+          fputs(", ", stream);
         fprintf(stream, "%%%d", insn->pop.vids[i]);
       }
       fprintf(stream, " = pop;\n");
@@ -655,7 +663,8 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
     case ETH_INSN_CAP:
       for (int i = 0; i < insn->cap.n; ++i)
       {
-        if (i > 0) fputs(", ", stream);
+        if (i > 0)
+          fputs(", ", stream);
         fprintf(stream, "%%%d", insn->cap.vids[i]);
       }
       fprintf(stream, " = cap;\n");
@@ -664,7 +673,8 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
     case ETH_INSN_LDSCP:
       for (int i = 0; i < insn->ldscp.n; ++i)
       {
-        if (i > 0) fputs(", ", stream);
+        if (i > 0)
+          fputs(", ", stream);
         fprintf(stream, "%%%d", insn->ldscp.vids[i]);
       }
       fprintf(stream, " = ldscp;\n");
@@ -683,19 +693,24 @@ dump_ssa(int ident, const eth_insn *insn, FILE *stream)
 
     case ETH_INSN_TRY:
       fprintf(stream, "try ");
-      if (insn->out >= 0) fprintf(stream, "<phi %%%d> ", insn->out);
-      if (insn->try.likely > 0) fprintf(stream, "<likely> ");
-      else if (insn->try.likely < 0) fprintf(stream, "<unlikely> ");
+      if (insn->out >= 0)
+        fprintf(stream, "<phi %%%d> ", insn->out);
+      if (insn->try.likely > 0)
+        fprintf(stream, "<likely> ");
+      else if (insn->try.likely < 0)
+        fprintf(stream, "<unlikely> ");
       fprintf(stream, "\n");
 
       dump_ssa(ident + 2, insn->try.trybr, stream);
 
-      for (int i = 0; i < ident; ++i) putc(' ', stream);
+      for (int i = 0; i < ident; ++i)
+        putc(' ', stream);
       fputs("except\n", stream);
 
       dump_ssa(ident + 2, insn->try.catchbr, stream);
 
-      for (int i = 0; i < ident; ++i) putc(' ', stream);
+      for (int i = 0; i < ident; ++i)
+        putc(' ', stream);
       fputs("end\n", stream);
       break;
 
@@ -731,4 +746,3 @@ eth_set_insn_comment(eth_insn *insn, const char *comment)
     free(insn->comment);
   insn->comment = strdup(comment);
 }
-

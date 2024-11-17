@@ -277,7 +277,6 @@ inf                                 |
 
 
 struct { return STRUCT; }
-enum   { return ENUM; }
 open   { return OPEN; }
 import { return IMPORT; }
 rec    { return REC; }

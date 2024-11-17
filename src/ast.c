@@ -15,15 +15,13 @@
  */
 #include "ether/ether.h"
 
-#include <string.h>
-#include <stdlib.h>
 #include <assert.h>
-
+#include <stdlib.h>
+#include <string.h>
 
 ETH_MODULE("ether:ast")
 
-
-eth_ast_pattern*
+eth_ast_pattern *
 eth_ast_dummy_pattern(void)
 {
   eth_ast_pattern *pat = eth_malloc(sizeof(eth_ast_pattern));
@@ -32,7 +30,7 @@ eth_ast_dummy_pattern(void)
   return pat;
 }
 
-eth_ast_pattern*
+eth_ast_pattern *
 eth_ast_ident_pattern(const char *ident)
 {
   eth_ast_pattern *pat = eth_malloc(sizeof(eth_ast_pattern));
@@ -52,16 +50,16 @@ eth_set_ident_attr(eth_ast_pattern *ident, eth_attr *attr)
   ident->ident.attr = attr;
 }
 
-eth_ast_pattern*
+eth_ast_pattern *
 eth_ast_unpack_pattern(eth_type *type, char *const fields[],
-    eth_ast_pattern *const pats[], int n)
+                       eth_ast_pattern *const pats[], int n)
 {
   eth_ast_pattern *pat = eth_malloc(sizeof(eth_ast_pattern));
   pat->rc = 0;
   pat->tag = ETH_AST_PATTERN_UNPACK;
   pat->unpack.type = type;
-  pat->unpack.fields = eth_malloc(sizeof(char*) * n);
-  pat->unpack.subpats = eth_malloc(sizeof(eth_ast_pattern*) * n);
+  pat->unpack.fields = eth_malloc(sizeof(char *) * n);
+  pat->unpack.subpats = eth_malloc(sizeof(eth_ast_pattern *) * n);
   pat->unpack.n = n;
   pat->unpack.alias = NULL;
   for (int i = 0; i < n; ++i)
@@ -72,19 +70,16 @@ eth_ast_unpack_pattern(eth_type *type, char *const fields[],
   return pat;
 }
 
-eth_ast_pattern*
-eth_ast_record_pattern(eth_ast *proto, char *const fields[],
-    eth_ast_pattern *pats[], int n)
+eth_ast_pattern *
+eth_ast_record_pattern(char *const fields[], eth_ast_pattern *pats[], int n)
 {
   eth_ast_pattern *pat = eth_malloc(sizeof(eth_ast_pattern));
   pat->rc = 0;
   pat->tag = ETH_AST_PATTERN_RECORD;
-  pat->record.fields = eth_malloc(sizeof(char*) * n);
-  pat->record.subpats = eth_malloc(sizeof(eth_ast_pattern*) * n);
+  pat->record.fields = eth_malloc(sizeof(char *) * n);
+  pat->record.subpats = eth_malloc(sizeof(eth_ast_pattern *) * n);
   pat->record.n = n;
   pat->record.alias = NULL;
-  if ((pat->record.proto = proto))
-    eth_ref_ast(proto);
   for (int i = 0; i < n; ++i)
   {
     pat->record.fields[i] = strdup(fields[i]);
@@ -93,7 +88,7 @@ eth_ast_record_pattern(eth_ast *proto, char *const fields[],
   return pat;
 }
 
-eth_ast_pattern*
+eth_ast_pattern *
 eth_ast_constant_pattern(eth_t val)
 {
   eth_ast_pattern *pat = eth_malloc(sizeof(eth_ast_pattern));
@@ -103,7 +98,7 @@ eth_ast_constant_pattern(eth_t val)
   return pat;
 }
 
-eth_ast_pattern*
+eth_ast_pattern *
 eth_ast_record_star_pattern()
 {
   eth_ast_pattern *pat = eth_malloc(sizeof(eth_ast_pattern));
@@ -183,8 +178,6 @@ destroy_ast_pattern(eth_ast_pattern *pat)
       free(pat->record.subpats);
       if (pat->record.alias)
         free(pat->record.alias);
-      if (pat->record.proto)
-        eth_unref_ast(pat->record.proto);
       break;
 
     case ETH_AST_PATTERN_RECORD_STAR:
@@ -217,7 +210,7 @@ eth_drop_ast_pattern(eth_ast_pattern *pat)
     destroy_ast_pattern(pat);
 }
 
-static inline eth_ast*
+static inline eth_ast *
 create_ast_node(eth_ast_tag tag)
 {
   eth_ast *node = eth_malloc(sizeof(eth_ast));
@@ -402,7 +395,7 @@ eth_set_ast_location(eth_ast *ast, eth_location *loc)
     eth_ref_location(loc);
 }
 
-eth_ast*
+eth_ast *
 eth_ast_cval(eth_t val)
 {
   eth_ast *ast = create_ast_node(ETH_AST_CVAL);
@@ -410,7 +403,7 @@ eth_ast_cval(eth_t val)
   return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_ident(const char *ident)
 {
   eth_ast *ast = create_ast_node(ETH_AST_IDENT);
@@ -418,13 +411,13 @@ eth_ast_ident(const char *ident)
   return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_apply(eth_ast *fn, eth_ast *const *args, int nargs)
 {
   eth_ast *ast = create_ast_node(ETH_AST_APPLY);
   eth_ref_ast(ast->apply.fn = fn);
   ast->apply.nargs = nargs;
-  ast->apply.args = eth_malloc(sizeof(eth_ast*) * nargs);
+  ast->apply.args = eth_malloc(sizeof(eth_ast *) * nargs);
   for (int i = 0; i < nargs; ++i)
     eth_ref_ast(ast->apply.args[i] = args[i]);
   return ast;
@@ -435,12 +428,12 @@ eth_ast_append_arg(eth_ast *ast, eth_ast *arg)
 {
   assert(ast->tag == ETH_AST_APPLY);
   int nargs = ast->apply.nargs + 1;
-  ast->apply.args = realloc(ast->apply.args, sizeof(eth_ast*) * (nargs + 1));
+  ast->apply.args = realloc(ast->apply.args, sizeof(eth_ast *) * (nargs + 1));
   ast->apply.args[ast->apply.nargs++] = arg;
   eth_ref_ast(arg);
 }
 
-eth_ast*
+eth_ast *
 eth_ast_if(eth_ast *cond, eth_ast *then, eth_ast *els)
 {
   eth_ast *ast = create_ast_node(ETH_AST_IF);
@@ -451,7 +444,7 @@ eth_ast_if(eth_ast *cond, eth_ast *then, eth_ast *els)
   return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_seq(eth_ast *e1, eth_ast *e2)
 {
   eth_ast *ast = create_ast_node(ETH_AST_SEQ);
@@ -460,7 +453,7 @@ eth_ast_seq(eth_ast *e1, eth_ast *e2)
   return ast;
 }
 
-static eth_ast*
+static eth_ast *
 _dig_out_body(eth_ast *ast)
 {
   if (ast->tag == ETH_AST_FN)
@@ -469,15 +462,15 @@ _dig_out_body(eth_ast *ast)
     return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_let(eth_ast_pattern *const pats[], eth_ast *const *vals, int n,
-    eth_ast *body)
+            eth_ast *body)
 {
   eth_ast *ast = create_ast_node(ETH_AST_LET);
   eth_ref_ast(ast->let.body = body);
   ast->let.n = n;
-  ast->let.pats = eth_malloc(sizeof(eth_ast_pattern*) * n);
-  ast->let.vals = eth_malloc(sizeof(eth_ast*) * n);
+  ast->let.pats = eth_malloc(sizeof(eth_ast_pattern *) * n);
+  ast->let.vals = eth_malloc(sizeof(eth_ast *) * n);
   for (int i = 0; i < n; ++i)
   {
     eth_ref_ast(ast->let.vals[i] = vals[i]);
@@ -504,16 +497,16 @@ eth_ast_let(eth_ast_pattern *const pats[], eth_ast *const *vals, int n,
   return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_letrec(eth_ast_pattern *const pats[], eth_ast *const *vals, int n,
-    eth_ast *body)
+               eth_ast *body)
 {
   eth_ast *ast = eth_ast_let(pats, vals, n, body);
   ast->tag = ETH_AST_LETREC;
   return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_binop(eth_binop op, eth_ast *lhs, eth_ast *rhs)
 {
   eth_ast *ast = create_ast_node(ETH_AST_BINOP);
@@ -523,7 +516,7 @@ eth_ast_binop(eth_binop op, eth_ast *lhs, eth_ast *rhs)
   return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_unop(eth_unop op, eth_ast *expr)
 {
   eth_ast *ast = create_ast_node(ETH_AST_UNOP);
@@ -532,11 +525,12 @@ eth_ast_unop(eth_unop op, eth_ast *expr)
   return ast;
 }
 
-eth_ast*
-eth_ast_fn_with_patterns(eth_ast_pattern *const args[], int arity, eth_ast *body)
+eth_ast *
+eth_ast_fn_with_patterns(eth_ast_pattern *const args[], int arity,
+                         eth_ast *body)
 {
   eth_ast *ast = create_ast_node(ETH_AST_FN);
-  ast->fn.args = eth_malloc(sizeof(eth_ast_pattern*) * arity);
+  ast->fn.args = eth_malloc(sizeof(eth_ast_pattern *) * arity);
   ast->fn.arity = arity;
   ast->fn.body = body;
   for (int i = 0; i < arity; ++i)
@@ -545,7 +539,7 @@ eth_ast_fn_with_patterns(eth_ast_pattern *const args[], int arity, eth_ast *body
   return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_fn(char **args, int arity, eth_ast *body)
 {
   eth_ast_pattern *pats[arity];
@@ -554,9 +548,9 @@ eth_ast_fn(char **args, int arity, eth_ast *body)
   return eth_ast_fn_with_patterns(pats, arity, body);
 }
 
-eth_ast*
+eth_ast *
 eth_ast_match(eth_ast_pattern *pat, eth_ast *expr, eth_ast *thenbr,
-    eth_ast *elsebr)
+              eth_ast *elsebr)
 {
   eth_ast *ast = create_ast_node(ETH_AST_MATCH);
   ast->match.pat = pat;
@@ -569,7 +563,7 @@ eth_ast_match(eth_ast_pattern *pat, eth_ast *expr, eth_ast *thenbr,
   return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_and(eth_ast *lhs, eth_ast *rhs)
 {
   eth_ast *ast = create_ast_node(ETH_AST_AND);
@@ -578,7 +572,7 @@ eth_ast_and(eth_ast *lhs, eth_ast *rhs)
   return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_or(eth_ast *lhs, eth_ast *rhs)
 {
   eth_ast *ast = create_ast_node(ETH_AST_OR);
@@ -587,7 +581,7 @@ eth_ast_or(eth_ast *lhs, eth_ast *rhs)
   return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_access(eth_ast *expr, const char *field)
 {
   eth_ast *ast = create_ast_node(ETH_AST_ACCESS);
@@ -596,7 +590,7 @@ eth_ast_access(eth_ast *expr, const char *field)
   return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_try(eth_ast_pattern *pat, eth_ast *try, eth_ast *catch, int likely)
 {
   // inner pattern must non-dummy because we will need that value
@@ -624,14 +618,14 @@ eth_ast_try(eth_ast_pattern *pat, eth_ast *try, eth_ast *catch, int likely)
   return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_make_record(eth_type *type, char *const fields[], eth_ast *const vals[],
-    int n)
+                    int n)
 {
   eth_ast *ast = create_ast_node(ETH_AST_MKRCRD);
   ast->mkrcrd.type = type;
-  ast->mkrcrd.fields = eth_malloc(sizeof(char*) * n);
-  ast->mkrcrd.vals = eth_malloc(sizeof(eth_ast*) * n);
+  ast->mkrcrd.fields = eth_malloc(sizeof(char *) * n);
+  ast->mkrcrd.vals = eth_malloc(sizeof(eth_ast *) * n);
   ast->mkrcrd.n = n;
   for (int i = 0; i < n; ++i)
   {
@@ -641,14 +635,14 @@ eth_ast_make_record(eth_type *type, char *const fields[], eth_ast *const vals[],
   return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_update(eth_ast *src, eth_ast *const vals[], char *const fields[], int n)
 {
   eth_ast *ast = create_ast_node(ETH_AST_UPDATE);
   eth_ref_ast(ast->update.src = src);
   ast->update.n = n;
-  ast->update.fields = eth_malloc(sizeof(char*) * n);
-  ast->update.vals = eth_malloc(sizeof(eth_ast*) * n);
+  ast->update.fields = eth_malloc(sizeof(char *) * n);
+  ast->update.vals = eth_malloc(sizeof(eth_ast *) * n);
   for (int i = 0; i < n; ++i)
   {
     ast->update.fields[i] = strdup(fields[i]);
@@ -657,7 +651,7 @@ eth_ast_update(eth_ast *src, eth_ast *const vals[], char *const fields[], int n)
   return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_assert(eth_ast *expr)
 {
   eth_ast *ast = create_ast_node(ETH_AST_ASSERT);
@@ -665,7 +659,7 @@ eth_ast_assert(eth_ast *expr)
   return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_defined(const char *ident)
 {
   eth_ast *ast = create_ast_node(ETH_AST_DEFINED);
@@ -673,7 +667,7 @@ eth_ast_defined(const char *ident)
   return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_evmac(eth_ast *expr)
 {
   eth_ast *ast = create_ast_node(ETH_AST_EVMAC);
@@ -681,19 +675,19 @@ eth_ast_evmac(eth_ast *expr)
   return ast;
 }
 
-eth_match_table*
+eth_match_table *
 eth_create_match_table(eth_ast_pattern **const tab[], eth_ast *const exprs[],
-    int h, int w)
+                       int h, int w)
 {
   eth_match_table *table = eth_malloc(sizeof(eth_match_table));
-  table->tab = eth_malloc(sizeof(eth_ast_pattern*) * h);
+  table->tab = eth_malloc(sizeof(eth_ast_pattern *) * h);
   for (int i = 0; i < h; ++i)
   {
-    table->tab[i] = eth_malloc(sizeof(eth_ast_pattern*) * w);
+    table->tab[i] = eth_malloc(sizeof(eth_ast_pattern *) * w);
     for (int j = 0; j < w; ++j)
       eth_ref_ast_pattern(table->tab[i][j] = tab[i][j]);
   }
-  table->exprs = eth_malloc(sizeof(eth_ast*) * h);
+  table->exprs = eth_malloc(sizeof(eth_ast *) * h);
   for (int i = 0; i < h; ++i)
     eth_ref_ast(table->exprs[i] = exprs[i]);
   table->w = w;
@@ -717,18 +711,18 @@ eth_destroy_match_table(eth_match_table *table)
   free(table);
 }
 
-eth_ast*
+eth_ast *
 eth_ast_multimatch(eth_match_table *table, eth_ast *const exprs[])
 {
   eth_ast *ast = create_ast_node(ETH_AST_MULTIMATCH);
   ast->multimatch.table = table;
-  ast->multimatch.exprs = eth_malloc(sizeof(eth_ast*) * table->w);
+  ast->multimatch.exprs = eth_malloc(sizeof(eth_ast *) * table->w);
   for (int i = 0; i < table->w; ++i)
     eth_ref_ast(ast->multimatch.exprs[i] = exprs[i]);
   return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_assign(const char *ident, eth_ast *val)
 {
   eth_ast *ast = create_ast_node(ETH_AST_ASSIGN);
@@ -737,7 +731,7 @@ eth_ast_assign(const char *ident, eth_ast *val)
   return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_return(eth_ast *expr)
 {
   eth_ast *ast = create_ast_node(ETH_AST_RETURN);
@@ -745,14 +739,14 @@ eth_ast_return(eth_ast *expr)
   return ast;
 }
 
-eth_ast*
+eth_ast *
 eth_ast_this()
 {
   eth_ast *ast = create_ast_node(ETH_AST_THIS);
   return ast;
 }
 
-static eth_ast_pattern*
+static eth_ast_pattern *
 ast_to_pattern(eth_ast *ast, bool *e)
 {
   switch (ast->tag)
@@ -769,25 +763,23 @@ ast_to_pattern(eth_ast *ast, bool *e)
     case ETH_AST_BINOP:
       if (ast->binop.op == ETH_CONS)
       {
-        char *fields[2] = { "car", "cdr" };
-        eth_ast_pattern *pats[2] = {
-          ast_to_pattern(ast->binop.lhs, e),
-          ast_to_pattern(ast->binop.rhs, e)
-        };
+        char *fields[2] = {"car", "cdr"};
+        eth_ast_pattern *pats[2] = {ast_to_pattern(ast->binop.lhs, e),
+                                    ast_to_pattern(ast->binop.rhs, e)};
         return eth_ast_unpack_pattern(eth_pair_type, fields, pats, 2);
       }
       break;
 
-    case ETH_AST_MKRCRD:
-    {
+    case ETH_AST_MKRCRD: {
       int n = ast->mkrcrd.n;
       eth_ast_pattern *fldpats[n];
       for (int i = 0; i < n; ++i)
         fldpats[i] = ast_to_pattern(ast->mkrcrd.vals[i], e);
       if (eth_is_tuple(ast->mkrcrd.type))
-        return eth_ast_unpack_pattern(ast->mkrcrd.type, ast->mkrcrd.fields, fldpats, n);
+        return eth_ast_unpack_pattern(ast->mkrcrd.type, ast->mkrcrd.fields,
+                                      fldpats, n);
       else if (eth_is_record(ast->mkrcrd.type))
-        return eth_ast_record_pattern(NULL, ast->mkrcrd.fields, fldpats, n);
+        return eth_ast_record_pattern(ast->mkrcrd.fields, fldpats, n);
       else
       {
         eth_error("undexpected type in record-AST");
@@ -803,7 +795,7 @@ ast_to_pattern(eth_ast *ast, bool *e)
   return eth_ast_dummy_pattern();
 }
 
-eth_ast_pattern*
+eth_ast_pattern *
 eth_ast_to_pattern(eth_ast *ast)
 {
   bool e = false;

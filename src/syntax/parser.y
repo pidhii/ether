@@ -218,7 +218,7 @@ _create_attr(int aflag, void *locpp)
 // =============================================================================
 %token START_REPL UNDEFINED
 %token START_FORMAT END_FORMAT
-%token STRUCT ENUM
+%token STRUCT
 %token THIS
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %token<number> NUMBER
@@ -384,22 +384,6 @@ Atom
   }
   | FmtString
   | RegExp
-
-  | ENUM '(' TupleAux ')' {
-    int n = $3.len;
-    char fieldsbuf[n][22];
-    char *fields[n];
-    for (int i = 0; i < n; ++i)
-    {
-      fields[i] = fieldsbuf[i];
-      sprintf(fields[i], "_%d", i+1);
-    }
-    eth_type *type = eth_unique_record_type(fields, n);
-    eth_add_method(type->methods, eth_enum_ctor_method, eth_nil);
-    $$ = eth_ast_make_record(type, fields, $3.data, n);
-    cod_vec_destroy($3);
-    LOC($$, @$);
-  }
 ;
 
 Form
@@ -915,12 +899,12 @@ AtomicPattern
         fields[i] = fieldsbuf[i];
         sprintf(fields[i], "_%d", i+1);
       }
-      $$ = eth_ast_record_pattern(NULL, fields, $2.data, n);
+      $$ = eth_ast_record_pattern(fields, $2.data, n);
     }
     cod_vec_destroy($2);
   }
   | '{' RecordPattern '}' {
-    $$ = eth_ast_record_pattern(NULL, $2.keys.data, $2.vals.data, $2.keys.len);
+    $$ = eth_ast_record_pattern($2.keys.data, $2.vals.data, $2.keys.len);
     cod_vec_iter($2.keys, i, x, free(x));
     cod_vec_destroy($2.keys);
     cod_vec_destroy($2.vals);
@@ -962,7 +946,7 @@ FormPattern
       eth_error("invalid syntax: expected identifier, got ...");
       abort();
     }
-    $$ = eth_ast_record_pattern(NULL, &$1->ident.str, &$2, 1);
+    $$ = eth_ast_record_pattern(&$1->ident.str, &$2, 1);
     eth_drop_ast_pattern($1);
   }
 ;

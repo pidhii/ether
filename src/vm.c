@@ -15,13 +15,12 @@
  */
 #include "ether/ether.h"
 
-#include <stdlib.h>
-#include <string.h>
 #include <assert.h>
 #include <math.h>
+#include <stdlib.h>
+#include <string.h>
 
 ETH_MODULE("ether:vm")
-
 
 static inline bool
 _updtrcrd(eth_t *restrict r, int out, int src, const size_t *iids,
@@ -35,7 +34,7 @@ _updtrcrd(eth_t *restrict r, int out, int src, const size_t *iids,
     size_t *restrict const ids = type->fieldids;
     const int n = type->nfields;
     assert(n > 0);
-    eth_struct *rec = eth_alloc(sizeof(eth_struct) + sizeof(eth_t)*n);
+    eth_struct *rec = eth_alloc(sizeof(eth_struct) + sizeof(eth_t) * n);
     int I = 0;
     size_t id = iids[I];
     int i;
@@ -49,7 +48,7 @@ _updtrcrd(eth_t *restrict r, int out, int src, const size_t *iids,
           test = 0;
           for (i = n - 1; i >= 0; --i)
             eth_dec(rec->data[i]);
-          eth_free(rec, sizeof(eth_struct) + sizeof(eth_t)*n);
+          eth_free(rec, sizeof(eth_struct) + sizeof(eth_t) * n);
           break;
         }
         else
@@ -82,8 +81,8 @@ _updtrcrd(eth_t *restrict r, int out, int src, const size_t *iids,
 
 // XXX BROKEN (ocasionally leaks memory)
 static inline bool
-_updtrcrd2(eth_t *restrict r, int out, int src, const size_t *iids,
-           eth_t *vals, const int N)
+_updtrcrd2(eth_t *restrict r, int out, int src, const size_t *iids, eth_t *vals,
+           const int N)
 {
   eth_t const x = r[src];
   eth_type *restrict const type = x->type;
@@ -93,7 +92,7 @@ _updtrcrd2(eth_t *restrict r, int out, int src, const size_t *iids,
     size_t *restrict const ids = type->fieldids;
     const int n = type->nfields;
     assert(n > 0);
-    eth_struct *rec = eth_alloc(sizeof(eth_struct) + sizeof(eth_t)*n);
+    eth_struct *rec = eth_alloc(sizeof(eth_struct) + sizeof(eth_t) * n);
     int I = 0;
     size_t id = iids[I];
     int i;
@@ -109,7 +108,7 @@ _updtrcrd2(eth_t *restrict r, int out, int src, const size_t *iids,
           //for (int j = 0; j < N; ++j) eth_ref(vals[j]);
           //for (int j = 0; j < i; ++j) eth_unref(rec->data[j]);
           //for (int j = 0; j < N; ++j) eth_unref(rec->data[j]);
-          eth_free(rec, sizeof(eth_struct) + sizeof(eth_t)*n);
+          eth_free(rec, sizeof(eth_struct) + sizeof(eth_t) * n);
           break;
         }
         else
@@ -136,8 +135,10 @@ _updtrcrd2(eth_t *restrict r, int out, int src, const size_t *iids,
         eth_ref(rec->data[i] = eth_tup_get(x, i));
     }
   }
-  for (int i = 0; i < N; ++i) eth_ref(vals[i]);
-  for (int i = 0; i < N; ++i) eth_unref(vals[i]);
+  for (int i = 0; i < N; ++i)
+    eth_ref(vals[i]);
+  for (int i = 0; i < N; ++i)
+    eth_unref(vals[i]);
   return test;
 }
 
@@ -164,61 +165,61 @@ eth_vm(eth_bytecode *bc)
 
   register eth_bc_insn *ip = bc->code;
   static const void *insn[] = {
-    [ETH_OPC_CVAL     ] = &&INSN_CVAL,
-    [ETH_OPC_PUSH     ] = &&INSN_PUSH,
-    [ETH_OPC_POP      ] = &&INSN_POP,
-    [ETH_OPC_APPLY    ] = &&INSN_APPLY,
-    [ETH_OPC_APPLYTC  ] = &&INSN_APPLYTC,
-    [ETH_OPC_TEST     ] = &&INSN_TEST,
-    [ETH_OPC_TESTTY   ] = &&INSN_TESTTY,
-    [ETH_OPC_TESTIS   ] = &&INSN_TESTIS,
-    [ETH_OPC_TESTEQUAL] = &&INSN_TESTEQUAL,
-    [ETH_OPC_GETTEST  ] = &&INSN_GETTEST,
-    [ETH_OPC_DUP      ] = &&INSN_DUP,
-    [ETH_OPC_JNZ      ] = &&INSN_JNZ,
-    [ETH_OPC_JZE      ] = &&INSN_JZE,
-    [ETH_OPC_JMP      ] = &&INSN_JMP,
-    [ETH_OPC_LOOP     ] = &&INSN_LOOP,
-    [ETH_OPC_REF      ] = &&INSN_REF,
-    [ETH_OPC_DEC      ] = &&INSN_DEC,
-    [ETH_OPC_UNREF    ] = &&INSN_UNREF,
-    [ETH_OPC_DROP     ] = &&INSN_DROP,
-    [ETH_OPC_RET      ] = &&INSN_RET,
-    [ETH_OPC_THIS     ] = &&INSN_THIS,
-    [ETH_OPC_ADD      ] = &&INSN_ADD,
-    [ETH_OPC_SUB      ] = &&INSN_SUB,
-    [ETH_OPC_MUL      ] = &&INSN_MUL,
-    [ETH_OPC_DIV      ] = &&INSN_DIV,
-    [ETH_OPC_MOD      ] = &&INSN_MOD,
-    [ETH_OPC_POW      ] = &&INSN_POW,
-    [ETH_OPC_LAND     ] = &&INSN_LAND,
-    [ETH_OPC_LOR      ] = &&INSN_LOR,
-    [ETH_OPC_LXOR     ] = &&INSN_LXOR,
-    [ETH_OPC_LSHL     ] = &&INSN_LSHL,
-    [ETH_OPC_LSHR     ] = &&INSN_LSHR,
-    [ETH_OPC_ASHL     ] = &&INSN_ASHL,
-    [ETH_OPC_ASHR     ] = &&INSN_ASHR,
-    [ETH_OPC_LT       ] = &&INSN_LT,
-    [ETH_OPC_LE       ] = &&INSN_LE,
-    [ETH_OPC_GT       ] = &&INSN_GT,
-    [ETH_OPC_GE       ] = &&INSN_GE,
-    [ETH_OPC_EQ       ] = &&INSN_EQ,
-    [ETH_OPC_NE       ] = &&INSN_NE,
-    [ETH_OPC_IS       ] = &&INSN_IS,
-    [ETH_OPC_EQUAL    ] = &&INSN_EQUAL,
-    [ETH_OPC_CONS     ] = &&INSN_CONS,
-    [ETH_OPC_NOT      ] = &&INSN_NOT,
-    [ETH_OPC_LNOT     ] = &&INSN_LNOT,
-    [ETH_OPC_FN       ] = &&INSN_FN,
-    [ETH_OPC_CAP      ] = &&INSN_CAP,
-    [ETH_OPC_LDSCP    ] = &&INSN_LDSCP,
-    [ETH_OPC_MKSCP    ] = &&INSN_MKSCP,
-    [ETH_OPC_LOAD     ] = &&INSN_LOAD,
-    [ETH_OPC_LOADRCRD ] = &&INSN_LOADRCRD,
-    [ETH_OPC_SETEXN   ] = &&INSN_SETEXN,
-    [ETH_OPC_GETEXN   ] = &&INSN_GETEXN,
-    [ETH_OPC_MKRCRD   ] = &&INSN_MKRCRD,
-    [ETH_OPC_UPDTRCRD ] = &&INSN_UPDTRCRD,
+      [ETH_OPC_CVAL] = &&INSN_CVAL,
+      [ETH_OPC_PUSH] = &&INSN_PUSH,
+      [ETH_OPC_POP] = &&INSN_POP,
+      [ETH_OPC_APPLY] = &&INSN_APPLY,
+      [ETH_OPC_APPLYTC] = &&INSN_APPLYTC,
+      [ETH_OPC_TEST] = &&INSN_TEST,
+      [ETH_OPC_TESTTY] = &&INSN_TESTTY,
+      [ETH_OPC_TESTIS] = &&INSN_TESTIS,
+      [ETH_OPC_TESTEQUAL] = &&INSN_TESTEQUAL,
+      [ETH_OPC_GETTEST] = &&INSN_GETTEST,
+      [ETH_OPC_DUP] = &&INSN_DUP,
+      [ETH_OPC_JNZ] = &&INSN_JNZ,
+      [ETH_OPC_JZE] = &&INSN_JZE,
+      [ETH_OPC_JMP] = &&INSN_JMP,
+      [ETH_OPC_LOOP] = &&INSN_LOOP,
+      [ETH_OPC_REF] = &&INSN_REF,
+      [ETH_OPC_DEC] = &&INSN_DEC,
+      [ETH_OPC_UNREF] = &&INSN_UNREF,
+      [ETH_OPC_DROP] = &&INSN_DROP,
+      [ETH_OPC_RET] = &&INSN_RET,
+      [ETH_OPC_THIS] = &&INSN_THIS,
+      [ETH_OPC_ADD] = &&INSN_ADD,
+      [ETH_OPC_SUB] = &&INSN_SUB,
+      [ETH_OPC_MUL] = &&INSN_MUL,
+      [ETH_OPC_DIV] = &&INSN_DIV,
+      [ETH_OPC_MOD] = &&INSN_MOD,
+      [ETH_OPC_POW] = &&INSN_POW,
+      [ETH_OPC_LAND] = &&INSN_LAND,
+      [ETH_OPC_LOR] = &&INSN_LOR,
+      [ETH_OPC_LXOR] = &&INSN_LXOR,
+      [ETH_OPC_LSHL] = &&INSN_LSHL,
+      [ETH_OPC_LSHR] = &&INSN_LSHR,
+      [ETH_OPC_ASHL] = &&INSN_ASHL,
+      [ETH_OPC_ASHR] = &&INSN_ASHR,
+      [ETH_OPC_LT] = &&INSN_LT,
+      [ETH_OPC_LE] = &&INSN_LE,
+      [ETH_OPC_GT] = &&INSN_GT,
+      [ETH_OPC_GE] = &&INSN_GE,
+      [ETH_OPC_EQ] = &&INSN_EQ,
+      [ETH_OPC_NE] = &&INSN_NE,
+      [ETH_OPC_IS] = &&INSN_IS,
+      [ETH_OPC_EQUAL] = &&INSN_EQUAL,
+      [ETH_OPC_CONS] = &&INSN_CONS,
+      [ETH_OPC_NOT] = &&INSN_NOT,
+      [ETH_OPC_LNOT] = &&INSN_LNOT,
+      [ETH_OPC_FN] = &&INSN_FN,
+      [ETH_OPC_CAP] = &&INSN_CAP,
+      [ETH_OPC_LDSCP] = &&INSN_LDSCP,
+      [ETH_OPC_MKSCP] = &&INSN_MKSCP,
+      [ETH_OPC_LOAD] = &&INSN_LOAD,
+      [ETH_OPC_LOADRCRD] = &&INSN_LOADRCRD,
+      [ETH_OPC_SETEXN] = &&INSN_SETEXN,
+      [ETH_OPC_GETEXN] = &&INSN_GETEXN,
+      [ETH_OPC_MKRCRD] = &&INSN_MKRCRD,
+      [ETH_OPC_UPDTRCRD] = &&INSN_UPDTRCRD,
   };
 #define FAST_DISPATCH_NEXT() goto *insn[(++ip)->opc]
 #define FAST_DISPATCH() goto *insn[ip->opc]
@@ -227,21 +228,21 @@ eth_vm(eth_bytecode *bc)
 #define DISPATCH() continue
 
 #define PREDICTED(opc) PREDICTED_##opc:
-#define PREDICT_NEXT(pred)             \
-  do {                                 \
-    if ((++ip)->opc == ETH_OPC_##pred) \
-      goto PREDICTED_##pred;           \
-    --ip;                              \
+#define PREDICT_NEXT(pred)                                                     \
+  do                                                                           \
+  {                                                                            \
+    if ((++ip)->opc == ETH_OPC_##pred)                                         \
+      goto PREDICTED_##pred;                                                   \
+    --ip;                                                                      \
   } while (0)
-#define PREDICT(pred)                  \
-  do {                                 \
-    if (ip->opc == ETH_OPC_##pred)     \
-      goto PREDICTED_##pred;           \
+#define PREDICT(pred)                                                          \
+  do                                                                           \
+  {                                                                            \
+    if (ip->opc == ETH_OPC_##pred)                                             \
+      goto PREDICTED_##pred;                                                   \
   } while (0)
 
-#define OP(opc) \
-  INSN_##opc:   \
-  case ETH_OPC_##opc:
+#define OP(opc) INSN_##opc : case ETH_OPC_##opc:
 
   PREDICT(POP);
   for (;;)
@@ -256,7 +257,8 @@ eth_vm(eth_bytecode *bc)
 
       OP(PUSH)
       {
-        do {
+        do
+        {
           eth_sp -= 1;
           *eth_sp = r[ip->push.vid];
           nstack += 1;
@@ -285,18 +287,19 @@ eth_vm(eth_bytecode *bc)
           r[ip->apply.out] = eth_apply(fn, nstack);
           nstack = 0;
         }
-        else if ((apply_impl = eth_find_method(fn->type->methods, eth_apply_method)))
+        else if ((apply_impl =
+                      eth_find_method(fn->type->methods, eth_apply_method)))
         {
           eth_reserve_stack(1);
           eth_sp[0] = fn;
-          r[ip->apply.out] = eth_apply(apply_impl, nstack+1);
+          r[ip->apply.out] = eth_apply(apply_impl, nstack + 1);
           nstack = 0;
         }
         else if (eth_find_method(fn->type->methods, eth_enum_ctor_method))
         {
           const int n = nstack;
           test = _updtrcrd2(r, ip->apply.out, ip->apply.fn,
-                            (const size_t*)(eth_ordsyms+1), eth_sp, n);
+                            (const size_t *)(eth_ordsyms + 1), eth_sp, n);
           if (not test)
             eth_unimplemented();
           eth_pop_stack(n);
@@ -304,8 +307,10 @@ eth_vm(eth_bytecode *bc)
         }
         else
         {
-          for (int i = 0; i < nstack; eth_ref(eth_sp[i++]));
-          for (int i = 0; i < nstack; eth_unref(eth_sp[i++]));
+          for (int i = 0; i < nstack; eth_ref(eth_sp[i++]))
+            ;
+          for (int i = 0; i < nstack; eth_unref(eth_sp[i++]))
+            ;
           r[ip->apply.out] = eth_exn(eth_sym("apply_error"));
           eth_pop_stack(nstack);
           nstack = 0;
@@ -321,7 +326,8 @@ eth_vm(eth_bytecode *bc)
         if (fn->type == eth_function_type)
         {
           eth_function *restrict func = ETH_FUNCTION(fn);
-          if (func->islam && func->clos.bc->nreg <= nreg && func->arity == nstack)
+          if (func->islam && func->clos.bc->nreg <= nreg &&
+              func->arity == nstack)
           {
             bc = func->clos.bc;
             ip = func->clos.bc->code;
@@ -337,18 +343,19 @@ eth_vm(eth_bytecode *bc)
             nstack = 0;
           }
         }
-        else if ((apply_impl = eth_find_method(fn->type->methods, eth_apply_method)))
+        else if ((apply_impl =
+                      eth_find_method(fn->type->methods, eth_apply_method)))
         {
           eth_reserve_stack(1);
           eth_sp[0] = fn;
-          r[ip->apply.out] = eth_apply(apply_impl, nstack+1);
+          r[ip->apply.out] = eth_apply(apply_impl, nstack + 1);
           nstack = 0;
         }
         else if (eth_find_method(fn->type->methods, eth_enum_ctor_method))
         {
           const int n = nstack;
           test = _updtrcrd2(r, ip->apply.out, ip->apply.fn,
-                            (const size_t*)(eth_ordsyms+1), eth_sp, n);
+                            (const size_t *)(eth_ordsyms + 1), eth_sp, n);
           if (test)
           {
             eth_pop_stack(n);
@@ -359,8 +366,10 @@ eth_vm(eth_bytecode *bc)
         }
         else
         {
-          for (int i = 0; i < nstack; eth_ref(eth_sp[i++]));
-          for (int i = 0; i < nstack; eth_unref(eth_sp[i++]));
+          for (int i = 0; i < nstack; eth_ref(eth_sp[i++]))
+            ;
+          for (int i = 0; i < nstack; eth_unref(eth_sp[i++]))
+            ;
           r[ip->apply.out] = eth_exn(eth_sym("apply_error"));
           eth_pop_stack(nstack);
           nstack = 0;
@@ -461,19 +470,16 @@ eth_vm(eth_bytecode *bc)
         FAST_DISPATCH_NEXT();
       }
 
-      OP(RET)
-      {
-        return r[ip->ret.vid];
-      }
+      OP(RET) { return r[ip->ret.vid]; }
 
-#define ARITHM_BINOP(opc, op)                                 \
-      OP(opc)                                                 \
-      {                                                       \
-        eth_number_t lhs = ETH_NUMBER(r[ip->binop.lhs])->val; \
-        eth_number_t rhs = ETH_NUMBER(r[ip->binop.rhs])->val; \
-        r[ip->binop.out] = eth_num(op);                       \
-        DISPATCH_NEXT();                                 \
-      }
+#define ARITHM_BINOP(opc, op)                                                  \
+  OP(opc)                                                                      \
+  {                                                                            \
+    eth_number_t lhs = ETH_NUMBER(r[ip->binop.lhs])->val;                      \
+    eth_number_t rhs = ETH_NUMBER(r[ip->binop.rhs])->val;                      \
+    r[ip->binop.out] = eth_num(op);                                            \
+    DISPATCH_NEXT();                                                           \
+  }
       ARITHM_BINOP(ADD, lhs + rhs)
       ARITHM_BINOP(SUB, lhs - rhs)
       ARITHM_BINOP(MUL, lhs * rhs)
@@ -482,33 +488,33 @@ eth_vm(eth_bytecode *bc)
       ARITHM_BINOP(POW, eth_pow(lhs, rhs))
       // ---
       ARITHM_BINOP(LAND, (intmax_t)lhs & (intmax_t)rhs)
-      ARITHM_BINOP(LOR,  (intmax_t)lhs | (intmax_t)rhs)
+      ARITHM_BINOP(LOR, (intmax_t)lhs | (intmax_t)rhs)
       ARITHM_BINOP(LXOR, (intmax_t)lhs ^ (intmax_t)rhs)
       ARITHM_BINOP(LSHL, (uintmax_t)lhs << (uintmax_t)rhs)
       ARITHM_BINOP(LSHR, (uintmax_t)lhs >> (uintmax_t)rhs)
       ARITHM_BINOP(ASHL, (intmax_t)lhs << (intmax_t)rhs)
       ARITHM_BINOP(ASHR, (intmax_t)lhs >> (intmax_t)rhs)
 
-#define ARITHM_CMP_BINOP(opc, op)                             \
-      OP(opc)                                                 \
-      {                                                       \
-        eth_number_t lhs = ETH_NUMBER(r[ip->binop.lhs])->val; \
-        eth_number_t rhs = ETH_NUMBER(r[ip->binop.rhs])->val; \
-        r[ip->binop.out] = eth_boolean(op);                   \
-        FAST_DISPATCH_NEXT();                                 \
-      }
+#define ARITHM_CMP_BINOP(opc, op)                                              \
+  OP(opc)                                                                      \
+  {                                                                            \
+    eth_number_t lhs = ETH_NUMBER(r[ip->binop.lhs])->val;                      \
+    eth_number_t rhs = ETH_NUMBER(r[ip->binop.rhs])->val;                      \
+    r[ip->binop.out] = eth_boolean(op);                                        \
+    FAST_DISPATCH_NEXT();                                                      \
+  }
       ARITHM_CMP_BINOP(EQ, lhs == rhs)
       ARITHM_CMP_BINOP(NE, lhs != rhs)
 
-#define ARITHM_CMP_BINOP2(opc, op)                            \
-      OP(opc)                                                 \
-      {                                                       \
-        eth_number_t lhs = ETH_NUMBER(r[ip->binop.lhs])->val; \
-        eth_t rhsval = r[ip->binop.rhs];                      \
-        eth_number_t rhs = ETH_NUMBER(rhsval)->val;           \
-        r[ip->binop.out] = op ? rhsval : eth_false;           \
-        FAST_DISPATCH_NEXT();                                 \
-      }
+#define ARITHM_CMP_BINOP2(opc, op)                                             \
+  OP(opc)                                                                      \
+  {                                                                            \
+    eth_number_t lhs = ETH_NUMBER(r[ip->binop.lhs])->val;                      \
+    eth_t rhsval = r[ip->binop.rhs];                                           \
+    eth_number_t rhs = ETH_NUMBER(rhsval)->val;                                \
+    r[ip->binop.out] = op ? rhsval : eth_false;                                \
+    FAST_DISPATCH_NEXT();                                                      \
+  }
       ARITHM_CMP_BINOP2(LT, lhs < rhs)
       ARITHM_CMP_BINOP2(LE, lhs <= rhs)
       ARITHM_CMP_BINOP2(GT, lhs > rhs)
@@ -522,7 +528,8 @@ eth_vm(eth_bytecode *bc)
 
       OP(EQUAL)
       {
-        r[ip->binop.out] = eth_boolean(eth_equal(r[ip->binop.lhs], r[ip->binop.rhs]));
+        r[ip->binop.out] =
+            eth_boolean(eth_equal(r[ip->binop.lhs], r[ip->binop.rhs]));
         FAST_DISPATCH_NEXT();
       }
 
@@ -551,7 +558,7 @@ eth_vm(eth_bytecode *bc)
         for (size_t i = 0; i < ncap; ++i)
           cap[i] = r[ip->fn.data->caps[i]];
         eth_t fn = eth_create_clos(ip->fn.data->src, ip->fn.data->bc, cap, ncap,
-            ip->fn.data->arity);
+                                   ip->fn.data->arity);
         r[ip->fn.out] = fn;
         FAST_DISPATCH_NEXT();
       }
@@ -565,7 +572,7 @@ eth_vm(eth_bytecode *bc)
       OP(LDSCP)
       {
         memcpy(r + ip->ldscp.vid0, eth_this->clos.scp->fns,
-            sizeof(eth_t) * ip->ldscp.n);
+               sizeof(eth_t) * ip->ldscp.n);
         FAST_DISPATCH_NEXT();
       }
 
@@ -580,13 +587,13 @@ eth_vm(eth_bytecode *bc)
 
       OP(LOAD)
       {
-        eth_t v = *(eth_t*)((char*)r[ip->load.vid] + ip->load.offs);
+        eth_t v = *(eth_t *)((char *)r[ip->load.vid] + ip->load.offs);
         if (v->type == eth_lazy_type)
         {
           eth_t vv = eth_get_lazy_value(v);
           eth_ref(vv);
           eth_unref(v);
-          *(eth_t*)((char*)r[ip->load.vid] + ip->load.offs) = vv;
+          *(eth_t *)((char *)r[ip->load.vid] + ip->load.offs) = vv;
           r[ip->load.out] = vv;
         }
         else
@@ -598,8 +605,7 @@ eth_vm(eth_bytecode *bc)
       {
         eth_t x = r[ip->loadrcrd.src];
         eth_type *restrict type = x->type;
-        int proto = ip->loadrcrd.proto;
-        test = eth_is_like_record(type) and (proto < 0 or type == r[proto]->type);
+        test = eth_is_like_record(type);
         if (eth_likely(test))
         {
           size_t *restrict ids = type->fieldids;
@@ -631,14 +637,15 @@ eth_vm(eth_bytecode *bc)
                 }
                 else
                   r[ip->loadrcrd.vids[I++]] = v;
-                if (I == N) break;
+                if (I == N)
+                  break;
                 id = ip->loadrcrd.ids[I];
                 ids[n] = id;
               }
             }
           }
           /*if (eth_unlikely(i == n))*/
-            /*test = 0;*/
+          /*test = 0;*/
         }
         FAST_DISPATCH_NEXT();
       }
@@ -671,8 +678,8 @@ eth_vm(eth_bytecode *bc)
 
       OP(UPDTRCRD)
       {
-        test = _updtrcrd(r, ip->updtrcrd.out, ip->updtrcrd.src, ip->updtrcrd.ids,
-                         ip->updtrcrd.vids, ip->updtrcrd.n);
+        test = _updtrcrd(r, ip->updtrcrd.out, ip->updtrcrd.src,
+                         ip->updtrcrd.ids, ip->updtrcrd.vids, ip->updtrcrd.n);
         FAST_DISPATCH_NEXT();
       }
 
@@ -687,4 +694,3 @@ eth_vm(eth_bytecode *bc)
     ip += 1;
   }
 }
-

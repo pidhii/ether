@@ -283,11 +283,7 @@ build_pattern(ir_builder *bldr, eth_ast_pattern *pat, eth_location *loc, int *e)
         pats[i] = fields[i].pat;
       }
 
-      eth_ir_node *proto = NULL;
-      if (pat->record.proto)
-        proto = build_with_toplvl(bldr, pat->record.proto, e, false);
-
-      return eth_ir_record_pattern(alias, proto, ids, pats, n);
+      return eth_ir_record_pattern(alias, ids, pats, n);
     }
 
     case ETH_AST_PATTERN_RECORD_STAR: {
@@ -1104,8 +1100,7 @@ build(ir_builder *bldr, eth_ast *ast, int *e)
         int tmpvid = new_vid(bldr);
         eth_ir_pattern *tmpid = eth_ir_ident_pattern(tmpvid);
         size_t field = eth_get_symbol_id(eth_sym(ast->access.field));
-        eth_ir_pattern *matchpat =
-            eth_ir_record_pattern(0, NULL, &field, &tmpid, 1);
+        eth_ir_pattern *matchpat = eth_ir_record_pattern(0, &field, &tmpid, 1);
         // if match succeeds return the field value
         eth_ir_node *thenbr = eth_ir_var(tmpvid);
         // else throw type error

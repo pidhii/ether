@@ -654,7 +654,7 @@ build_pattern(ssa_builder *bldr, eth_ssa_tape *tape, const eth_ir_pattern *pat,
 
       match_result mymchres = MATCH_UNKNOWN;
 #if 1
-      if (pat->record.proto == NULL and bldr->ssavinfo[expr]->type)
+      if (bldr->ssavinfo[expr]->type)
       {
         eth_type *type = bldr->ssavinfo[expr]->type;
         int nmchfields = pat->record.n;
@@ -704,10 +704,6 @@ build_pattern(ssa_builder *bldr, eth_ssa_tape *tape, const eth_ir_pattern *pat,
 #endif
 
     l_match_record_without_vinfo:;
-      int proto = -1;
-      if (pat->record.proto)
-        proto = build(bldr, tape, pat->record.proto, false, e);
-
       eth_ssa_pattern *pats[pat->record.n];
       int vids[pat->record.n];
       for (int i = 0; i < pat->record.n; ++i)
@@ -719,8 +715,7 @@ build_pattern(ssa_builder *bldr, eth_ssa_tape *tape, const eth_ir_pattern *pat,
         mymchres = combine_match_results(mymchres, submchres);
       }
       *mchres = mymchres;
-      return eth_ssa_record_pattern(proto, pat->record.ids, vids, pats,
-                                    pat->record.n);
+      return eth_ssa_record_pattern(pat->record.ids, vids, pats, pat->record.n);
     }
 
     case ETH_PATTERN_STAR:
@@ -1386,12 +1381,6 @@ is_using(eth_insn *insn, int vid)
             if (insn->iff.update.vids[i] == vid)
               return true;
           }
-          break;
-
-        case ETH_TEST_MATCH:
-          if (insn->iff.pat->tag == ETH_PATTERN_RECORD &&
-              vid == insn->iff.pat->record.proto)
-            return true;
           break;
 
         default:
