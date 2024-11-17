@@ -276,7 +276,9 @@ _strstr_opt(void)
   if (p)
   {
     eth_t val = eth_num(p - eth_str_cstr(x));
-    ret = eth_create_record(Some->type, &val);
+    eth_reserve_stack(1);
+    eth_sp[0] = val;
+    ret = eth_apply(Some, 1);
   }
   else
     ret = eth_false;

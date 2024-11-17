@@ -21,9 +21,7 @@
 
 #include <codeine/vec.h>
 
-
 ETH_MODULE("ether:io");
-
 
 static eth_t
 _read_line_of(void)
@@ -54,8 +52,10 @@ _read_line_of(void)
       switch (err)
       {
         case EBADF:
-        case EINVAL: return eth_exn(eth_invalid_argument());
-        default: return eth_system_error(err);
+        case EINVAL:
+          return eth_exn(eth_invalid_argument());
+        default:
+          return eth_system_error(err);
       }
     }
   }
@@ -92,7 +92,7 @@ _read_of(void)
     return eth_exn(eth_invalid_argument());
   }
 
-  cod_vec(char*) bufs;
+  cod_vec(char *) bufs;
   cod_vec(size_t) buflens;
   size_t nread = 0;
   size_t nleft = size;
@@ -126,7 +126,8 @@ _read_of(void)
       {
         eth_unref(file);
         eth_unref(n);
-        for (size_t i = 0; i < bufs.len; free(bufs.data[i++]));
+        for (size_t i = 0; i < bufs.len; free(bufs.data[i++]))
+          ;
         cod_vec_destroy(bufs);
         cod_vec_destroy(buflens);
         return eth_exn(eth_system_error(0));
@@ -135,12 +136,12 @@ _read_of(void)
     cod_vec_push(bufs, buf);
     cod_vec_push(buflens, nrd);
   }
-        /*return eth_exn(eth_sym("end_of_file"));*/
+  /*return eth_exn(eth_sym("end_of_file"));*/
   eth_unref(file);
   eth_unref(n);
 
   // TODO optimize for the case when there is only one buffer read
-  char *res = eth_malloc(nread+1);
+  char *res = eth_malloc(nread + 1);
   char *p = res;
   for (size_t i = 0; i < bufs.len; ++i)
   {
@@ -154,59 +155,57 @@ _read_of(void)
   return eth_create_string_from_ptr2(res, nread);
 }
 
-#define DEF_READ_NUM(NAME, TYPE)                       \
-  static eth_t                                         \
-  _read_##NAME##_of(void)                              \
-  {                                                    \
-    eth_use_symbol(end_of_file);                       \
-    eth_use_symbol(Failure);                           \
-                                                       \
-    eth_args args = eth_start(1);                      \
-    eth_t file = eth_arg2(args, eth_file_type);        \
-    FILE *stream = eth_get_file_stream(file);          \
-    TYPE buf;                                          \
-    size_t nrd = fread(&buf, sizeof(TYPE), 1, stream); \
-    if (nrd == 0)                                      \
-    {                                                  \
-      if (feof(stream))                                \
-        eth_throw(args, end_of_file);                  \
-      else if (ferror(stream))                         \
-        eth_throw(args, eth_system_error(0));          \
-    }                                                  \
-    else if (nrd != 1)                                 \
-    {                                                  \
-      eth_throw(args, Failure);                        \
-    }                                                  \
-    eth_return(args, eth_num(buf));                    \
+#define DEF_READ_NUM(NAME, TYPE)                                               \
+  static eth_t _read_##NAME##_of(void)                                         \
+  {                                                                            \
+    eth_use_symbol(end_of_file);                                               \
+    eth_use_symbol(Failure);                                                   \
+                                                                               \
+    eth_args args = eth_start(1);                                              \
+    eth_t file = eth_arg2(args, eth_file_type);                                \
+    FILE *stream = eth_get_file_stream(file);                                  \
+    TYPE buf;                                                                  \
+    size_t nrd = fread(&buf, sizeof(TYPE), 1, stream);                         \
+    if (nrd == 0)                                                              \
+    {                                                                          \
+      if (feof(stream))                                                        \
+        eth_throw(args, end_of_file);                                          \
+      else if (ferror(stream))                                                 \
+        eth_throw(args, eth_system_error(0));                                  \
+    }                                                                          \
+    else if (nrd != 1)                                                         \
+    {                                                                          \
+      eth_throw(args, Failure);                                                \
+    }                                                                          \
+    eth_return(args, eth_num(buf));                                            \
   }
 
-#define DEF_WRITE_NUM(NAME, TYPE)                     \
-  static eth_t                                        \
-  _write_##NAME##_to(void)                            \
-  {                                                   \
-    eth_args args = eth_start(2);                     \
-    eth_t file = eth_arg2(args, eth_file_type);       \
-    eth_t num = eth_arg2(args, eth_number_type);      \
-    FILE *stream = eth_get_file_stream(file);         \
-    TYPE buf = eth_num_val(num);                      \
-    clearerr(stream);                                 \
-    errno = 0;                                        \
-    size_t nwr = fwrite(&buf, sizeof buf, 1, stream); \
-    if (ferror(stream))                               \
-    {                                                 \
-      switch (errno)                                  \
-      {                                               \
-        case EINVAL:                                  \
-        case EBADF:                                   \
-          eth_throw(args, eth_invalid_argument());    \
-      }                                               \
-      eth_throw(args, eth_system_error(0));           \
-    }                                                 \
-    eth_return(args, eth_nil);                        \
+#define DEF_WRITE_NUM(NAME, TYPE)                                              \
+  static eth_t _write_##NAME##_to(void)                                        \
+  {                                                                            \
+    eth_args args = eth_start(2);                                              \
+    eth_t file = eth_arg2(args, eth_file_type);                                \
+    eth_t num = eth_arg2(args, eth_number_type);                               \
+    FILE *stream = eth_get_file_stream(file);                                  \
+    TYPE buf = eth_num_val(num);                                               \
+    clearerr(stream);                                                          \
+    errno = 0;                                                                 \
+    size_t nwr = fwrite(&buf, sizeof buf, 1, stream);                          \
+    if (ferror(stream))                                                        \
+    {                                                                          \
+      switch (errno)                                                           \
+      {                                                                        \
+        case EINVAL:                                                           \
+        case EBADF:                                                            \
+          eth_throw(args, eth_invalid_argument());                             \
+      }                                                                        \
+      eth_throw(args, eth_system_error(0));                                    \
+    }                                                                          \
+    eth_return(args, eth_nil);                                                 \
   }
 
-#define DEF_READ_WRITE_NUM(NAME, TYPE) \
-  DEF_READ_NUM(NAME, TYPE) \
+#define DEF_READ_WRITE_NUM(NAME, TYPE)                                         \
+  DEF_READ_NUM(NAME, TYPE)                                                     \
   DEF_WRITE_NUM(NAME, TYPE)
 
 DEF_READ_WRITE_NUM(int8, int8_t);
@@ -219,7 +218,6 @@ DEF_READ_WRITE_NUM(uint32, uint32_t);
 DEF_READ_WRITE_NUM(uint64, uint64_t);
 DEF_READ_WRITE_NUM(float, float);
 DEF_READ_WRITE_NUM(double, double);
-
 
 static eth_t
 _read_file(void)
@@ -235,13 +233,17 @@ _read_file(void)
 
   errno = 0;
   long start = ftell(stream);
-  if (errno) goto error;
+  if (errno)
+    goto error;
   fseek(stream, 0, SEEK_END);
-  if (errno) goto error;
+  if (errno)
+    goto error;
   long end = ftell(stream);
-  if (errno) goto error;
+  if (errno)
+    goto error;
   fseek(stream, start, SEEK_SET);
-  if (errno) goto error;
+  if (errno)
+    goto error;
 
   char *buf = eth_malloc(end - start + 1);
   size_t nrd = fread(buf, 1, end - start, stream);
@@ -300,9 +302,11 @@ _printf_aux(void)
   char *fmt = ETH_STRING(data->fmt)->cstr;
   int n = data->n;
   /*return _fmt(fmt, n, stream);*/
-  for (int i = 0; i < n; eth_ref(eth_sp[i++]));
+  for (int i = 0; i < n; eth_ref(eth_sp[i++]))
+    ;
   int ok = eth_format(stream, fmt, eth_sp, n);
-  for (int i = 0; i < n; eth_unref(eth_sp[i++]));
+  for (int i = 0; i < n; eth_unref(eth_sp[i++]))
+    ;
   eth_pop_stack(n);
   return ok ? eth_nil : eth_exn(Format_error);
 }
@@ -330,7 +334,7 @@ _printf(void)
     data->file = file;
     data->n = n;
     eth_pop_stack(2);
-    return eth_create_proc(_printf_aux, n, data, (void*)destroy_format_data);
+    return eth_create_proc(_printf_aux, n, data, (void *)destroy_format_data);
   }
 }
 
@@ -387,7 +391,8 @@ _seek(void)
   eth_t file = eth_arg2(args, eth_file_type);
   eth_t whence = eth_arg2(args, eth_number_type);
   eth_t offs = eth_arg2(args, eth_number_type);
-  int ret = fseek(eth_get_file_stream(file), eth_num_val(whence), eth_num_val(offs));
+  int ret =
+      fseek(eth_get_file_stream(file), eth_num_val(whence), eth_num_val(offs));
   int err = errno;
   if (ret)
   {
@@ -447,7 +452,8 @@ ether_module(eth_module *mod, eth_root *toplvl)
   eth_define(mod, "__seek", eth_proc(_seek, 3));
   eth_define(mod, "flush", eth_proc(_flush, 1));
 
-  eth_module *aux = eth_load_module_from_script2(toplvl, "./lib.eth", NULL, mod);
+  eth_module *aux =
+      eth_load_module_from_script2(toplvl, "./lib.eth", NULL, mod);
   if (not aux)
     return -1;
   eth_copy_defs(aux, mod);

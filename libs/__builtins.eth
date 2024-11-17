@@ -36,6 +36,7 @@ let pub __builtin fn (not) x = not x in
 
 
 --let pub (∘) f g x = f (g x)
+let pub fn (>>) f g x = g (f x) in
 
 let pub fn list x =
   if x is of (_ :: _) then
@@ -219,8 +220,8 @@ let pub fn type_error nil = raise `type_error in
 
 
 
-let pub some = enum (nil) in
-let pub system_error = enum (nil) in
+let pub fn some x = {some = x} in
+let pub fn system_error x = {system_error = x} in
 
 nil
 

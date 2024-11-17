@@ -50,7 +50,6 @@
 -- * memq?
 --
 -- Searching:
--- * rev_filter
 -- * filter
 -- * remove
 -- * insert
@@ -79,7 +78,7 @@ let pub rev_append = __rev_append in
 let rec pub fn fold_map f z xs =
   if let x :: xs' = xs then
     let (x', z') = f z x in
-    x' :: fold_map f z' xs'
+    x' :: lazy fold_map f z' xs'
   else []
 in
 
@@ -92,49 +91,65 @@ let pub fn init n f =
 in
 
 let pub fn unfold_left f z =
-  (fn z acc ->
+  let rec fn loop z acc =
     if let (z, x) = f z then
-      this z (x :: acc)
+      loop z (x :: acc)
     else acc
-  ) z []
+  in loop z []
 in
-
 
 let rec pub fn unfold_right f z =
   if let (x, z) = f z then
-    x :: unfold_right f z
+    x :: lazy unfold_right f z
   else []
 in
 
-let pub fn range (from .. to) =
-  (fn i acc ->
-    if i < from then acc
-    else this (i - 1) (i :: acc)
-  ) to []
+let rec pub fn range rng =
+  if let (from .. to) = rng then
+    if from <= to then
+      from :: lazy range (from+1 .. to)
+    else nil
+  else if let (from ..*) = rng then
+    from :: lazy range (from+1 ..*)
+  else if let (*.. to) = rng then
+    to :: lazy range (*.. to-1)
+  else
+    invalid_argument nil
 in
 
-let pub fn linspace from to n =
+let pub fn linspace (from .. to) n =
   let {fma} = import 'math' in
   let dx = (to - from) / (n - 1) in
-  unfold_left (fn i -> if i >= 0 then (i - 1, fma  dx i from)) (n - 1)
+  unfold_left (fn i -> if i >= 0 then (i - 1, fma dx i from)) (n - 1)
 in
 
 let pub fn rev xs = rev_append xs nil in
+
 let rec pub fn append xs ys =
   if let x::xs = xs then
-    x :: append xs ys
+    x :: lazy append xs ys
   else ys
 in
 
+let rec pub fn map f xs =
+  if let x :: xs = xs then
+    f x :: lazy map f xs
+  else nil
+in
 
-let pub rev_map = __rev_map in
-let pub fn map f xs = rev $ rev_map f xs in
+let pub fn mapi f xs =
+  let rec fn loop i xs =
+    if let x :: xs = xs then
+      f i x :: lazy loop (i+1) xs
+    else nil
+  in loop 0 xs
+in
 
-let pub rev_mapi = __rev_mapi in
-let pub fn mapi f xs = rev $ rev_mapi f xs in
-
-let pub rev_map2 = __rev_map2 in
-let pub fn map2 f xs ys = rev $ rev_map2 f xs ys in
+let rec pub fn map2 f xs ys =
+  if let (x :: xs, y :: ys) = (xs, ys) then
+    f x y :: lazy map2 f xs ys
+  else nil
+in
 
 let pub rev_zip = __rev_zip in
 let pub fn zip f ltup = rev $ rev_zip f ltup in
@@ -142,7 +157,7 @@ let pub fn zip f ltup = rev $ rev_zip f ltup in
 let pub fold_zip = __fold_zip in
 
 let rec pub fn iter f xs =
-  if let x::xs = xs then (
+  if let x :: xs = xs then (
     f x;
     iter f xs
   )
@@ -157,63 +172,40 @@ let rec pub fn iteri f xs =
   ) 0 xs
 in
 
-let rec pub fn rev_flat_map f xs =
-  (fn ys xs acc ->
-    if let y::ys = ys then
-      this ys xs (y :: acc)
-    else if let x::xs = xs then
-      this (f x) xs acc
-    else acc
-  ) [] xs []
-in
-
 let rec pub fn flat_map f xs =
-  if let x::xs = xs then
-    if xs is nil then f x
-    else append (f x) (flat_map f xs)
+  if let x :: xs = xs then
+    let ys = f x in
+    if pair? ys then
+      append ys (lazy flat_map f xs)
+    else
+      flat_map f xs
   else nil
 in
 
 let pub flatten = flat_map id in
-let pub rev_filter_map = __rev_filter_map in
-let pub fn filter_map f xs = rev $ rev_filter_map f xs in
 
-let pub fn fold_left f z xs =
-  {help|
-  = List.fold_left
-
-  == DESCRIPTION
-  It takes the second argument and the first item of the list and applies the
-  function to them, then feeds the function with this result and the second
-  argument and so on:
-
-    fold_left f z xs = f (... (f (f z x1) x2)) xn
-
-  See _scan_left_ for intermediate results.
-
-  == SYNOPSIS
-
-    fold_left (z -> x -> z) z [x] -> z
-  |help};
-  (fn xs acc ->
-    if let x::xs = xs then
-      this xs (f acc x)
-    else acc
-  ) xs z
+let rec pub fn filter_map f xs =
+  if let x :: xs = xs then
+    if let some y = f x then
+      y :: lazy filter_map f xs
+    else filter_map f xs
+  else nil
 in
 
-let pub fn fold_left2 f z xs ys =
-  (fn xs ys acc ->
-    if let x :: xs = xs then
-      if let y :: ys = ys then
-        this xs ys (f acc x y)
-      else acc
-    else acc
-  ) xs ys z
+let rec pub fn fold_left f z xs =
+  if let x :: xs = xs then
+    fold_left f (f z x) xs
+  else z
+in
+
+let rec pub fn fold_left2 f z xs ys =
+  if let (x :: xs, y :: ys) = (xs, ys) then
+    fold_left2 f (f z x y) xs ys
+  else z
 in
 
 let rec pub fn fold_right f z xs =
-  if let x::xs = xs then
+  if let x :: xs = xs then
     f x (fold_right f z xs)
   else z
 in
@@ -226,49 +218,10 @@ let rec pub fn fold_right2 f z xs ys =
   else z
 in
 
-let pub fn reduce_left f xs =
-  if let x::xs = xs then fold_left f x xs
-  else invalid_argument nil
-in
-
-let pub fn reduce_left' f xs =
-  if let x::xs = xs then fold_left f x xs
-  else let [x] = xs in x
-in
-
-let fn reduce_right_aux f =
-  let rec fn aux xs =
-    if let x::(_::_ as xs) = xs then
-      f x (aux xs)
-    else car xs
-  in aux
-in
-
-let pub fn reduce_right f xs =
-  if let x::(_::_ as xs) = xs then
-    f x (reduce_right_aux f xs)
-  else invalid_argument nil
-in
-
-let pub fn reduce_right' f xs =
-  if let x::(_::_ as xs) = xs then
-    f x (reduce_right_aux f xs)
-  else let [x] = xs in x
-in
-
-let pub fn rev_scan_left f z xs =
-  (fn z xs acc ->
-    if let x :: xs = xs then
-      let z = f z x in
-      this z xs (z :: acc)
-    else acc
-  ) z xs []
-in
-
 let rec pub fn scan_left f z xs =
-  if let x::xs = xs then
+  if let x :: xs = xs then
     let z = f z x in
-    z :: scan_left f z xs
+    z :: lazy scan_left f z xs
   else nil
 in
 
@@ -280,25 +233,19 @@ let rec pub fn scan_right f z xs =
   else nil
 in
 
-let pub fn rev_take n xs =
-  (fn n xs acc ->
-    if n > 0 then
-      let x::xs = xs in
-      this (n - 1) xs (x :: acc)
-    else acc
-  ) n xs []
-in
-
 let rec pub fn take n xs =
   if n > 0 then
-    let x::xs = xs in
-    x :: take (n - 1) xs
-  else []
+    if let x :: xs = xs then
+      x :: lazy take (n - 1) xs
+    else nil
+  else nil
 in
 
 let rec pub fn drop n xs =
   if n > 0 then
-    drop (n - 1) (cdr xs)
+    if let x :: xs = xs then
+      drop (n - 1) xs
+    else nil
   else xs
 in
 
@@ -326,32 +273,31 @@ let rec pub fn memq? a xs =
   else false
 in
 
-let pub fn rev_filter f xs =
-  (fn xs acc ->
-    if let x :: xs = xs then
-      this xs (if f x then x :: acc else acc)
-    else acc
-  ) xs nil
+let rec pub fn filter f xs =
+  if let x :: xs = xs then
+    if f x then
+      x :: lazy filter f xs
+    else
+      filter f xs
+  else nil
 in
 
-let pub fn filter f xs = rev $ rev_filter f xs in
-
 let rec pub fn remove f xs =
-  if let x::xs = xs then
+  if let x :: xs = xs then
     if f x then xs
-    else x :: remove f xs
+    else x :: lazy remove f xs
   else []
 in
 
 let rec pub fn insert cmp x ys =
-  if let y::ys' = ys then
+  if let y :: ys' = ys then
     if cmp x y then x :: ys
-    else y :: insert cmp x ys'
+    else y :: lazy insert cmp x ys'
   else [x]
 in
 
 let rec pub fn find_opt p xs =
-  if let x::xs = xs then
+  if let x :: xs = xs then
     if p x then some x
     else find_opt p xs
   else false
@@ -394,20 +340,13 @@ in
 --in
 
 let pub fn partition p xs =
-  (fn xs acc1 acc2 ->
-    if let x::xs = xs then
-      if p x then
-        this xs (x :: acc1) acc2
-      else
-        this xs acc1 (x :: acc2)
-    else (rev acc1, rev acc2)
-  ) xs [] []
+  (filter p xs, filter (fn x -> not p x) xs)
 in
 
 let pub fn merge cmp xs ys =
   (fn xs ys acc ->
-    if let x::xs' = xs then
-      if let y::ys' = ys then
+    if let x :: xs' = xs then
+      if let y :: ys' = ys then
         if cmp x y
         then this xs' ys (x::acc)
         else this xs  ys' (y::acc)
@@ -464,16 +403,16 @@ in
 let rec pub fn transpose xs =
   if let xs :: xss = xs then
     if let x :: xs = xs then
-      let fn f l = if let hd::_ = l then some hd in
-      let head = x :: filter_map f xss in
-      let fn f l = if let _::tl = l then some tl in
-      let tail = transpose (xs :: filter_map f xss) in
+      let fn f l = if let hd :: _ = l then some hd in
+      let head = x :: (list $ filter_map f xss) in
+      let fn f l = if let _ :: tl = l then some tl in
+      let tail = transpose (xs :: (list $ filter_map f xss)) in
       head :: tail
     else transpose xss
   else []
 in
 
-let pub fn get l k = car $  drop k l in
+let pub fn get l k = car $ drop k l in
 
 let pub list = list in -- not to hide the builtin `list` by module name
 

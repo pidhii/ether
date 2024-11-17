@@ -50,25 +50,32 @@ let string = import 'string' in
 
 let pub fopen = __open in
 
-let pub fn read_line = read_line_of stdin in
-let pub fn read_line_opt =
-  try some (read_line ())
-  except `end_of_file -> false
-in
-let pub fn read_line_of_opt file =
-  try some (read_line_of file)
-  except `end_of_file -> false
-in
 
-let pub read = read_of stdin in
-let pub fn read_opt n =
-  try some (read n)
-  except `end_of_file -> false
-in
+let pub fn read n = read_of stdin n in
+
+
 let pub fn read_of_opt file n =
   try some (read_of file n)
   except `end_of_file -> false
 in
+let pub fn read_opt n = read_of_opt stdin n in
+
+
+let pub fn read_line = read_line_of stdin in
+
+
+let pub fn read_line_of_opt file =
+  try some (read_line_of file)
+  except `end_of_file -> false
+in
+let pub fn read_line_opt = read_line_of_opt stdin in
+
+let rec pub fn read_lines_of file =
+  if let some line = read_line_of_opt file then
+    line :: lazy read_lines_of file
+  else nil
+in
+let pub fn read_lines = read_lines_of stdin in
 
 let pub printf = __printf stdout in
 let pub fn fprintf file = __printf file in
@@ -76,12 +83,12 @@ let pub eprintf = __printf stderr in
 
 let pub write = write_to stdout in
 
-let pub seek_set = enum (nil) in
-let pub seek_cur = enum (nil) in
-let pub seek_end = enum (nil) in
+let pub fn seek_set x = {seek_set = x} in
+let pub fn seek_cur x = {seek_cur = x} in
+let pub fn seek_end x = {seek_end = x} in
 let pub fn seek file pos =
   let (offs, whence) =
-    if let seek_set  x = pos then (x, 0)
+    if let seek_set x = pos then (x, 0)
     else if let seek_cur x = pos then (x, 1)
     else if let seek_end x = pos then (x, 2)
     else invalid_argument nil

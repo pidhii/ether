@@ -956,22 +956,13 @@ MaybeComaDots
 
 FormPattern
   : AtomicPattern
-  | AtomicPattern ArgPatternsPlus {
+  | AtomicPattern AtomicPattern {
     if ($1->tag != ETH_AST_PATTERN_IDENT)
     {
       eth_error("invalid syntax: expected identifier, got ...");
       abort();
     }
-    int n = $2.len;
-    char fieldsbuf[n][22];
-    char *fields[n];
-    for (int i = 0; i < n; ++i)
-    {
-      fields[i] = fieldsbuf[i];
-      sprintf(fields[i], "_%d", i+1);
-    }
-    $$ = eth_ast_record_pattern(eth_ast_ident($1->ident.str), fields, $2.data, n);
-    cod_vec_destroy($2);
+    $$ = eth_ast_record_pattern(NULL, &$1->ident.str, &$2, 1);
     eth_drop_ast_pattern($1);
   }
 ;

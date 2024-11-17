@@ -1,38 +1,11 @@
 
-let pub create arg =
-  {help|
-  = RegExp.create
+let pub fn create arg =
+  if let (pat, opt) = arg then
+    _create pat opt
+  else
+    _create arg 0
+in
 
-  == SYNOPSIS
-  1. `create string? -> regexp?`
-  2. `create (string?, number?) -> regexp?`
+let pub study = _study in
 
-  == DESCRIPTION
-  Compile string into regular expression. In order to specify PCRE-options use signature (2).
-
-  See available options in RegExp.pcre_*. See \`man pcre_compile` for meanings.
-  |help}
-  if let (pat, opt) = arg
-  then _create pat opt
-  else _create arg 0
-
-let pub study =
-  {help|
-  = RegExp.study
-
-  == DESCRIPTION
-  Optimize regular expression for better performance in subsequent executions.
-  JIT compilation is performed if available. This operation is "mutable", and
-  returned value \`is` the original argument. The same expression may be studied
-  multiple times, only the first study will be actually evaluated.
-
-
-  == SYNOPSIS
-
-    study regexp? -> regexp?
-
-  NOTE: regular expressions created as constants (using \`\\.../`-syntax) are
-  already studied during parsing.
-  |help}
-  _study
-
+nil

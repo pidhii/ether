@@ -1,7 +1,7 @@
 let {*} = import 'list' in
 let {*} = import 'string' in
 
-let pub invalid_option_argument = enum (nil) in
+let pub fn invalid_option_argument x = {invalid_option_argument = x} in
 
 let fn get_options cfg os =
   cfg |> iter (fn opt ->

@@ -59,31 +59,6 @@ _rev_append(void)
 }
 
 static eth_t
-_rev_map(void)
-{
-  eth_args args = eth_start(2);
-  const eth_t f = eth_arg2(args, eth_function_type);
-  const eth_t l = eth_arg(args);
-
-  eth_t acc = eth_nil;
-  eth_t it;
-  for (it = l; it->type == eth_pair_type; it = eth_cdr(it))
-  {
-    eth_reserve_stack(1);
-    eth_sp[0] = eth_car(it);
-    const eth_t v = eth_apply(f, 1);
-    if (eth_unlikely(v->type == eth_exception_type))
-    {
-      eth_drop(acc);
-      eth_rethrow(args, v);
-    }
-    acc = eth_cons(v, acc);
-  }
-
-  eth_return(args, acc);
-}
-
-static eth_t
 _rev_mapi(void)
 {
   eth_args args = eth_start(2);
@@ -275,7 +250,6 @@ ether_module(eth_module *mod, eth_root *topenv)
 
   eth_define(mod, "__len", eth_create_proc(_length, 1, NULL, NULL));
   eth_define(mod, "__rev_append", eth_create_proc(_rev_append, 2, NULL, NULL));
-  eth_define(mod, "__rev_map", eth_create_proc(_rev_map, 2, NULL, NULL));
   eth_define(mod, "__rev_mapi", eth_create_proc(_rev_mapi, 2, NULL, NULL));
   eth_define(mod, "__rev_map2", eth_create_proc(_rev_map2, 3, NULL, NULL));
   eth_define(mod, "__rev_zip", eth_create_proc(_rev_zip, 2, NULL, NULL));
