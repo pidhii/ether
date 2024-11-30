@@ -317,8 +317,8 @@ Entry
 Atom
   : SYMBOL { $$ = eth_ast_ident($1); free($1); LOC($$, @$); }
   /*| '(' Expr DDOT Expr ')' { char *fields[] = { "l", "r" }; eth_ast *vals[] = { $2, $4 }; $$ = eth_ast_make_record(eth_rangelr_type, fields, vals, 2); }*/
-  | THIS { $$ = eth_ast_this(); }
-  | '['']' { $$ = eth_ast_cval(eth_nil); }
+  | THIS { $$ = eth_ast_this(); LOC($$, @$); }
+  | '['']' { $$ = eth_ast_cval(eth_nil); LOC($$, @$); }
   | '[' List ']' {
     $$ = eth_ast_cval(eth_nil);
     cod_vec_riter($2, i, x, $$ = eth_ast_binop(ETH_CONS, x, $$));
@@ -331,6 +331,7 @@ Atom
     cod_vec_iter($2.keys, i, x, free(x));
     cod_vec_destroy($2.keys);
     cod_vec_destroy($2.vals);
+    LOC($$, @$);
   }
   | '{' Dict '}' {
     eth_ast *rbtree = eth_ast_cval(eth_get_builtin(SCANROOT, "dict"));
@@ -343,20 +344,21 @@ Atom
     $$ = rbtree;
     cod_vec_destroy($2.keys);
     cod_vec_destroy($2.vals);
+    LOC($$, @$);
   }
 
   | Tuple
 
   | Atom '.' SYMBOL {
     $$ = eth_ast_access($1, $3);
-    LOC($$, @$);
     free($3);
+    LOC($$, @$);
   }
   | Atom '.' String {
     cod_vec_push($3, 0);
     $$ = eth_ast_access($1, $3.data);
-    LOC($$, @$);
     cod_vec_destroy($3);
+    LOC($$, @$);
   }
   /*| Atom ':' SYMBOL {*/
     /*eth_ast *access = eth_ast_access($1, $3);*/
@@ -390,8 +392,8 @@ Form
   : Atom
   | Atom Args {
     $$ = eth_ast_apply($1, $2.data, $2.len);
-    LOC($$, @$);
     cod_vec_destroy($2);
+    LOC($$, @$);
   }
 ;
 
@@ -403,6 +405,7 @@ Expr
     cod_vec_iter($4.keys, i, x, free(x));
     cod_vec_destroy($4.keys);
     cod_vec_destroy($4.vals);
+    LOC($$, @$);
   }
 
   | Expr ';'
@@ -436,7 +439,7 @@ Expr
     LOC($$, @$);
   }
 
-  | ASSERT Expr { $$ = eth_ast_assert($2); }
+  | ASSERT Expr { $$ = eth_ast_assert($2); LOC($$, @$); }
 
   | Expr OR Expr { $$ = eth_ast_try(NULL, $1, $3, 0); LOC($$, @$); }
   | Expr OPAND Expr { $$ = eth_ast_and($1, $3); LOC($$, @$); }
@@ -468,9 +471,9 @@ Expr
 
   | Expr PPLUS Expr { eth_ast *args[] = { $1, $3 }; eth_ast *fn = eth_ast_ident("++"); $$ = eth_ast_apply(fn, args, 2); LOC($$, @$); }
   | Expr EQ_TILD Expr { eth_ast *args[] = { $1, $3 }; eth_ast *fn = eth_ast_ident("=~"); $$ = eth_ast_apply(fn, args, 2); LOC($$, @$); }
-  | Expr DDOT Expr { char *fields[] = { "l", "r" }; eth_ast *vals[] = { $1, $3 }; $$ = eth_ast_make_record(eth_rangelr_type, fields, vals, 2); }
-  | Expr DDDOTR  { char *fields[] = { "l" }; eth_ast *vals[] = { $1 }; $$ = eth_ast_make_record(eth_rangel_type, fields, vals, 1); }
-  | DDDOTL Expr { char *fields[] = { "r" }; eth_ast *vals[] = { $2 }; $$ = eth_ast_make_record(eth_ranger_type, fields, vals, 1); }
+  | Expr DDOT Expr { char *fields[] = { "l", "r" }; eth_ast *vals[] = { $1, $3 }; $$ = eth_ast_make_record(eth_rangelr_type, fields, vals, 2); LOC($$, @$); }
+  | Expr DDDOTR  { char *fields[] = { "l" }; eth_ast *vals[] = { $1 }; $$ = eth_ast_make_record(eth_rangel_type, fields, vals, 1); LOC($$, @$); }
+  | DDDOTL Expr { char *fields[] = { "r" }; eth_ast *vals[] = { $2 }; $$ = eth_ast_make_record(eth_ranger_type, fields, vals, 1); LOC($$, @$); }
   | '-' Expr %prec UMINUS { $$ = eth_ast_binop(ETH_SUB, eth_ast_cval(eth_num(0)), $2); LOC($$, @$); }
   | '+' Expr %prec UPLUS { $$ = eth_ast_binop(ETH_ADD, eth_ast_cval(eth_num(0)), $2); LOC($$, @$); }
 
@@ -524,6 +527,7 @@ Expr
     assert(lazy);
     eth_ast *thunk = eth_ast_fn(NULL, 0, $2);
     $$ = eth_ast_apply(eth_ast_cval(lazy), &thunk, 1);
+    LOC($$, @$);
   }
 
   | FN ArgPatterns RARROW Expr %prec FN {
@@ -552,6 +556,7 @@ Expr
     eth_ast_pattern *lhs = eth_ast_record_star_pattern();
     eth_ref_attr(lhs->recordstar.attr = eth_create_attr($1));
     $$ = eth_ast_let(&lhs, &rhs, 1, eth_ast_cval(eth_nil));
+    LOC($$, @$);
   }
 
   | IMPORT String {
@@ -560,6 +565,7 @@ Expr
     eth_ast *arg = eth_ast_cval(eth_create_string_from_ptr2($2.data, $2.len - 1));
     $2.data = NULL;
     $$ = eth_ast_evmac(eth_ast_apply(require, &arg, 1));
+    LOC($$, @$);
   }
 
   /*| Attribute IMPORT Expr AS SYMBOL {*/
@@ -585,6 +591,7 @@ Expr
     eth_ast *p[] = { eth_ast_cval(eth_num($2.len)), impl };
     $$ = eth_ast_apply(eth_ast_cval(make_method), p, 2);
     cod_vec_destroy($2);
+    LOC($$, @$);
   }
 
   | METHOD ArgPatterns RARROW UNDEFINED {
@@ -593,6 +600,7 @@ Expr
     $$ = eth_ast_apply(eth_ast_cval(make_method), p, 2);
     cod_vec_iter($2, i, x, eth_drop_ast_pattern(x));
     cod_vec_destroy($2);
+    LOC($$, @$);
   }
 
   | STRUCT Struct {
@@ -628,8 +636,9 @@ Expr
     cod_vec_destroy($2.methods);
     cod_vec_destroy($2.methimpls);
     cod_vec_destroy($2.mutfields);
-  }
 
+    LOC($$, @$);
+  }
 ;
 
 Tuple
@@ -651,8 +660,8 @@ Tuple
       }
       $$ = eth_ast_make_record(eth_tuple_type(n), fields, $2.data, n);
       cod_vec_destroy($2);
-      LOC($$, @$);
     }
+    LOC($$, @$);
   }
 ;
 
