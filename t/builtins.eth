@@ -123,8 +123,8 @@ let list_tests =
       let (a, b) = partition odd? [1, 2, 3] in
       list a eq [1, 3] && list b eq [2]
     ),
-    ("merge", fn -> merge (<) [2, 4, 5] [1, 3, 5, 6] eq [1, 2, 3, 4, 5, 5, 6]),
-    ("sort", fn -> sort (<) [1, 4, 7, 4, 3, 2, 5] eq [1, 2, 3, 4, 4, 5, 7]),
+    ("merge", fn -> list (merge (<) [2, 4, 5] [1, 3, 5, 6]) eq [1, 2, 3, 4, 5, 5, 6]),
+    ("sort", fn -> list (sort (<) [1, 4, 7, 4, 3, 2, 5]) eq [1, 2, 3, 4, 4, 5, 7]),
     ("assoc", fn ->
       let t1 = assoc "b" [("a", 1), ("b", 2), ("c", 3)] eq 2 in
       let t2 = not assoc_opt "b" [("a", 1), ("c", 3)] in

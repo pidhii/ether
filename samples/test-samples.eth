@@ -19,7 +19,7 @@ let fn test_mergesort =
     |> first
   in
 
-  let correct = sort (<) origlist in
+  let correct = list $ sort (<) origlist in
 
   assert ret eq correct
 in

@@ -105,16 +105,14 @@ let rec pub fn unfold_right f z =
 in
 
 let rec pub fn range rng =
-  if let (from .. to) = rng then
+  case rng of
+  # (from .. to) -> 
     if from <= to then
       from :: lazy range (from+1 .. to)
     else nil
-  else if let (from ..*) = rng then
-    from :: lazy range (from+1 ..*)
-  else if let (*.. to) = rng then
-    to :: lazy range (*.. to-1)
-  else
-    invalid_argument nil
+  # (from ..*) -> from :: lazy range (from+1 ..*)
+  # (*.. to) -> to :: lazy range (*.. to-1)
+  # _ -> invalid_argument nil
 in
 
 let pub fn linspace (from .. to) n =
@@ -343,23 +341,21 @@ let pub fn partition p xs =
   (filter p xs, filter (fn x -> not p x) xs)
 in
 
-let pub fn merge cmp xs ys =
-  (fn xs ys acc ->
-    if let x :: xs' = xs then
-      if let y :: ys' = ys then
-        if cmp x y
-        then this xs' ys (x::acc)
-        else this xs  ys' (y::acc)
-      else rev_append acc xs
-    else rev_append acc ys
-  ) xs ys []
+let rec pub fn merge cmp xs ys =
+  case (xs, ys) of
+  # (x :: xs', y :: ys') ->
+    if cmp x y
+    then x :: lazy merge cmp xs' ys
+    else y :: lazy merge cmp xs ys'
+  # (xs, nil) -> xs
+  # (nil, ys) -> ys
 in
 
 let split_by_half =
   let rec fn loop slow fast acc =
-    if let _::_::fast = fast then
-      let x::slow = slow in
-      loop slow fast (x::acc)
+    if let _ :: _ :: fast = fast then
+      let x :: slow = slow in
+      loop slow fast (x :: acc)
     else (acc, slow)
   in fn xs -> loop xs xs []
 in
