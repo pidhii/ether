@@ -292,6 +292,8 @@ do     { return DO; }
 lazy   { return LAZY; }
 assert { return ASSERT; }
 return { return RETURN; }
+do     { return DO; }
+done   { return DONE; }
 
 defined { return DEFINED; }
 

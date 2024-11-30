@@ -1,5 +1,5 @@
 
-open 'os'
+open 'os' in
 
 let [_ dope testDir] = command_line
 let dope = realpath(dope)

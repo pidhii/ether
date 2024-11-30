@@ -6,18 +6,15 @@ let test_sample =
   let fn do_test name thunk =
     printf "- %d " name;
     try
-      if thunk () then (
+      if thunk () then
         printf "\x1b[38;5;2;1m✓\x1b[0m\n";
         return true
-      )
-      else (
+      else
         printf "\x1b[38;5;1;1m✗\x1b[0m\n";
         return false
-      )
-    except e -> (
+    except e ->
       printf "\x1b[38;5;1;1m✗ (%w)\x1b[0m\n" e;
       return false
-    )
   in
 
   fold_left (fn (nok, nfail) (name, thunk) ->
@@ -34,9 +31,9 @@ in
 let pub fn run samples =
   let fn do_sample res (title, tlist) =
     print "";
-    if title is not nil then
-      printf "\x1b[1mTest %d\x1b[0m\n" title;
-    else nil;
+    do if title is not nil then
+      printf "\x1b[1mTest %d\x1b[0m\n" title
+    done
     sumres res (test_sample tlist)
   in
 

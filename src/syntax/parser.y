@@ -231,12 +231,11 @@ _create_attr(int aflag, void *locpp)
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %right FN
 %right IN
-%right ';'
 %nonassoc AS
 %nonassoc LARROW
 %nonassoc PUB MUT BUILTIN DEPRECATED
 %nonassoc LIST_DDOT
-%nonassoc DO
+%nonassoc DO DONE
 %nonassoc DEFINED
 %nonassoc OPEN IMPORT
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -252,6 +251,7 @@ _create_attr(int aflag, void *locpp)
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 // level 0:
 /*%right '='*/
+%right ';'
 %right OR
 %nonassoc ASSIGN '='
 %left PIPE
@@ -296,7 +296,7 @@ _create_attr(int aflag, void *locpp)
 %type<charvec> StringAux
 %type<pattern> AtomicPattern FormPattern ExprPattern
 %type<astvec> List
-%type<patvec> ArgPatterns ArgPatternsPlus TuplePatternAux
+%type<patvec> ArgPatterns TuplePatternAux
 %type<boolean> MaybeComaDots
 %type<record> Record
 %type<dict> Dict
@@ -408,7 +408,14 @@ Expr
     LOC($$, @$);
   }
 
+  | DO Expr DONE { $$ = $2; }
+  | DO Expr DONE Expr {
+    $$ = eth_ast_seq($2, $4);
+    LOC($$, @$);
+  }
+
   | Expr ';'
+
   | Expr ';' Expr {
     if (($1->tag == ETH_AST_LET || $1->tag == ETH_AST_LETREC))
     {
@@ -544,7 +551,7 @@ Expr
   | Expr PIPE Expr { if ($3->tag == ETH_AST_APPLY) { $$ = $3; eth_ast_append_arg($$, $1); } else $$ = eth_ast_apply($3, &$1, 1); LOC($$, @$); }
   | Expr '$' Expr { if ($1->tag == ETH_AST_APPLY) { $$ = $1; eth_ast_append_arg($$, $3); } else $$ = eth_ast_apply($1, &$3, 1); LOC($$, @$); }
 
-  | Attribute OPEN Atom {
+  | Attribute OPEN Atom IN Expr {
     eth_ast *rhs;
     if ($3->tag == ETH_AST_CVAL and $3->cval.val->type == eth_string_type)
     {
@@ -555,7 +562,7 @@ Expr
       rhs = $3;
     eth_ast_pattern *lhs = eth_ast_record_star_pattern();
     eth_ref_attr(lhs->recordstar.attr = eth_create_attr($1));
-    $$ = eth_ast_let(&lhs, &rhs, 1, eth_ast_cval(eth_nil));
+    $$ = eth_ast_let(&lhs, &rhs, 1, $5);
     LOC($$, @$);
   }
 
@@ -1007,18 +1014,6 @@ ArgPatterns
     cod_vec_push($$, $2);
   }
 ;
-
-ArgPatternsPlus
-  : AtomicPattern {
-    cod_vec_init($$);
-    cod_vec_push($$, $1);
-  }
-  | ArgPatternsPlus AtomicPattern {
-    $$ = $1;
-    cod_vec_push($$, $2);
-  }
-;
-
 
 RecordPattern
   /*: SYMBOL {*/
