@@ -131,6 +131,10 @@ _create_attr(int aflag, void *locpp)
     cod_vec(eth_ast*) methimpls;
     cod_vec(int) mutfields;
   } structure;
+  struct {
+    cod_vec(eth_ast_pattern*) pats;
+    cod_vec(eth_ast*) bodies;
+  } cases;
 
   cod_vec(eth_ast*) astvec;
   cod_vec(char) charvec;
@@ -220,6 +224,7 @@ _create_attr(int aflag, void *locpp)
 %token START_FORMAT END_FORMAT
 %token STRUCT
 %token THIS
+%token CASE OF
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %token<number> NUMBER
 %token<string> SYMBOL
@@ -283,7 +288,8 @@ _create_attr(int aflag, void *locpp)
 
 
 // =============================================================================
-%type<ast> Atom Form Expr Tuple
+%type<ast> Atom Form Expr Tuple Case
+%type<cases> Cases
 %type<astvec> TupleAux
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 %type<binds> Binds
@@ -400,6 +406,8 @@ Form
 Expr
   : Form
 
+  | Case
+
   | Expr WITH '{' Record '}' {
     $$ = eth_ast_update($1, $4.vals.data, $4.keys.data, $4.vals.len);
     cod_vec_iter($4.keys, i, x, free(x));
@@ -409,7 +417,7 @@ Expr
   }
 
   | DO Expr DONE { $$ = $2; }
-  | DO Expr DONE Expr {
+  | DO Expr DONE Expr %prec ';' {
     $$ = eth_ast_seq($2, $4);
     LOC($$, @$);
   }
@@ -645,6 +653,31 @@ Expr
     cod_vec_destroy($2.mutfields);
 
     LOC($$, @$);
+  }
+;
+
+Case: CASE Expr OF Cases {
+  eth_ast_pattern *tmpvar = eth_ast_ident_pattern("_");
+
+  eth_ast *body = eth_ast_cval(eth_nil);
+  for (int i = $4.bodies.len - 1; i >= 0; --i)
+    body = eth_ast_match($4.pats.data[i], eth_ast_ident("_"), $4.bodies.data[i], body);
+
+  $$ = eth_ast_match(tmpvar, $2, body, eth_ast_cval(eth_nil));
+
+  cod_vec_destroy($4.pats);
+  cod_vec_destroy($4.bodies);
+  LOC($$, @$);
+};
+
+Cases
+  : {
+    cod_vec_init($$.pats);
+    cod_vec_init($$.bodies);
+  }
+  | Cases '#' ExprPattern RARROW Expr {
+    cod_vec_push($$.pats, $3);
+    cod_vec_push($$.bodies, $5);
   }
 ;
 

@@ -294,6 +294,8 @@ assert { return ASSERT; }
 return { return RETURN; }
 do     { return DO; }
 done   { return DONE; }
+case   { return CASE; }
+of     { return OF; }
 
 defined { return DEFINED; }
 
